@@ -197,10 +197,10 @@ function uploadAnnouncementImage(?array $file): ?int {
         throw new Exception('Image upload failed. Please try again.');
     }
 
-    // 5MB max
-    $maxBytes = 5 * 1024 * 1024;
+    // 10MB max
+    $maxBytes = 10 * 1024 * 1024;
     if ($file['size'] > $maxBytes) {
-        throw new Exception('Image is too large. Maximum size is 5MB.');
+        throw new Exception('Image is too large. Maximum size is 10MB.');
     }
 
     $allowed = [
@@ -596,4 +596,257 @@ function generateCSRFToken(): string {
  */
 function verifyCSRFToken(string $token): bool {
     return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+}
+
+// ============================================================
+// HOMEPAGE SLIDESHOW (Section Editor)
+// ============================================================
+
+/**
+ * Handle an uploaded slide background — image OR video.
+ * Validates type/size, stores it under /uploads/hero-slides/.
+ * Returns ['type' => 'image'|'video', 'path' => '/uploads/hero-slides/xxx.ext'] or null if no file given.
+ * Throws an Exception with a user-friendly message on validation failure.
+ */
+function uploadHeroMedia(?array $file): ?array {
+    if (empty($file) || $file['error'] === UPLOAD_ERR_NO_FILE) {
+        return null;
+    }
+
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        // Map PHP's upload error codes to specific, actionable messages
+        // instead of a single generic "Upload failed" for every case.
+        $messages = [
+            UPLOAD_ERR_INI_SIZE   => 'The file exceeds the server\'s upload_max_filesize limit (see php.ini).',
+            UPLOAD_ERR_FORM_SIZE  => 'The file exceeds the maximum size allowed by the form.',
+            UPLOAD_ERR_PARTIAL    => 'The file was only partially uploaded. Please try again.',
+            UPLOAD_ERR_NO_TMP_DIR => 'Server is missing a temporary folder for uploads.',
+            UPLOAD_ERR_CANT_WRITE => 'Server failed to write the uploaded file to disk.',
+            UPLOAD_ERR_EXTENSION  => 'A server extension stopped the file upload.',
+        ];
+        $msg = $messages[$file['error']] ?? ('Upload failed (error code ' . $file['error'] . ').');
+        throw new Exception($msg);
+    }
+
+    $allowedImages = [
+        'image/jpeg' => 'jpg',
+        'image/png'  => 'png',
+        'image/gif'  => 'gif',
+        'image/webp' => 'webp',
+    ];
+    $allowedVideos = [
+        'video/mp4'       => 'mp4',
+        'video/webm'      => 'webm',
+        'video/quicktime' => 'mov',
+    ];
+
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime  = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+
+    if (isset($allowedImages[$mime])) {
+        $type = 'image';
+        $ext  = $allowedImages[$mime];
+        $maxBytes = 10 * 1024 * 1024; // 10MB
+    } elseif (isset($allowedVideos[$mime])) {
+        $type = 'video';
+        $ext  = $allowedVideos[$mime];
+        $maxBytes = 50 * 1024 * 1024; // 50MB
+    } else {
+        throw new Exception('Unsupported file type. Allowed: JPG, PNG, GIF, WEBP, MP4, WEBM, MOV.');
+    }
+
+    if ($file['size'] > $maxBytes) {
+        throw new Exception('File is too large. Maximum size is ' . ($type === 'video' ? '50MB for video' : '10MB for images') . '.');
+    }
+
+    $filename = bin2hex(random_bytes(16)) . '.' . $ext;
+    $uploadDir = __DIR__ . '/../uploads/hero-slides/';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+
+    $destination = $uploadDir . $filename;
+    if (!move_uploaded_file($file['tmp_name'], $destination)) {
+        throw new Exception('Failed to save the uploaded file.');
+    }
+
+    return ['type' => $type, 'path' => '/uploads/hero-slides/' . $filename];
+}
+
+/**
+ * Get all hero slides, ordered for display.
+ * Pass $publishedOnly = true for the public homepage query.
+ */
+function getHeroSlides(bool $publishedOnly = false): array {
+    try {
+        $db = getDB();
+        $sql = "SELECT * FROM hero_slides";
+        if ($publishedOnly) {
+            $sql .= " WHERE status = 'published'";
+        }
+        $sql .= " ORDER BY display_order ASC, slide_id ASC";
+        $stmt = $db->query($sql);
+        return $stmt->fetchAll();
+    } catch (Exception $e) {
+        error_log('Get hero slides error: ' . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Get a single hero slide by ID.
+ */
+function getHeroSlideById(int $id): ?array {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("SELECT * FROM hero_slides WHERE slide_id = ?");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    } catch (Exception $e) {
+        error_log('Get hero slide error: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Create a new hero slide. Returns the new slide_id, or false on failure.
+ * $data keys: title, subtitle, btn1_text, btn1_link, btn2_text, btn2_link, status, show_on_mobile
+ * $media: ['type' => 'image'|'video', 'path' => '...'] from uploadHeroMedia()
+ */
+function createHeroSlide(array $data, array $media): int|false {
+    try {
+        $db = getDB();
+
+        $stmt = $db->query("SELECT COALESCE(MAX(display_order), 0) + 1 AS next_order FROM hero_slides");
+        $nextOrder = (int)$stmt->fetch()['next_order'];
+
+        $stmt = $db->prepare("
+            INSERT INTO hero_slides
+                (media_type, media_path, title, subtitle, btn1_text, btn1_link, btn2_text, btn2_link,
+                 display_order, status, show_on_mobile, created_by, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        ");
+        $stmt->execute([
+            $media['type'],
+            $media['path'],
+            $data['title'] !== '' ? $data['title'] : null,
+            $data['subtitle'] !== '' ? $data['subtitle'] : null,
+            $data['btn1_text'] !== '' ? $data['btn1_text'] : null,
+            $data['btn1_link'] !== '' ? $data['btn1_link'] : null,
+            $data['btn2_text'] !== '' ? $data['btn2_text'] : null,
+            $data['btn2_link'] !== '' ? $data['btn2_link'] : null,
+            $nextOrder,
+            $data['status'] ?? 'published',
+            !empty($data['show_on_mobile']) ? 1 : 0,
+            $_SESSION['user_id'] ?? null,
+        ]);
+
+        $newId = (int)$db->lastInsertId();
+        logActivity($_SESSION['user_id'], 'CREATE', 'hero_slides', $newId, 'Added a new slideshow slide');
+        return $newId;
+    } catch (Exception $e) {
+        error_log('Create hero slide error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Update an existing hero slide. $media is null if no new file was uploaded
+ * (keeps the existing media_path/media_type).
+ */
+function updateHeroSlide(int $id, array $data, ?array $media = null): bool {
+    try {
+        $db = getDB();
+        $existing = getHeroSlideById($id);
+        if (!$existing) return false;
+
+        $mediaType = $media['type'] ?? $existing['media_type'];
+        $mediaPath = $media['path'] ?? $existing['media_path'];
+
+        $stmt = $db->prepare("
+            UPDATE hero_slides SET
+                media_type = ?, media_path = ?, title = ?, subtitle = ?,
+                btn1_text = ?, btn1_link = ?, btn2_text = ?, btn2_link = ?,
+                status = ?, show_on_mobile = ?
+            WHERE slide_id = ?
+        ");
+        $stmt->execute([
+            $mediaType,
+            $mediaPath,
+            ($data['title'] ?? '') !== '' ? $data['title'] : null,
+            ($data['subtitle'] ?? '') !== '' ? $data['subtitle'] : null,
+            ($data['btn1_text'] ?? '') !== '' ? $data['btn1_text'] : null,
+            ($data['btn1_link'] ?? '') !== '' ? $data['btn1_link'] : null,
+            ($data['btn2_text'] ?? '') !== '' ? $data['btn2_text'] : null,
+            ($data['btn2_link'] ?? '') !== '' ? $data['btn2_link'] : null,
+            $data['status'] ?? 'published',
+            !empty($data['show_on_mobile']) ? 1 : 0,
+            $id,
+        ]);
+
+        // Remove the old file if it was replaced
+        if ($media !== null && $existing['media_path'] && $existing['media_path'] !== $mediaPath) {
+            $oldFile = __DIR__ . '/..' . $existing['media_path'];
+            if (is_file($oldFile)) @unlink($oldFile);
+        }
+
+        logActivity($_SESSION['user_id'], 'UPDATE', 'hero_slides', $id, 'Updated slideshow slide');
+        return true;
+    } catch (Exception $e) {
+        error_log('Update hero slide error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Delete a hero slide and its uploaded media file.
+ */
+function deleteHeroSlide(int $id): bool {
+    try {
+        $db = getDB();
+        $slide = getHeroSlideById($id);
+        if (!$slide) return false;
+
+        $stmt = $db->prepare("DELETE FROM hero_slides WHERE slide_id = ?");
+        $result = $stmt->execute([$id]);
+
+        if ($result) {
+            if (!empty($slide['media_path'])) {
+                $file = __DIR__ . '/..' . $slide['media_path'];
+                if (is_file($file)) @unlink($file);
+            }
+            logActivity($_SESSION['user_id'], 'DELETE', 'hero_slides', $id, 'Deleted slideshow slide');
+        }
+
+        return $result;
+    } catch (Exception $e) {
+        error_log('Delete hero slide error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Persist a new slide order. $orderedIds is an array of slide_id values
+ * in the order they should appear (index 0 = first).
+ */
+function reorderHeroSlides(array $orderedIds): bool {
+    try {
+        $db = getDB();
+        $db->beginTransaction();
+
+        $stmt = $db->prepare("UPDATE hero_slides SET display_order = ? WHERE slide_id = ?");
+        foreach ($orderedIds as $position => $slideId) {
+            $stmt->execute([$position + 1, (int)$slideId]);
+        }
+
+        $db->commit();
+        logActivity($_SESSION['user_id'], 'UPDATE', 'hero_slides', null, 'Reordered slideshow slides');
+        return true;
+    } catch (Exception $e) {
+        if (isset($db) && $db->inTransaction()) $db->rollBack();
+        error_log('Reorder hero slides error: ' . $e->getMessage());
+        return false;
+    }
 }

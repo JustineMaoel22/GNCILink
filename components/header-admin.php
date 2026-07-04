@@ -20,7 +20,7 @@ $csrfToken   = generateCSRFToken();
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/header-admin-style.css">
-
+    <link rel="icon" type="image/x-icon" href="../assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
 
@@ -67,6 +67,11 @@ $csrfToken   = generateCSRFToken();
         <li>
             <a href="/admin/events.php" class="sidebar-link <?= $currentPage === 'events' ? 'active' : '' ?>">
                 <i class="bi bi-calendar-event-fill"></i> Events
+            </a>
+        </li>
+        <li>
+            <a href="/admin/section-edit.php" class="sidebar-link <?= $currentPage === 'section-edit' ? 'active' : '' ?>">
+                <i class="bi bi-grid-1x2"></i> Section Editor
             </a>
         </li>
     </ul>

@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/config/config.php';
 
-// Fetch the latest published announcements for the public homepage
+// ---------------------------------------------------------------
+// Fetch the latest published admin announcements
+// ---------------------------------------------------------------
 try {
     $db = getDB();
     $stmt = $db->query("
@@ -12,12 +14,123 @@ try {
         LEFT JOIN media_library m ON a.featured_image = m.media_id
         WHERE a.status = 'published'
         ORDER BY COALESCE(a.published_at, a.created_at) DESC
-        LIMIT 3
+        LIMIT 6
     ");
-    $publicAnnouncements = $stmt->fetchAll();
+    $dbAnnouncements = $stmt->fetchAll();
 } catch (Exception $e) {
-    $publicAnnouncements = [];
+    $dbAnnouncements = [];
 }
+
+// Normalize DB rows into the shared feed shape
+$publicAnnouncements = [];
+foreach ($dbAnnouncements as $ann) {
+    $excerpt = strip_tags($ann['content']);
+    $excerpt = mb_strlen($excerpt) > 110 ? mb_substr($excerpt, 0, 110) . '…' : $excerpt;
+    $publicAnnouncements[] = [
+        'source'     => 'admin',
+        'title'      => $ann['title'],
+        'excerpt'    => $excerpt,
+        'image_path' => $ann['image_path'],
+        'date'       => $ann['published_at'] ?? $ann['created_at'],
+        'link'       => 'announcement.php?slug=' . urlencode($ann['slug']),
+    ];
+}
+
+// ---------------------------------------------------------------
+// Fetch the latest Facebook Page posts (cached to avoid rate limits)
+// ---------------------------------------------------------------
+function getFacebookPosts(): array {
+    $pageId      = '403969556396264';      // define these in config.php
+    $accessToken = 'EAAjxjZAhVjfsBR8Fe3JZBECx60dvOxCco6EroVvHAiwmDXEKwFTZA3wlzM1CObBjx1bf3ZCtC4t6r48UjU9zYtGWGFk2Ff79lGbDqGBAZBlZAWxmyMDT4IrtdeA8YqghPZAKguoZAFDcuAZBt4j4NZAOZCFGe5E6jtxV1loT2Elr2IhOfo5k7oyuOswV8RPuvam';
+    $cacheFile   = __DIR__ . '/cache/fb_posts_cache.json';
+    $cacheTtl    = 600; // 10 minutes
+
+    if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTtl)) {
+        $cached = json_decode(file_get_contents($cacheFile), true);
+        if ($cached !== null) return $cached;
+    }
+
+    $url = "https://graph.facebook.com/v19.0/{$pageId}/posts"
+         . "?fields=message,created_time,permalink_url,full_picture&limit=6"
+         . "&access_token={$accessToken}";
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    $raw = curl_exec($ch);
+    $curlErr = curl_error($ch);
+    curl_close($ch);
+
+    if ($raw === false) {
+        error_log("Facebook fetch failed: $curlErr");
+        return file_exists($cacheFile) ? (json_decode(file_get_contents($cacheFile), true) ?? []) : [];
+    }
+
+    $response = json_decode($raw, true);
+
+    if (isset($response['error'])) {
+        error_log("Facebook API error: " . $response['error']['message']);
+        return file_exists($cacheFile) ? (json_decode(file_get_contents($cacheFile), true) ?? []) : [];
+    }
+
+    $posts = [];
+    if (!empty($response['data'])) {
+        foreach ($response['data'] as $post) {
+            if (empty($post['message'])) continue; // skip posts with no text (photo-only, etc.)
+
+            $excerpt = mb_strlen($post['message']) > 110 ? mb_substr($post['message'], 0, 110) . '…' : $post['message'];
+
+            $posts[] = [
+                'source'     => 'facebook',
+                'title'      => null,
+                'excerpt'    => $excerpt,
+                'image_path' => $post['full_picture'] ?? null,
+                'date'       => $post['created_time'],
+                'link'       => $post['permalink_url'] ?? 'https://facebook.com/' . FB_PAGE_ID,
+            ];
+        }
+    }
+
+    $cacheDir = dirname($cacheFile);
+    if (!is_dir($cacheDir)) mkdir($cacheDir, 0755, true);
+    file_put_contents($cacheFile, json_encode($posts));
+
+    return $posts;
+}
+
+$facebookPosts = getFacebookPosts();
+
+// ---------------------------------------------------------------
+// Homepage slideshow (managed via Admin > Section Editor)
+// ---------------------------------------------------------------
+try {
+    $heroSlides = $db->query("
+        SELECT * FROM hero_slides
+        WHERE status = 'published'
+        ORDER BY display_order ASC, slide_id ASC
+    ")->fetchAll();
+} catch (Exception $e) {
+    $heroSlides = [];
+}
+
+// Lightweight mobile detection so slides marked "hide on mobile" are
+// simply not rendered on small-screen devices.
+$isMobileUA = isset($_SERVER['HTTP_USER_AGENT'])
+    && preg_match('/Mobile|Android|iPhone|iPad|iPod/i', $_SERVER['HTTP_USER_AGENT']);
+if ($isMobileUA) {
+    $heroSlides = array_values(array_filter($heroSlides, fn($s) => (int)$s['show_on_mobile'] === 1));
+}
+
+// ---------------------------------------------------------------
+// Merge + sort combined feed, newest first, capped at 6
+// ---------------------------------------------------------------
+$publicAnnouncements = array_merge($publicAnnouncements, $facebookPosts);
+usort($publicAnnouncements, function ($a, $b) {
+    return strtotime($b['date']) <=> strtotime($a['date']);
+});
+$publicAnnouncements = array_slice($publicAnnouncements, 0, 6);
 
 // ---------------------------------------------------------------
 // Events calendar (public, published only)
@@ -96,119 +209,69 @@ try {
     <link href="assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="assets/css/index-style.css?v=2" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-    <link rel="icon" type="image/x-icon" href="assets/images/logos/GNC LOGO 1.svg">
+    <link rel="icon" type="image/x-icon" href="assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
 
-    <nav class="navbar gnc-navbar sticky-top navbar-expand-lg shadow-sm">
-        <div class="container">
-            <a class="navbar-brand d-flex align-items-center gap-2 me-3">
-                <img src="assets/images/logos/GNC LOGO 1.svg" alt="GNC Logo" width="46" height="46">
-                <div class="brand-text d-none d-md-block">
-                    <span class="brand-name d-block">Guagua National Colleges, Inc.</span>
-                    <span class="brand-tagline d-block">Fides, Scientia et. Patria</span>
-                </div>
-            </a>
+    <?php include __DIR__ . '/components/index-nav.php'; ?>
 
-            <button class="navbar-toggler border-0 ms-auto me-2" type="button"
-                    data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto align-items-center">
-                    <li class="nav-item active">
-                        <a class="nav-link active" href="#">Home</a>
-                    </li>
-                    <li class="nav-item"><a class="nav-link" href="#">About</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#">Academics</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#">Admissions</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#">Student Life</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#">News & Events</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#">Contact Us</a></li>
-
-                    <li class="nav-item d-flex align-items-center">
-                        <button id="search-toggle" class="btn-search" type="button" aria-label="Search">
-                            <i class="bi bi-search"></i>
-                        </button>
-                    </li>
-                    <li class="nav-item" id="search-box-item" style="display:none;">
-                        <form class="d-flex" action="#" onsubmit="return false;">
-                            <input id="search-input" class="form-control form-control-sm"
-                                type="search" placeholder="Search…" aria-label="Search"
-                                style="min-width:160px;">
-                        </form>
-                    </li>
-
-                    <li class="nav-item ms-2">
-                        <a class="btn-portal" href="auth/login.php" target="_blank">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill" viewBox="0 0 16 16">
-                                <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
-                            </svg>
-                            Student Portal
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
+    <?php if (!empty($heroSlides)): ?>
     <div class="hero-slideshow">
-        <div class="hero-slide slide-1 active" data-slide="0">
-            <div class="slide-bg" style="background-image: url('assets/images/gnc-front.png');"></div>
+        <?php foreach ($heroSlides as $i => $slide):
+            $titleLines = $slide['title'] ? explode('|', $slide['title'], 2) : [];
+            $hasButtons = !empty($slide['btn1_text']) || !empty($slide['btn2_text']);
+        ?>
+        <div class="hero-slide <?= $i === 0 ? 'active' : '' ?>" data-slide="<?= $i ?>">
+            <?php if ($slide['media_type'] === 'video'): ?>
+                <div class="slide-video-wrap">
+                    <video
+                        class="slide-video hero-slide-video"
+                        src="<?= htmlspecialchars($slide['media_path']) ?>"
+                        <?= $slide['poster_path'] ? 'poster="' . htmlspecialchars($slide['poster_path']) . '"' : '' ?>
+                        muted loop playsinline preload="auto">
+                    </video>
+                </div>
+            <?php else: ?>
+                <div class="slide-bg" style="background-image: url('<?= htmlspecialchars($slide['media_path']) ?>');"></div>
+            <?php endif; ?>
             <div class="slide-overlay"></div>
+
+            <?php if ($titleLines || $slide['subtitle'] || $hasButtons): ?>
             <div class="container h-100">
                 <div class="hero-content">
-                    <h1 class="hero-title-gold mb-0">EMPOWERING MINDS.</h1>
-                    <h1 class="hero-title-white">INSPIRING FUTURES.</h1>
-                    <p class="hero-desc">
-                        A Legacy of academic excellence, character formation,<br>
-                        and service to the community since 1918.
-                    </p>
+                    <?php if (!empty($titleLines[0])): ?>
+                        <h1 class="hero-title-gold mb-0"><?= htmlspecialchars($titleLines[0]) ?></h1>
+                    <?php endif; ?>
+                    <?php if (!empty($titleLines[1])): ?>
+                        <h1 class="hero-title-white"><?= htmlspecialchars($titleLines[1]) ?></h1>
+                    <?php endif; ?>
+                    <?php if (!empty($slide['subtitle'])): ?>
+                        <p class="hero-desc"><?= nl2br(htmlspecialchars($slide['subtitle'])) ?></p>
+                    <?php endif; ?>
+                    <?php if ($hasButtons): ?>
                     <div class="hero-ctas">
-                        <a href="auth/login.php" target="_blank" class="btn-enroll">
-                            ENROLL NOW
-                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
-                                <path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/>
-                            </svg>
-                        </a>
-                        <a href="#about" class="btn-explore">EXPLORE GNC</a>
+                        <?php if (!empty($slide['btn1_text'])): ?>
+                            <a href="<?= htmlspecialchars($slide['btn1_link'] ?: '#') ?>" class="btn-enroll">
+                                <?= htmlspecialchars($slide['btn1_text']) ?>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
+                                    <path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/>
+                                </svg>
+                            </a>
+                        <?php endif; ?>
+                        <?php if (!empty($slide['btn2_text'])): ?>
+                            <a href="<?= htmlspecialchars($slide['btn2_link'] ?: '#') ?>" class="btn-explore">
+                                <?= htmlspecialchars($slide['btn2_text']) ?>
+                            </a>
+                        <?php endif; ?>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
+            <?php endif; ?>
         </div>
+        <?php endforeach; ?>
 
-        <div class="hero-slide slide-2" data-slide="1">
-            <div class="slide-video-wrap">
-                <video
-                    id="hero-video"
-                    class="slide-video"
-                    src="assets/video/gnc-drone-shot.mov"
-                    poster="assets/images/gnc-front.png"
-                    muted
-                    loop
-                    playsinline
-                    preload="auto">
-                </video>
-            </div>
-            <div class="slide-overlay"></div>
-        </div>
-
-        <div class="hero-slide slide-3" data-slide="2">
-            <div class="slide-bg" style="background-image: url('assets/images/the-devs.png');"></div>
-            <div class="slide-overlay"></div>
-            <div class="container h-100">
-                <div class="hero-content">
-                    <h1 class="hero-title-gold mb-0">MEET THE</h1>
-                    <h1 class="hero-title-white">DEVELOPERS.</h1>
-                    <p class="hero-desc">
-                        We are a dedicated group of student developers working together as part of our capstone project to design and develop our school’s official website. Our goal is to create a clean, user-friendly, and informative platform that effectively represents the school and serves the needs of students, teachers, parents, and visitors.
-                    </p>
-                </div>
-            </div>
-        </div>
-
+        <?php if (count($heroSlides) > 1): ?>
         <button type="button" class="slide-arrow slide-arrow-prev" id="slide-prev" aria-label="Previous slide">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
                 <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
@@ -221,25 +284,22 @@ try {
         </button>
 
         <div class="hero-dots">
-            <span class="active" data-target="0"></span>
-            <span data-target="1"></span>
-            <span data-target="2"></span>
+            <?php foreach ($heroSlides as $i => $slide): ?>
+                <span class="<?= $i === 0 ? 'active' : '' ?>" data-target="<?= $i ?>"></span>
+            <?php endforeach; ?>
         </div>
+        <?php endif; ?>
     </div>
+    <?php endif; ?>
 
-    <div class="gnc-pillars">
+<div class="gnc-pillars">
         <div class="container">
             <div class="pillar-card">
                 <div class="pillar-wrap">
 
                     <div class="pillar-item">
                         <div class="pillar-icon-wrap fides-bg">
-                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 2L12 6" stroke="#C9A84C" stroke-width="2" stroke-linecap="round"/>
-                                <path d="M10 4H14" stroke="#C9A84C" stroke-width="2" stroke-linecap="round"/>
-                                <path d="M4 22V12L12 6L20 12V22" stroke="#C9A84C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                                <path d="M9 22V17C9 15.9 9.9 15 11 15H13C14.1 15 15 15.9 15 17V22" stroke="#C9A84C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
+                            <img src="assets/images/svg/church.svg" alt="Fides" class="pillar-icon-img">
                         </div>
                         <div>
                             <p class="pillar-title fides-color">FIDES</p>
@@ -249,11 +309,7 @@ try {
 
                     <div class="pillar-item">
                         <div class="pillar-icon-wrap scientia-bg">
-                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M2 6C2 6 5 5 7 5C9 5 11 6 12 7C13 6 15 5 17 5C19 5 22 6 22 6V19C22 19 19 18 17 18C15 18 13 19 12 20C11 19 9 18 7 18C5 18 2 19 2 19V6Z"
-                                    stroke="#094024" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                                <path d="M12 7V20" stroke="#094024" stroke-width="1.8" stroke-linecap="round"/>
-                            </svg>
+                            <img src="assets/images/svg/book.svg" alt="Scientia" class="pillar-icon-img">
                         </div>
                         <div>
                             <p class="pillar-title scientia-color">SCIENTIA</p>
@@ -263,11 +319,7 @@ try {
 
                     <div class="pillar-item">
                         <div class="pillar-icon-wrap patria-bg">
-                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M5 19L19 5" stroke="#b03030" stroke-width="1.8" stroke-linecap="round"/>
-                                <path d="M19 19L5 5" stroke="#b03030" stroke-width="1.8" stroke-linecap="round"/>
-                                <circle cx="12" cy="12" r="3" stroke="#b03030" stroke-width="1.8"/>
-                            </svg>
+                            <img src="assets/images/svg/swords.svg" alt="Patria" class="pillar-icon-img">
                         </div>
                         <div>
                             <p class="pillar-title patria-color">PATRIA</p>
@@ -278,11 +330,11 @@ try {
                 </div>
             </div>
         </div>
-    </div>  
+    </div>
 
     <section class="gnc-announcements py-5" id="announcements">
         <div class="container">
-            <div class="text-center mb-5" style="max-width:640px;margin-left:auto;margin-right:auto;">
+            <div class="gnc-announce-header mb-5" style="background-image: url('assets/images/Section Header.png')">
                 <span class="d-inline-block mb-2" style="color:#EABA3B;font-weight:700;font-size:.78rem;letter-spacing:1.5px;text-transform:uppercase;">
                     Latest Announcements
                 </span>
@@ -294,33 +346,52 @@ try {
                 <p class="text-muted text-center">No announcements have been posted yet. Please check back soon.</p>
             <?php else: ?>
                 <div class="row g-4">
-                    <?php foreach ($publicAnnouncements as $ann):
-                        $excerpt = strip_tags($ann['content']);
-                        $excerpt = mb_strlen($excerpt) > 110 ? mb_substr($excerpt, 0, 110) . '…' : $excerpt;
-                        $dateToShow = $ann['published_at'] ?? $ann['created_at'];
+                    <?php foreach ($publicAnnouncements as $item):
+                        $isFacebook = $item['source'] === 'facebook';
+                        $linkTarget = $isFacebook ? ' target="_blank" rel="noopener"' : '';
                     ?>
                     <div class="col-md-6 col-lg-4">
-                        <div class="card h-100 border-0 gnc-announcement-card">
-                            <?php if (!empty($ann['image_path'])): ?>
-                            <img src="<?= htmlspecialchars($ann['image_path']) ?>" class="card-img-top" alt="<?= htmlspecialchars($ann['title']) ?>" style="height:190px;object-fit:cover;">
+                        <div class="card h-100 border-0 gnc-announcement-card" style="position:relative;">
+
+                            <?php if ($isFacebook): ?>
+                            <span style="position:absolute;top:12px;left:12px;z-index:2;background:#1877F2;color:#fff;
+                                width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                box-shadow:0 2px 6px rgba(0,0,0,.25);" title="Posted on Facebook">
+                                <i class="bi bi-facebook" style="font-size:1.05rem;"></i>
+                            </span>
+                            <?php endif; ?>
+
+                            <?php if (!empty($item['image_path'])): ?>
+                            <img src="<?= htmlspecialchars($item['image_path']) ?>" class="card-img-top" alt="<?= htmlspecialchars($item['title'] ?? 'Facebook post') ?>" style="height:280px;object-fit:cover;">
                             <?php else: ?>
-                            <div style="height:190px;background:#eef1ee;display:flex;align-items:center;justify-content:center;color:#c3cbc4;">
-                                <i class="bi bi-megaphone" style="font-size:2rem;"></i>
+                            <div style="height:280px;background:#eef1ee;display:flex;align-items:center;justify-content:center;color:#c3cbc4;">
+                                <i class="bi <?= $isFacebook ? 'bi-facebook' : 'bi-megaphone' ?>" style="font-size:2rem;"></i>
                             </div>
                             <?php endif; ?>
+
                             <div class="card-body d-flex flex-column">
-                                <small class="text-muted mb-2">
-                                    <i class="bi bi-calendar3"></i> <?= date('F d, Y', strtotime($dateToShow)) ?>
+                                <small class="text-muted mb-2 d-flex align-items-center gap-2">
+                                    <i class="bi bi-calendar3"></i> <?= date('F d, Y', strtotime($item['date'])) ?>
+                                    <?php if ($isFacebook): ?>
+                                        <span class="badge" style="background:#e7f0fe;color:#1877F2;font-weight:600;font-size:.68rem;">
+                                            <i class="bi bi-facebook"></i> From Facebook
+                                        </span>
+                                    <?php endif; ?>
                                 </small>
+
+                                <?php if (!empty($item['title'])): ?>
                                 <h5 class="card-title" style="font-family: 'Noto Serif', serif; color:#094024;font-weight:800;">
-                                    <?= htmlspecialchars($ann['title']) ?>
+                                    <?= htmlspecialchars($item['title']) ?>
                                 </h5>
+                                <?php endif; ?>
+
                                 <p class="card-text text-muted flex-grow-1" style="font-family: 'Inter', sans-serif; font-size: .9rem;">
-                                    <?= htmlspecialchars($excerpt) ?>
+                                    <?= htmlspecialchars($item['excerpt']) ?>
                                 </p>
-                                <a href="announcement.php?slug=<?= urlencode($ann['slug']) ?>" class="gnc-read-more text-decoration-none mt-1">
-                                    Read More
-                                    <i class="bi bi-arrow-right"></i>
+
+                                <a href="<?= htmlspecialchars($item['link']) ?>"<?= $linkTarget ?> class="gnc-read-more text-decoration-none mt-1">
+                                    <?= $isFacebook ? 'View on Facebook' : 'Read More' ?>
+                                    <i class="bi <?= $isFacebook ? 'bi-box-arrow-up-right' : 'bi-arrow-right' ?>"></i>
                                 </a>
                             </div>
                         </div>
@@ -420,7 +491,127 @@ try {
         </div>
     </section>
 
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 my-4 px-4 py-3"
+            style="background:#eaf5ee;border:1px solid rgba(9,64,36,0.15);border-radius:10px;">
+            <div class="d-flex align-items-center gap-3">
+                <span style="background:#094024;color:#fff;width:28px;height:28px;border-radius:50%;
+                            display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-info-lg" style="font-size:0.85rem;"></i>
+                </span>
+                <span style="font-size:0.88rem;color:#333;">
+                    These announcements are posted on our official Facebook page. For more updates and interactions, follow us on Facebook
+                </span>
+            </div>
+            <a href="https://www.facebook.com/gnc.edu.ph" target="_blank" rel="noopener"
+            class="d-flex align-items-center gap-2 text-decoration-none flex-shrink-0"
+            style="background:#fff;border:1px solid rgba(9,64,36,0.15);border-radius:8px;
+                    padding:0.55rem 1.1rem;font-weight:600;font-size:0.85rem;color:#1a1a1a;">
+                <i class="bi bi-facebook" style="color:#1877F2;font-size:1rem;"></i>
+                Follow us on Facebook
+                <i class="bi bi-box-arrow-up-right" style="font-size:0.8rem;color:#555;"></i>
+            </a>
+        </div>
+    </div>
+
+    <section class="gnc-programs py-5" id="programs">
+        <div class="container">
+            <div class="gnc-programs-header" style="background-image: url('assets/images/Section Header.png');">
+                <span class="gnc-eyebrow">Academic Programs</span>
+                <h2 class="gnc-section-title">Shaping Minds, Building Futures</h2>
+                <p class="text-muted mb-0">
+                    Explore the services, personnel, and contact information of every office within Guagua National Colleges.
+                </p>
+            </div>
+
+            <div class="row g-4 mt-2">
+                <div class="col-md-4">
+                    <div class="gnc-program-card">
+                        <div class="gnc-program-img" style="background-image:url('assets/images/basic-edu.png');"></div>
+                        <div class="gnc-program-body">
+                            <h5 class="gnc-program-title">Basic Education</h5>
+                            <p class="gnc-program-desc">
+                                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                            </p>
+                            <a href="#" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="gnc-program-card">
+                        <div class="gnc-program-img" style="background-image:url('assets/images/college-programs.png');"></div>
+                        <div class="gnc-program-body">
+                            <h5 class="gnc-program-title">College Programs</h5>
+                            <p class="gnc-program-desc">
+                                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                            </p>
+                            <a href="#" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="gnc-program-card">
+                        <div class="gnc-program-img" style="background-image:url('assets/images/graduate-school.png');"></div>
+                        <div class="gnc-program-body">
+                            <h5 class="gnc-program-title">Graduate School</h5>
+                            <p class="gnc-program-desc">
+                                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                            </p>
+                            <a href="#" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="gnc-president py-5" id="president">
+        <div class="container">
+            <div class="row align-items-center g-5">
+                <div class="col-lg-5">
+                    <div class="gnc-president-leaves"></div>
+
+                    <div class="gnc-president-label">
+                        <span class="gnc-label-bar"></span>
+                        Message from the President
+                    </div>
+
+                    <div class="gnc-president-card">
+                        <div class="gnc-president-photo-wrap">
+                            <div class="gnc-president-seal"></div>
+                            <img src="assets/images/maam-president.png" alt="Geraldine G. Lim, MBA" class="gnc-president-photo">
+                        </div>
+                        <div class="gnc-president-nameplate">
+                            <p class="gnc-president-name">Geraldine G. Lim, MBA</p>
+                            <p class="gnc-president-role">President</p>
+                            <p class="gnc-president-org">Guagua National Colleges, Inc.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <p class="gnc-president-eyebrow">A Warm Welcome to</p>
+                    <h2 class="gnc-president-title">Our New Students</h2>
+
+                    <p class="gnc-president-greeting">Welcome GNCians!</p>
+
+                    <p class="gnc-president-quote">
+                        &ldquo;Congratulations for choosing Guagua National Colleges, Inc. to take care of you and your education.
+                    </p>
+                    <p class="gnc-president-quote">
+                        Guagua National Colleges, Inc. boast of 100 plus years of giving quality education.&rdquo;
+                    </p>
+                </div>
+    </section>
+
+    <?php include __DIR__ . '/components/index-footer.php'; ?>
+
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
     <style>
+
         .gnc-cal-card, .gnc-upcoming-card {
             background:#fff; border-radius:12px;
             box-shadow:0 2px 10px rgba(0,0,0,0.06);
@@ -483,34 +674,5 @@ try {
     </style>
     
     <script src="assets/js/index.js?v=2"></script>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            document.body.addEventListener('click', async (e) => {
-                const navLink = e.target.closest('.gnc-cal-nav');
-                if (!navLink) return;
-
-                e.preventDefault(); 
-                
-                const url = navLink.href;
-
-                try {
-                    const response = await fetch(url);
-                    const html = await response.text();
-
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const newCalendar = doc.querySelector('.gnc-cal-card').innerHTML;
-
-                    document.querySelector('.gnc-cal-card').innerHTML = newCalendar;
-                    
-                    window.history.pushState({}, '', url);
-                } catch (error) {
-                    console.error('Failed to load calendar:', error);
-                    window.location.href = url;
-                }
-            });
-        });
-    </script>
 </body>
 </html>

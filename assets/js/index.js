@@ -18,97 +18,151 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    /* ── Slideshow ── */
-    const slides    = document.querySelectorAll('.hero-slide');
-    const dots      = document.querySelectorAll('.hero-dots span');
-    const prevBtn   = document.getElementById('slide-prev');
-    const nextBtn   = document.getElementById('slide-next');
-    const heroVideo = document.getElementById('hero-video');
+    /* ── Slideshow (supports any number of admin-managed slides) ── */
+    const slideshow = document.querySelector('.hero-slideshow');
 
-    let current   = 0;
-    let autoTimer = null;
-    const INTERVAL = 10000;  // 10 seconds
-    const TOTAL    = slides.length;
+    if (slideshow) {
+        const slides  = document.querySelectorAll('.hero-slide');
+        const dots    = document.querySelectorAll('.hero-dots span');
+        const prevBtn = document.getElementById('slide-prev');
+        const nextBtn = document.getElementById('slide-next');
 
-    function goTo(index, direction) {
-        const prev  = current;
-        current     = (index + TOTAL) % TOTAL;
+        let current   = 0;
+        let autoTimer = null;
+        const INTERVAL = 10000;  // 10 seconds
+        const TOTAL    = slides.length;
 
-        const leaving  = slides[prev];
-        const entering = slides[current];
+        // Any slide may contain its own <video>; look it up per-slide rather
+        // than assuming a single fixed hero video.
+        function videoIn(slideEl) {
+            return slideEl.querySelector('.hero-slide-video');
+        }
 
-        if (prev === 1 && heroVideo) heroVideo.pause();
+        function goTo(index, direction) {
+            const prev  = current;
+            current     = (index + TOTAL) % TOTAL;
+            if (current === prev) return;
 
-        leaving.classList.add(direction === 'prev' ? 'exit-right' : 'exit-left');
-        leaving.classList.remove('active');
+            const leaving  = slides[prev];
+            const entering = slides[current];
 
-        entering.classList.add(direction === 'prev' ? 'enter-from-left' : 'enter-from-right');
+            const leavingVideo = videoIn(leaving);
+            if (leavingVideo) leavingVideo.pause();
 
-        entering.getBoundingClientRect();
+            leaving.classList.add(direction === 'prev' ? 'exit-right' : 'exit-left');
+            leaving.classList.remove('active');
 
-        entering.classList.add('active');
-        entering.classList.remove('enter-from-left', 'enter-from-right');
+            entering.classList.add(direction === 'prev' ? 'enter-from-left' : 'enter-from-right');
 
-        leaving.addEventListener('transitionend', function cleanup() {
-            leaving.classList.remove('exit-left', 'exit-right');
-            leaving.removeEventListener('transitionend', cleanup);
+            entering.getBoundingClientRect();
+
+            entering.classList.add('active');
+            entering.classList.remove('enter-from-left', 'enter-from-right');
+
+            leaving.addEventListener('transitionend', function cleanup() {
+                leaving.classList.remove('exit-left', 'exit-right');
+                leaving.removeEventListener('transitionend', cleanup);
+            });
+
+            if (dots.length) {
+                dots.forEach(d => d.classList.remove('active'));
+                if (dots[current]) dots[current].classList.add('active');
+            }
+
+            const enteringVideo = videoIn(entering);
+            if (enteringVideo) {
+                enteringVideo.currentTime = 0;
+                enteringVideo.play().catch(() => {});
+            }
+
+            const content = entering.querySelector('.hero-content');
+            if (content) {
+                content.classList.remove('content-in');
+                void content.offsetWidth;
+                content.classList.add('content-in');
+            }
+        }
+
+        function startAuto() {
+            if (TOTAL <= 1) return; // nothing to rotate to
+            clearInterval(autoTimer);
+            autoTimer = setInterval(() => goTo(current + 1, 'next'), INTERVAL);
+        }
+
+        function resetAuto() {
+            startAuto();
+        }
+
+        if (prevBtn) {
+            prevBtn.addEventListener('click', function () {
+                goTo(current - 1, 'prev');
+                resetAuto();
+            });
+        }
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function () {
+                goTo(current + 1, 'next');
+                resetAuto();
+            });
+        }
+
+        dots.forEach(function (dot) {
+            dot.addEventListener('click', function () {
+                const target = parseInt(dot.dataset.target, 10);
+                if (target !== current) {
+                    goTo(target, target > current ? 'next' : 'prev');
+                    resetAuto();
+                }
+            });
         });
 
-        dots.forEach(d => d.classList.remove('active'));
-        dots[current].classList.add('active');
-
-        if (current === 1 && heroVideo) {
-            heroVideo.currentTime = 0;
-            heroVideo.play().catch(() => {});
+        if (TOTAL > 1) {
+            let touchStartX = 0;
+            slideshow.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+            slideshow.addEventListener('touchend', e => {
+                const dx = e.changedTouches[0].clientX - touchStartX;
+                if (Math.abs(dx) > 50) {
+                    dx < 0 ? goTo(current + 1, 'next') : goTo(current - 1, 'prev');
+                    resetAuto();
+                }
+            });
         }
 
-        const content = entering.querySelector('.hero-content');
-        if (content) {
-            content.classList.remove('content-in');
-            void content.offsetWidth;
-            content.classList.add('content-in');
+        if (slides.length) {
+            const firstContent = slides[0].querySelector('.hero-content');
+            if (firstContent) firstContent.classList.add('content-in');
+
+            const firstVideo = videoIn(slides[0]);
+            if (firstVideo) firstVideo.play().catch(() => {});
         }
-    }
 
-    function startAuto() {
-        clearInterval(autoTimer);
-        autoTimer = setInterval(() => goTo(current + 1, 'next'), INTERVAL);
-    }
-
-    function resetAuto() {
         startAuto();
     }
+});
 
-    prevBtn.addEventListener('click', function () {
-        goTo(current - 1, 'prev');
-        resetAuto();
-    });
-    nextBtn.addEventListener('click', function () {
-        goTo(current + 1, 'next');
-        resetAuto();
-    });
+document.addEventListener('DOMContentLoaded', () => {
+    document.body.addEventListener('click', async (e) => {
+        const navLink = e.target.closest('.gnc-cal-nav');
+        if (!navLink) return;
 
-    dots.forEach(function (dot) {
-        dot.addEventListener('click', function () {
-            const target = parseInt(dot.dataset.target, 10);
-            if (target !== current) {
-                goTo(target, target > current ? 'next' : 'prev');
-                resetAuto();
-            }
-        });
-    });
+        e.preventDefault(); 
+        
+        const url = navLink.href;
 
-    let touchStartX = 0;
-    const slideshow = document.querySelector('.hero-slideshow');
-    slideshow.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
-    slideshow.addEventListener('touchend', e => {
-        const dx = e.changedTouches[0].clientX - touchStartX;
-        if (Math.abs(dx) > 50) {
-            dx < 0 ? goTo(current + 1, 'next') : goTo(current - 1, 'prev');
-            resetAuto();
+        try {
+            const response = await fetch(url);
+            const html = await response.text();
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newCalendar = doc.querySelector('.gnc-cal-card').innerHTML;
+
+            document.querySelector('.gnc-cal-card').innerHTML = newCalendar;
+            
+            window.history.pushState({}, '', url);
+        } catch (error) {
+            console.error('Failed to load calendar:', error);
+            window.location.href = url;
         }
     });
-
-    slides[0].querySelector('.hero-content').classList.add('content-in');
-    startAuto();
 });

@@ -207,7 +207,7 @@ include __DIR__ . '/../components/header-admin.php';
             <div class="col-md-6">
               <label class="form-label">Featured Image</label>
               <input type="file" name="image" id="modal-image-input" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" style="display:block !important">
-              <div class="form-text">JPG, PNG, GIF or WEBP. Max 5MB.</div>
+              <div class="form-text">JPG, PNG, GIF or WEBP. Max 10MB.</div>
               <div id="modal-image-preview-wrap" class="mt-2" style="display:none">
                 <img id="modal-image-preview" src="" style="max-width:100px;height:80px;object-fit:cover;border-radius:6px;display:block;margin-bottom:6px">
                 <div class="form-check" id="modal-remove-image-wrap" style="display:none">
