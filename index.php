@@ -37,21 +37,28 @@ foreach ($dbAnnouncements as $ann) {
 }
 
 // ---------------------------------------------------------------
-// Fetch the latest Facebook Page posts (cached to avoid rate limits)
+// Fetch the latest Facebook Page posts (cached in the database to
+// avoid rate limits). Images are downloaded once and registered in
+// media_library — same as every other file in this project — so we
+// never depend on Facebook's short-lived signed CDN URLs at render time.
 // ---------------------------------------------------------------
 function getFacebookPosts(): array {
-    $pageId      = '403969556396264';      // define these in config.php
-    $accessToken = 'EAAjxjZAhVjfsBR8Fe3JZBECx60dvOxCco6EroVvHAiwmDXEKwFTZA3wlzM1CObBjx1bf3ZCtC4t6r48UjU9zYtGWGFk2Ff79lGbDqGBAZBlZAWxmyMDT4IrtdeA8YqghPZAKguoZAFDcuAZBt4j4NZAOZCFGe5E6jtxV1loT2Elr2IhOfo5k7oyuOswV8RPuvam';
-    $cacheFile   = __DIR__ . '/cache/fb_posts_cache.json';
-    $cacheTtl    = 600; // 10 minutes
+    $db       = getDB();
+    $cacheTtl = 600; // 10 minutes
 
-    if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTtl)) {
-        $cached = json_decode(file_get_contents($cacheFile), true);
-        if ($cached !== null) return $cached;
+    $lastFetchRow = $db->query("SELECT MAX(fetched_at) AS last_fetch FROM fb_posts_cache")->fetch();
+    $isFresh = !empty($lastFetchRow['last_fetch'])
+        && (time() - strtotime($lastFetchRow['last_fetch']) < $cacheTtl);
+
+    if ($isFresh) {
+        return fetchCachedFbPostsFromDb($db);
     }
 
+    $pageId      = $_ENV['FB_PAGE_ID'];
+    $accessToken = $_ENV['FB_ACCESS_TOKEN'];
+
     $url = "https://graph.facebook.com/v19.0/{$pageId}/posts"
-         . "?fields=message,created_time,permalink_url,full_picture&limit=6"
+         . "?fields=id,message,created_time,permalink_url,full_picture&limit=6"
          . "&access_token={$accessToken}";
 
     $ch = curl_init();
@@ -65,39 +72,134 @@ function getFacebookPosts(): array {
 
     if ($raw === false) {
         error_log("Facebook fetch failed: $curlErr");
-        return file_exists($cacheFile) ? (json_decode(file_get_contents($cacheFile), true) ?? []) : [];
+        return fetchCachedFbPostsFromDb($db); // serve whatever's already cached, even if stale
     }
 
     $response = json_decode($raw, true);
 
     if (isset($response['error'])) {
         error_log("Facebook API error: " . $response['error']['message']);
-        return file_exists($cacheFile) ? (json_decode(file_get_contents($cacheFile), true) ?? []) : [];
+        return fetchCachedFbPostsFromDb($db);
     }
 
-    $posts = [];
     if (!empty($response['data'])) {
+        $existingStmt = $db->prepare("SELECT image_media_id FROM fb_posts_cache WHERE fb_post_id = ?");
+
+        $upsertStmt = $db->prepare("
+            INSERT INTO fb_posts_cache (fb_post_id, message, image_media_id, permalink_url, created_time, fetched_at)
+            VALUES (:fb_post_id, :message, :image_media_id, :permalink_url, :created_time, NOW())
+            ON DUPLICATE KEY UPDATE
+                message         = VALUES(message),
+                permalink_url   = VALUES(permalink_url),
+                created_time    = VALUES(created_time),
+                fetched_at      = NOW(),
+                image_media_id  = COALESCE(image_media_id, VALUES(image_media_id))
+        ");
+
         foreach ($response['data'] as $post) {
-            if (empty($post['message'])) continue; // skip posts with no text (photo-only, etc.)
+            if (empty($post['message']) || empty($post['id'])) continue; // skip photo-only / malformed posts
 
-            $excerpt = mb_strlen($post['message']) > 110 ? mb_substr($post['message'], 0, 110) . '…' : $post['message'];
+            // Reuse the existing media_library row for this post if we already downloaded it
+            $existingStmt->execute([$post['id']]);
+            $imageMediaId = $existingStmt->fetchColumn() ?: null;
 
-            $posts[] = [
-                'source'     => 'facebook',
-                'title'      => null,
-                'excerpt'    => $excerpt,
-                'image_path' => $post['full_picture'] ?? null,
-                'date'       => $post['created_time'],
-                'link'       => $post['permalink_url'] ?? 'https://facebook.com/' . FB_PAGE_ID,
-            ];
+            if (empty($imageMediaId) && !empty($post['full_picture'])) {
+                $imageMediaId = downloadAndStoreFbImageAsMedia($db, $post['id'], $post['full_picture']);
+            }
+
+            $upsertStmt->execute([
+                ':fb_post_id'     => $post['id'],
+                ':message'        => $post['message'],
+                ':image_media_id' => $imageMediaId,
+                ':permalink_url'  => $post['permalink_url'] ?? null,
+                ':created_time'   => date('Y-m-d H:i:s', strtotime($post['created_time'])),
+            ]);
         }
     }
 
-    $cacheDir = dirname($cacheFile);
-    if (!is_dir($cacheDir)) mkdir($cacheDir, 0755, true);
-    file_put_contents($cacheFile, json_encode($posts));
+    return fetchCachedFbPostsFromDb($db);
+}
 
+/**
+ * Read cached FB posts back out of the database, joined against
+ * media_library for the image path — same shape as the admin
+ * announcements feed so index.php can merge/sort them together.
+ */
+function fetchCachedFbPostsFromDb(PDO $db): array {
+    $rows = $db->query("
+        SELECT f.message, f.permalink_url, f.created_time, m.file_path
+        FROM fb_posts_cache f
+        LEFT JOIN media_library m ON f.image_media_id = m.media_id
+        ORDER BY f.created_time DESC
+        LIMIT 6
+    ")->fetchAll();
+
+    $posts = [];
+    foreach ($rows as $row) {
+        $excerpt = mb_strlen($row['message']) > 110 ? mb_substr($row['message'], 0, 110) . '…' : $row['message'];
+        $posts[] = [
+            'source'     => 'facebook',
+            'title'      => null,
+            'excerpt'    => $excerpt,
+            'image_path' => $row['file_path'], // e.g. /uploads/facebook/fb_12345.jpg, or null
+            'date'       => $row['created_time'],
+            'link'       => $row['permalink_url'] ?? 'https://facebook.com/' . FB_PAGE_ID,
+        ];
+    }
     return $posts;
+}
+
+/**
+ * Download a Facebook post image once and register it in media_library,
+ * exactly like every other uploaded file in this project. Returns the
+ * new media_id, or null if the download/insert failed.
+ */
+function downloadAndStoreFbImageAsMedia(PDO $db, string $postId, string $remoteUrl): ?int {
+    $urlPath = parse_url($remoteUrl, PHP_URL_PATH) ?? '';
+    $ext = strtolower(pathinfo($urlPath, PATHINFO_EXTENSION));
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+        $ext = 'jpg';
+    }
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $remoteUrl);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    $imageData = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($imageData === false || $httpCode !== 200) {
+        error_log("Failed to download FB image for post $postId (HTTP $httpCode)");
+        return null;
+    }
+
+    $safeId   = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $postId);
+    $filename = 'fb_' . $safeId . '.' . $ext;
+
+    $destDir = UPLOAD_PATH . 'facebook/';
+    if (!is_dir($destDir)) mkdir($destDir, 0755, true);
+
+    $saved = file_put_contents($destDir . $filename, $imageData);
+    if ($saved === false) {
+        error_log("Failed to save FB image for post $postId to disk");
+        return null;
+    }
+
+    $publicPath = '/uploads/facebook/' . $filename;
+
+    try {
+        $stmt = $db->prepare("
+            INSERT INTO media_library (file_name, file_type, file_size, file_path, created_by, created_at)
+            VALUES (?, ?, ?, ?, NULL, NOW())
+        ");
+        $stmt->execute([$filename, $ext, $saved, $publicPath]);
+        return (int) $db->lastInsertId();
+    } catch (Exception $e) {
+        error_log("Failed to insert media_library row for FB post $postId: " . $e->getMessage());
+        return null;
+    }
 }
 
 $facebookPosts = getFacebookPosts();
@@ -207,7 +309,9 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guagua National Colleges</title>
     <link href="assets/css/bootstrap.min.css" rel="stylesheet">
-    <link href="assets/css/index-style.css?v=2" rel="stylesheet">
+    <link href="assets/css/navbar-style.css" rel="stylesheet">
+    <link href="assets/css/footer-style.css" rel="stylesheet">
+    <link href="assets/css/index-style.css?v=3" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="icon" type="image/x-icon" href="assets/images/logos/gnc-logo-v1.svg">
 </head>
@@ -220,19 +324,36 @@ try {
         <?php foreach ($heroSlides as $i => $slide):
             $titleLines = $slide['title'] ? explode('|', $slide['title'], 2) : [];
             $hasButtons = !empty($slide['btn1_text']) || !empty($slide['btn2_text']);
+            $isFirstSlide = $i === 0;
         ?>
-        <div class="hero-slide <?= $i === 0 ? 'active' : '' ?>" data-slide="<?= $i ?>">
+        <div class="hero-slide <?= $isFirstSlide ? 'active' : '' ?>" data-slide="<?= $i ?>">
             <?php if ($slide['media_type'] === 'video'): ?>
                 <div class="slide-video-wrap">
+                    <?php if ($isFirstSlide): ?>
                     <video
                         class="slide-video hero-slide-video"
                         src="<?= htmlspecialchars($slide['media_path']) ?>"
                         <?= $slide['poster_path'] ? 'poster="' . htmlspecialchars($slide['poster_path']) . '"' : '' ?>
                         muted loop playsinline preload="auto">
                     </video>
+                    <?php else: ?>
+                    <!-- Lazy: only slide 1 needs to load right away. Later slides get their
+                         src/poster attached by the IntersectionObserver in the script below,
+                         right before the carousel is about to bring them into view. -->
+                    <video
+                        class="slide-video hero-slide-video lazy-video"
+                        data-src="<?= htmlspecialchars($slide['media_path']) ?>"
+                        <?= $slide['poster_path'] ? 'data-poster="' . htmlspecialchars($slide['poster_path']) . '"' : '' ?>
+                        muted loop playsinline preload="none">
+                    </video>
+                    <?php endif; ?>
                 </div>
             <?php else: ?>
+                <?php if ($isFirstSlide): ?>
                 <div class="slide-bg" style="background-image: url('<?= htmlspecialchars($slide['media_path']) ?>');"></div>
+                <?php else: ?>
+                <div class="slide-bg lazy-bg" data-bg="<?= htmlspecialchars($slide['media_path']) ?>"></div>
+                <?php endif; ?>
             <?php endif; ?>
             <div class="slide-overlay"></div>
 
@@ -240,10 +361,10 @@ try {
             <div class="container h-100">
                 <div class="hero-content">
                     <?php if (!empty($titleLines[0])): ?>
-                        <h1 class="hero-title-gold mb-0"><?= htmlspecialchars($titleLines[0]) ?></h1>
+                        <h1 class="hero-title-line"><?= htmlspecialchars($titleLines[0]) ?></h1>
                     <?php endif; ?>
                     <?php if (!empty($titleLines[1])): ?>
-                        <h1 class="hero-title-white"><?= htmlspecialchars($titleLines[1]) ?></h1>
+                        <h1 class="hero-title-line"><?= htmlspecialchars($titleLines[1]) ?></h1>
                     <?php endif; ?>
                     <?php if (!empty($slide['subtitle'])): ?>
                         <p class="hero-desc"><?= nl2br(htmlspecialchars($slide['subtitle'])) ?></p>
@@ -280,7 +401,7 @@ try {
         <button type="button" class="slide-arrow slide-arrow-next" id="slide-next" aria-label="Next slide">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
                 <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
-            </svg>
+                </svg>
         </button>
 
         <div class="hero-dots">
@@ -299,7 +420,7 @@ try {
 
                     <div class="pillar-item">
                         <div class="pillar-icon-wrap fides-bg">
-                            <img src="assets/images/svg/church.svg" alt="Fides" class="pillar-icon-img">
+                            <img src="assets/images/svg/church.svg" alt="Fides" class="pillar-icon-img" loading="lazy" decoding="async">
                         </div>
                         <div>
                             <p class="pillar-title fides-color">FIDES</p>
@@ -309,7 +430,7 @@ try {
 
                     <div class="pillar-item">
                         <div class="pillar-icon-wrap scientia-bg">
-                            <img src="assets/images/svg/book.svg" alt="Scientia" class="pillar-icon-img">
+                            <img src="assets/images/svg/book.svg" alt="Scientia" class="pillar-icon-img" loading="lazy" decoding="async">
                         </div>
                         <div>
                             <p class="pillar-title scientia-color">SCIENTIA</p>
@@ -319,7 +440,7 @@ try {
 
                     <div class="pillar-item">
                         <div class="pillar-icon-wrap patria-bg">
-                            <img src="assets/images/svg/swords.svg" alt="Patria" class="pillar-icon-img">
+                            <img src="assets/images/svg/swords.svg" alt="Patria" class="pillar-icon-img" loading="lazy" decoding="async">
                         </div>
                         <div>
                             <p class="pillar-title patria-color">PATRIA</p>
@@ -334,7 +455,7 @@ try {
 
     <section class="gnc-announcements py-5" id="announcements">
         <div class="container">
-            <div class="gnc-announce-header mb-5" style="background-image: url('assets/images/Section Header.png')">
+            <div class="gnc-announce-header lazy-bg mb-5" data-bg="assets/images/Section Header.png">
                 <span class="d-inline-block mb-2" style="color:#EABA3B;font-weight:700;font-size:.78rem;letter-spacing:1.5px;text-transform:uppercase;">
                     Latest Announcements
                 </span>
@@ -353,16 +474,8 @@ try {
                     <div class="col-md-6 col-lg-4">
                         <div class="card h-100 border-0 gnc-announcement-card" style="position:relative;">
 
-                            <?php if ($isFacebook): ?>
-                            <span style="position:absolute;top:12px;left:12px;z-index:2;background:#1877F2;color:#fff;
-                                width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-                                box-shadow:0 2px 6px rgba(0,0,0,.25);" title="Posted on Facebook">
-                                <i class="bi bi-facebook" style="font-size:1.05rem;"></i>
-                            </span>
-                            <?php endif; ?>
-
                             <?php if (!empty($item['image_path'])): ?>
-                            <img src="<?= htmlspecialchars($item['image_path']) ?>" class="card-img-top" alt="<?= htmlspecialchars($item['title'] ?? 'Facebook post') ?>" style="height:280px;object-fit:cover;">
+                            <img src="<?= htmlspecialchars($item['image_path']) ?>" class="card-img-top" alt="<?= htmlspecialchars($item['title'] ?? 'Facebook post') ?>" style="height:280px;object-fit:cover;" loading="lazy" decoding="async">
                             <?php else: ?>
                             <div style="height:280px;background:#eef1ee;display:flex;align-items:center;justify-content:center;color:#c3cbc4;">
                                 <i class="bi <?= $isFacebook ? 'bi-facebook' : 'bi-megaphone' ?>" style="font-size:2rem;"></i>
@@ -516,7 +629,7 @@ try {
 
     <section class="gnc-programs py-5" id="programs">
         <div class="container">
-            <div class="gnc-programs-header" style="background-image: url('assets/images/Section Header.png');">
+            <div class="gnc-programs-header lazy-bg" data-bg="assets/images/Section Header.png">
                 <span class="gnc-eyebrow">Academic Programs</span>
                 <h2 class="gnc-section-title">Shaping Minds, Building Futures</h2>
                 <p class="text-muted mb-0">
@@ -527,7 +640,7 @@ try {
             <div class="row g-4 mt-2">
                 <div class="col-md-4">
                     <div class="gnc-program-card">
-                        <div class="gnc-program-img" style="background-image:url('assets/images/basic-edu.png');"></div>
+                        <div class="gnc-program-img lazy-bg" data-bg="assets/images/basic-edu.png"></div>
                         <div class="gnc-program-body">
                             <h5 class="gnc-program-title">Basic Education</h5>
                             <p class="gnc-program-desc">
@@ -540,7 +653,7 @@ try {
 
                 <div class="col-md-4">
                     <div class="gnc-program-card">
-                        <div class="gnc-program-img" style="background-image:url('assets/images/college-programs.png');"></div>
+                        <div class="gnc-program-img lazy-bg" data-bg="assets/images/college-programs.png"></div>
                         <div class="gnc-program-body">
                             <h5 class="gnc-program-title">College Programs</h5>
                             <p class="gnc-program-desc">
@@ -553,7 +666,7 @@ try {
 
                 <div class="col-md-4">
                     <div class="gnc-program-card">
-                        <div class="gnc-program-img" style="background-image:url('assets/images/graduate-school.png');"></div>
+                        <div class="gnc-program-img lazy-bg" data-bg="assets/images/graduate-school.png"></div>
                         <div class="gnc-program-body">
                             <h5 class="gnc-program-title">Graduate School</h5>
                             <p class="gnc-program-desc">
@@ -581,7 +694,7 @@ try {
                     <div class="gnc-president-card">
                         <div class="gnc-president-photo-wrap">
                             <div class="gnc-president-seal"></div>
-                            <img src="assets/images/maam-president.png" alt="Geraldine G. Lim, MBA" class="gnc-president-photo">
+                            <img src="assets/images/maam-president.png" alt="Geraldine G. Lim, MBA" class="gnc-president-photo" loading="lazy" decoding="async">
                         </div>
                         <div class="gnc-president-nameplate">
                             <p class="gnc-president-name">Geraldine G. Lim, MBA</p>

@@ -86,8 +86,8 @@ define('LOCKOUT_DURATION', (int) env('LOCKOUT_DURATION', 900)); // 15 minutes
 // ------------------------------------------------------------
 define('MAIL_HOST', env('MAIL_HOST', 'smtp.gmail.com'));
 define('MAIL_PORT', (int) env('MAIL_PORT', 587));
-define('MAIL_USERNAME', env('MAIL_USERNAME', 'justinemaoel.gnc@gmail.com'));
-define('MAIL_PASSWORD', env('MAIL_PASSWORD', 'oyfd odwv zfwx nmip'));
+define('MAIL_USERNAME', env('MAIL_USERNAME', ''));
+define('MAIL_PASSWORD', env('MAIL_PASSWORD', ''));
 define('MAIL_FROM_NAME', env('MAIL_FROM_NAME', 'GNC Admin System'));
 define('MAIL_ENCRYPTION', env('MAIL_ENCRYPTION', 'tls'));
 
@@ -95,10 +95,10 @@ define('MAIL_ENCRYPTION', env('MAIL_ENCRYPTION', 'tls'));
 // Facebook Page Feed
 // ------------------------------------------------------------
 define('FB_PAGE_ID', env('FB_PAGE_ID', '403969556396264'));
-define('FB_ACCESS_TOKEN', env('FB_ACCESS_TOKEN', 'EAAjxjZAhVjfsBR8Fe3JZBECx60dvOxCco6EroVvHAiwmDXEKwFTZA3wlzM1CObBjx1bf3ZCtC4t6r48UjU9zYtGWGFk2Ff79lGbDqGBAZBlZAWxmyMDT4IrtdeA8YqghPZAKguoZAFDcuAZBt4j4NZAOZCFGe5E6jtxV1loT2Elr2IhOfo5k7oyuOswV8RPuvam'));
+define('FB_ACCESS_TOKEN', env('FB_ACCESS_TOKEN', 'EAAjxjZAhVjfsBR8YUjD5ZAvRvvUu8iHFsNwLwXs8Asl6s4f22XlFiKwY6wZBm1GA47zDKSKTCYAQCahVX4BiTaNhsjxZCZA1O1sgschbfsCkpqlpdZCHG3XwWJuq6wS9AlHBfwzXZAZAoI1cefWCBOjtpCxjyZBH3Ad8XEC5ZBW7IDm8800SEwJtoDXCZAbzNOAQD9eH4DwrlRN'));
 
 // ------------------------------------------------------------
-// Upload Settings
+// Upload Setting
 // ------------------------------------------------------------
 define('UPLOAD_PATH', __DIR__ . '/../uploads/');
 define('UPLOAD_URL', APP_URL . '/uploads/');

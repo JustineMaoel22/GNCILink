@@ -1,0 +1,155 @@
+* { box-sizing: border-box; }
+
+body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: var(--gnc-white) !important;
+}
+
+/* =============================================
+NURSING PROGRAM HERO
+============================================= */
+.nursing-hero {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    min-height: 400px; /* or whatever matches your image */
+    /* remove height: 100% / width: 100% inline styles */
+}
+
+.nursing-hero .container {
+    position: relative;
+    z-index: 2;
+}
+
+/* Breadcrumb */
+.nursing-breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    margin-bottom: 1rem;
+    margin-top: 10px;
+}
+
+.nursing-breadcrumb a {
+    color: var(--gnc-accent, #c0472a);
+    text-decoration: none;
+}
+
+.nursing-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.nursing-breadcrumb span {
+    color: var(--gnc-accent, #c0472a);
+}
+
+.nursing-breadcrumb i {
+    font-size: 0.6rem;
+    color: var(--gnc-accent, #c0472a);
+    opacity: 0.7;
+}
+
+/* Title & copy */
+.nursing-hero-content {
+    max-width: 600px;
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+}
+
+
+.nursing-title {
+    font-family: 'Noto Serif', serif;
+    font-size: 2.75rem;
+    font-weight: 800;
+    color: var(--gnc-accent-dark, #a8391f);
+    margin-bottom: 0.35rem;
+    line-height: 1.1;
+}
+
+.nursing-subtitle {
+    font-size: 1rem;
+    font-weight: 700;
+    font-style: italic;
+    color: var(--gnc-accent, #c0472a);
+    margin-bottom: 0.65rem;
+}
+
+.nursing-desc {
+    font-size: 0.9rem;
+    color: #3a2e2a;
+    max-width: 480px;
+    margin-bottom: 1.75rem;
+}
+
+/* Badges row — one shared card wrapping all badges */
+.nursing-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.75rem;
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 1.1rem 1.5rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+    width: fit-content;
+}
+
+.nursing-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+}
+
+.nursing-badge i {
+    font-size: 1.6rem;
+    color: var(--gnc-accent, #c0472a);
+}
+
+.nursing-badge div {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.nursing-badge strong {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--gnc-accent, #c0472a);
+}
+
+.nursing-badge span {
+    font-size: 0.75rem;
+    color: #6b5c55;
+}
+
+/* Responsive */
+@media (max-width: 991px) {
+    .nursing-photo-wrap {
+        margin-top: 2rem;
+        min-height: 260px;
+    }
+
+    .nursing-title {
+        font-size: 2.1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .nursing-badges {
+        gap: 0.5rem;
+    }
+
+    .nursing-badge {
+        padding: 0.45rem 0.75rem;
+    }
+}

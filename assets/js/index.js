@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return slideEl.querySelector('.hero-slide-video');
         }
 
-        function goTo(index, direction) {
+        function goTo(index) {
             const prev  = current;
             current     = (index + TOTAL) % TOTAL;
             if (current === prev) return;
@@ -49,20 +49,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const leavingVideo = videoIn(leaving);
             if (leavingVideo) leavingVideo.pause();
 
-            leaving.classList.add(direction === 'prev' ? 'exit-right' : 'exit-left');
             leaving.classList.remove('active');
-
-            entering.classList.add(direction === 'prev' ? 'enter-from-left' : 'enter-from-right');
-
-            entering.getBoundingClientRect();
-
             entering.classList.add('active');
-            entering.classList.remove('enter-from-left', 'enter-from-right');
-
-            leaving.addEventListener('transitionend', function cleanup() {
-                leaving.classList.remove('exit-left', 'exit-right');
-                leaving.removeEventListener('transitionend', cleanup);
-            });
 
             if (dots.length) {
                 dots.forEach(d => d.classList.remove('active'));
@@ -74,19 +62,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 enteringVideo.currentTime = 0;
                 enteringVideo.play().catch(() => {});
             }
-
-            const content = entering.querySelector('.hero-content');
-            if (content) {
-                content.classList.remove('content-in');
-                void content.offsetWidth;
-                content.classList.add('content-in');
-            }
         }
 
         function startAuto() {
             if (TOTAL <= 1) return; // nothing to rotate to
             clearInterval(autoTimer);
-            autoTimer = setInterval(() => goTo(current + 1, 'next'), INTERVAL);
+            autoTimer = setInterval(() => goTo(current + 1), INTERVAL);
         }
 
         function resetAuto() {
@@ -95,13 +76,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (prevBtn) {
             prevBtn.addEventListener('click', function () {
-                goTo(current - 1, 'prev');
+                goTo(current - 1);
                 resetAuto();
             });
         }
         if (nextBtn) {
             nextBtn.addEventListener('click', function () {
-                goTo(current + 1, 'next');
+                goTo(current + 1);
                 resetAuto();
             });
         }
@@ -110,7 +91,7 @@ document.addEventListener('DOMContentLoaded', function () {
             dot.addEventListener('click', function () {
                 const target = parseInt(dot.dataset.target, 10);
                 if (target !== current) {
-                    goTo(target, target > current ? 'next' : 'prev');
+                    goTo(target);
                     resetAuto();
                 }
             });
@@ -122,16 +103,13 @@ document.addEventListener('DOMContentLoaded', function () {
             slideshow.addEventListener('touchend', e => {
                 const dx = e.changedTouches[0].clientX - touchStartX;
                 if (Math.abs(dx) > 50) {
-                    dx < 0 ? goTo(current + 1, 'next') : goTo(current - 1, 'prev');
+                    dx < 0 ? goTo(current + 1) : goTo(current - 1);
                     resetAuto();
                 }
             });
         }
 
         if (slides.length) {
-            const firstContent = slides[0].querySelector('.hero-content');
-            if (firstContent) firstContent.classList.add('content-in');
-
             const firstVideo = videoIn(slides[0]);
             if (firstVideo) firstVideo.play().catch(() => {});
         }
@@ -164,5 +142,71 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Failed to load calendar:', error);
             window.location.href = url;
         }
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    var lazyBgEls    = document.querySelectorAll('.lazy-bg[data-bg]');
+    var lazyVideoEls = document.querySelectorAll('.lazy-video[data-src]');
+
+    function loadBg(el) {
+        if (!el.dataset.bg) return;
+        el.style.backgroundImage = "url('" + el.dataset.bg + "')";
+        el.classList.remove('lazy-bg');
+        el.removeAttribute('data-bg');
+    }
+
+    function loadVideo(video) {
+        if (video.dataset.src) {
+            video.src = video.dataset.src;
+            video.removeAttribute('data-src');
+        }
+        if (video.dataset.poster) {
+            video.poster = video.dataset.poster;
+            video.removeAttribute('data-poster');
+        }
+        video.preload = 'auto';
+        video.load();
+        video.classList.remove('lazy-video');
+    }
+
+    if ('IntersectionObserver' in window) {
+        var bgObserver = new IntersectionObserver(function (entries, observer) {
+            entries.forEach(function (entry) {
+                if (entry.isIntersecting) {
+                    loadBg(entry.target);
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { rootMargin: '200px 0px' });
+
+        var videoObserver = new IntersectionObserver(function (entries, observer) {
+            entries.forEach(function (entry) {
+                if (entry.isIntersecting) {
+                    loadVideo(entry.target);
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { rootMargin: '200px 0px' });
+
+        lazyBgEls.forEach(function (el) { bgObserver.observe(el); });
+        lazyVideoEls.forEach(function (video) { videoObserver.observe(video); });
+    } else {
+        // Older browsers without IntersectionObserver support: just load everything.
+        lazyBgEls.forEach(loadBg);
+        lazyVideoEls.forEach(loadVideo);
+    }
+
+    // The hero slideshow also needs the *next* slide ready just before
+    // it's swiped/advanced to, so playback/transition doesn't stall.
+    document.querySelectorAll('.hero-dots span, #slide-next, #slide-prev').forEach(function (control) {
+        control.addEventListener('click', function () {
+            document.querySelectorAll('.hero-slide').forEach(function (slideEl) {
+                var bg = slideEl.querySelector('.lazy-bg[data-bg]');
+                if (bg) loadBg(bg);
+                var vid = slideEl.querySelector('.lazy-video[data-src]');
+                if (vid) loadVideo(vid);
+            });
+        });
     });
 });

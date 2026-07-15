@@ -2,7 +2,7 @@
     <div class="gnc-footer-banner">
         <div class="gnc-footer-banner-overlay"></div>
         <div class="gnc-footer-seal-wrap">
-            <img src="assets/images/logos/gnc-logo-v1.svg" alt="Guagua National Colleges Seal" class="gnc-footer-seal">
+            <img src="/assets/images/logos/gnc-logo-v1.svg" alt="Guagua National Colleges Seal" class="gnc-footer-seal">
         </div>
     </div>
 
@@ -37,9 +37,9 @@
                     </ul>
 
                     <div class="gnc-footer-socials">
-                        <a href="#" aria-label="Facebook"><i class="bi bi-facebook"></i></a>
-                        <a href="#" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
-                        <a href="#" aria-label="LinkedIn"><i class="bi bi-linkedin"></i></a>
+                        <a href="https://www.facebook.com/gnc.edu.ph" aria-label="Facebook" target="_blank"><i class="bi bi-facebook"></i></a>
+                        <a href="https://www.instagram.com/gnci1918/" aria-label="Instagram" target="_blank"><i class="bi bi-instagram"></i></a>
+                        <a href="https://www.linkedin.com/school/guagua-national-colleges/" aria-label="LinkedIn" target="_blank"><i class="bi bi-linkedin"></i></a>
                     </div>
                 </div>
 

@@ -1,0 +1,297 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+:root {
+    --gnc-green:      #094024;
+    --gnc-gold:       #EABA3B;
+    --gnc-gold-light: #E2C06A;
+    --gnc-white:      #F9F6F1;
+    --gnc-dark:       #1a1a1a;
+}
+
+/* =============================================================
+   NAVBAR
+   ============================================================= */
+.gnc-navbar {
+    background-color: var(--gnc-green) !important;
+    padding-top: 0;
+    padding-bottom: 0;
+    min-height: 64px;
+    z-index: 1030;
+}
+
+.gnc-navbar .navbar-brand img {
+    width: 46px;
+    height: 46px;
+    object-fit: contain;
+}
+
+.gnc-navbar .brand-text .brand-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--gnc-white);
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+    font-family: 'Noto Serif', serif;
+}
+
+.gnc-navbar .brand-text .brand-tagline {
+    font-size: 0.68rem;
+    color: var(--gnc-gold);
+    font-style: italic;
+    line-height: 1;
+    margin-top: 5px;
+}
+
+.gnc-navbar .nav-link {
+    color: rgba(255,255,255,0.88) !important;
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.5rem 0.7rem !important;
+    border-top: 2px solid transparent;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+
+.gnc-navbar .nav-link:hover {
+    color: var(--gnc-white) !important;
+}
+
+.gnc-navbar .nav-item.active .nav-link,
+.gnc-navbar .nav-link.active {
+    background-color: rgba(234, 186, 59, 0.18);
+    color: var(--gnc-white) !important;
+    font-weight: 600;
+    border-top: 2px solid var(--gnc-gold);
+    border-bottom: 2px solid var(--gnc-gold);
+    border-radius: 0;
+}
+
+.gnc-navbar .btn-search {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.88) !important;
+    padding: 0.5rem 0.7rem;
+    display: flex;
+    align-items: center;
+}
+.gnc-navbar .btn-search:hover { color: var(--gnc-white) !important; }
+
+.gnc-navbar .navbar-toggler {
+    border-color: rgba(255,255,255,0.4);
+}
+.gnc-navbar .navbar-toggler-icon {
+    filter: invert(1);
+}
+
+@media (max-width: 480px) {
+    .gnc-navbar .navbar-brand img {
+        width: 38px;
+        height: 38px;
+    }
+
+    .gnc-navbar .brand-text .brand-name {
+        font-size: 0.72rem;
+    }
+
+    .gnc-navbar .brand-text .brand-tagline {
+        font-size: 0.6rem;
+    }
+}
+
+/* Portal button — scoped globally (not just .gnc-navbar) so it also
+   works inside the offcanvas sidebar */
+.btn-portal {
+    background-color: var(--gnc-gold);
+    color: var(--gnc-green) !important;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.42rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    transition: background-color 0.15s;
+    white-space: nowrap;
+}
+.btn-portal:hover {
+    background-color: var(--gnc-gold-light);
+    color: var(--gnc-green) !important;
+}
+
+
+/* =============================================================
+   NAVBAR DROPDOWNS (desktop)
+   ============================================================= */
+.gnc-navbar .dropdown-toggle::after {
+    vertical-align: 0.15em;
+    margin-left: 0.35em;
+}
+
+.gnc-navbar .gnc-dropdown-menu {
+    background-color: var(--gnc-green);
+    border: 1px solid rgba(234, 186, 59, 0.35);
+    border-radius: 6px;
+    padding: 0.4rem 0;
+    margin-top: 0.4rem;
+    min-width: 240px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.gnc-navbar .gnc-dropdown-menu .dropdown-item {
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 0.82rem;
+    padding: 0.5rem 1.1rem;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.gnc-navbar .gnc-dropdown-menu .dropdown-item:hover,
+.gnc-navbar .gnc-dropdown-menu .dropdown-item:focus {
+    background-color: rgba(234, 186, 59, 0.18);
+    color: var(--gnc-white);
+}
+
+@media (min-width: 992px) {
+    .gnc-navbar .nav-item.dropdown:hover > .dropdown-menu {
+        display: block;
+        margin-top: 0;
+    }
+}
+
+
+/* =============================================================
+   MOBILE OFFCANVAS SIDEBAR
+   ============================================================= */
+.gnc-offcanvas {
+    background-color: var(--gnc-green);
+    width: 280px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.gnc-offcanvas .offcanvas-header {
+    padding: 0.75rem 1rem 0;
+    border-bottom: none;
+}
+
+.gnc-offcanvas .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+    opacity: 0.8;
+}
+
+/* Main nav list */
+.gnc-mobile-nav {
+    padding: 0.5rem 0;
+}
+
+.gnc-mobile-item {
+    border-left: 3px solid transparent;
+}
+
+.gnc-mobile-item.active {
+    background-color: rgba(234, 186, 59, 0.15);
+    border-left: 3px solid var(--gnc-gold);
+}
+
+.gnc-mobile-link {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.85rem 1.1rem;
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 0.92rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background-color 0.15s;
+}
+
+.gnc-mobile-link:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.gnc-mobile-link i:first-child {
+    font-size: 1.05rem;
+    width: 20px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.gnc-mobile-item.active .gnc-mobile-link i:first-child {
+    color: var(--gnc-gold);
+}
+
+.gnc-chevron {
+    font-size: 0.75rem;
+    transition: transform 0.2s ease;
+}
+
+.gnc-mobile-link[aria-expanded="true"] .gnc-chevron {
+    transform: rotate(180deg);
+}
+
+/* Submenu (accordion) */
+.gnc-submenu ul li a {
+    display: block;
+    padding: 0.6rem 1.1rem 0.6rem 3.15rem;
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.75);
+    text-decoration: none;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.gnc-submenu ul li a:hover {
+    color: var(--gnc-gold);
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* Divider before search */
+.gnc-mobile-nav + .gnc-mobile-search {
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Search field */
+.gnc-mobile-search {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.1rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+}
+
+.gnc-mobile-search-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #fff;
+    font-size: 0.85rem;
+    flex: 1;
+}
+
+.gnc-mobile-search-input::placeholder {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+/* Portal button pinned to bottom */
+.gnc-mobile-portal {
+    padding: 1rem 1.1rem 1.5rem;
+}
+
+
+/* =============================================================
+   SEARCH BOX (desktop navbar)
+   ============================================================= */
+#search-box-item .form-control {
+    background-color: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    font-size: 0.82rem;
+}
+#search-box-item .form-control::placeholder { color: rgba(255,255,255,0.6); }
+#search-box-item .form-control:focus {
+    background-color: rgba(255,255,255,0.2);
+    border-color: var(--gnc-gold);
+    box-shadow: none;
+    color: white;
+}

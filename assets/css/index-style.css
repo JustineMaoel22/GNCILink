@@ -1,13 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
-
-:root {
-    --gnc-green:      #094024;
-    --gnc-gold:       #EABA3B;
-    --gnc-gold-light: #E2C06A;
-    --gnc-white:      #F9F6F1;
-    --gnc-dark:       #1a1a1a;
-}
-
 * { box-sizing: border-box; }
 
 body {
@@ -18,103 +8,9 @@ body {
     background-color: var(--gnc-white) !important;
 }
 
-/* =============================================
-NAVBAR
-============================================= */
-.gnc-navbar {
-    background-color: var(--gnc-green) !important;
-    padding-top: 0;
-    padding-bottom: 0;
-    min-height: 64px;
-    z-index: 1030;
-}
-
-.gnc-navbar .navbar-brand img {
-    width: 46px;
-    height: 46px;
-    object-fit: contain;
-}
-
-.gnc-navbar .brand-text .brand-name {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: var(--gnc-white);
-    line-height: 1.1;
-    letter-spacing: 0.01em;
-    font-family: 'Noto Serif', serif;
-}
-
-.gnc-navbar .brand-text .brand-tagline {
-    font-size: 0.68rem;
-    color: var(--gnc-gold);
-    font-style: italic;
-    line-height: 1;
-    margin-top: 5px;
-}
-
-.gnc-navbar .nav-link {
-    color: rgba(255,255,255,0.88) !important;
-    font-size: 0.8rem;
-    font-weight: 500;
-    padding: 0.5rem 0.7rem !important;
-    border-top: 2px solid transparent;
-    border-bottom: 2px solid transparent;
-    transition: color 0.15s, border-color 0.15s, background-color 0.15s;
-}
-
-.gnc-navbar .nav-link:hover {
-    color: var(--gnc-white) !important;
-}
-
-.gnc-navbar .nav-item.active .nav-link,
-.gnc-navbar .nav-link.active {
-    background-color: rgba(234, 186, 59, 0.18);
-    color: var(--gnc-white) !important;
-    font-weight: 600;
-    border-top: 2px solid var(--gnc-gold);
-    border-bottom: 2px solid var(--gnc-gold);
-    border-radius: 0;
-}
-
-.gnc-navbar .btn-search {
-    background: none;
-    border: none;
-    color: rgba(255,255,255,0.88) !important;
-    padding: 0.5rem 0.7rem;
-    display: flex;
-    align-items: center;
-}
-.gnc-navbar .btn-search:hover { color: var(--gnc-white) !important; }
-
-.gnc-navbar .btn-portal {
-    background-color: var(--gnc-gold);
-    color: var(--gnc-green) !important;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.78rem;
-    font-weight: 700;
-    padding: 0.42rem 1rem;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    text-decoration: none;
-    transition: background-color 0.15s;
-    white-space: nowrap;
-}
-.gnc-navbar .btn-portal:hover {
-    background-color: var(--gnc-gold-light);
-}
-
-.gnc-navbar .navbar-toggler {
-    border-color: rgba(255,255,255,0.4);
-}
-.gnc-navbar .navbar-toggler-icon {
-    filter: invert(1);
-}
-
-/* =============================================
-HERO SLIDESHOW WRAPPER
-============================================= */
+/* =============================================================
+   HERO SLIDESHOW
+   ============================================================= */
 .hero-slideshow {
     position: relative;
     width: 100%;
@@ -124,9 +20,7 @@ HERO SLIDESHOW WRAPPER
     padding-bottom: 0;
 }
 
-/* =============================================
-INDIVIDUAL SLIDES
-============================================= */
+/* Individual slides — simple crossfade */
 .hero-slide {
     position: absolute;
     inset: 0;
@@ -134,35 +28,16 @@ INDIVIDUAL SLIDES
     height: 100%;
     display: flex;
     align-items: center;
-    transform: translateX(100%);
-    transition: transform 0.75s cubic-bezier(0.77, 0, 0.175, 1);
-    will-change: transform;
+    opacity: 0;
+    transition: opacity 0.9s ease;
     pointer-events: none;
     z-index: 1;
 }
 
 .hero-slide.active {
-    transform: translateX(0);
+    opacity: 1;
     pointer-events: auto;
     z-index: 2;
-}
-
-.hero-slide.exit-left {
-    transform: translateX(-100%);
-    z-index: 1;
-}
-
-.hero-slide.exit-right {
-    transform: translateX(100%);
-    z-index: 1;
-}
-
-.hero-slide.enter-from-left {
-    transform: translateX(-100%);
-}
-
-.hero-slide.enter-from-right {
-    transform: translateX(100%);
 }
 
 .slide-overlay {
@@ -199,53 +74,7 @@ INDIVIDUAL SLIDES
     display: block;
 }
 
-@keyframes slide-in-from-right {
-    from {
-        opacity: 0;
-        transform: translateX(100%);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-@keyframes slide-in-from-left {
-    from {
-        opacity: 0;
-        transform: translateX(-100%);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-@keyframes slide-out-to-left {
-    from {
-        opacity: 1;
-        transform: translateX(0);
-    }
-    to {
-        opacity: 0;
-        transform: translateX(-100%);
-    }
-}
-
-@keyframes slide-out-to-right {
-    from {
-        opacity: 1;
-        transform: translateX(0);
-    }
-    to {
-        opacity: 0;
-        transform: translateX(100%);
-    }
-}
-
-/* =============================================
-HERO CONTENT 
-============================================= */
+/* Hero content */
 .hero-slide .container {
     position: relative;
     z-index: 2;
@@ -259,15 +88,6 @@ HERO CONTENT
     position: relative;
     text-align: left;
     max-width: 600px;
-
-    opacity: 0;
-    transform: translateY(22px);
-    transition: opacity 0.55s ease 0.35s, transform 0.55s ease 0.35s;
-}
-
-.hero-content.content-in {
-    opacity: 1;
-    transform: translateY(0);
 }
 
 .slide-eyebrow {
@@ -283,25 +103,21 @@ HERO CONTENT
     margin-bottom: 0.9rem;
 }
 
-.hero-title-gold {
+.hero-title-line {
     font-family: 'Noto Serif', serif;
     font-size: clamp(2rem, 4vw, 3rem);
     font-weight: 800;
     text-transform: uppercase;
     color: var(--gnc-gold);
     line-height: 1.1;
-    margin-bottom: 0;
     letter-spacing: 0.01em;
 }
+.hero-title-line:first-child { margin-bottom: 0; }
+.hero-title-line:last-child  { margin-bottom: 1rem; }
 
-.hero-title-white {
-    font-family: 'Noto Serif', serif;
-    font-size: clamp(2rem, 4vw, 3rem);
-    font-weight: 800;
-    color: var(--gnc-white);
-    line-height: 1.1;
-    margin-bottom: 1rem;
-    letter-spacing: 0.01em;
+/* Slide 3 ("Meet the Developers") — both title lines gold */
+.hero-slide[data-slide="2"] .hero-title-white {
+    color: var(--gnc-gold);
 }
 
 .hero-desc {
@@ -360,9 +176,7 @@ HERO CONTENT
     border-color: var(--gnc-white);
 }
 
-/* =============================================
-NAVIGATION ARROWS
-============================================= */
+/* Navigation arrows */
 .slide-arrow {
     position: absolute;
     top: 50%;
@@ -390,12 +204,10 @@ NAVIGATION ARROWS
 .slide-arrow-prev { left: 1.25rem; }
 .slide-arrow-next { right: 1.25rem; }
 
-/* =============================================
-DOT INDICATORS
-============================================= */
+/* Dot indicators */
 .hero-dots {
     position: absolute;
-    bottom: 80px; 
+    bottom: 80px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -420,9 +232,10 @@ DOT INDICATORS
     border-radius: 4px;
 }
 
-/* =============================================
-PILLARS CARD STRIP
-============================================= */
+
+/* =============================================================
+   PILLARS CARD STRIP
+   ============================================================= */
 .gnc-pillars {
     position: relative;
     z-index: 20;
@@ -503,10 +316,10 @@ PILLARS CARD STRIP
     margin: 0;
 }
 
-/* =============================================
-Announcements
-============================================= */
 
+/* =============================================================
+   ANNOUNCEMENTS
+   ============================================================= */
 .gnc-announce-header {
     position: relative;
     max-width: none;
@@ -555,28 +368,26 @@ Announcements
 .gnc-read-more:hover {
     color: #d99e1d;
 }
+
 .gnc-view-all-btn {
-    background: #094024;
-    color: #fff;
-    font-weight: 600;
+    font-family: 'Inter', sans-serif !important;
+    background-color: var(--gnc-green) !important;
+    color: #ffff !important;
+    font-weight: bold !important;
     padding: .75rem 2rem;
     border-radius: 8px;
 }
 .gnc-view-all-btn:hover {
-    background: #0c5631;
-    color: #fff;
+    background-color: var(--gnc-gold) !important;
+    color: #ffff !important;
 }
 
-/* =============================================
-ACADEMIC PROGRAMS
-============================================= */
+
+/* =============================================================
+   ACADEMIC PROGRAMS
+   ============================================================= */
 .gnc-programs {
     background-color: var(--gnc-white);
-}
-
-.gnc-programs-header {
-    max-width: 600px;
-    text-align: left;
 }
 
 .gnc-programs-header {
@@ -615,7 +426,6 @@ ACADEMIC PROGRAMS
     box-shadow: 0 4px 18px rgba(9, 64, 36, 0.08);
     transition: transform .2s ease, box-shadow .2s ease;
 }
-
 .gnc-program-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 10px 26px rgba(9, 64, 36, 0.14);
@@ -655,14 +465,14 @@ ACADEMIC PROGRAMS
     align-items: center;
     gap: 6px;
 }
-
 .gnc-program-link:hover {
     color: #d99e1d;
 }
 
-/* =============================================
-MESSAGE FROM THE PRESIDENT
-============================================= */
+
+/* =============================================================
+   MESSAGE FROM THE PRESIDENT
+   ============================================================= */
 .gnc-president {
     position: relative;
     background-color: var(--gnc-white);
@@ -845,9 +655,9 @@ MESSAGE FROM THE PRESIDENT
 }
 
 
-/* =============================================
-FOOTER
-============================================= */
+/* =============================================================
+   FOOTER
+   ============================================================= */
 .gnc-footer {
     background-color: var(--gnc-green);
     color: rgba(255, 255, 255, 0.85);
@@ -855,8 +665,8 @@ FOOTER
 
 .gnc-footer-banner {
     position: relative;
-    height: 160px;
-    background-image: url('../images/footer-header.png');
+    height: 240px;
+    background-image: url('/assets/images/footer-header.png');
     background-size: cover;
     background-position: center;
     overflow: visible;
@@ -865,7 +675,7 @@ FOOTER
 .gnc-footer-seal-wrap {
     position: absolute;
     left: 50%;
-    bottom: -55px;
+    bottom: -30px;
     transform: translateX(-50%);
     width: 130px;
     height: 130px;
@@ -885,10 +695,6 @@ FOOTER
 .gnc-footer-top {
     position: relative;
     z-index: 1;
-    padding: 4.5rem 0 3rem; /* was likely 4rem 0 3rem — bumped top to clear the seal */
-}
-
-.gnc-footer-top {
     padding: 4rem 0 3rem;
 }
 
@@ -1048,26 +854,9 @@ FOOTER
 }
 
 
-
-/* =============================================
-RESPONSIVE
-============================================= */
-@media (max-width: 480px) {
-    .gnc-navbar .navbar-brand img {
-        width: 38px;
-        height: 38px;
-    }
-
-    .gnc-navbar .brand-text .brand-name {
-        font-size: 0.72rem;
-    }
-
-    .gnc-navbar .brand-text .brand-tagline {
-        font-size: 0.6rem;
-    }
-}
-
-
+/* =============================================================
+   RESPONSIVE OVERRIDES
+   ============================================================= */
 @media (max-width: 768px) {
     .hero-title-gold,
     .hero-title-white {
@@ -1097,9 +886,10 @@ RESPONSIVE
     .gnc-pillars .pillar-item:last-child {
         border-bottom: none;
     }
+
     .gnc-programs-header {
-    max-width: 100%;
-}
+        max-width: 100%;
+    }
 }
 
 @media (max-width: 576px) {
@@ -1110,40 +900,13 @@ RESPONSIVE
         max-width: 100%;
     }
 }
-/* =============================================
-REDUCED MOTION
-============================================= */
+
+
+/* =============================================================
+   REDUCED MOTION
+   ============================================================= */
 @media (prefers-reduced-motion: reduce) {
     .hero-slide {
         transition: opacity 0.4s ease;
-        transform: none !important; 
     }
-    .hero-slide.exit-left,
-    .hero-slide.exit-right {
-        transform: none !important;
-    }
-    .slide-bg {
-        animation: none;
-    }
-    .hero-content {
-        transition: opacity 0.3s ease 0.2s;
-        transform: none !important;
-    }
-}
-
-/* =============================================
-SEARCH BOX
-============================================= */
-#search-box-item .form-control {
-    background-color: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.3);
-    color: white;
-    font-size: 0.82rem;
-}
-#search-box-item .form-control::placeholder { color: rgba(255,255,255,0.6); }
-#search-box-item .form-control:focus {
-    background-color: rgba(255,255,255,0.2);
-    border-color: var(--gnc-gold);
-    box-shadow: none;
-    color: white;
 }

@@ -95,7 +95,7 @@ if (isLoggedIn()) { // Changed back to your original function!
 
             <!-- Footer -->
             <div class="login-footer">
-                &copy; 2026 Guagua National Colleges, Inc. All rights reserved.
+                &copy; 2026 Guagua National Colleges, Inc.
             </div>
         </div>
     </div>
