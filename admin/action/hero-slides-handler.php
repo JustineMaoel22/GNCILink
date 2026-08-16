@@ -64,6 +64,7 @@ try {
                 'btn2_link'      => trim($_POST['btn2_link'] ?? ''),
                 'status'         => in_array($_POST['status'] ?? '', ['published', 'draft'], true) ? $_POST['status'] : 'published',
                 'show_on_mobile' => isset($_POST['show_on_mobile']) && $_POST['show_on_mobile'] === '1',
+                'show_gradient'  => isset($_POST['show_gradient']) && $_POST['show_gradient'] === '1',
             ];
 
             // Basic length guards to match the reference UI's character limits
@@ -72,7 +73,13 @@ try {
             if (mb_strlen($data['btn1_text']) > 30) $data['btn1_text'] = mb_substr($data['btn1_text'], 0, 30);
             if (mb_strlen($data['btn2_text']) > 30) $data['btn2_text'] = mb_substr($data['btn2_text'], 0, 30);
 
+            // Desktop background — image or video, unchanged behavior.
             $media = isset($_FILES['media']) ? uploadHeroMedia($_FILES['media']) : null;
+
+            // Mobile background — completely independent of the desktop upload above.
+            // Restricted to images server-side (imageOnly = true), matching the admin UI.
+            $mobileMedia = isset($_FILES['media_mobile']) ? uploadHeroMedia($_FILES['media_mobile'], true) : null;
+            $removeMobileMedia = isset($_POST['remove_mobile_media']) && $_POST['remove_mobile_media'] === '1';
 
             if ($id > 0) {
                 // Updating an existing slide
@@ -80,7 +87,7 @@ try {
                     echo json_encode(['error' => 'A background image or video is required.']);
                     break;
                 }
-                $ok = updateHeroSlide($id, $data, $media);
+                $ok = updateHeroSlide($id, $data, $media, $mobileMedia, $removeMobileMedia);
                 if (!$ok) {
                     http_response_code(400);
                     echo json_encode(['error' => 'Could not update the slide.']);
@@ -88,12 +95,12 @@ try {
                 }
                 echo json_encode(['success' => true, 'slide_id' => $id]);
             } else {
-                // Creating a new slide — media is required
+                // Creating a new slide — desktop media is required, mobile image is optional
                 if ($media === null) {
                     echo json_encode(['error' => 'Please upload a background image or video for the new slide.']);
                     break;
                 }
-                $newId = createHeroSlide($data, $media);
+                $newId = createHeroSlide($data, $media, $mobileMedia);
                 if ($newId === false) {
                     http_response_code(400);
                     echo json_encode(['error' => 'Could not create the slide.']);

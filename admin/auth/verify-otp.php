@@ -85,18 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 logActivity($user['user_id'], 'LOGIN', null, null, 'Successful login via OTP');
 
-                // Remember me cookie
+                // Remember me — use the shared helper (from auth_handler.php) so this
+                // stays in sync with the AJAX login path: it hashes + stores the token,
+                // sets remember_token_expires_at (30 days), and sets the cookie with the
+                // correct 'secure' flag for the current environment.
                 if (!empty($_SESSION['remember_me'])) {
-                    $token = bin2hex(random_bytes(32));
-                    setcookie('gnc_remember_me', $token, [
-                        'expires'  => time() + (30 * 24 * 3600),
-                        'path'     => '/',
-                        'httponly' => true,
-                        'secure'   => false, // set true in production (HTTPS)
-                        'samesite' => 'Strict'
-                    ]);
-                    $db->prepare("UPDATE users SET remember_token = ? WHERE user_id = ?")
-                       ->execute([hash('sha256', $token), $user['user_id']]);
+                    generateRememberToken((int) $user['user_id']);
                     unset($_SESSION['remember_me']);
                 }
 

@@ -226,16 +226,16 @@ include __DIR__ . '/../components/header-admin.php';
                 <?php if (empty($logs)): ?>
                 <div class="empty-state"><i class="bi bi-journal-x"></i><p>No activity yet.</p></div>
                 <?php else: foreach ($logs as $log): ?>
-                <div style="display:flex;gap:.75rem;align-items:flex-start;padding:.6rem 1.25rem;border-bottom:1px solid #f5f5f5">
+                <div style="display:flex;gap:.75rem;align-items:center;padding:.6rem 1.25rem;border-bottom:1px solid #f5f5f5">
                     <?php
                     $actionColors = [
                         'LOGIN'=>'success','LOGOUT'=>'secondary','CREATE'=>'primary',
                         'UPDATE'=>'warning','DELETE'=>'danger','PUBLISH'=>'info',
-                        'APPROVE'=>'success','REJECT'=>'danger','OTP_SENT'=>'secondary'
+                        'APPROVE'=>'success','REJECT'=>'danger','OTP-SENT'=>'secondary'
                     ];
                     $actionColor = $actionColors[$log['action']] ?? 'secondary';
                     ?>
-                    <span class="badge bg-<?= $actionColor ?>" style="font-size:.65rem;margin-top:2px;flex-shrink:0">
+                    <span class="badge bg-<?= $actionColor ?>" style="font-size:.7rem;flex-shrink:0;width:80px;text-align:center;">
                         <?= htmlspecialchars($log['action']) ?>
                     </span>
                     <div style="flex:1;min-width:0">

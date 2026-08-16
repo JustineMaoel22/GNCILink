@@ -1,0 +1,282 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+/* ==========================================================================
+   College Programs / College Departments Section
+   Guagua National Colleges, Inc.
+   ========================================================================== */
+
+.gnc-college-programs {
+    --gnc-green: #0b4228;
+    --gnc-green-light: #1F5E2C;
+    --gnc-green-dark: #08331e;
+    --gnc-gold: #d3a63a;
+    --gnc-cream: #f9f6f1;
+    --gnc-text-dark: #202020;
+    --gnc-text-gray: #6b6b66;
+    --gnc-border: #e6e1d8;
+    font-family: 'Noto Serif', serif;
+    background-color: var(--gnc-cream);
+}
+
+/* ---------- Hero ---------- */
+.cp-hero {
+  position: relative;
+  background-color: var(--gnc-cream);
+  background-image:
+    linear-gradient(90deg, var(--gnc-cream) 0%, rgba(249, 246, 241, 0.55) 45%, rgba(249, 246, 241, 0.1) 70%),
+    url('/assets/images/Section Header.png');
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: cover;
+  border-bottom: 1px solid var(--gnc-border);
+}
+
+.cp-hero-inner {
+  padding: 40px 15px 44px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.cp-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gnc-gold);
+  margin-bottom: 18px;
+}
+
+.cp-breadcrumb a {
+  color: var(--gnc-gold);
+  text-decoration: none;
+}
+
+.cp-breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.cp-breadcrumb i {
+  font-size: 10px;
+  color: var(--gnc-gold);
+  opacity: 0.8;
+}
+
+.cp-breadcrumb .cp-current {
+  color: var(--gnc-gold);
+  opacity: 0.85;
+}
+
+.cp-hero h1 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  color: var(--gnc-green-light);
+  font-size: clamp(28px, 4vw, 40px);
+  margin: 0 0 10px;
+}
+
+.cp-hero p {
+  color: black;
+  font-size: 15px;
+  max-width: 520px;
+  margin: 0;
+}
+
+/* ---------- Features bar ---------- */
+.cp-features {
+  font-family: 'Inter', sans-serif;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 15px;
+  transform: translateY(-28px);
+}
+
+.cp-features-box {
+  background: var(--gnc-cream);
+  border: 1px solid var(--gnc-border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(11, 66, 40, 0.06);
+  padding: 22px 10px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.cp-feature {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 22px;
+  border-right: 1px solid var(--gnc-border);
+}
+
+.cp-feature:last-child {
+  border-right: none;
+}
+
+.cp-feature-icon {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--gnc-green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cp-feature-icon img {
+  width: 40px;
+  height: 40px;
+}
+
+.cp-feature-text h3 {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--gnc-text-dark);
+  margin: 0 0 3px;
+}
+
+.cp-feature-text p {
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: black;
+  margin: 0;
+}
+
+/* ---------- Colleges grid ---------- */
+.cp-colleges {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 10px 15px 70px;
+}
+
+.cp-college-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 36px 60px;
+}
+
+.cp-college {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 0;
+}
+
+.cp-college-logo {
+  flex: none;
+  width: 170px;
+  height: 170px;
+  object-fit: contain;
+}
+
+.cp-college-info h3 {
+  font-family: 'Noto Serif', serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: black;
+  margin: 0 0 8px;
+}
+
+.cp-college-info .cp-underline {
+  display: block;
+  width: 42px;
+  height: 3px;
+  background: var(--gnc-gold);
+  margin: -4px 0 10px;
+}
+
+.cp-college-info p {
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: black;
+  margin: 0 0 10px;
+  max-width: 46ch;
+}
+
+.cp-view-link {
+  font-family: 'Inter', sans-serif;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--gnc-gold);
+  text-decoration: none;
+}
+
+.cp-view-link i {
+  transition: transform 0.2s ease;
+}
+
+.cp-view-link:hover {
+  color: var(--gnc-green);
+}
+
+.cp-view-link:hover i {
+  transform: translateX(3px);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 991px) {
+  .cp-hero {
+    background-image: linear-gradient(180deg, rgba(249, 246, 241, 0.4) 0%, var(--gnc-cream) 85%),
+      url('/assets/images/Section Header.png');
+    background-position: center;
+  }
+
+  .cp-features-box {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 20px;
+  }
+
+  .cp-feature {
+    border-right: none;
+  }
+
+  .cp-feature:nth-child(odd) {
+    border-right: 1px solid var(--gnc-border);
+  }
+
+  .cp-college-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .cp-college-logo {
+    width: 130px;
+    height: 130px;
+  }
+}
+
+@media (max-width: 575px) {
+  .cp-features-box {
+    grid-template-columns: 1fr;
+  }
+
+  .cp-feature {
+    border-right: none !important;
+    border-bottom: 1px solid var(--gnc-border);
+    padding: 16px 6px;
+  }
+
+  .cp-feature:last-child {
+    border-bottom: none;
+  }
+
+  .cp-college {
+    flex-direction: column;
+  }
+
+  .cp-college-logo {
+    width: 110px;
+    height: 110px;
+  }
+}

@@ -1,3 +1,23 @@
+<?php
+// Determine current path (without query string) once, at the top of the partial.
+$currentPath = strtok($_SERVER['REQUEST_URI'], '?');
+
+/**
+ * Returns true if $currentPath contains $needle anywhere.
+ * Using "contains" instead of "starts with" so this still works
+ * even if pages live under an extra folder, e.g. /pages/academics/nursing.php
+ */
+function gnc_section_active($needle, $currentPath) {
+    return strpos($currentPath, $needle) !== false;
+}
+
+$isHome        = ($currentPath === '/' || $currentPath === '/index.php');
+$isAbout       = gnc_section_active('/about/', $currentPath);
+$isAcademics   = gnc_section_active('/academics/', $currentPath);
+$isAdmissions  = gnc_section_active('/admissions/', $currentPath);
+$isStudentLife = gnc_section_active('/student-life/', $currentPath);
+?>
+
 <nav class="navbar gnc-navbar sticky-top navbar-expand-lg shadow-sm">
     <div class="container">
         <a class="navbar-brand d-flex align-items-center gap-2 me-3" href="/">
@@ -19,12 +39,12 @@
         <div class="collapse navbar-collapse d-none d-lg-flex" id="navbarNav">
             <ul class="navbar-nav ms-auto align-items-center">
 
-                <li class="nav-item active">
-                    <a class="nav-link active" href="/">Home</a>
+                <li class="nav-item <?= $isHome ? 'active' : '' ?>">
+                    <a class="nav-link <?= $isHome ? 'active' : '' ?>" href="/">Home</a>
                 </li>
 
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="aboutDropdown" role="button"
+                <li class="nav-item dropdown <?= $isAbout ? 'active' : '' ?>">
+                    <a class="nav-link dropdown-toggle <?= $isAbout ? 'active' : '' ?>" href="#" id="aboutDropdown" role="button"
                        data-bs-toggle="dropdown" aria-expanded="false">About</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="aboutDropdown">
                         <li><a class="dropdown-item" href="/about/history.php">History of GNC</a></li>
@@ -36,18 +56,18 @@
                     </ul>
                 </li>
 
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="academicsDropdown" role="button"
+                <li class="nav-item dropdown <?= $isAcademics ? 'active' : '' ?>">
+                    <a class="nav-link dropdown-toggle <?= $isAcademics ? 'active' : '' ?>" href="#" id="academicsDropdown" role="button"
                        data-bs-toggle="dropdown" aria-expanded="false">Academics</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="academicsDropdown">
                         <li><a class="dropdown-item" href="/academics/basic-education.php">Basic Education</a></li>
-                        <li><a class="dropdown-item" href="/academics/college.php">College</a></li>
+                        <li><a class="dropdown-item" href="/pages/college-programs.php">College</a></li>
                         <li><a class="dropdown-item" href="/academics/graduate-school.php">Graduate School</a></li>
                     </ul>
                 </li>
 
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="admissionsDropdown" role="button"
+                <li class="nav-item dropdown <?= $isAdmissions ? 'active' : '' ?>">
+                    <a class="nav-link dropdown-toggle <?= $isAdmissions ? 'active' : '' ?>" href="#" id="admissionsDropdown" role="button"
                        data-bs-toggle="dropdown" aria-expanded="false">Admissions</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="admissionsDropdown">
                         <li><a class="dropdown-item" href="/admissions/requirements.php">Admission Requirements</a></li>
@@ -58,8 +78,8 @@
                     </ul>
                 </li>
 
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="studentLifeDropdown" role="button"
+                <li class="nav-item dropdown <?= $isStudentLife ? 'active' : '' ?>">
+                    <a class="nav-link dropdown-toggle <?= $isStudentLife ? 'active' : '' ?>" href="#" id="studentLifeDropdown" role="button"
                        data-bs-toggle="dropdown" aria-expanded="false">Student Life</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="studentLifeDropdown">
                         <li><a class="dropdown-item" href="/student-life/organizations.php">Student Organization</a></li>
@@ -110,20 +130,20 @@
     <div class="offcanvas-body d-flex flex-column p-0">
         <ul class="gnc-mobile-nav list-unstyled mb-0">
 
-            <li class="gnc-mobile-item active">
+            <li class="gnc-mobile-item <?= $isHome ? 'active' : '' ?>">
                 <a href="/" class="gnc-mobile-link">
                     <i class="bi bi-house-door-fill"></i>
                     <span>Home</span>
                 </a>
             </li>
 
-            <li class="gnc-mobile-item">
-                <a href="#" class="gnc-mobile-link" data-bs-toggle="collapse" data-bs-target="#mAbout" aria-expanded="false">
+            <li class="gnc-mobile-item <?= $isAbout ? 'active' : '' ?>">
+                <a href="#" class="gnc-mobile-link" data-bs-toggle="collapse" data-bs-target="#mAbout" aria-expanded="<?= $isAbout ? 'true' : 'false' ?>">
                     <i class="bi bi-people-fill"></i>
                     <span>About</span>
                     <i class="bi bi-chevron-down gnc-chevron ms-auto"></i>
                 </a>
-                <div class="collapse gnc-submenu" id="mAbout">
+                <div class="collapse gnc-submenu <?= $isAbout ? 'show' : '' ?>" id="mAbout">
                     <ul class="list-unstyled mb-0">
                         <li><a href="/about/history.php">History of GNC</a></li>
                         <li><a href="/about/vision-mission.php">Vision and Mission</a></li>
@@ -135,13 +155,13 @@
                 </div>
             </li>
 
-            <li class="gnc-mobile-item">
-                <a href="#" class="gnc-mobile-link" data-bs-toggle="collapse" data-bs-target="#mAcademics" aria-expanded="false">
+            <li class="gnc-mobile-item <?= $isAcademics ? 'active' : '' ?>">
+                <a href="#" class="gnc-mobile-link" data-bs-toggle="collapse" data-bs-target="#mAcademics" aria-expanded="<?= $isAcademics ? 'true' : 'false' ?>">
                     <i class="bi bi-mortarboard-fill"></i>
                     <span>Academics</span>
                     <i class="bi bi-chevron-down gnc-chevron ms-auto"></i>
                 </a>
-                <div class="collapse gnc-submenu" id="mAcademics">
+                <div class="collapse gnc-submenu <?= $isAcademics ? 'show' : '' ?>" id="mAcademics">
                     <ul class="list-unstyled mb-0">
                         <li><a href="/academics/basic-education.php">Basic Education</a></li>
                         <li><a href="/academics/college.php">College</a></li>
@@ -150,13 +170,13 @@
                 </div>
             </li>
 
-            <li class="gnc-mobile-item">
-                <a href="#" class="gnc-mobile-link" data-bs-toggle="collapse" data-bs-target="#mAdmissions" aria-expanded="false">
+            <li class="gnc-mobile-item <?= $isAdmissions ? 'active' : '' ?>">
+                <a href="#" class="gnc-mobile-link" data-bs-toggle="collapse" data-bs-target="#mAdmissions" aria-expanded="<?= $isAdmissions ? 'true' : 'false' ?>">
                     <i class="bi bi-file-earmark-text-fill"></i>
                     <span>Admissions</span>
                     <i class="bi bi-chevron-down gnc-chevron ms-auto"></i>
                 </a>
-                <div class="collapse gnc-submenu" id="mAdmissions">
+                <div class="collapse gnc-submenu <?= $isAdmissions ? 'show' : '' ?>" id="mAdmissions">
                     <ul class="list-unstyled mb-0">
                         <li><a href="/admissions/requirements.php">Admission Requirements</a></li>
                         <li><a href="/admissions/enrollment-procedures.php">Enrollment Procedures</a></li>
@@ -167,13 +187,13 @@
                 </div>
             </li>
 
-            <li class="gnc-mobile-item">
-                <a href="#" class="gnc-mobile-link" data-bs-toggle="collapse" data-bs-target="#mStudentLife" aria-expanded="false">
+            <li class="gnc-mobile-item <?= $isStudentLife ? 'active' : '' ?>">
+                <a href="#" class="gnc-mobile-link" data-bs-toggle="collapse" data-bs-target="#mStudentLife" aria-expanded="<?= $isStudentLife ? 'true' : 'false' ?>">
                     <i class="bi bi-people-fill"></i>
                     <span>Student Life</span>
                     <i class="bi bi-chevron-down gnc-chevron ms-auto"></i>
                 </a>
-                <div class="collapse gnc-submenu" id="mStudentLife">
+                <div class="collapse gnc-submenu <?= $isStudentLife ? 'show' : '' ?>" id="mStudentLife">
                     <ul class="list-unstyled mb-0">
                         <li><a href="/student-life/organizations.php">Student Organization</a></li>
                         <li><a href="/student-life/leadership-programs.php">Student Leadership Programs</a></li>

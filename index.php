@@ -267,23 +267,45 @@ try {
     $evtRangeStart = sprintf('%04d-%02d-01 00:00:00', $evtYear, $evtMonth);
     $evtRangeEnd   = date('Y-m-d 23:59:59', mktime(0, 0, 0, $evtMonth, $evtDaysInMonth, $evtYear));
 
+    // Overlap condition: include any event that touches this month at all,
+    // not just ones that *start* in it — so multi-day events that started
+    // last month but run into this one still show up.
     $stmt = $db->prepare("
         SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, c.category_name, c.category_color
         FROM events e
         LEFT JOIN categories c ON e.category_id = c.category_id
-        WHERE e.status = 'published' AND e.start_date BETWEEN ? AND ?
+        WHERE e.status = 'published'
+          AND e.start_date <= ?
+          AND COALESCE(e.end_date, e.start_date) >= ?
         ORDER BY e.start_date ASC
     ");
-    $stmt->execute([$evtRangeStart, $evtRangeEnd]);
+    $stmt->execute([$evtRangeEnd, $evtRangeStart]);
     $publicMonthEvents = $stmt->fetchAll();
 } catch (Exception $e) {
     $publicMonthEvents = [];
 }
 
+// Expand each event across every day it spans (clamped to this month),
+// so a "Jul 18 - Jul 20" event gets a chip on the 18th, 19th, and 20th —
+// matching how the admin calendar renders multi-day events.
 $publicEventsByDay = [];
+$evtMonthStartObj = new DateTime(date('Y-m-d', strtotime($evtRangeStart)));
+$evtMonthEndObj   = new DateTime(date('Y-m-d', strtotime($evtRangeEnd)));
+
 foreach ($publicMonthEvents as $ev) {
-    $day = (int)date('j', strtotime($ev['start_date']));
-    $publicEventsByDay[$day][] = $ev;
+    $evStartObj = new DateTime(date('Y-m-d', strtotime($ev['start_date'])));
+    $evEndObj   = new DateTime(date('Y-m-d', strtotime($ev['end_date'] ?: $ev['start_date'])));
+    if ($evEndObj < $evStartObj) $evEndObj = clone $evStartObj; // guard against bad data
+
+    // Clamp the event's span to the days that actually fall within this calendar month
+    $cursor  = $evStartObj > $evtMonthStartObj ? clone $evStartObj : clone $evtMonthStartObj;
+    $lastDay = $evEndObj   < $evtMonthEndObj   ? clone $evEndObj   : clone $evtMonthEndObj;
+
+    while ($cursor <= $lastDay) {
+        $day = (int)$cursor->format('j');
+        $publicEventsByDay[$day][] = $ev;
+        $cursor->modify('+1 day');
+    }
 }
 
 // Upcoming events (next 3 published, from today onward, any month)
@@ -348,14 +370,25 @@ try {
                     </video>
                     <?php endif; ?>
                 </div>
-            <?php else: ?>
+            <?php else:
+                // Desktop and mobile images are rendered as two completely separate
+                // layers. Which one is visible is decided purely by the browser's
+                // current viewport width (Bootstrap's d-none/d-md-block utilities),
+                // never by server-side device detection — so changing one image can
+                // never bleed into the other, and there's no UA string to misread.
+                $mobileMediaPath = $slide['media_path_mobile'] ?: $slide['media_path'];
+            ?>
                 <?php if ($isFirstSlide): ?>
-                <div class="slide-bg" style="background-image: url('<?= htmlspecialchars($slide['media_path']) ?>');"></div>
+                <div class="slide-bg d-none d-md-block" style="background-image: url('<?= htmlspecialchars($slide['media_path']) ?>');"></div>
+                <div class="slide-bg d-md-none" style="background-image: url('<?= htmlspecialchars($mobileMediaPath) ?>');"></div>
                 <?php else: ?>
-                <div class="slide-bg lazy-bg" data-bg="<?= htmlspecialchars($slide['media_path']) ?>"></div>
+                <div class="slide-bg lazy-bg d-none d-md-block" data-bg="<?= htmlspecialchars($slide['media_path']) ?>"></div>
+                <div class="slide-bg lazy-bg d-md-none" data-bg="<?= htmlspecialchars($mobileMediaPath) ?>"></div>
                 <?php endif; ?>
             <?php endif; ?>
+            <?php if ($slide['show_gradient'] === null || (int)$slide['show_gradient'] === 1): ?>
             <div class="slide-overlay"></div>
+            <?php endif; ?>
 
             <?php if ($titleLines || $slide['subtitle'] || $hasButtons): ?>
             <div class="container h-100">
@@ -459,8 +492,8 @@ try {
                 <span class="d-inline-block mb-2" style="color:#EABA3B;font-weight:700;font-size:.78rem;letter-spacing:1.5px;text-transform:uppercase;">
                     Latest Announcements
                 </span>
-                <h2 class="mb-2" style="font-family: 'Noto Serif', serif; color:#094024;font-weight:800;">Stay Updated, Stay Informed</h2>
-                <p class="text-muted mb-0">Get the latest news, events, and important updates from our official Facebook page.</p>
+                <h2 class="mb-2" style="font-family: 'Noto Serif', serif; color:#1F5E2C;font-weight:800;">Stay Updated, Stay Informed</h2>
+                <p class="text-muted mb-0">Get the latest news, events, and important updates</p>
             </div>
 
             <?php if (empty($publicAnnouncements)): ?>
@@ -523,7 +556,7 @@ try {
 
     <section class="gnc-events-cal py-5" id="events" style="background:#f7f8f6;">
         <div class="container">
-            <h2 class="mb-4" style="font-family:'Noto Serif', serif; color:#094024; font-weight:800;">Calendar of Events</h2>
+            <h2 class="mb-4" style="font-family:'Noto Serif', serif; color:#1F5E2C; font-weight:800;">Calendar of Events</h2>
 
             <div class="row g-4">
                 <div class="col-lg-7">
@@ -549,19 +582,28 @@ try {
 
                             <?php for ($day = 1; $day <= $evtDaysInMonth; $day++):
                                 $isToday = ($day == (int)date('j') && $evtMonth == (int)date('n') && $evtYear == (int)date('Y'));
-                                $dayHasEvent = !empty($publicEventsByDay[$day]);
-                                $dayTitles = $dayHasEvent ? implode("\n", array_map(fn($e) => $e['title'], $publicEventsByDay[$day])) : '';
-                                $dayColors = $dayHasEvent ? array_values(array_unique(array_map(fn($e) => evt_categoryColor($e['category_color'] ?? null, $e['category_name'] ?? null), $publicEventsByDay[$day]))) : [];
+                                $dayEvents = $publicEventsByDay[$day] ?? [];
+                                $dayHasEvent = !empty($dayEvents);
+                                $dayTitles = $dayHasEvent ? implode("\n", array_map(fn($e) => $e['title'], $dayEvents)) : '';
+                                $visibleEvents = array_slice($dayEvents, 0, 2);
+                                $extraCount = count($dayEvents) - count($visibleEvents);
                             ?>
                                 <div class="gnc-cal-cell<?= $isToday ? ' gnc-cal-today' : '' ?><?= $dayHasEvent ? ' gnc-cal-hasevent' : '' ?>"
                                      <?= $dayHasEvent ? 'title="' . htmlspecialchars($dayTitles) . '"' : '' ?>>
-                                    <?= $day ?>
+                                    <span class="gnc-cal-daynum"><?= $day ?></span>
                                     <?php if ($dayHasEvent): ?>
-                                        <span class="gnc-cal-dots">
-                                            <?php foreach (array_slice($dayColors, 0, 3) as $c): ?>
-                                                <span class="gnc-cal-dot" style="background:<?= $c ?>;"></span>
+                                        <div class="gnc-cal-events">
+                                            <?php foreach ($visibleEvents as $e):
+                                                $c = evt_categoryColor($e['category_color'] ?? null, $e['category_name'] ?? null);
+                                            ?>
+                                                <span class="gnc-cal-event-chip" style="background:<?= $c ?>22; color:<?= $c ?>;">
+                                                    <?= htmlspecialchars($e['title']) ?>
+                                                </span>
                                             <?php endforeach; ?>
-                                        </span>
+                                            <?php if ($extraCount > 0): ?>
+                                                <span class="gnc-cal-event-more">+<?= $extraCount ?> more</span>
+                                            <?php endif; ?>
+                                        </div>
                                     <?php endif; ?>
                                 </div>
                             <?php endfor; ?>
@@ -590,6 +632,9 @@ try {
                                         <div class="gnc-upcoming-title"><?= htmlspecialchars($ev['title']) ?></div>
                                         <div class="gnc-upcoming-date">
                                             <?= date('F j, Y', strtotime($ev['start_date'])) ?>
+                                            <?php if (!empty($ev['end_date']) && date('Y-m-d', strtotime($ev['end_date'])) !== date('Y-m-d', strtotime($ev['start_date']))): ?>
+                                                &ndash; <?= date('F j, Y', strtotime($ev['end_date'])) ?>
+                                            <?php endif; ?>
                                             <?php if (!empty($ev['location'])): ?>
                                                 · <?= htmlspecialchars($ev['location']) ?>
                                             <?php endif; ?>
@@ -631,7 +676,7 @@ try {
         <div class="container">
             <div class="gnc-programs-header lazy-bg" data-bg="assets/images/Section Header.png">
                 <span class="gnc-eyebrow">Academic Programs</span>
-                <h2 class="gnc-section-title">Shaping Minds, Building Futures</h2>
+                <h2 class="gnc-section-title" style="color: #1F5E2C;">Shaping Minds, Building Futures</h2>
                 <p class="text-muted mb-0">
                     Explore the services, personnel, and contact information of every office within Guagua National Colleges.
                 </p>
@@ -659,7 +704,7 @@ try {
                             <p class="gnc-program-desc">
                                 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
                             </p>
-                            <a href="#" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
+                            <a href="/pages/college-programs.php" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
                         </div>
                     </div>
                 </div>
@@ -705,8 +750,8 @@ try {
                 </div>
 
                 <div class="col-lg-7">
-                    <p class="gnc-president-eyebrow">A Warm Welcome to</p>
-                    <h2 class="gnc-president-title">Our New Students</h2>
+                    <p class="gnc-president-eyebrow" style="color: #1F5E2C;">A Warm Welcome to</p>
+                    <h2 class="gnc-president-title" style="color: #1F5E2C;">Our New Students</h2>
 
                     <p class="gnc-president-greeting">Welcome GNCians!</p>
 
@@ -734,7 +779,7 @@ try {
             display:flex; align-items:center; gap:.75rem;
             padding:1rem 1.25rem; border-bottom:1px solid #f0f0f0;
         }
-        .gnc-cal-title { font-weight:700; color:#094024; font-size:1.05rem; }
+        .gnc-cal-title { font-weight:700; color:#1F5E2C; font-size:1.05rem; }
         .gnc-cal-nav {
             width:32px; height:32px; border-radius:8px;
             display:flex; align-items:center; justify-content:center;
@@ -752,18 +797,32 @@ try {
             color:#999; text-transform:uppercase; padding-bottom:6px;
         }
         .gnc-cal-cell {
-            aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+            min-height:88px; display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start;
             font-size:.82rem; color:#444; border-radius:6px; position:relative;
+            padding:5px 4px; gap:3px; overflow:hidden;
         }
-        .gnc-cal-empty { background:none; }
+        .gnc-cal-empty { background:none; min-height:auto; }
+        .gnc-cal-daynum { line-height:1; }
         .gnc-cal-today { background:#DDEBFD; font-weight:700; color:#094024; border:1px solid #1877F2; }
         .gnc-cal-hasevent {
             background:#f3f6f3; font-weight:700; cursor:default;
         }
         .gnc-cal-hasevent.gnc-cal-today { background:#DDEBFD; border-color:#1877F2; }
-        .gnc-cal-dots { display:flex; gap:3px; margin-top:2px; }
+        .gnc-cal-events {
+            display:flex; flex-direction:column; gap:2px; width:100%;
+        }
+        .gnc-cal-event-chip {
+            display:flex; align-items:center; gap:4px;
+            font-size:.62rem; font-weight:600; line-height:1.2;
+            padding:2px 4px; border-radius:4px;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+            max-width:100%;
+        }
+        .gnc-cal-event-more {
+            font-size:.6rem; font-weight:600; color:#888; padding:0 4px;
+        }
         .gnc-cal-dot {
-            display:inline-block; width:6px; height:6px; border-radius:50%;
+            display:inline-block; width:6px; height:6px; border-radius:50%; flex-shrink:0;
         }
         .gnc-cal-legend {
             display:flex; flex-wrap:wrap; gap:14px; padding:0 1.25rem 1rem;

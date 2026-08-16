@@ -306,7 +306,7 @@ body {
 }
 
 .gnc-pillars .pillar-title.fides-color    { color: #EABA3B; }
-.gnc-pillars .pillar-title.scientia-color { color: #094024; }
+.gnc-pillars .pillar-title.scientia-color { color: #1F5E2C; }
 .gnc-pillars .pillar-title.patria-color   { color: #b03030; }
 
 .gnc-pillars .pillar-desc {
@@ -517,7 +517,7 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    color: var(--gnc-green);
+    color: var(--gnc-green-light);
     font-weight: 700;
     font-size: .78rem;
     letter-spacing: 1px;
@@ -633,7 +633,7 @@ body {
 }
 
 .gnc-president-greeting {
-    color: var(--gnc-green);
+    color: var(--gnc-green-light);
     font-weight: 700;
     font-size: 1.05rem;
     margin-bottom: .75rem;

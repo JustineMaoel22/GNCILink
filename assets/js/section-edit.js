@@ -10,6 +10,13 @@ let currentMediaPath = null; // path of the media already saved on the server fo
 let currentMediaType = 'image';
 let objectUrlToRevoke = null;
 
+let currentMobileMediaPath = null; // mobile-specific image path (server path, or blob: url for a pending upload) — null means "no mobile override"
+let mobileObjectUrlToRevoke = null;
+let mobileMediaRemoved = false; // true when the admin explicitly cleared the mobile image on an existing slide
+
+let previewMode = 'desktop'; // 'desktop' | 'mobile'
+let currentGradient = true; // whether the dark gradient overlay renders on top of this slide's media
+
 /* ---------- Empty state / editor toggle ---------- */
 function showEmptyState() {
     editorEmpty.style.display = 'flex';
@@ -37,6 +44,7 @@ function setActiveListItem(id) {
 
 function resetForm() {
     if (objectUrlToRevoke) { URL.revokeObjectURL(objectUrlToRevoke); objectUrlToRevoke = null; }
+    if (mobileObjectUrlToRevoke) { URL.revokeObjectURL(mobileObjectUrlToRevoke); mobileObjectUrlToRevoke = null; }
 
     form.reset();
     document.getElementById('f-slide-id').value = 0;
@@ -46,11 +54,23 @@ function resetForm() {
     document.getElementById('btn2-fields').style.display = 'none';
     document.getElementById('f-mobile').checked = true;
     document.getElementById('f-mobile-label').textContent = 'Show';
+    document.getElementById('f-gradient').checked = true;
+    document.getElementById('f-gradient-label').textContent = 'On';
+    currentGradient = true;
     document.getElementById('f-status').value = 'published';
     currentMediaPath = null;
     currentMediaType = 'image';
     document.getElementById('media-filename').textContent = 'No file selected';
     document.getElementById('media-meta').textContent = 'Image or video';
+
+    currentMobileMediaPath = null;
+    mobileMediaRemoved = false;
+    document.getElementById('f-remove-mobile-media').value = '0';
+    document.getElementById('media-mobile-filename').textContent = 'Using desktop image';
+    document.getElementById('media-mobile-meta').textContent = 'No mobile-specific image set';
+    document.getElementById('btn-clear-mobile').classList.add('d-none');
+
+    setPreviewMode('desktop');
     updatePreview();
     updateCounters();
     clearAlert();
@@ -58,6 +78,7 @@ function resetForm() {
 
 function loadSlideIntoForm(slide) {
     if (objectUrlToRevoke) { URL.revokeObjectURL(objectUrlToRevoke); objectUrlToRevoke = null; }
+    if (mobileObjectUrlToRevoke) { URL.revokeObjectURL(mobileObjectUrlToRevoke); mobileObjectUrlToRevoke = null; }
 
     document.getElementById('f-slide-id').value = slide.slide_id;
     document.getElementById('f-title').value = (slide.title || '').replace(/\|/g, ' ');
@@ -79,10 +100,31 @@ function loadSlideIntoForm(slide) {
     document.getElementById('f-mobile').checked = !!Number(slide.show_on_mobile);
     document.getElementById('f-mobile-label').textContent = document.getElementById('f-mobile').checked ? 'Show' : 'Hide';
 
+    // show_gradient defaults to on for slides saved before this option existed
+    currentGradient = slide.show_gradient === undefined || slide.show_gradient === null
+        ? true
+        : !!Number(slide.show_gradient);
+    document.getElementById('f-gradient').checked = currentGradient;
+    document.getElementById('f-gradient-label').textContent = currentGradient ? 'On' : 'Off';
+
     currentMediaPath = slide.media_path;
     currentMediaType = slide.media_type;
     document.getElementById('media-filename').textContent = slide.media_path.split('/').pop();
     document.getElementById('media-meta').textContent = slide.media_type === 'video' ? 'Video' : 'Image';
+
+    // Mobile image is entirely independent of the desktop media above.
+    mobileMediaRemoved = false;
+    document.getElementById('f-remove-mobile-media').value = '0';
+    currentMobileMediaPath = slide.media_path_mobile || null;
+    if (currentMobileMediaPath) {
+        document.getElementById('media-mobile-filename').textContent = currentMobileMediaPath.split('/').pop();
+        document.getElementById('media-mobile-meta').textContent = 'Image';
+        document.getElementById('btn-clear-mobile').classList.remove('d-none');
+    } else {
+        document.getElementById('media-mobile-filename').textContent = 'Using desktop image';
+        document.getElementById('media-mobile-meta').textContent = 'No mobile-specific image set';
+        document.getElementById('btn-clear-mobile').classList.add('d-none');
+    }
 
     updatePreview();
     updateCounters();
@@ -98,6 +140,32 @@ async function fetchSlide(id) {
     showEditor();
 }
 
+/* ---------- Preview mode (Desktop / Mobile tabs) ---------- */
+function setPreviewMode(mode) {
+    previewMode = mode;
+    document.getElementById('mini-hero-wrap').classList.toggle('preview-mobile', mode === 'mobile');
+    document.getElementById('tab-desktop').classList.toggle('active', mode === 'desktop');
+    document.getElementById('tab-mobile').classList.toggle('active', mode === 'mobile');
+    document.getElementById('tab-desktop').setAttribute('aria-selected', mode === 'desktop');
+    document.getElementById('tab-mobile').setAttribute('aria-selected', mode === 'mobile');
+    updatePreview();
+}
+document.getElementById('tab-desktop').addEventListener('click', () => setPreviewMode('desktop'));
+document.getElementById('tab-mobile').addEventListener('click', () => setPreviewMode('mobile'));
+
+/* Resolves which media (type + path) should actually be shown for the current
+   preview mode. Desktop and mobile images are independent; mobile falls back
+   to the desktop media only when no mobile-specific image has been set. */
+function getActiveMedia() {
+    if (previewMode === 'mobile') {
+        if (currentMobileMediaPath) {
+            return { type: 'image', path: currentMobileMediaPath, isFallback: false };
+        }
+        return { type: currentMediaType, path: currentMediaPath, isFallback: true };
+    }
+    return { type: currentMediaType, path: currentMediaPath, isFallback: false };
+}
+
 /* ---------- Live preview ---------- */
 function updatePreview() {
     const title = document.getElementById('f-title').value;
@@ -109,20 +177,27 @@ function updatePreview() {
     document.getElementById('mini-sub').textContent = sub;
     document.getElementById('mini-btn1').textContent = btn1;
     document.getElementById('mini-btn2').textContent = btn2;
+    document.querySelector('.mini-hero-overlay').style.display = currentGradient ? 'block' : 'none';
 
     const bg  = document.getElementById('mini-hero-bg');
     const vid = document.getElementById('mini-hero-video');
+    const media = getActiveMedia();
 
-    if (currentMediaType === 'video' && currentMediaPath) {
+    if (media.type === 'video' && media.path) {
         bg.style.display = 'none';
         vid.style.display = 'block';
-        vid.src = currentMediaPath;
+        if (vid.src !== media.path) vid.src = media.path;
         vid.play().catch(() => {});
     } else {
         vid.style.display = 'none';
         bg.style.display = 'block';
-        bg.style.backgroundImage = currentMediaPath ? `url('${currentMediaPath}')` : 'none';
+        bg.style.backgroundImage = media.path ? `url('${media.path}')` : 'none';
     }
+
+    document.getElementById('mobile-fallback-note').classList.toggle(
+        'd-none',
+        !(previewMode === 'mobile' && media.isFallback && media.path)
+    );
 }
 
 function updateCounters() {
@@ -155,8 +230,13 @@ document.getElementById('f-btn2-toggle').addEventListener('change', e => {
 document.getElementById('f-mobile').addEventListener('change', e => {
     document.getElementById('f-mobile-label').textContent = e.target.checked ? 'Show' : 'Hide';
 });
+document.getElementById('f-gradient').addEventListener('change', e => {
+    currentGradient = e.target.checked;
+    document.getElementById('f-gradient-label').textContent = currentGradient ? 'On' : 'Off';
+    updatePreview();
+});
 
-/* ---------- Media upload preview ---------- */
+/* ---------- Media upload preview (Desktop) ---------- */
 document.getElementById('btn-upload').addEventListener('click', () => document.getElementById('f-media').click());
 document.getElementById('f-media').addEventListener('change', e => {
     const file = e.target.files[0];
@@ -170,6 +250,37 @@ document.getElementById('f-media').addEventListener('change', e => {
     currentMediaPath = url;
     document.getElementById('media-filename').textContent = file.name;
     document.getElementById('media-meta').textContent = currentMediaType === 'video' ? 'Video (new upload)' : 'Image (new upload)';
+    updatePreview(); // desktop change never touches mobile state
+});
+
+/* ---------- Media upload preview (Mobile) — fully independent of desktop ---------- */
+document.getElementById('btn-upload-mobile').addEventListener('click', () => document.getElementById('f-media-mobile').click());
+document.getElementById('f-media-mobile').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (mobileObjectUrlToRevoke) URL.revokeObjectURL(mobileObjectUrlToRevoke);
+    const url = URL.createObjectURL(file);
+    mobileObjectUrlToRevoke = url;
+
+    currentMobileMediaPath = url;
+    mobileMediaRemoved = false;
+    document.getElementById('f-remove-mobile-media').value = '0';
+    document.getElementById('media-mobile-filename').textContent = file.name;
+    document.getElementById('media-mobile-meta').textContent = 'Image (new upload)';
+    document.getElementById('btn-clear-mobile').classList.remove('d-none');
+    updatePreview(); // mobile change never touches desktop state
+});
+
+document.getElementById('btn-clear-mobile').addEventListener('click', () => {
+    if (mobileObjectUrlToRevoke) { URL.revokeObjectURL(mobileObjectUrlToRevoke); mobileObjectUrlToRevoke = null; }
+    document.getElementById('f-media-mobile').value = '';
+    currentMobileMediaPath = null;
+    mobileMediaRemoved = true; // tells the server to clear media_path_mobile on save
+    document.getElementById('f-remove-mobile-media').value = '1';
+    document.getElementById('media-mobile-filename').textContent = 'Using desktop image';
+    document.getElementById('media-mobile-meta').textContent = 'No mobile-specific image set';
+    document.getElementById('btn-clear-mobile').classList.add('d-none');
     updatePreview();
 });
 
@@ -214,6 +325,10 @@ form.addEventListener('submit', async e => {
     const fd = new FormData(form);
     fd.set('action', 'save');
     fd.set('show_on_mobile', document.getElementById('f-mobile').checked ? '1' : '0');
+    fd.set('show_gradient', document.getElementById('f-gradient').checked ? '1' : '0');
+    // If a new mobile file was chosen, that upload takes priority over "remove" on the server,
+    // but keep this explicit so the two never fall out of sync with the DOM.
+    fd.set('remove_mobile_media', mobileMediaRemoved ? '1' : '0');
     if (!document.getElementById('f-btn1-toggle').checked) { fd.set('btn1_text', ''); fd.set('btn1_link', ''); }
     if (!document.getElementById('f-btn2-toggle').checked) { fd.set('btn2_text', ''); fd.set('btn2_link', ''); }
 

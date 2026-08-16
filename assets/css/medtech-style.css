@@ -1,0 +1,578 @@
+:root {
+    --gnc-green:       #094024;
+    --gnc-green-dark:  #062018;
+    --gnc-green-mid:   #0d5c33;
+    --gnc-gold:        #EABA3B;
+    --gnc-gold-light:  #E2C06A;
+    --gnc-cream:       #F9F6F1;
+    --gnc-white:       #ffffff; 
+    --gnc-medtech:      #307056;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: var(--gnc-cream) !important;
+}
+
+/* =============================================
+NURSING PROGRAM HERO
+============================================= */
+.medtech-hero {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    min-height: 500px;
+}
+
+.medtech-hero .container {
+    position: relative;
+    z-index: 2;
+}
+
+/* Breadcrumb */
+.medtech-breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    margin-bottom: 1rem;
+    margin-top: 30px;
+}
+
+.medtech-breadcrumb a {
+    color: var(--gnc-medtech);
+    text-decoration: none;
+}
+
+.medtech-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.medtech-breadcrumb span {
+    color: var(--gnc-medtech);
+}
+
+.medtech-breadcrumb i {
+    font-size: 0.6rem;
+    color: var(--gnc-medtech);
+    opacity: 0.7;
+}
+
+/* Title & copy */
+.medtech-hero-content {
+    max-width: 600px;
+    margin-top: 50px;
+    margin-bottom: 2rem;
+}
+
+.medtech-title {
+    font-family: 'Noto Serif', serif;
+    font-size: 2.75rem;
+    font-weight: 800;
+    color: var(--gnc-medtech);
+    margin-bottom: 0.35rem;
+    line-height: 1.1;
+}
+
+.medtech-subtitle {
+    font-size: 1rem;
+    font-weight: 700;
+    font-style: italic;
+    color: var(--gnc-medtech);
+    margin-bottom: 0.65rem;
+}
+
+.medtech-desc {
+    font-size: 0.9rem;
+    color: black;
+    max-width: 800px;
+    margin-bottom: 1.75rem;
+}
+
+/* Badges row */
+.medtech-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.75rem;
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 1.1rem 1.5rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+    width: fit-content;
+}
+
+.medtech-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+}
+
+.medtech-badge i {
+    font-size: 1.6rem;
+    color: var(--gnc-medtech);
+}
+
+.medtech-badge div {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.medtech-badge strong {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--gnc-medtech);
+}
+
+.medtech-badge span {
+    font-size: 0.75rem;
+    color: #6b5c55;
+}
+
+.medtech-about {
+    background-color: #faf6f1;
+}
+
+/* Section title */
+.medtech-section-title {
+    color: var(--gnc-medtech);
+    font-weight: 700;
+    position: relative;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.medtech-section-title::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 40px;
+    height: 3px;
+    background-color: var(--gnc-medtech);
+}
+
+/* Modifier: gold underline (used on "About the Program") */
+.medtech-section-title--gold::after {
+    background-color: var(--gnc-gold);
+}
+
+.medtech-section-text {
+    color: #333;
+    line-height: 1.7;
+}
+
+/* =============================================
+VISION & MISSION
+============================================= */
+.medtech-vm-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.medtech-vm-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    background-color: var(--gnc-white);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+.medtech-vm-icon {
+    flex: 0 0 auto;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background-color: rgba(48, 112, 86, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/*
+   Icons are rendered as CSS masks (not <img> tags) so the SOURCE svg's
+   own baked-in fill color is ignored entirely and replaced with
+   background-color below. This is what makes both icons pick up the
+   same theme green regardless of what color the original .svg file was
+   authored in (this is why the Mission shield was showing red/orange
+   before: `color` does not apply to <img> elements, only mask-image +
+   background-color does).
+*/
+.medtech-vm-icon-mask {
+    display: block;
+    width: 32px;
+    height: 32px;
+    background-color: var(--gnc-medtech);
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+}
+
+.medtech-vm-icon-mask--vision {
+    -webkit-mask-image: url('/assets/images/svg/psychiatry.svg');
+    mask-image: url('/assets/images/svg/psychiatry.svg');
+}
+
+.medtech-vm-icon-mask--mission {
+    -webkit-mask-image: url('/assets/images/svg/shield_with_heart.svg');
+    mask-image: url('/assets/images/svg/shield_with_heart.svg');
+}
+
+.medtech-vm-card-title {
+    color: var(--gnc-medtech);
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+}
+
+.medtech-vm-card-text {
+    color: #6b6b6b;
+    font-size: 0.85rem;
+    line-height: 1.65;
+    margin: 0;
+}
+
+.medtech-seal{
+    width: 100%;
+    max-width: 400px;
+    height: auto;
+    margin-left: 100px;
+}
+
+/* =============================================
+CORE VALUES
+============================================= */
+.corevalue-subtitle {
+    color: #6b6b6b;
+    font-size: 0.85rem;
+    margin-top: -0.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.corevalue-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.corevalue-card {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background-color: var(--gnc-white);
+    border-left: 5px solid var(--gnc-medtech);
+    border-radius: 12px;
+    padding: 1.35rem 1.85rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+.corevalue-icon {
+    flex: 0 0 auto;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background-color: rgba(48, 112, 86, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.corevalue-icon-img {
+    width: 32px;
+    height: 32px;
+}
+
+.corevalue-titlegroup {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    min-width: 280px;
+    padding-right: 1.5rem;
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.corevalue-letter {
+    flex: 0 0 auto;
+    width: 60px;
+    font-family: 'Inter', sans-serif;
+    font-size: 3rem;
+    font-weight: bold;
+    color: var(--gnc-medtech);
+    line-height: 1;
+}
+
+.corevalue-title {
+    color: var(--gnc-medtech);
+    font-weight: bold;
+    font-size: 1.5rem;
+    margin: 0;
+    line-height: 1;
+}
+
+.corevalue-text {
+    flex: 1 1 auto;
+    color: #6b6b6b;
+    font-size: 0.95rem;
+    line-height: 1.65;
+    margin: 0;
+    padding-left: 0.35rem;
+}
+
+@media (max-width: 576px) {
+    .corevalue-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.6rem;
+    }
+    .corevalue-titlegroup {
+        min-width: auto;
+        border-right: none;
+        padding-right: 0;
+    }
+    .corevalue-text {
+        padding-left: 0;
+    }
+}
+
+/* =============================================
+WHY CHOOSE BSMLS
+============================================= */
+.medtech-why {
+    background-color: var(--gnc-cream);
+}
+
+.whychoose-subtitle {
+    color: #333;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    max-width: 900px;
+    margin-bottom: 2rem;
+}
+
+.whychoose-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.whychoose-card {
+    background-color: var(--gnc-white);
+    border-radius: 16px;
+    padding: 2rem 1.75rem;
+    text-align: center;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+.whychoose-illustration {
+    width: 100%;
+    max-width: 170px;
+    height: auto;
+    margin: 0 auto 1.25rem;
+    display: block;
+}
+
+.whychoose-title {
+    color: var(--gnc-medtech);
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.6rem;
+}
+
+.whychoose-desc {
+    color: #6b6b6b;
+    font-size: 0.85rem;
+    line-height: 1.65;
+    margin: 0;
+}
+
+@media (max-width: 991px) {
+    .whychoose-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 576px) {
+    .whychoose-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =============================================
+UNIFORM
+============================================= */
+.medtech-uniform {
+    background-color: #faf6f1;
+}
+
+.medtech-uniform-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.75rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+}
+
+.medtech-uniform-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.medtech-uniform-card img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 6px;
+}
+
+/* =============================================
+CAREER OPPORTUNITIES
+============================================= */
+.medtech-career {
+    background-color: var(--gnc-cream);
+}
+
+.career-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-top: 0.5rem;
+}
+
+.career-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.25rem;
+    background-color: var(--gnc-white);
+    border-radius: 14px;
+    padding: 1.25rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+.career-thumb {
+    flex: 0 0 auto;
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 10px;
+}
+
+.career-body {
+    flex: 1 1 auto;
+}
+
+.career-title {
+    color: var(--gnc-medtech);
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.4rem;
+}
+
+.career-desc {
+    color: #6b6b6b;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin: 0;
+}
+
+@media (max-width: 767px) {
+    .career-grid {
+        grid-template-columns: 1fr;
+    }
+    .career-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .career-thumb {
+        width: 100%;
+        height: 160px;
+    }
+}
+
+/* =============================================
+CTA BANNER
+============================================= */
+.medtech-cta-card {
+    background: #fff;
+    border-radius: 10px;
+    border-left: 5px solid var(--gnc-medtech);
+    padding: 1.25rem 1.75rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.medtech-cta-icon {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.medtech-cta-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.medtech-cta-text {
+    flex: 1 1 auto;
+}
+
+.medtech-cta-title {
+    color: var(--gnc-medtech);
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+}
+
+.medtech-cta-desc {
+    color: #666;
+    font-size: 0.82rem;
+    margin-bottom: 0;
+}
+
+.medtech-cta-action {
+    flex: 0 0 auto;
+}
+
+.medtech-cta-btn {
+    display: inline-block;
+    background-color: var(--gnc-medtech);
+    color: var(--gnc-white);
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 0.6rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.2s ease;
+}
+
+.medtech-cta-btn:hover {
+    background-color: var(--gnc-medtech);
+    color: var(--gnc-medtech);
+}

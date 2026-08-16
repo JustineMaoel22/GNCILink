@@ -66,7 +66,7 @@
                     <div class="gnc-footer-map">
                         <a href="https://www.google.com/maps/search/?api=1&query=Guagua+National+Colleges,+Pampanga" 
                         target="_blank" rel="noopener" class="gnc-footer-map-link">
-                            View on Google Maps
+                            View on Google Maps 
                         </a>
                         <iframe
                             src="https://maps.google.com/maps?q=Guagua+National+Colleges,+Pampanga&t=&z=16&ie=UTF8&iwloc=&output=embed"

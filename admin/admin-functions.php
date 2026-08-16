@@ -415,9 +415,16 @@ function getAnnouncements(array $filters = [], int $limit = 20, int $offset = 0)
         }
         
         if (isset($filters['search'])) {
-            $query .= " AND (a.title LIKE ? OR a.content LIKE ?)";
-            $params[] = '%' . $filters['search'] . '%';
-            $params[] = '%' . $filters['search'] . '%';
+            // Escape LIKE wildcard characters (% _ \) in the user-supplied
+            // search term so they can't widen the match pattern beyond what
+            // was intended. This is always bound as a parameter (never raw
+            // SQL), so it's not an injection risk either way — but leaving
+            // % / _ unescaped lets a "search" turn into an unintended
+            // wildcard scan.
+            $escapedSearch = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filters['search']);
+            $query .= " AND (a.title LIKE ? ESCAPE '\\\\' OR a.content LIKE ? ESCAPE '\\\\')";
+            $params[] = '%' . $escapedSearch . '%';
+            $params[] = '%' . $escapedSearch . '%';
         }
         
         if ($_SESSION['user_role'] === 'Content Editor') {
@@ -608,7 +615,7 @@ function verifyCSRFToken(string $token): bool {
  * Returns ['type' => 'image'|'video', 'path' => '/uploads/hero-slides/xxx.ext'] or null if no file given.
  * Throws an Exception with a user-friendly message on validation failure.
  */
-function uploadHeroMedia(?array $file): ?array {
+function uploadHeroMedia(?array $file, bool $imageOnly = false): ?array {
     if (empty($file) || $file['error'] === UPLOAD_ERR_NO_FILE) {
         return null;
     }
@@ -648,12 +655,14 @@ function uploadHeroMedia(?array $file): ?array {
         $type = 'image';
         $ext  = $allowedImages[$mime];
         $maxBytes = 10 * 1024 * 1024; // 10MB
-    } elseif (isset($allowedVideos[$mime])) {
+    } elseif (!$imageOnly && isset($allowedVideos[$mime])) {
         $type = 'video';
         $ext  = $allowedVideos[$mime];
         $maxBytes = 50 * 1024 * 1024; // 50MB
     } else {
-        throw new Exception('Unsupported file type. Allowed: JPG, PNG, GIF, WEBP, MP4, WEBM, MOV.');
+        throw new Exception($imageOnly
+            ? 'Unsupported file type. The mobile background must be an image (JPG, PNG, GIF, WEBP).'
+            : 'Unsupported file type. Allowed: JPG, PNG, GIF, WEBP, MP4, WEBM, MOV.');
     }
 
     if ($file['size'] > $maxBytes) {
@@ -712,10 +721,15 @@ function getHeroSlideById(int $id): ?array {
 
 /**
  * Create a new hero slide. Returns the new slide_id, or false on failure.
- * $data keys: title, subtitle, btn1_text, btn1_link, btn2_text, btn2_link, status, show_on_mobile
- * $media: ['type' => 'image'|'video', 'path' => '...'] from uploadHeroMedia()
+ * $data keys: title, subtitle, btn1_text, btn1_link, btn2_text, btn2_link, status, show_on_mobile, show_gradient
+ *   show_gradient controls whether the dark gradient overlay renders on top of this slide's
+ *   media on the public site (helps text stay readable). Defaults to on (1) when omitted.
+ * $media: ['type' => 'image'|'video', 'path' => '...'] from uploadHeroMedia() — the desktop background.
+ * $mobileMedia: optional ['type' => 'image', 'path' => '...'] — a separate, independent mobile background.
+ *               Pass null when the admin didn't upload a mobile-specific image; the public site then
+ *               falls back to the desktop media on mobile.
  */
-function createHeroSlide(array $data, array $media): int|false {
+function createHeroSlide(array $data, array $media, ?array $mobileMedia = null): int|false {
     try {
         $db = getDB();
 
@@ -724,13 +738,14 @@ function createHeroSlide(array $data, array $media): int|false {
 
         $stmt = $db->prepare("
             INSERT INTO hero_slides
-                (media_type, media_path, title, subtitle, btn1_text, btn1_link, btn2_text, btn2_link,
-                 display_order, status, show_on_mobile, created_by, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                (media_type, media_path, media_path_mobile, title, subtitle, btn1_text, btn1_link, btn2_text, btn2_link,
+                 display_order, status, show_on_mobile, show_gradient, created_by, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([
             $media['type'],
             $media['path'],
+            $mobileMedia['path'] ?? null,
             $data['title'] !== '' ? $data['title'] : null,
             $data['subtitle'] !== '' ? $data['subtitle'] : null,
             $data['btn1_text'] !== '' ? $data['btn1_text'] : null,
@@ -740,6 +755,7 @@ function createHeroSlide(array $data, array $media): int|false {
             $nextOrder,
             $data['status'] ?? 'published',
             !empty($data['show_on_mobile']) ? 1 : 0,
+            array_key_exists('show_gradient', $data) ? (!empty($data['show_gradient']) ? 1 : 0) : 1,
             $_SESSION['user_id'] ?? null,
         ]);
 
@@ -753,10 +769,16 @@ function createHeroSlide(array $data, array $media): int|false {
 }
 
 /**
- * Update an existing hero slide. $media is null if no new file was uploaded
+ * Update an existing hero slide. $media is null if no new desktop file was uploaded
  * (keeps the existing media_path/media_type).
+ *
+ * The mobile image is handled entirely independently of the desktop image:
+ *   - $mobileMedia !== null  → replace the mobile image with the new upload
+ *   - $removeMobileMedia === true → clear the mobile image (site falls back to desktop on mobile)
+ *   - otherwise → leave the existing mobile image untouched
+ * Changing the desktop image never affects the mobile image, and vice versa.
  */
-function updateHeroSlide(int $id, array $data, ?array $media = null): bool {
+function updateHeroSlide(int $id, array $data, ?array $media = null, ?array $mobileMedia = null, bool $removeMobileMedia = false): bool {
     try {
         $db = getDB();
         $existing = getHeroSlideById($id);
@@ -765,16 +787,25 @@ function updateHeroSlide(int $id, array $data, ?array $media = null): bool {
         $mediaType = $media['type'] ?? $existing['media_type'];
         $mediaPath = $media['path'] ?? $existing['media_path'];
 
+        if ($mobileMedia !== null) {
+            $mediaPathMobile = $mobileMedia['path'];
+        } elseif ($removeMobileMedia) {
+            $mediaPathMobile = null;
+        } else {
+            $mediaPathMobile = $existing['media_path_mobile'] ?? null;
+        }
+
         $stmt = $db->prepare("
             UPDATE hero_slides SET
-                media_type = ?, media_path = ?, title = ?, subtitle = ?,
+                media_type = ?, media_path = ?, media_path_mobile = ?, title = ?, subtitle = ?,
                 btn1_text = ?, btn1_link = ?, btn2_text = ?, btn2_link = ?,
-                status = ?, show_on_mobile = ?
+                status = ?, show_on_mobile = ?, show_gradient = ?
             WHERE slide_id = ?
         ");
         $stmt->execute([
             $mediaType,
             $mediaPath,
+            $mediaPathMobile,
             ($data['title'] ?? '') !== '' ? $data['title'] : null,
             ($data['subtitle'] ?? '') !== '' ? $data['subtitle'] : null,
             ($data['btn1_text'] ?? '') !== '' ? $data['btn1_text'] : null,
@@ -783,13 +814,21 @@ function updateHeroSlide(int $id, array $data, ?array $media = null): bool {
             ($data['btn2_link'] ?? '') !== '' ? $data['btn2_link'] : null,
             $data['status'] ?? 'published',
             !empty($data['show_on_mobile']) ? 1 : 0,
+            array_key_exists('show_gradient', $data) ? (!empty($data['show_gradient']) ? 1 : 0) : (int)($existing['show_gradient'] ?? 1),
             $id,
         ]);
 
-        // Remove the old file if it was replaced
+        // Remove the old desktop file if it was replaced — independent of the mobile file below.
         if ($media !== null && $existing['media_path'] && $existing['media_path'] !== $mediaPath) {
             $oldFile = __DIR__ . '/..' . $existing['media_path'];
             if (is_file($oldFile)) @unlink($oldFile);
+        }
+
+        // Remove the old mobile file if it was replaced or explicitly cleared — independent of desktop.
+        $oldMobilePath = $existing['media_path_mobile'] ?? null;
+        if ($oldMobilePath && $oldMobilePath !== $mediaPathMobile) {
+            $oldMobileFile = __DIR__ . '/..' . $oldMobilePath;
+            if (is_file($oldMobileFile)) @unlink($oldMobileFile);
         }
 
         logActivity($_SESSION['user_id'], 'UPDATE', 'hero_slides', $id, 'Updated slideshow slide');
@@ -816,6 +855,10 @@ function deleteHeroSlide(int $id): bool {
             if (!empty($slide['media_path'])) {
                 $file = __DIR__ . '/..' . $slide['media_path'];
                 if (is_file($file)) @unlink($file);
+            }
+            if (!empty($slide['media_path_mobile'])) {
+                $mobileFile = __DIR__ . '/..' . $slide['media_path_mobile'];
+                if (is_file($mobileFile)) @unlink($mobileFile);
             }
             logActivity($_SESSION['user_id'], 'DELETE', 'hero_slides', $id, 'Deleted slideshow slide');
         }

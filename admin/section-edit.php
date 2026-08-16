@@ -80,22 +80,40 @@ include __DIR__ . '/../components/header-admin.php';
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                 <input type="hidden" name="slide_id" id="f-slide-id" value="0">
 
+                <!-- Preview mode switch -->
+                <div class="preview-tabs" role="tablist" aria-label="Preview device">
+                    <button type="button" class="preview-tab active" id="tab-desktop" data-preview="desktop" role="tab" aria-selected="true">
+                        <i class="bi bi-display"></i> Desktop Preview
+                    </button>
+                    <button type="button" class="preview-tab" id="tab-mobile" data-preview="mobile" role="tab" aria-selected="false">
+                        <i class="bi bi-phone"></i> Mobile Preview
+                    </button>
+                </div>
+                <p class="small text-muted mb-2" style="margin-top:-.3rem">
+                    Mobile Preview is an approximation of the live site's layout, not a pixel-exact render.
+                </p>
+
                 <!-- Live preview -->
-                <div class="mini-hero" id="mini-hero">
-                    <div class="mini-hero-bg" id="mini-hero-bg"></div>
-                    <video id="mini-hero-video" muted loop playsinline style="display:none"></video>
-                    <div class="mini-hero-overlay"></div>
-                    <div class="mini-hero-content">
-                        <div class="mini-title" id="mini-title"></div>
-                        <div class="mini-sub" id="mini-sub"></div>
-                        <div class="mini-ctas">
-                            <span class="mini-btn mini-btn-primary" id="mini-btn1"></span>
-                            <span class="mini-btn mini-btn-secondary" id="mini-btn2"></span>
+                <div class="mini-hero-wrap" id="mini-hero-wrap">
+                    <div class="mini-hero" id="mini-hero">
+                        <div class="mini-hero-bg" id="mini-hero-bg"></div>
+                        <video id="mini-hero-video" muted loop playsinline style="display:none"></video>
+                        <div class="mini-hero-overlay"></div>
+                        <div class="mini-hero-content">
+                            <div class="mini-title" id="mini-title"></div>
+                            <div class="mini-sub" id="mini-sub"></div>
+                            <div class="mini-ctas">
+                                <span class="mini-btn mini-btn-primary" id="mini-btn1"></span>
+                                <span class="mini-btn mini-btn-secondary" id="mini-btn2"></span>
+                            </div>
                         </div>
+                        <div class="mini-arrow mini-arrow-prev"><i class="bi bi-chevron-left"></i></div>
+                        <div class="mini-arrow mini-arrow-next"><i class="bi bi-chevron-right"></i></div>
+                        <div class="mini-dots"><span class="active"></span><span></span><span></span></div>
                     </div>
-                    <div class="mini-arrow mini-arrow-prev"><i class="bi bi-chevron-left"></i></div>
-                    <div class="mini-arrow mini-arrow-next"><i class="bi bi-chevron-right"></i></div>
-                    <div class="mini-dots"><span class="active"></span><span></span><span></span></div>
+                </div>
+                <div class="small text-muted mt-1 d-none" id="mobile-fallback-note">
+                    <i class="bi bi-info-circle"></i> No mobile image set for this slide — showing the desktop image as a fallback.
                 </div>
 
                 <div class="row g-3 mt-1">
@@ -142,21 +160,53 @@ include __DIR__ . '/../components/header-admin.php';
                         </div>
                     </div>
 
-                    <!-- Background Media -->
-                    <div class="col-md-6">
-                        <label class="form-label">Background Media</label>
-                        <div class="d-flex align-items-center gap-2">
-                            <div class="media-swatch" id="media-swatch"><i class="bi bi-image"></i></div>
-                            <div class="flex-grow-1">
-                                <div class="small text-truncate" id="media-filename">No file selected</div>
-                                <div class="small text-muted" id="media-meta">Image or video</div>
+                    <!-- Background Media: Desktop + Mobile are independent -->
+                    <div class="col-12">
+                        <label class="form-label mb-2">Background Media</label>
+                        <div class="row g-3">
+                            <!-- Desktop background -->
+                            <div class="col-md-6">
+                                <div class="bg-media-field">
+                                    <div class="bg-media-field-label">
+                                        <i class="bi bi-display"></i> Desktop <span class="text-muted fw-normal">(image or video)</span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="media-swatch" id="media-swatch"><i class="bi bi-image"></i></div>
+                                        <div class="flex-grow-1">
+                                            <div class="small text-truncate" id="media-filename">No file selected</div>
+                                            <div class="small text-muted" id="media-meta">Image or video</div>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-upload">Upload</button>
+                                        <input type="file" id="f-media" name="media" accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime" hidden>
+                                    </div>
+                                </div>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-upload">Upload</button>
-                            <input type="file" id="f-media" name="media" accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime" hidden>
+
+                            <!-- Mobile background -->
+                            <div class="col-md-6">
+                                <div class="bg-media-field">
+                                    <div class="bg-media-field-label">
+                                        <i class="bi bi-phone"></i> Mobile <span class="text-muted fw-normal">(image only, optional)</span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="media-swatch" id="media-mobile-swatch"><i class="bi bi-image"></i></div>
+                                        <div class="flex-grow-1">
+                                            <div class="small text-truncate" id="media-mobile-filename">Using desktop image</div>
+                                            <div class="small text-muted" id="media-mobile-meta">No mobile-specific image set</div>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-upload-mobile">Upload</button>
+                                        <input type="file" id="f-media-mobile" name="media_mobile" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
+                                    </div>
+                                    <button type="button" class="btn btn-link btn-sm p-0 mt-1 d-none" id="btn-clear-mobile">
+                                        <i class="bi bi-x-circle"></i> Remove mobile image (fall back to desktop)
+                                    </button>
+                                    <input type="hidden" name="remove_mobile_media" id="f-remove-mobile-media" value="0">
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Status + Mobile -->
+                    <!-- Status + Mobile + Gradient -->
                     <div class="col-md-3">
                         <label class="form-label">Status</label>
                         <select class="form-select" id="f-status" name="status">
@@ -169,6 +219,13 @@ include __DIR__ . '/../components/header-admin.php';
                         <div class="form-check form-switch mt-2">
                             <input class="form-check-input" type="checkbox" id="f-mobile" checked>
                             <label class="form-check-label small" id="f-mobile-label">Show</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label d-block">Gradient Overlay</label>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" id="f-gradient" checked>
+                            <label class="form-check-label small" id="f-gradient-label">On</label>
                         </div>
                     </div>
                 </div>
@@ -313,6 +370,43 @@ include __DIR__ . '/../components/header-admin.php';
     padding: .2rem .4rem;
 }
 
+.preview-tabs {
+    display: flex;
+    gap: .4rem;
+    margin-bottom: .6rem;
+}
+
+.preview-tab {
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 20px;
+    padding: .35rem 1rem;
+    font-size: .78rem;
+    font-weight: 600;
+    color: #666;
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    cursor: pointer;
+    transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.preview-tab:hover {
+    border-color: rgba(9, 64, 36, 0.3);
+}
+
+.preview-tab.active {
+    background: var(--gnc-green);
+    border-color: var(--gnc-green);
+    color: #fff;
+}
+
+.mini-hero-wrap {
+    display: flex;
+    justify-content: center;
+    transition: all var(--transition);
+}
+
 .mini-hero {
     position: relative;
     width: 100%;
@@ -323,6 +417,66 @@ include __DIR__ . '/../components/header-admin.php';
     color: #fff;
     display: flex;
     align-items: center;
+    transition: aspect-ratio var(--transition), max-width var(--transition);
+}
+
+/* Mobile preview: simulate a phone-shaped frame instead of the wide desktop banner */
+/* Mobile preview: an edge-to-edge phone-width viewport, not a decorative device
+   mockup — this should track the real public site's mobile hero as closely as
+   possible. NOTE: font sizes / exact spacing below are still an approximation;
+   see /* PENDING */ note — swap in the real site's CSS values once available. */
+.mini-hero-wrap.preview-mobile {
+    background: #f4f4f4;
+    border-radius: 12px;
+    padding: 1.25rem 0;
+}
+
+.mini-hero-wrap.preview-mobile .mini-hero {
+    aspect-ratio: 9 / 17.5;
+    max-width: 260px;
+    border-radius: 0;
+    box-shadow: 0 0 0 1px #ddd;
+    align-items: center; /* real site's .container appears vertically centered, not bottom-anchored */
+}
+
+.mini-hero-wrap.preview-mobile .mini-hero-content {
+    max-width: 100%;
+    padding: 0 7%;
+}
+
+.mini-hero-wrap.preview-mobile .mini-title {
+    font-size: clamp(.78rem, 5vw, 1rem);
+}
+
+.mini-hero-wrap.preview-mobile .mini-sub {
+    font-size: .64rem;
+    margin-top: .3rem;
+}
+
+.mini-hero-wrap.preview-mobile .mini-btn {
+    font-size: .56rem;
+    padding: .3rem .65rem;
+}
+
+.mini-hero-wrap.preview-mobile .mini-arrow {
+    width: 22px;
+    height: 22px;
+    font-size: .7rem;
+}
+
+.mini-hero-wrap.preview-mobile .mini-dots span {
+    width: 5px;
+    height: 5px;
+}
+
+.bg-media-field-label {
+    font-size: .78rem;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: .4rem;
+    display: flex;
+    align-items: center;
+    gap: .35rem;
 }
 
 .mini-hero-bg {

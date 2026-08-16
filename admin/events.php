@@ -194,21 +194,34 @@ try {
                e.status, e.category_id, c.category_name, c.category_color
         FROM events e
         LEFT JOIN categories c ON e.category_id = c.category_id
-        WHERE e.start_date BETWEEN ? AND ?
+        WHERE e.start_date <= ?
+          AND COALESCE(e.end_date, e.start_date) >= ?
         ORDER BY e.start_date ASC
     ");
-    $stmt->execute([$rangeStart, $rangeEnd]);
+    $stmt->execute([$rangeEnd, $rangeStart]);
     $monthEvents = $stmt->fetchAll();
 } catch (Exception $e) {
     error_log('Get month events error: ' . $e->getMessage());
     $monthEvents = [];
 }
 
-// Group events by day number for quick lookup in the calendar grid
+// Group events by day number for quick lookup in the calendar grid.
+// Multi-day events (start_date .. end_date) are placed on every day they
+// span, not just their start day, so the end date is actually reflected
+// on the calendar.
 $eventsByDay = [];
 foreach ($monthEvents as $ev) {
-    $day = (int)date('j', strtotime($ev['start_date']));
-    $eventsByDay[$day][] = $ev;
+    $startTs = strtotime($ev['start_date']);
+    $endTs   = !empty($ev['end_date']) ? strtotime($ev['end_date']) : $startTs;
+    if ($endTs < $startTs) $endTs = $startTs; // guard against bad data
+
+    $spanStart = max($startTs, $firstOfMonth);
+    $spanEnd   = min($endTs, mktime(0, 0, 0, $month, $daysInMonth, $year));
+
+    for ($ts = $spanStart; $ts <= $spanEnd; $ts = strtotime('+1 day', $ts)) {
+        $day = (int)date('j', $ts);
+        $eventsByDay[$day][] = $ev;
+    }
 }
 
 // All events list (most recent first) for the management table below
@@ -359,7 +372,16 @@ include __DIR__ . '/../components/header-admin.php';
                                     <span class="text-muted">—</span>
                                 <?php endif; ?>
                             </td>
-                            <td style="font-size:.8rem"><?= date('M d, Y', strtotime($ev['start_date'])) ?></td>
+                            <td style="font-size:.8rem">
+                                <?php
+                                    $startLabel = date('M d, Y', strtotime($ev['start_date']));
+                                    if (!empty($ev['end_date']) && date('Y-m-d', strtotime($ev['end_date'])) !== date('Y-m-d', strtotime($ev['start_date']))) {
+                                        echo htmlspecialchars($startLabel . ' – ' . date('M d, Y', strtotime($ev['end_date'])));
+                                    } else {
+                                        echo htmlspecialchars($startLabel);
+                                    }
+                                ?>
+                            </td>
                             <td><span class="status-badge <?= $ev['status'] ?>"><?= ucfirst($ev['status']) ?></span></td>
                             <td style="font-size:.8rem"><?= htmlspecialchars(trim($ev['author']) ?: '—') ?></td>
                             <td>

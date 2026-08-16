@@ -104,28 +104,51 @@ function handleLogin() {
             exit;
         }
 
-        // Check for Remember Me token (skip OTP if valid token exists)
-        if ($rememberMe) {
-            $rememberToken = $_COOKIE['gnc_remember_me'] ?? null;
-            if ($rememberToken && verifyRememberToken($user['user_id'], $rememberToken)) {
-                loginUser($user);
-                echo json_encode([
-                    'success'  => true,
-                    'message'  => 'Logged in successfully',
-                    'redirect' => '/admin/admin-dash.php'
-                ]);
-                exit;
+        // Password OK — reset the throttling counters
+        $db->prepare("UPDATE users SET login_attempts = 0, locked_until = NULL WHERE user_id = ?")
+           ->execute([$user['user_id']]);
+
+        // ------------------------------------------------------------------
+        // Trusted device check.
+        //
+        // IMPORTANT: this check is INDEPENDENT of the current state of the
+        // "Remember this device" checkbox. A device that was remembered on a
+        // previous login must stay trusted for the full 30 days regardless
+        // of whether the box happens to be ticked on THIS particular login.
+        // The checkbox only controls whether a (new) 30-day trust window is
+        // created after this login completes — see below and
+        // handleOTPVerification().
+        // ------------------------------------------------------------------
+        $rememberToken = $_COOKIE['gnc_remember_me'] ?? null;
+
+        if ($rememberToken && verifyRememberToken((int) $user['user_id'], $rememberToken)) {
+            loginUser($user);
+
+            // If the user re-checked the box on an already-trusted device,
+            // refresh the 30-day window. If they unchecked it, we simply
+            // leave the existing trust alone — it will expire naturally.
+            if ($rememberMe) {
+                generateRememberToken((int) $user['user_id']);
             }
+
+            logActivity($user['user_id'], 'LOGIN', null, null, 'Successful login via trusted device (OTP skipped)');
+
+            echo json_encode([
+                'success'  => true,
+                'message'  => 'Logged in successfully',
+                'redirect' => '/admin/admin-dash.php'
+            ]);
+            exit;
         }
 
-        // Generate OTP
+        // No valid trusted-device token for this browser — normal OTP policy applies.
         $otp          = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $otpExpiresAt = date('Y-m-d H:i:s', time() + OTP_EXPIRY);
 
         // Store OTP in database
         $stmt = $db->prepare("
             UPDATE users
-            SET otp_code = ?, otp_expires_at = ?, login_attempts = 0, locked_until = NULL
+            SET otp_code = ?, otp_expires_at = ?
             WHERE user_id = ?
         ");
         $stmt->execute([$otp, $otpExpiresAt, $user['user_id']]);
@@ -137,6 +160,9 @@ function handleLogin() {
             $_SESSION['temp_user_id'] = $user['user_id'];
             $_SESSION['temp_email']   = $user['email'];
             $_SESSION['temp_name']    = $user['first_name'];
+            // This ONLY decides whether a new trusted-device token gets
+            // issued once OTP verification succeeds — it does not gate
+            // whether OTP is required in the first place.
             $_SESSION['remember_me']  = $rememberMe;
             $_SESSION['otp_attempts'] = 0;
 
@@ -218,7 +244,8 @@ function handleOTPVerification() {
         $stmt = $db->prepare("UPDATE users SET otp_code = NULL, otp_expires_at = NULL, otp_verified = 1 WHERE user_id = ?");
         $stmt->execute([$userId]);
 
-        // Handle Remember Me
+        // Handle Remember Me — only now, after OTP success, do we ever
+        // issue a NEW trusted-device token.
         if (!empty($_SESSION['remember_me'])) {
             generateRememberToken($userId);
         }
@@ -304,10 +331,23 @@ function handleResendOTP() {
  * Login user and set session
  */
 function loginUser(array $user) {
-    $_SESSION['user_id']    = $user['user_id'];
-    $_SESSION['user_email'] = $user['email'];
-    $_SESSION['user_role']  = $user['role'];
-    $_SESSION['user_name']  = $user['first_name'] . ' ' . $user['last_name'];
+    $_SESSION['user_id']       = $user['user_id'];
+    $_SESSION['user_email']    = $user['email'];
+    $_SESSION['user_role']     = $user['role'];
+    $_SESSION['user_name']     = $user['first_name'] . ' ' . $user['last_name'];
+    $_SESSION['otp_verified']  = true;
+    $_SESSION['last_activity'] = time();
+
+    // Keep this in sync with the structure verify-otp.php builds — admin-dash.php
+    // (and anything else reading $_SESSION['user']) expects it regardless of
+    // whether OTP ran this time or was skipped via a trusted device.
+    $_SESSION['user'] = [
+        'user_id'    => $user['user_id'],
+        'first_name' => $user['first_name'],
+        'last_name'  => $user['last_name'],
+        'email'      => $user['email'],
+        'role'       => $user['role'],
+    ];
 
     try {
         $db   = getDB();
@@ -408,22 +448,26 @@ function sendOTPEmailPHPMailer(string $email, string $firstName, string $otp): b
 }
 
 /**
- * Generate Remember Me token
+ * Generate (or refresh) a "remember this device" token for the given user.
+ * Stores a hashed token + explicit server-side expiry, and sets the cookie.
+ * Rotates the token every time it's called, so an old cookie value can
+ * never be replayed after a refresh.
  */
 function generateRememberToken(int $userId): bool {
     try {
         $token       = bin2hex(random_bytes(32));
         $hashedToken = hash('sha256', $token);
+        $expiresAt   = date('Y-m-d H:i:s', time() + (30 * 24 * 3600));
 
         $db   = getDB();
-        $stmt = $db->prepare("UPDATE users SET remember_token = ? WHERE user_id = ?");
-        $stmt->execute([$hashedToken, $userId]);
+        $stmt = $db->prepare("UPDATE users SET remember_token = ?, remember_token_expires_at = ? WHERE user_id = ?");
+        $stmt->execute([$hashedToken, $expiresAt, $userId]);
 
         setcookie('gnc_remember_me', $token, [
-            'expires'  => strtotime('+30 days'),
+            'expires'  => time() + (30 * 24 * 3600),
             'path'     => '/',
             'httponly' => true,
-            'secure'   => true,
+            'secure'   => isHttpsRequest(),
             'samesite' => 'Strict'
         ]);
 
@@ -435,14 +479,23 @@ function generateRememberToken(int $userId): bool {
 }
 
 /**
- * Verify Remember Me token
+ * Verify a "remember this device" token. Requires the DB-side token to
+ * match AND to not be past its stored expiry — the 30-day window is
+ * enforced server-side, not just by the browser's cookie lifetime.
  */
 function verifyRememberToken(int $userId, string $token): bool {
     try {
         $hashedToken = hash('sha256', $token);
 
         $db   = getDB();
-        $stmt = $db->prepare("SELECT remember_token FROM users WHERE user_id = ? AND remember_token IS NOT NULL");
+        $stmt = $db->prepare("
+            SELECT remember_token
+            FROM users
+            WHERE user_id = ?
+              AND remember_token IS NOT NULL
+              AND remember_token_expires_at IS NOT NULL
+              AND remember_token_expires_at > NOW()
+        ");
         $stmt->execute([$userId]);
         $user = $stmt->fetch();
 
@@ -451,4 +504,14 @@ function verifyRememberToken(int $userId, string $token): bool {
         error_log('Verify remember token error: ' . $e->getMessage());
         return false;
     }
+}
+
+/**
+ * Whether the current request is over HTTPS, so the remember-me cookie's
+ * "secure" flag can be set correctly in both local HTTP dev and production.
+ */
+function isHttpsRequest(): bool {
+    return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+        || (($_SERVER['SERVER_PORT'] ?? '') == 443);
 }
