@@ -1,21 +1,44 @@
 <?php
-// Determine current path (without query string) once, at the top of the partial.
-$currentPath = strtok($_SERVER['REQUEST_URI'], '?');
-
 /**
- * Returns true if $currentPath contains $needle anywhere.
- * Using "contains" instead of "starts with" so this still works
- * even if pages live under an extra folder, e.g. /pages/academics/nursing.php
+ * Shared navbar partial.
+ *
+ * HOW ACTIVE-SECTION HIGHLIGHTING WORKS:
+ * Before including this file, each page should declare which section it
+ * belongs to, e.g.:
+ *
+ *     <?php $activeSection = 'academics'; ?>
+ *     <?php include __DIR__ . '/../components/index-nav.php'; ?>
+ *
+ * Valid values: 'home', 'about', 'academics', 'admissions', 'student-life'.
+ * If a page doesn't declare $activeSection, we fall back to guessing from
+ * the URL path (kept only for pages that haven't been updated yet) — but
+ * the explicit variable is what you should rely on, since guessing from
+ * folder names breaks the moment a page doesn't live in a matching folder.
  */
-function gnc_section_active($needle, $currentPath) {
-    return strpos($currentPath, $needle) !== false;
+
+$activeSection = $activeSection ?? null;
+
+if ($activeSection === null) {
+    // Fallback guess (legacy behavior) — only used if a page forgot to set $activeSection.
+    $currentPath = strtok($_SERVER['REQUEST_URI'], '?');
+    if ($currentPath === '/' || $currentPath === '/index.php') {
+        $activeSection = 'home';
+    } elseif (strpos($currentPath, '/about/') !== false) {
+        $activeSection = 'about';
+    } elseif (strpos($currentPath, '/academics/') !== false || strpos($currentPath, 'college-programs') !== false) {
+        $activeSection = 'academics';
+    } elseif (strpos($currentPath, '/admissions/') !== false) {
+        $activeSection = 'admissions';
+    } elseif (strpos($currentPath, '/student-life/') !== false) {
+        $activeSection = 'student-life';
+    }
 }
 
-$isHome        = ($currentPath === '/' || $currentPath === '/index.php');
-$isAbout       = gnc_section_active('/about/', $currentPath);
-$isAcademics   = gnc_section_active('/academics/', $currentPath);
-$isAdmissions  = gnc_section_active('/admissions/', $currentPath);
-$isStudentLife = gnc_section_active('/student-life/', $currentPath);
+$isHome        = $activeSection === 'home';
+$isAbout       = $activeSection === 'about';
+$isAcademics   = $activeSection === 'academics';
+$isAdmissions  = $activeSection === 'admissions';
+$isStudentLife = $activeSection === 'student-life';
 ?>
 
 <nav class="navbar gnc-navbar sticky-top navbar-expand-lg shadow-sm">
@@ -164,7 +187,7 @@ $isStudentLife = gnc_section_active('/student-life/', $currentPath);
                 <div class="collapse gnc-submenu <?= $isAcademics ? 'show' : '' ?>" id="mAcademics">
                     <ul class="list-unstyled mb-0">
                         <li><a href="/academics/basic-education.php">Basic Education</a></li>
-                        <li><a href="/academics/college.php">College</a></li>
+                        <li><a href="/pages/college-programs.php">College</a></li>
                         <li><a href="/academics/graduate-school.php">Graduate School</a></li>
                     </ul>
                 </div>

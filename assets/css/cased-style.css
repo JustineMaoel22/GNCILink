@@ -1,0 +1,574 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+/* ==========================================================================
+   College of Arts, Sciences, and Education — Program Page
+   Guagua National Colleges, Inc.
+   ========================================================================== */
+
+.cased-intro,
+.cased-about,
+.cased-programs,
+.cased-dean {
+    --gnc-green: #0b4228;
+    --gnc-green-light: #1F5E2C;
+    --gnc-green-dark: #08331e;
+    --gnc-gold: #d3a63a;
+    --gnc-gold-light: #e9b93c;
+    --gnc-maroon: #8f1230;
+    --gnc-cream: #f9f6f1;
+    --gnc-text-dark: #202020;
+    --gnc-text-gray: #6b6b66;
+    --gnc-border: #e6e1d8;
+    font-family: 'Noto Serif', serif;
+}
+
+.cased-intro,
+.cased-about {
+    background-color: var(--gnc-cream);
+}
+
+/* ---------- Hero ---------- */
+.cased-hero {
+  position: relative;
+  background-color: var(--gnc-cream);
+  background-image: url('/assets/images/Section Header.png');
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: cover;
+  border-bottom: 1px solid var(--gnc-border);
+}
+
+.cased-hero-inner {
+  padding: 40px 15px 44px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.cased-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gnc-gold);
+  margin-bottom: 14px;
+}
+
+.cased-breadcrumb a {
+  color: var(--gnc-gold);
+  text-decoration: none;
+}
+
+.cased-breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.cased-breadcrumb i {
+  font-size: 10px;
+  color: var(--gnc-gold);
+  opacity: 0.8;
+}
+
+.cased-breadcrumb .cased-current {
+  color: var(--gnc-gold);
+}
+
+.cased-hero h1 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  color: var(--gnc-green-light);
+  font-size: clamp(28px, 4vw, 40px);
+  margin: 0 0 8px;
+}
+
+.cased-hero p {
+  font-family: 'Inter', sans-serif;
+  color: var(--gnc-text-gray);
+  font-size: 14px;
+  max-width: 520px;
+  margin: 0;
+}
+
+/* ---------- About section ---------- */
+.cased-about {
+  padding: 70px 15px;
+}
+
+.cased-about-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 60px;
+  align-items: start;
+}
+
+/* Logo cluster */
+.cased-logo-wrap {
+  position: relative;
+  width: 280px;
+  height: 280px;
+}
+
+.cased-logo-square {
+  position: absolute;
+  top: -14px;
+  left: 4px;
+  width: 130px;
+  height: 130px;
+  background: var(--gnc-gold-light);
+  border-radius: 8px;
+  z-index: 1;
+}
+
+.cased-logo {
+  position: relative;
+  z-index: 2;
+  width: 280px;
+  height: 280px;
+  object-fit: contain;
+  display: block;
+}
+
+.cased-dots {
+  position: absolute;
+  right: -6px;
+  bottom: 6px;
+  width: 78px;
+  height: 45px;
+  background-image: radial-gradient(circle, var(--gnc-green) 2.2px, transparent 2.6px);
+  background-size: 15px 15px;
+  z-index: 1;
+}
+
+/* About content */
+.cased-about-content {
+  padding-top: 6px;
+}
+
+.cased-eyebrow {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gnc-gold);
+  margin-bottom: 8px;
+}
+
+.cased-about-content h2 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  color: var(--gnc-green-light);
+  font-size: clamp(22px, 2.6vw, 28px);
+  margin: 0 0 16px;
+}
+
+.cased-about-content p {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--gnc-text-dark);
+  max-width: 100ch;
+  margin: 0 0 16px;
+}
+ 
+.cased-offers-label {
+  font-weight: 600;
+  margin-bottom: 6px !important;
+}
+
+.cased-offers-list {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  line-height: 1.0;
+  color: var(--gnc-text-dark);
+  margin: 0 0 16px;
+  padding-left: 20px;
+}
+
+.cased-offers-list li {
+  margin-bottom: 4px;
+}
+
+.cased-offers-list .offer-green {
+  color: var(--gnc-green-light);
+}
+
+.cased-offers-list .offer-gold {
+  color: var(--gnc-gold);
+}
+
+.cased-offers-list .offer-maroon {
+  color: var(--gnc-maroon);
+}
+
+/* ---------- Programs section ---------- */
+.cased-programs {
+  background-color: var(--gnc-cream);
+  padding: 60px 15px 80px;
+}
+
+.cased-programs-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.cased-programs-inner .cased-eyebrow {
+  margin-bottom: 8px;
+}
+
+.cased-programs-inner h2 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  color: var(--gnc-green-light);
+  font-size: clamp(22px, 2.6vw, 28px);
+  margin: 0 0 32px;
+}
+
+.cased-programs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.cased-program-card {
+  background: #fff;
+  border: 1px solid var(--gnc-border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cased-program-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
+}
+
+.cased-program-img {
+  width: 100%;
+  height: 190px;
+  overflow: hidden;
+}
+
+.cased-program-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cased-program-body {
+  padding: 20px 22px 24px;
+}
+
+.cased-program-body h3 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--gnc-green-light);
+  margin: 0 0 10px;
+}
+
+.cased-program-body p {
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--gnc-text-gray);
+  margin: 0 0 16px;
+}
+
+.cased-program-link {
+  font-family: 'Inter', sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--gnc-gold);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cased-program-link:hover {
+  color: var(--gnc-green-light);
+}
+
+.cased-program-link i {
+  font-size: 12px;
+}
+
+/* ---------- Head of Office / Meet the Dean section ---------- */
+.cased-dean {
+  background-color: var(--gnc-cream);
+  padding: 60px 15px 90px;
+}
+
+.cased-dean-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.cased-dean-intro {
+  max-width: 640px;
+  margin-bottom: 48px;
+}
+
+.cased-dean-intro h2 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  color: var(--gnc-green-light);
+  font-size: clamp(24px, 3vw, 32px);
+  margin: 0 0 10px;
+}
+
+.cased-dean-intro p {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: var(--gnc-text-gray);
+  line-height: 1.7;
+  margin: 0;
+}
+
+.cased-dean-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 70px;
+  align-items: start;
+}
+
+/* Photo cluster */
+.cased-dean-photo-wrap {
+  position: relative;
+  width: 300px;
+  padding-bottom: 30px;
+}
+
+.cased-dean-square {
+  position: absolute;
+  top: -18px;
+  left: -18px;
+  width: 130px;
+  height: 130px;
+  background: var(--gnc-gold-light);
+  border-radius: 8px;
+  z-index: 1;
+}
+
+.cased-dean-accent {
+  position: absolute;
+  right: -18px;
+  bottom: 0;
+  width: 90px;
+  height: 90px;
+  background: var(--gnc-gold-light);
+  border-radius: 8px;
+  z-index: 1;
+}
+
+.cased-dean-photo {
+  position: relative;
+  z-index: 2;
+  width: 260px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.15);
+}
+
+.cased-dean-photo img {
+  width: 100%;
+  height: 320px;
+  object-fit: cover;
+  display: block;
+}
+
+.cased-dean-badge {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  background: var(--gnc-green);
+  border-radius: 6px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cased-dean-badge-title {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--gnc-gold-light);
+}
+
+.cased-dean-badge-sub {
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #ffffff;
+}
+
+/* Content column */
+.cased-dean-content .cased-eyebrow {
+  margin-bottom: 8px;
+}
+
+.cased-dean-content h3 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  color: var(--gnc-green-light);
+  font-size: clamp(22px, 2.6vw, 27px);
+  margin: 0 0 14px;
+}
+
+.cased-dean-rule {
+  width: 60px;
+  height: 3px;
+  background: var(--gnc-gold);
+  margin: 0 0 20px;
+}
+
+.cased-dean-content p {
+  font-family: 'Inter', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: var(--gnc-text-dark);
+  max-width: 62ch;
+  margin: 0;
+}
+
+.cased-dean-divider {
+  border: none;
+  border-top: 1px solid var(--gnc-border);
+  margin: 28px 0 24px;
+}
+
+.cased-dean-contact {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.cased-dean-contact i {
+  color: var(--gnc-green-light);
+  font-size: 16px;
+  margin-top: 2px;
+}
+
+.cased-contact-label {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--gnc-green-light);
+  margin-bottom: 2px;
+}
+
+.cased-contact-value {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: var(--gnc-text-gray);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 991px) {
+  .cased-about-inner {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+
+  .cased-logo-wrap {
+    width: 220px;
+    height: 220px;
+    margin: 0 auto;
+  }
+
+  .cased-logo {
+    width: 220px;
+    height: 220px;
+  }
+
+  .cased-logo-square {
+    width: 100px;
+    height: 100px;
+  }
+
+  .cased-about-content {
+    text-align: center;
+  }
+
+  .cased-offers-list {
+    text-align: left;
+    display: inline-block;
+  }
+
+  .cased-programs-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cased-dean-grid {
+    grid-template-columns: 1fr;
+    gap: 60px;
+    justify-items: center;
+  }
+
+  .cased-dean-content {
+    text-align: center;
+    max-width: 560px;
+  }
+
+  .cased-dean-rule {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .cased-dean-contact {
+    text-align: left;
+    max-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+@media (max-width: 575px) {
+  .cased-hero-inner {
+    padding: 24px 15px 28px;
+  }
+
+  .cased-about {
+    padding: 44px 15px;
+  }
+
+  .cased-programs {
+    padding: 44px 15px 56px;
+  }
+
+  .cased-programs-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cased-dean {
+    padding: 44px 15px 56px;
+  }
+
+  .cased-dean-photo-wrap {
+    width: 260px;
+  }
+
+  .cased-dean-photo {
+    width: 220px;
+  }
+
+  .cased-dean-photo img {
+    height: 270px;
+  }
+}

@@ -331,6 +331,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guagua National Colleges</title>
     <link href="assets/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/css/base-style.css" rel="stylesheet">
     <link href="assets/css/navbar-style.css" rel="stylesheet">
     <link href="assets/css/footer-style.css" rel="stylesheet">
     <link href="assets/css/index-style.css?v=3" rel="stylesheet">
@@ -339,6 +340,7 @@ try {
 </head>
 <body>
 
+    <?php $activeSection = 'home'; ?>
     <?php include __DIR__ . '/components/index-nav.php'; ?>
 
     <?php if (!empty($heroSlides)): ?>

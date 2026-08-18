@@ -22,9 +22,7 @@
 .cp-hero {
   position: relative;
   background-color: var(--gnc-cream);
-  background-image:
-    linear-gradient(90deg, var(--gnc-cream) 0%, rgba(249, 246, 241, 0.55) 45%, rgba(249, 246, 241, 0.1) 70%),
-    url('/assets/images/Section Header.png');
+  background-image: url('/assets/images/Section Header.png');
   background-repeat: no-repeat;
   background-position: right center;
   background-size: cover;
@@ -80,7 +78,8 @@
 }
 
 .cp-hero p {
-  color: black;
+  font-family: 'Inter', sans-serif;
+  color: var(--gnc-text-gray);
   font-size: 15px;
   max-width: 520px;
   margin: 0;

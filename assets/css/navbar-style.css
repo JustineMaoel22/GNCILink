@@ -7,6 +7,7 @@
     --gnc-gold-light: #E2C06A;
     --gnc-white:      #F9F6F1;
     --gnc-dark:       #1a1a1a;
+    --gnc-nav-font:   'Inter', 'Segoe UI', Arial, sans-serif;
 }
 
 /* =============================================================
@@ -18,6 +19,7 @@
     padding-bottom: 0;
     min-height: 64px;
     z-index: 1030;
+    font-family: var(--gnc-nav-font);
 }
 
 .gnc-navbar .navbar-brand img {
@@ -41,10 +43,12 @@
     font-style: italic;
     line-height: 1;
     margin-top: 5px;
+    font-family: var(--gnc-nav-font);
 }
 
 .gnc-navbar .nav-link {
     color: rgba(255,255,255,0.88) !important;
+    font-family: var(--gnc-nav-font);
     font-size: 0.8rem;
     font-weight: 500;
     padding: 0.5rem 0.7rem !important;
@@ -106,6 +110,7 @@
     color: var(--gnc-green) !important;
     border: none;
     border-radius: 6px;
+    font-family: var(--gnc-nav-font);
     font-size: 0.78rem;
     font-weight: 700;
     padding: 0.42rem 1rem;
@@ -138,6 +143,7 @@
     margin-top: 0.4rem;
     min-width: 240px;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    font-family: var(--gnc-nav-font);
 }
 
 .gnc-navbar .gnc-dropdown-menu .dropdown-item {
@@ -168,6 +174,7 @@
     background-color: var(--gnc-green);
     width: 280px;
     color: rgba(255, 255, 255, 0.9);
+    font-family: var(--gnc-nav-font);
 }
 
 .gnc-offcanvas .offcanvas-header {
@@ -268,6 +275,7 @@
     color: #fff;
     font-size: 0.85rem;
     flex: 1;
+    font-family: var(--gnc-nav-font);
 }
 
 .gnc-mobile-search-input::placeholder {
@@ -287,6 +295,7 @@
     background-color: rgba(255,255,255,0.15);
     border: 1px solid rgba(255,255,255,0.3);
     color: white;
+    font-family: var(--gnc-nav-font);
     font-size: 0.82rem;
 }
 #search-box-item .form-control::placeholder { color: rgba(255,255,255,0.6); }
