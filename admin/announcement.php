@@ -108,7 +108,6 @@ include __DIR__ . '/../components/header-admin.php';
                 <option value="<?= htmlspecialchars($code) ?>" <?= $programFilter === $code ? 'selected' : '' ?>><?= htmlspecialchars($code === 'ALL' ? 'All Programs (Everyone)' : $code) ?></option>
                 <?php endforeach; ?>
             </select>
-            <button type="submit" class="btn btn-sm btn-outline-secondary flex-shrink-0"><i class="bi bi-search"></i></button>
         </form>
     </div>
     <style>
