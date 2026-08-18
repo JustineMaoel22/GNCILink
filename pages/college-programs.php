@@ -90,7 +90,7 @@
                         <h3>College of Arts, Sciences, and Education</h3>
                         <span class="cp-underline"></span>
                         <p>The College is dedicated to the holistic development of students, preparing highly motivated and competent educators who drive positive transformation in their communities while preserving and promoting Filipino historical and cultural heritage.</p>
-                        <a href="#" class="cp-view-link">View Programs <i class="bi bi-arrow-right"></i></a>
+                        <a href="/pages/academics/departments/cased.php" class="cp-view-link">View Programs <i class="bi bi-arrow-right"></i></a>
                     </div>
                 </div>
 

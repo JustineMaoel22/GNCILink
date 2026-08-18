@@ -177,6 +177,55 @@ function getActivityLogs(int $limit = 50, int $offset = 0): array {
 }
 
 // ============================================================
+// PROGRAM CATEGORIES
+// ============================================================
+
+/**
+ * Canonical list of academic program categories an announcement can be
+ * tagged with. Keys are the stored codes (announcements.program column),
+ * values are the full display names. 'ALL' is a real, selectable option
+ * meaning "this announcement applies to every program" — it is not the
+ * same thing as an empty/unfiltered list selection in the UI.
+ */
+function getProgramCategories(): array {
+    return [
+        'ALL'     => 'All Programs',
+        'BEEd'    => 'Bachelor of Elementary Education',
+        'BSEd'    => 'Bachelor of Secondary Education',
+        'BAEL'    => 'Bachelor of Arts in English Language',
+        'BSCE'    => 'Bachelor of Science in Civil Engineering',
+        'BSAIS'   => 'Bachelor of Science in Accounting Information Systems',
+        'BSA'     => 'Bachelor of Science in Accountancy',
+        'BSBA-FM' => 'Bachelor of Science in Business Administration major in Financial Management',
+        'BSCS'    => 'Bachelor of Science in Computer Science',
+        'BSIT'    => 'Bachelor of Science in Information Technology',
+        'BSHM'    => 'Bachelor of Science in Hospitality Management',
+        'BSTM'    => 'Bachelor of Science in Tourism Management',
+        'BSMLS'   => 'Bachelor of Science in Medical Laboratory Science',
+        'BSPh'    => 'Bachelor of Science in Pharmacy',
+        'BSN'     => 'Bachelor of Science in Nursing',
+    ];
+}
+
+/**
+ * Validate/normalize a submitted program code. Falls back to 'ALL' for
+ * anything missing or not on the approved list, so a tampered or stale
+ * form value can never write an arbitrary string into the column.
+ */
+function normalizeProgramCategory(?string $code): string {
+    $valid = getProgramCategories();
+    return isset($valid[$code]) ? $code : 'ALL';
+}
+
+/**
+ * Full display name for a stored program code (for badges, detail pages, etc).
+ */
+function getProgramCategoryLabel(?string $code): string {
+    $valid = getProgramCategories();
+    return $valid[$code] ?? $valid['ALL'];
+}
+
+// ============================================================
 // CONTENT MANAGEMENT FUNCTIONS
 // ============================================================
 
@@ -282,10 +331,12 @@ function createAnnouncement(array $data): ?int {
                 ? $data['status'] ?? 'draft' 
                 : 'pending';
         
+        $program = normalizeProgramCategory($data['program'] ?? null);
+
         $stmt = $db->prepare("
             INSERT INTO announcements 
-            (user_id, title, slug, content, category_id, featured_image, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+            (user_id, title, slug, content, category_id, program, featured_image, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         
         $result = $stmt->execute([
@@ -294,6 +345,7 @@ function createAnnouncement(array $data): ?int {
             $slug,
             $data['content'],
             $data['category_id'] ?? null,
+            $program,
             $data['featured_image'] ?? null,  // Use featured_image instead of media_id
             $status
         ]);
@@ -342,10 +394,14 @@ function updateAnnouncement(int $id, array $data): bool {
         if (array_key_exists('featured_image', $data)) {
             $featuredImage = $data['featured_image']; // may be null (removed) or a new media_id
         }
+
+        $program = array_key_exists('program', $data)
+            ? normalizeProgramCategory($data['program'])
+            : ($announcement['program'] ?? 'ALL');
         
         $stmt = $db->prepare("
             UPDATE announcements
-            SET title = ?, slug = ?, content = ?, category_id = ?, featured_image = ?, status = ?, updated_at = NOW()
+            SET title = ?, slug = ?, content = ?, category_id = ?, program = ?, featured_image = ?, status = ?, updated_at = NOW()
             WHERE announcement_id = ?
         ");
         
@@ -354,6 +410,7 @@ function updateAnnouncement(int $id, array $data): bool {
             $slug,
             $data['content'],
             $data['category_id'] ?? null,
+            $program,
             $featuredImage,
             $status,
             $id
@@ -412,6 +469,11 @@ function getAnnouncements(array $filters = [], int $limit = 20, int $offset = 0)
         if (isset($filters['status'])) {
             $query .= " AND a.status = ?";
             $params[] = $filters['status'];
+        }
+
+        if (isset($filters['program'])) {
+            $query .= " AND a.program = ?";
+            $params[] = $filters['program'];
         }
         
         if (isset($filters['search'])) {

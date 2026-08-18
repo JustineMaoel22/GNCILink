@@ -88,6 +88,7 @@ if ($postAction === 'create' || $postAction === 'update') {
                 'title'       => $title,
                 'content'     => $content,
                 'category_id' => !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
+                'program'     => normalizeProgramCategory($_POST['program'] ?? null),
             ];
 
             if ($isUpdate) {

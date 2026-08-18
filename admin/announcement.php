@@ -21,10 +21,12 @@ unset($_SESSION['flash_errors'], $_SESSION['flash_old']);
 // ============================================================
 // LIST DATA
 // ============================================================
-$statusFilter = $_GET['status'] ?? '';
-$search       = trim($_GET['search'] ?? '');
-$filters      = [];
+$statusFilter  = $_GET['status'] ?? '';
+$programFilter = $_GET['program'] ?? '';
+$search        = trim($_GET['search'] ?? '');
+$filters       = [];
 if ($statusFilter !== '') $filters['status'] = $statusFilter;
+if ($programFilter !== '') $filters['program'] = $programFilter;
 if ($search !== '') $filters['search'] = $search;
 
 $announcements = getAnnouncements($filters, 50, 0);
@@ -34,6 +36,8 @@ try {
 } catch (Exception $e) {
     $categories = [];
 }
+
+$programCategories = getProgramCategories();
 
 // Which modal (if any) should auto-open on load
 $modalMode    = $_GET['modal'] ?? '';   // '', 'create', or 'edit'
@@ -61,20 +65,64 @@ include __DIR__ . '/../components/header-admin.php';
     <?php endif; ?>
 </div>
 
+<style>
+    .program-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: .72rem;
+        font-weight: 600;
+        letter-spacing: .02em;
+        background: rgba(201, 162, 39, 0.14);
+        color: #8a6d1f;
+        border: 1px solid rgba(201, 162, 39, 0.35);
+        white-space: nowrap;
+    }
+    .program-badge-all {
+        background: rgba(31, 94, 44, 0.1);
+        color: #1f5e2c;
+        border-color: rgba(31, 94, 44, 0.3);
+    }
+    @media (max-width: 768px) {
+        #announcements-table th:nth-child(3),
+        #announcements-table td:nth-child(3) {
+            display: none; /* hide Category column on small screens, keep Program */
+        }
+    }
+</style>
+
 <div class="data-card">
-    <div class="data-card-header flex-wrap gap-2">
+    <div class="data-card-header flex-wrap gap-3 align-items-center">
         <span class="data-card-title"><i class="bi bi-megaphone-fill me-1"></i> All Announcements</span>
-        <form method="GET" class="ms-auto d-flex gap-2 flex-wrap" style="max-width:480px;width:100%">
-            <input type="text" name="search" id="announcement-search" class="form-control form-control-sm" placeholder="Search title or content..." value="<?= htmlspecialchars($search) ?>" style="max-width:220px">
-            <select name="status" class="form-select form-select-sm" style="max-width:140px" onchange="this.form.submit()">
+        <form method="GET" class="ms-auto d-flex flex-wrap align-items-center gap-2">
+            <input type="text" name="search" id="announcement-search" class="form-control form-control-sm" placeholder="Search title or content..." value="<?= htmlspecialchars($search) ?>" style="width:220px">
+            <select name="status" class="form-select form-select-sm" style="width:140px" onchange="this.form.submit()">
                 <option value="">All Status</option>
                 <?php foreach (['draft','pending','published','archived'] as $s): ?>
                 <option value="<?= $s ?>" <?= $statusFilter === $s ? 'selected' : '' ?>><?= ucfirst($s) ?></option>
                 <?php endforeach; ?>
             </select>
-            <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-search"></i></button>
+            <select name="program" class="form-select form-select-sm" style="width:170px" onchange="this.form.submit()">
+                <option value="">All Programs</option>
+                <?php foreach ($programCategories as $code => $label): ?>
+                <option value="<?= htmlspecialchars($code) ?>" <?= $programFilter === $code ? 'selected' : '' ?>><?= htmlspecialchars($code === 'ALL' ? 'All Programs (Everyone)' : $code) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-secondary flex-shrink-0"><i class="bi bi-search"></i></button>
         </form>
     </div>
+    <style>
+        @media (max-width: 767px) {
+            .data-card-header form[method="GET"] {
+                width: 100%;
+                margin-left: 0 !important;
+            }
+            .data-card-header form[method="GET"] input,
+            .data-card-header form[method="GET"] select {
+                width: 100% !important;
+            }
+        }
+    </style>
     <div class="table-responsive">
         <table class="table table-hover mb-0" id="announcements-table">
             <thead>
@@ -82,6 +130,7 @@ include __DIR__ . '/../components/header-admin.php';
                     <th style="width:64px">Image</th>
                     <th>Title</th>
                     <th>Category</th>
+                    <th>Program</th>
                     <th>Status</th>
                     <th>Author</th>
                     <th>Date</th>
@@ -90,7 +139,7 @@ include __DIR__ . '/../components/header-admin.php';
             </thead>
             <tbody>
                 <?php if (empty($announcements)): ?>
-                <tr><td colspan="7" class="text-center py-5 text-muted">No announcements found.</td></tr>
+                <tr><td colspan="8" class="text-center py-5 text-muted">No announcements found.</td></tr>
                 <?php else: foreach ($announcements as $a): ?>
                 <tr>
                     <td>
@@ -106,6 +155,7 @@ include __DIR__ . '/../components/header-admin.php';
                         <?= htmlspecialchars($a['title']) ?>
                     </td>
                     <td style="font-size:.82rem;color:#666"><?= htmlspecialchars($a['category_name'] ?? '—') ?></td>
+                    <td><span class="program-badge<?= ($a['program'] ?? 'ALL') === 'ALL' ? ' program-badge-all' : '' ?>"><?= htmlspecialchars($a['program'] ?? 'ALL') ?></span></td>
                     <td><span class="status-badge <?= $a['status'] ?>"><?= ucfirst($a['status']) ?></span></td>
                     <td style="font-size:.82rem"><?= htmlspecialchars(trim(($a['first_name'] ?? '') . ' ' . ($a['last_name'] ?? '')) ?: '—') ?></td>
                     <td style="font-size:.78rem;color:#888"><?= date('M d, Y', strtotime($a['created_at'])) ?></td>
@@ -116,6 +166,7 @@ include __DIR__ . '/../components/header-admin.php';
                                 data-id="<?= $a['announcement_id'] ?>"
                                 data-title="<?= htmlspecialchars($a['title'], ENT_QUOTES) ?>"
                                 data-category="<?= (int)($a['category_id'] ?? 0) ?>"
+                                data-program="<?= htmlspecialchars($a['program'] ?? 'ALL') ?>"
                                 data-status="<?= htmlspecialchars($a['status']) ?>"
                                 data-image="<?= htmlspecialchars($a['image_path'] ?? '') ?>"
                                 data-content-id="ann-content-<?= $a['announcement_id'] ?>"
@@ -204,7 +255,17 @@ include __DIR__ . '/../components/header-admin.php';
               </select>
             </div>
 
-            <div class="col-md-6">
+            <div class="col-md-4">
+              <label class="form-label">Program Category <span style="color:#dc3545">*</span></label>
+              <select name="program" id="modal-program" class="form-select" required>
+                <?php foreach ($programCategories as $code => $label): ?>
+                <option value="<?= htmlspecialchars($code) ?>"><?= $code === 'ALL' ? 'All Programs' : htmlspecialchars($code . ' — ' . $label) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <div class="form-text">Which program this announcement is for. Choose "All Programs" if it applies to everyone.</div>
+            </div>
+
+            <div class="col-md-4" style="min-width:220px">
               <label class="form-label">Featured Image</label>
               <input type="file" name="image" id="modal-image-input" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" style="display:block !important">
               <div class="form-text">JPG, PNG, GIF or WEBP. Max 10MB.</div>
@@ -218,7 +279,7 @@ include __DIR__ . '/../components/header-admin.php';
             </div>
 
             <?php if (hasPermission('publish_announcement')): ?>
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label">Status</label>
               <select name="status" id="modal-status" class="form-select">
                 <option value="draft">Save as Draft</option>
@@ -227,7 +288,7 @@ include __DIR__ . '/../components/header-admin.php';
               </select>
             </div>
             <?php else: ?>
-            <div class="col-md-6">
+            <div class="col-md-4">
               <div class="alert alert-secondary mb-0" style="font-size:.85rem">
                 <i class="bi bi-info-circle"></i> This will be submitted for approval before it appears on the public site.
               </div>
@@ -284,6 +345,7 @@ const announcementModal   = new bootstrap.Modal(announcementModalEl);
 
 const modalTitleInput   = document.getElementById('modal-title');
 const modalCategory     = document.getElementById('modal-category');
+const modalProgram      = document.getElementById('modal-program');
 const modalStatus       = document.getElementById('modal-status');
 const modalActionInput  = document.getElementById('modal-action');
 const modalIdInput      = document.getElementById('modal-announcement-id');
@@ -300,6 +362,7 @@ function resetModalForm() {
     modalQuill.setContents([]);
     modalActionInput.value = 'create';
     modalIdInput.value = '';
+    if (modalProgram) modalProgram.value = 'ALL';
     modalLabel.textContent = 'New Announcement';
     modalSaveLabel.textContent = 'Create Announcement';
     modalImagePreviewWrap.style.display = 'none';
@@ -321,6 +384,7 @@ function openEditModal(btn) {
 
     modalTitleInput.value = btn.dataset.title || '';
     if (modalCategory) modalCategory.value = btn.dataset.category || '';
+    if (modalProgram) modalProgram.value = btn.dataset.program || 'ALL';
     if (modalStatus) modalStatus.value = btn.dataset.status || 'draft';
 
     const contentTpl = document.getElementById(btn.dataset.contentId);
@@ -373,6 +437,7 @@ openCreateModal();
 modalTitleInput.value = <?= json_encode($flashOld['title'] ?? '') ?>;
 modalQuill.root.innerHTML = <?= json_encode($flashOld['content'] ?? '') ?>;
 if (modalCategory) modalCategory.value = <?= json_encode($flashOld['category_id'] ?? '') ?>;
+if (modalProgram) modalProgram.value = <?= json_encode($flashOld['program'] ?? 'ALL') ?>;
 if (modalStatus) modalStatus.value = <?= json_encode($flashOld['status'] ?? 'draft') ?>;
 <?php endif; ?>
 <?php elseif ($modalMode === 'edit' && !empty($modalEditing)): ?>
@@ -384,6 +449,7 @@ modalSaveLabel.textContent = 'Save Changes';
 modalTitleInput.value = <?= json_encode($modalEditing['title'] ?? '') ?>;
 modalQuill.root.innerHTML = <?= json_encode($modalEditing['content'] ?? '') ?>;
 if (modalCategory) modalCategory.value = <?= json_encode($modalEditing['category_id'] ?? '') ?>;
+if (modalProgram) modalProgram.value = <?= json_encode($modalEditing['program'] ?? 'ALL') ?>;
 if (modalStatus) modalStatus.value = <?= json_encode($modalEditing['status'] ?? 'draft') ?>;
 <?php if (!empty($modalEditing['image_path'])): ?>
 modalImagePreview.src = <?= json_encode($modalEditing['image_path']) ?>;
