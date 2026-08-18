@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>College of Arts and Sciences, and Education</title>
+    <title>College of Engineering</title>
     <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="/assets/css/base-style.css" rel="stylesheet">
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
@@ -24,12 +24,12 @@
                     <i class="bi bi-chevron-right"></i>
                     <a href="/academics">Academics</a>
                     <i class="bi bi-chevron-right"></i>
-                    <a href="/academics/college-programs">College Departments</a>
+                    <a href="/academics/college-programs">College Programs</a>
                     <i class="bi bi-chevron-right"></i>
-                    <span class="dept-current">College of Arts and Sciences, and Education</span>
+                    <span class="dept-current">College of Engineering</span>
                 </nav>
-                <h1>College of Arts and Sciences, and Education</h1>
-                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam auctor, nisl eget ultricies aliquet, nunc nisl aliquam nisl, eget ultricies nunc nisl eget nunc.</p>
+                <h1>College of Engineering</h1>
+                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
             </div>
         </div>
     </section>
@@ -39,23 +39,14 @@
 
             <div class="dept-logo-wrap">
                 <div class="dept-logo-square"></div>
-                <img src="/assets/images/logos/cased-logo.svg" alt="College of Arts, Sciences, and Education seal" class="dept-logo">
+                <img src="/assets/images/logos/coe-logo.svg" alt="College of Engineering seal" class="dept-logo">
                 <div class="dept-dots" aria-hidden="true"></div>
             </div>
 
             <div class="dept-about-content">
                 <span class="dept-eyebrow">Overview</span>
-                <h2>About the College of Arts, Sciences, and Education</h2>
-                <p>The college provides a wide range of academic programs and support services designed to foster the holistic development of its students.</p>
-
-                <p class="dept-offers-label">The college offers:</p>
-                <ul class="dept-offers-list">
-                    <li><strong class="offer-green">Specialized Courses</strong> &nbsp;- &nbsp;Enhances Professional Competence</li>
-                    <li><strong class="offer-gold">General Education Subjects</strong> - Promotes Intellectual Growth Across Disciplines</li>
-                    <li><strong class="offer-maroon">Professional Education Courses</strong> - Strengthen Pedagogical Knowledge And Teaching Skills</li>
-                </ul>
-
-                <p>Through these learning opportunities, the College prepares future educators and professionals to become competent, innovative, and socially responsible individuals who can effectively respond to the needs of their learners, communities, and professions.</p>
+                <h2>About the College of Engineering</h2>
+                <p>The College of Engineering provides comprehensive student support through enrollment assistance, academic advising, faculty consultation, career and licensure support, OJT coordination, student activities, and efficient document processing.</p>
             </div>
 
         </div>
@@ -70,38 +61,12 @@
 
                 <div class="dept-program-card">
                     <div class="dept-program-img">
-                        <img src="/assets/images/programs/beed.jpg" alt="Bachelor of Elementary Education">
+                        <img src="/assets/images/programs/bscoe.jpg" alt="Bachelor of Science in Civil Engineering">
                     </div>
                     <div class="dept-program-body">
-                        <h3>Bachelor of Elementary Education</h3>
-                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                        <a href="/academics/programs/beed" class="dept-program-link">
-                            VIEW DETAILS <i class="bi bi-arrow-right"></i>
-                        </a>
-                    </div>
-                </div>
-
-                <div class="dept-program-card">
-                    <div class="dept-program-img">
-                        <img src="/assets/images/programs/bsed.jpg" alt="Bachelor of Secondary Education">
-                    </div>
-                    <div class="dept-program-body">
-                        <h3>Bachelor of Secondary Education</h3>
-                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                        <a href="/academics/programs/bsed" class="dept-program-link">
-                            VIEW DETAILS <i class="bi bi-arrow-right"></i>
-                        </a>
-                    </div>
-                </div>
-
-                <div class="dept-program-card">
-                    <div class="dept-program-img">
-                        <img src="/assets/images/programs/aeng.jpg" alt="Bachelor of Arts in English Language">
-                    </div>
-                    <div class="dept-program-body">
-                        <h3>Bachelor of Arts in English Language</h3>
-                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                        <a href="/academics/programs/aeng" class="dept-program-link">
+                        <h3>Bachelor of Science in Civil Engineering</h3>
+                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+                        <a href="/academics/programs/bscoe" class="dept-program-link">
                             VIEW DETAILS <i class="bi bi-arrow-right"></i>
                         </a>
                     </div>
@@ -117,7 +82,7 @@
             <div class="dept-dean-intro">
                 <span class="dept-eyebrow">Leadership &amp; Organization</span>
                 <h2>Head of Office</h2>
-                <p>Meet the visionary leader guiding the College of Arts, Sciences, and Education in advancing academic excellence, innovation, and service.</p>
+                <p>Meet the visionary leader guiding the College of Engineering in advancing academic excellence, innovation, and service.</p>
             </div>
 
             <div class="dept-dean-grid">
@@ -125,10 +90,10 @@
                 <div class="dept-dean-photo-wrap">
                     <div class="dept-dean-square"></div>
                     <div class="dept-dean-photo">
-                        <img src="/assets/images/maam-mariz.png" alt="Annaliza V. Maris, Dean of the College of Arts, Sciences, and Education">
+                        <img src="/assets/images/maam-sacdalan.png" alt="Ma. Lydia P. Sacdalan, Dean of the College of Engineering">
                         <div class="dept-dean-badge">
                             <span class="dept-dean-badge-title">Dean</span>
-                            <span class="dept-dean-badge-sub">College of Arts, Sciences,<br>and Education</span>
+                            <span class="dept-dean-badge-sub">College of Engineering</span>
                         </div>
                     </div>
                     <div class="dept-dean-accent" aria-hidden="true"></div>
@@ -136,7 +101,7 @@
 
                 <div class="dept-dean-content">
                     <span class="dept-eyebrow">Meet the Dean</span>
-                    <h3>Annaliza V. Maris, LPT, MA</h3>
+                    <h3>Engr. Ma. Lydia P. Sacdalan, ME-1, MMEP, ENP, SO-3</h3>
                     <div class="dept-dean-rule"></div>
                     <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
 

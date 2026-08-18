@@ -706,7 +706,7 @@ try {
                             <p class="gnc-program-desc">
                                 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
                             </p>
-                            <a href="/pages/college-programs.php" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
+                            <a href="/pages/college-departments.php" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
                         </div>
                     </div>
                 </div>

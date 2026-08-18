@@ -100,7 +100,7 @@
                         <h3>College of Business Administration</h3>
                         <span class="cp-underline"></span>
                         <p>The College aims to produce competent and well-rounded individuals who are prepared for the rigors of leadership and the demands of contemporary business and technology.</p>
-                        <a href="#" class="cp-view-link">View Programs <i class="bi bi-arrow-right"></i></a>
+                        <a href="/pages/academics/departments/cba.php" class="cp-view-link">View Programs <i class="bi bi-arrow-right"></i></a>
                     </div>
                 </div>
 
@@ -110,7 +110,7 @@
                         <h3>College of Engineering</h3>
                         <span class="cp-underline"></span>
                         <p>The College produces competent, ethical, community-oriented and globally competitive engineers who play a key role in the effective and efficient integrated design and construction of physical, technological and environmental systems.</p>
-                        <a href="#" class="cp-view-link">View Programs <i class="bi bi-arrow-right"></i></a>
+                        <a href="/pages/academics/departments/coe.php" class="cp-view-link">View Programs <i class="bi bi-arrow-right"></i></a>
                     </div>
                 </div>
 
@@ -120,7 +120,7 @@
                         <h3>College of Allied Medical Programs</h3>
                         <span class="cp-underline"></span>
                         <p>The prepares future medical technologists and healthcare professionals through rigorous, research-based education, building the analytical and critical thinking skills needed for accurate diagnostics, medical innovation, and quality patient care.</p>
-                        <a href="#" class="cp-view-link">View Programs <i class="bi bi-arrow-right"></i></a>
+                        <a href="/pages/academics/departments/camp.php" class="cp-view-link">View Programs <i class="bi bi-arrow-right"></i></a>
                     </div>
                 </div>
 
@@ -130,7 +130,7 @@
                         <h3>College of Accountancy</h3>
                         <span class="cp-underline"></span>
                         <p>The College aims to produce passers with topnotchers in the Certified Public Accountancy Board Examination and Accounting Information System Certification/Licensure Examination by providing proper training and materials.</p>
-                        <a href="#" class="cp-view-link">View Programs <i class="bi bi-arrow-right"></i></a>
+                        <a href="/pages/academics/departments/coa.php" class="cp-view-link">View Programs <i class="bi bi-arrow-right"></i></a>
                     </div>
                 </div>
 
@@ -140,7 +140,7 @@
                         <h3>College of Nursing</h3>
                         <span class="cp-underline"></span>
                         <p>The College prepares students to become globally competitive nurses grounded in current healthcare standards and best practices, and instills values of compassion and service.</p>
-                        <a href="#" class="cp-view-link">View Programs <i class="bi bi-arrow-right"></i></a>
+                        <a href="/pages/academics/departments/conursing.php" class="cp-view-link">View Programs <i class="bi bi-arrow-right"></i></a>
                     </div>
                 </div>
 
