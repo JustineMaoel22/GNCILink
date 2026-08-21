@@ -22,9 +22,7 @@
         <div class="cp-hero">
             <div class="cp-hero-inner">
                 <nav class="cp-breadcrumb" aria-label="breadcrumb">
-                    <a href="/">Home</a>
-                    <i class="bi bi-chevron-right"></i>
-                    <a href="/academics">Academics</a>
+                    <span>Academics</span>
                     <i class="bi bi-chevron-right"></i>
                     <span class="cp-current">College Departments</span>
                 </nav>

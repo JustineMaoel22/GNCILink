@@ -1,0 +1,451 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+:root {
+    --gnc-green:       #094024;
+    --gnc-green-dark:  #062018;
+    --gnc-green-mid:   #0d5c33;
+    --gnc-gold:        #EABA3B;
+    --gnc-gold-light:  #E2C06A;
+    --gnc-cream:       #F9F6F1;
+    --gnc-white:       #ffffff;
+    --gnc-elementary:     #135E95;
+    --gnc-elementary-light: #A9C6EB;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: var(--gnc-cream) !important;
+}
+
+/* =============================================
+ELEMENTARY EDUCATION PROGRAM HERO
+============================================= */
+.educ-hero {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    min-height: 500px;
+}
+
+.educ-hero .container {
+    position: relative;
+    z-index: 2;
+}
+
+/* Breadcrumb */
+.educ-breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    margin-bottom: 1rem;
+    margin-top: 30px;
+}
+
+.educ-breadcrumb a {
+    color: var(--gnc-elementary);
+    text-decoration: none;
+}
+
+.educ-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.educ-breadcrumb span {
+    color: var(--gnc-elementary);
+}
+
+.educ-breadcrumb i {
+    font-size: 0.6rem;
+    color: var(--gnc-elementary);
+    opacity: 0.7;
+}
+
+/* Title & copy */
+.educ-hero-content {
+    max-width: 700px;
+    margin-top: 100px;
+    margin-bottom: 2rem;
+}
+
+.educ-title {
+    font-family: 'Noto Serif', serif;
+    font-size: 2.25rem;
+    font-weight: 800;
+    color: var(--gnc-elementary);
+    margin-bottom: 0.35rem;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.educ-subtitle {
+    font-size: 1rem;
+    font-weight: 700;
+    font-style: italic;
+    color: var(--gnc-elementary);
+    margin-bottom: 0.65rem;
+}
+
+.educ-desc {
+    font-size: 0.9rem;
+    color: #3a2e2a;
+    max-width: 610px;
+    margin-bottom: 1.75rem;
+}
+
+/* Badges row */
+.educ-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.75rem;
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 1.1rem 1.5rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+    width: fit-content;
+}
+
+.educ-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+}
+
+.educ-badge i {
+    font-size: 1.6rem;
+    color: var(--gnc-elementary);
+}
+
+.educ-badge div {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.educ-badge strong {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--gnc-elementary);
+}
+
+.educ-badge span {
+    font-size: 0.75rem;
+    color: black;
+}
+
+.educ-about {
+    background-color: #faf6f1;
+}
+
+/* Section title */
+.educ-section-title {
+    color: var(--gnc-elementary);
+    font-weight: 700;
+    position: relative;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.educ-section-title::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 40px;
+    height: 3px;
+    background-color: var(--gnc-elementary);
+}
+
+/* Modifier: gold underline */
+.educ-section-title--gold::after {
+    background-color: var(--gnc-gold);
+}
+
+.educ-section-text {
+    color: black;
+    line-height: 1.7;
+}
+
+/* Mission card */
+.educ-mission-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+}
+
+.educ-mission-icon {
+    width: 60px;
+    height: 60px;
+    min-width: 60px;
+    border-radius: 50%;
+    background-color: #e8f0fb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pillar-icon-img {
+    width: 40px;
+    height: 40px;
+}
+
+.educ-mission-title {
+    color: var(--gnc-elementary);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.educ-mission-text {
+    color: black;
+    font-size: 0.92rem;
+    margin-bottom: 0;
+}
+
+/* Seal */
+.educ-seal {
+    width: 300px;
+    height: 300px;
+    margin-left: 100px;
+}
+
+/* Why Choose section */
+.educ-why {
+    background-color: var(--gnc-cream);
+}
+
+.educ-why-intro {
+    color: black;
+    margin-bottom: 0;
+}
+
+.educ-why-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 1.75rem 1.5rem;
+    height: 100%;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    text-align: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.educ-why-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+.educ-why-img {
+    width: 100%;
+    max-width: 220px;
+    height: 160px;
+    object-fit: contain;
+    margin-bottom: 1rem;
+}
+
+.educ-why-title {
+    color: var(--gnc-elementary);
+    font-weight: 700;
+    margin-bottom: 0.6rem;
+}
+
+.educ-why-desc {
+    color: black;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-bottom: 0;
+}
+
+.educ-curriculum {
+    background-color: #faf6f1;
+}
+
+/* Career Opportunities section */
+.educ-careers {
+    background-color: var(--gnc-cream);
+}
+
+.educ-careers-intro {
+    color: black;
+    margin-bottom: 0;
+}
+
+.educ-career-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.75rem;
+    height: 100%;
+    display: flex;
+    align-items: stretch;
+    gap: 1rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.educ-career-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.educ-career-img {
+    flex: 0 0 130px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.educ-career-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.educ-career-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;  /* was: center */
+    padding: 0.5rem 0.5rem 0.5rem 0;
+}
+
+.educ-career-title {
+    color: var(--gnc-elementary);
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+    font-size: 1rem;
+}
+
+.educ-career-desc {
+    color: black;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin-bottom: 0;
+}
+
+@media (max-width: 480px) {
+    .educ-career-card {
+        flex-direction: column;
+    }
+
+    .educ-career-img {
+        flex: 0 0 160px;
+        width: 100%;
+    }
+}
+
+/* CTA banner */
+.educ-cta-card {
+    background: #fff;
+    border-radius: 10px;
+    border-left: 5px solid var(--gnc-elementary);
+    padding: 1.25rem 1.75rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.educ-cta-icon {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.educ-cta-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.educ-cta-text {
+    flex: 1 1 auto;
+}
+
+.educ-cta-title {
+    color: var(--gnc-elementary);
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+}
+
+.educ-cta-desc {
+    color: black;
+    font-size: 0.82rem;
+    margin-bottom: 0;
+}
+
+.educ-cta-action {
+    flex: 0 0 auto;
+}
+
+.educ-cta-btn {
+    display: inline-block;
+    background-color: var(--gnc-elementary);
+    color: var(--gnc-white);
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 0.6rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.2s ease;
+}
+
+.educ-cta-btn:hover {
+    background-color: var(--gnc-elementary-light);
+    color: var(--gnc-elementary);
+}
+
+@media (max-width: 767px) {
+    .educ-cta-card {
+        flex-wrap: wrap;
+    }
+
+    .educ-cta-action {
+        width: 100%;
+    }
+
+    .educ-cta-btn {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* Responsive */
+@media (max-width: 991px) {
+    .educ-photo-wrap {
+        margin-top: 2rem;
+        min-height: 260px;
+    }
+
+    .educ-title {
+        font-size: 1.6rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .educ-badges {
+        gap: 0.5rem;
+    }
+
+    .educ-badge {
+        padding: 0.45rem 0.75rem;
+    }
+}

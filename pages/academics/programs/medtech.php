@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GNC | Medtech</title>
+    <title>Medical Laboratory Science</title>
     <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
     <link href="/assets/css/footer-style.css" rel="stylesheet">
@@ -20,11 +20,9 @@
         <div class="row align-items-center g-0">
             <div class="col-lg-6">
                 <nav class="medtech-breadcrumb" aria-label="breadcrumb">
-                    <a href="/">HOME</a>
+                    <span>ACADEMICS</span>
                     <i class="bi bi-chevron-right"></i>
-                    <a href="/academics/college.php">ACADEMICS</a>
-                    <i class="bi bi-chevron-right"></i>
-                    <a href="#">COLLEGE OF ALLIED MEDICAL PROGRAMS</a>
+                    <a href="/pages/academics/departments/camp.php">COLLEGE OF ALLIED MEDICAL PROGRAMS</a>
                     <i class="bi bi-chevron-right"></i>
                     <span>BS IN MEDICAL LABORATORY SCIENCE</span>
                 </nav>
@@ -257,21 +255,23 @@
     <section class="medtech-uniform py-5" id="medtech-uniform">
         <div class="container">
             <h2 class="medtech-section-title medtech-section-title--gold">Uniform</h2>
+            <p>The prescribed uniform for BS Medical Laboratory Science reflects professionalism, cleanliness, and readiness for laboratory practice, it promotes discipline and helps students embody 
+                the standards expected of future medical laboratory professionals.</p>
 
             <div class="row g-4 justify-content-center mt-2">
                 <div class="col-lg-5 col-md-6">
                     <div class="medtech-uniform-card">
-                        <img src="/assets/images/medtech-unif-female.png" alt="Medtech Female Uniform" loading="lazy">
+                        <img src="/assets/images/medtech-unif-female.png" alt="Medtech Female Uniform" loading="lazy" onclick="openUniformLightbox(this.src, this.alt)">
                     </div>
                 </div>
                 <div class="col-lg-5 col-md-6">
                     <div class="medtech-uniform-card">
-                        <img src="/assets/images/medtech-unif-male.png" alt="Medtech Male Uniform" loading="lazy">
+                        <img src="/assets/images/medtech-unif-male.png" alt="Medtech Male Uniform" loading="lazy" onclick="openUniformLightbox(this.src, this.alt)">
                     </div>
                 </div>
                 <div class="col-lg-5 col-md-6">
                     <div class="medtech-uniform-card">
-                        <img src="/assets/images/medtech-unif-3rd&4th.png" alt="Medtech 3rd and 4th Year Uniform" loading="lazy">
+                        <img src="/assets/images/medtech-unif-3rd&4th.png" alt="Medtech 3rd and 4th Year Uniform" loading="lazy" onclick="openUniformLightbox(this.src, this.alt)">
                     </div>
                 </div>
             </div>
@@ -335,10 +335,39 @@
         </div>
     </section>
 
+    <!-- Uniform Lightbox -->
+    <div class="uniform-lightbox" id="uniformLightbox" onclick="closeUniformLightbox()">
+        <span class="uniform-lightbox-close" onclick="closeUniformLightbox()">&times;</span>
+        <img class="uniform-lightbox-img" id="uniformLightboxImg" src="" alt="">
+        <p class="uniform-lightbox-caption" id="uniformLightboxCaption"></p>
+    </div>
+
     <?php include_once __DIR__ . '/../../../components/index-footer.php'; ?>
     
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
+
+    <script>
+        function openUniformLightbox(src, caption) {
+            const lightbox = document.getElementById('uniformLightbox');
+            const img = document.getElementById('uniformLightboxImg');
+            const captionEl = document.getElementById('uniformLightboxCaption');
+            img.src = src;
+            captionEl.textContent = caption;
+            lightbox.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeUniformLightbox() {
+            const lightbox = document.getElementById('uniformLightbox');
+            lightbox.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeUniformLightbox();
+        });
+    </script>
 
 </body>
 </html>

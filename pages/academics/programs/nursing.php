@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GNC | Nursing</title>
+    <title>Nursing</title>
     <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
     <link href="/assets/css/footer-style.css" rel="stylesheet">
@@ -20,13 +20,13 @@
         <div class="row align-items-center g-0">
             <div class="col-lg-6">
                 <nav class="nursing-breadcrumb" aria-label="breadcrumb">
-                    <a href="/">HOME</a>
+                    <span>ACADEMICS</span>
                     <i class="bi bi-chevron-right"></i>
-                    <a href="/academics/college.php">ACADEMICS</a>
+                    <a href="/pages/college-departments.php">COLLEGE DEPARTMENTS</a>
                     <i class="bi bi-chevron-right"></i>
-                    <a href="#">COLLEGE OF ALLIED MEDICAL PROGRAMS</a>
+                    <a href="/pages/academics/departments/conursing.php">COLLEGE OF ALLIED MEDICAL PROGRAMS</a>
                     <i class="bi bi-chevron-right"></i>
-                    <span>BS IN NURSING</span>
+                    <span>NURSING</span>
                 </nav>
 
                 <div class="nursing-hero-content">
@@ -87,7 +87,7 @@
 
                     <div class="nursing-mission-card" id="our-mission">
                         <div class="nursing-mission-icon">
-                            <img src="/assets/images/svg/shield_with_heart.svg" class="pillar-icon-img" loading="lazy" decoding="async">            
+                            <img src="/assets/images/svg/shield_with_heart.svg" class="pillar-icon-img" loading="lazy">            
                         </div>
                         <div>
                             <h5 class="nursing-mission-title">Our Mission</h5>
@@ -102,7 +102,7 @@
 
                 <!-- Seal -->
                 <div class="col-lg-3 d-flex align-items-center justify-content-center">
-                    <img src="/assets/images/logos/bsn-logo.svg" alt="Guagua National Colleges, Inc. College of Nursing Seal" class="nursing-seal" loading="lazy">
+                    <img src="/assets/images/logos/con-logo.svg" alt="Guagua National Colleges, Inc. College of Nursing Seal" class="nursing-seal" loading="lazy">
                 </div>
             </div>
         </div>
@@ -193,12 +193,12 @@
             <div class="row g-4 justify-content-center mt-2">
                 <div class="col-lg-5 col-md-6">
                     <div class="nursing-uniform-card">
-                        <img src="/assets/images/nurs-unif-female.png" alt="Nursing Female Uniform" loading="lazy">
+                        <img src="/assets/images/nurs-unif-female.png" alt="Nursing Female Uniform" loading="lazy" onclick="openUniformLightbox(this.src, this.alt)">
                     </div>
                 </div>
                 <div class="col-lg-5 col-md-6">
                     <div class="nursing-uniform-card">
-                        <img src="/assets/images/nurs-unif-male.png" alt="Nursing Male Uniform" loading="lazy">
+                        <img src="/assets/images/nurs-unif-male.png" alt="Nursing Male Uniform" loading="lazy" onclick="openUniformLightbox(this.src, this.alt)">
                     </div>
                 </div>
             </div>
@@ -291,10 +291,39 @@
         </div>
     </section>
 
+    <!-- Uniform Lightbox -->
+    <div class="uniform-lightbox" id="uniformLightbox" onclick="closeUniformLightbox()">
+        <span class="uniform-lightbox-close" onclick="closeUniformLightbox()">&times;</span>
+        <img class="uniform-lightbox-img" id="uniformLightboxImg" src="" alt="">
+        <p class="uniform-lightbox-caption" id="uniformLightboxCaption"></p>
+    </div>
+
     <?php include_once __DIR__ . '/../../../components/index-footer.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
+
+    <script>
+        function openUniformLightbox(src, caption) {
+            const lightbox = document.getElementById('uniformLightbox');
+            const img = document.getElementById('uniformLightboxImg');
+            const captionEl = document.getElementById('uniformLightboxCaption');
+            img.src = src;
+            captionEl.textContent = caption;
+            lightbox.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeUniformLightbox() {
+            const lightbox = document.getElementById('uniformLightbox');
+            lightbox.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeUniformLightbox();
+        });
+    </script>
 
 </body>
 </html>

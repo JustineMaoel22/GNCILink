@@ -20,11 +20,9 @@
         <div class="dept-hero">
             <div class="dept-hero-inner">
                 <nav class="dept-breadcrumb" aria-label="breadcrumb">
-                    <a href="/">Home</a>
+                    <span>Academics</span>
                     <i class="bi bi-chevron-right"></i>
-                    <a href="/academics">Academics</a>
-                    <i class="bi bi-chevron-right"></i>
-                    <a href="/academics/college-programs">College Programs</a>
+                    <a href="/pages/college-departments.php">College Departments</a>
                     <i class="bi bi-chevron-right"></i>
                     <span class="dept-current">College of Business Administration</span>
                 </nav>
@@ -66,7 +64,7 @@
                     <div class="dept-program-body">
                         <h3>Bachelor of Science in Business Administration major in Financial Management</h3>
                         <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                        <a href="/academics/programs/bsba-fm" class="dept-program-link">
+                        <a href="/pages/academics/programs/finan-manage.php" class="dept-program-link">
                             VIEW DETAILS <i class="bi bi-arrow-right"></i>
                         </a>
                     </div>
@@ -79,7 +77,7 @@
                     <div class="dept-program-body">
                         <h3>Bachelor of Science in Computer Science</h3>
                         <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                        <a href="/academics/programs/bscs" class="dept-program-link">
+                        <a href="/pages/academics/programs/com-sci.php" class="dept-program-link">
                             VIEW DETAILS <i class="bi bi-arrow-right"></i>
                         </a>
                     </div>
@@ -92,7 +90,7 @@
                     <div class="dept-program-body">
                         <h3>Bachelor of Science in Information Technology</h3>
                         <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                        <a href="/academics/programs/bsit" class="dept-program-link">
+                        <a href="/pages/academics/programs/info-tech.php" class="dept-program-link">
                             VIEW DETAILS <i class="bi bi-arrow-right"></i>
                         </a>
                     </div>
@@ -105,7 +103,7 @@
                     <div class="dept-program-body">
                         <h3>Bachelor of Science in Hospitality Management</h3>
                         <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                        <a href="/academics/programs/bshm" class="dept-program-link">
+                        <a href="/pages/academics/programs/hospi-manage.php" class="dept-program-link">
                             VIEW DETAILS <i class="bi bi-arrow-right"></i>
                         </a>
                     </div>

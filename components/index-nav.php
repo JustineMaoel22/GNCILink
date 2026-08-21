@@ -84,7 +84,7 @@ $isStudentLife = $activeSection === 'student-life';
                        data-bs-toggle="dropdown" aria-expanded="false">Academics</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="academicsDropdown">
                         <li><a class="dropdown-item" href="/academics/basic-education.php">Basic Education</a></li>
-                        <li><a class="dropdown-item" href="/pages/college-programs.php">College</a></li>
+                        <li><a class="dropdown-item" href="/pages/college-departments.php">College</a></li>
                         <li><a class="dropdown-item" href="/academics/graduate-school.php">Graduate School</a></li>
                     </ul>
                 </li>
@@ -187,7 +187,7 @@ $isStudentLife = $activeSection === 'student-life';
                 <div class="collapse gnc-submenu <?= $isAcademics ? 'show' : '' ?>" id="mAcademics">
                     <ul class="list-unstyled mb-0">
                         <li><a href="/academics/basic-education.php">Basic Education</a></li>
-                        <li><a href="/pages/college-programs.php">College</a></li>
+                        <li><a href="/pages/college-departments.php">College</a></li>
                         <li><a href="/academics/graduate-school.php">Graduate School</a></li>
                     </ul>
                 </div>

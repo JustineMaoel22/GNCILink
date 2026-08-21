@@ -20,11 +20,9 @@
         <div class="dept-hero">
             <div class="dept-hero-inner">
                 <nav class="dept-breadcrumb" aria-label="breadcrumb">
-                    <a href="/">Home</a>
+                    <span>Academics</span>
                     <i class="bi bi-chevron-right"></i>
-                    <a href="/academics">Academics</a>
-                    <i class="bi bi-chevron-right"></i>
-                    <a href="/academics/college-programs">College Programs</a>
+                    <a href="/pages/college-departments.php">College Departments</a>
                     <i class="bi bi-chevron-right"></i>
                     <span class="dept-current">College of Medical Allied Programs</span>
                 </nav>
@@ -61,12 +59,12 @@
 
                 <div class="dept-program-card">
                     <div class="dept-program-img">
-                        <img src="/assets/images/programs/bsmls.jpg" alt="Bachelor of Science in Medical Laboratory Science">
+                        <img src="/assets/images/medtech-pic.png" alt="Bachelor of Science in Medical Laboratory Science">
                     </div>
                     <div class="dept-program-body">
                         <h3>Bachelor of Science in Medical Laboratory Science</h3>
                         <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                        <a href="/academics/programs/bsmls" class="dept-program-link">
+                        <a href="/pages/academics/programs/medtech.php" class="dept-program-link">
                             VIEW DETAILS <i class="bi bi-arrow-right"></i>
                         </a>
                     </div>
