@@ -116,7 +116,7 @@
                     <div class="dept-program-body">
                         <h3>Bachelor of Science in Tourism Management</h3>
                         <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                        <a href="/academics/programs/btm" class="dept-program-link">
+                        <a href="/pages/academics/programs/tourism.php" class="dept-program-link">
                             VIEW DETAILS <i class="bi bi-arrow-right"></i>
                         </a>
                     </div>

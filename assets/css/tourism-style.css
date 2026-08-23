@@ -4,12 +4,13 @@
     --gnc-green:       #094024;
     --gnc-green-dark:  #062018;
     --gnc-green-mid:   #0d5c33;
+    --gnc-green-light: #287838;
     --gnc-gold:        #EABA3B;
     --gnc-gold-light:  #E2C06A;
     --gnc-cream:       #F9F6F1;
     --gnc-white:       #ffffff;
-    --gnc-elementary:     #135E95;
-    --gnc-elementary-light: #A9C6EB;
+    --gnc-tourism:     #5C198B;
+    --gnc-tourism-light: #EFE8F4;
 }
 
 * { box-sizing: border-box; }
@@ -23,22 +24,22 @@ body {
 }
 
 /* =============================================
-ELEMENTARY EDUCATION PROGRAM HERO
+TOURISM MANAGEMENT PROGRAM HERO
 ============================================= */
-.educ-hero {
+.tourism-hero {
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
     min-height: 500px;
 }
 
-.educ-hero .container {
+.tourism-hero .container {
     position: relative;
     z-index: 2;
 }
 
 /* Breadcrumb */
-.educ-breadcrumb {
+.tourism-breadcrumb {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -50,51 +51,50 @@ ELEMENTARY EDUCATION PROGRAM HERO
     margin-top: 30px;
 }
 
-.educ-breadcrumb a {
-    color: var(--gnc-elementary);
+.tourism-breadcrumb a {
+    color: var(--gnc-tourism);
     text-decoration: none;
 }
 
-.educ-breadcrumb a:hover {
+.tourism-breadcrumb a:hover {
     text-decoration: underline;
 }
 
-.educ-breadcrumb span {
-    color: var(--gnc-elementary);
+.tourism-breadcrumb span {
+    color: var(--gnc-tourism);
 }
 
-.educ-breadcrumb i {
+.tourism-breadcrumb i {
     font-size: 0.6rem;
-    color: var(--gnc-elementary);
+    color: var(--gnc-tourism);
     opacity: 0.7;
 }
 
 /* Title & copy */
-.educ-hero-content {
-    max-width: 700px;
+.tourism-hero-content {
+    max-width: 600px;
     margin-top: 100px;
     margin-bottom: 2rem;
 }
 
-.educ-title {
+.tourism-title {
     font-family: 'Noto Serif', serif;
     font-size: 2.75rem;
     font-weight: 800;
-    color: var(--gnc-elementary);
+    color: var(--gnc-tourism);
     margin-bottom: 0.35rem;
     line-height: 1.1;
-    white-space: nowrap;
 }
 
-.educ-subtitle {
+.tourism-subtitle {
     font-size: 1rem;
     font-weight: 700;
     font-style: italic;
-    color: var(--gnc-elementary);
+    color: var(--gnc-tourism);
     margin-bottom: 0.65rem;
 }
 
-.educ-desc {
+.tourism-desc {
     font-size: 0.9rem;
     color: #3a2e2a;
     max-width: 610px;
@@ -102,7 +102,7 @@ ELEMENTARY EDUCATION PROGRAM HERO
 }
 
 /* Badges row */
-.educ-badges {
+.tourism-badges {
     display: flex;
     flex-wrap: wrap;
     gap: 1.75rem;
@@ -113,7 +113,7 @@ ELEMENTARY EDUCATION PROGRAM HERO
     width: fit-content;
 }
 
-.educ-badge {
+.tourism-badge {
     display: flex;
     align-items: center;
     gap: 0.6rem;
@@ -123,63 +123,63 @@ ELEMENTARY EDUCATION PROGRAM HERO
     box-shadow: none;
 }
 
-.educ-badge i {
+.tourism-badge i {
     font-size: 1.6rem;
-    color: var(--gnc-elementary);
+    color: var(--gnc-tourism);
 }
 
-.educ-badge div {
+.tourism-badge div {
     display: flex;
     flex-direction: column;
     line-height: 1.15;
 }
 
-.educ-badge strong {
+.tourism-badge strong {
     font-size: 0.85rem;
     font-weight: 700;
-    color: var(--gnc-elementary);
+    color: var(--gnc-tourism);
 }
 
-.educ-badge span {
+.tourism-badge span {
     font-size: 0.75rem;
     color: black;
 }
 
-.educ-about {
+.tourism-about {
     background-color: #faf6f1;
 }
 
 /* Section title */
-.educ-section-title {
-    color: var(--gnc-elementary);
+.tourism-section-title {
+    color: var(--gnc-tourism);
     font-weight: 700;
     position: relative;
     padding-bottom: 0.5rem;
     margin-bottom: 1rem;
 }
 
-.educ-section-title::after {
+.tourism-section-title::after {
     content: "";
     position: absolute;
     left: 0;
     bottom: 0;
     width: 40px;
     height: 3px;
-    background-color: var(--gnc-elementary);
+    background-color: var(--gnc-tourism);
 }
 
-/* Modifier: gold underline */
-.educ-section-title--gold::after {
+/* Modifier: gold underline (used on "About the Program") */
+.tourism-section-title--gold::after {
     background-color: var(--gnc-gold);
 }
 
-.educ-section-text {
+.tourism-section-text {
     color: black;
     line-height: 1.7;
 }
 
 /* Mission card */
-.educ-mission-card {
+.tourism-mission-card {
     background: #fff;
     border-radius: 10px;
     padding: 1.5rem;
@@ -190,12 +190,12 @@ ELEMENTARY EDUCATION PROGRAM HERO
     box-shadow: 0 2px 10px rgba(0,0,0,0.04);
 }
 
-.educ-mission-icon {
+.tourism-mission-icon {
     width: 60px;
     height: 60px;
     min-width: 60px;
     border-radius: 50%;
-    background-color: #e8f0fb;
+    background-color: var(--gnc-tourism-light);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -206,36 +206,36 @@ ELEMENTARY EDUCATION PROGRAM HERO
     height: 40px;
 }
 
-.educ-mission-title {
-    color: var(--gnc-elementary);
+.tourism-mission-title {
+    color: var(--gnc-tourism);
     font-weight: 700;
     margin-bottom: 0.5rem;
 }
 
-.educ-mission-text {
+.tourism-mission-text {
     color: black;
     font-size: 0.92rem;
     margin-bottom: 0;
 }
 
 /* Seal */
-.educ-seal {
+.tourism-seal {
     width: 300px;
     height: 300px;
     margin-left: 100px;
 }
 
 /* Why Choose section */
-.educ-why {
+.tourism-why {
     background-color: var(--gnc-cream);
 }
 
-.educ-why-intro {
+.tourism-why-intro {
     color: black;
     margin-bottom: 0;
 }
 
-.educ-why-card {
+.tourism-why-card {
     background: #fff;
     border-radius: 10px;
     padding: 1.75rem 1.5rem;
@@ -245,12 +245,12 @@ ELEMENTARY EDUCATION PROGRAM HERO
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.educ-why-card:hover {
+.tourism-why-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
 
-.educ-why-img {
+.tourism-why-img {
     width: 100%;
     max-width: 220px;
     height: 160px;
@@ -258,34 +258,116 @@ ELEMENTARY EDUCATION PROGRAM HERO
     margin-bottom: 1rem;
 }
 
-.educ-why-title {
-    color: var(--gnc-elementary);
+.tourism-why-title {
+    color: var(--gnc-tourism);
     font-weight: 700;
     margin-bottom: 0.6rem;
 }
 
-.educ-why-desc {
+.tourism-why-desc {
     color: black;
     font-size: 0.9rem;
     line-height: 1.6;
     margin-bottom: 0;
 }
 
-.educ-curriculum {
+.tourism-uniform {
     background-color: #faf6f1;
 }
 
+/* Uniform card clickable image */
+.tourism-uniform-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.75rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+}
+
+.tourism-uniform-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.tourism-uniform-card img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* Uniform Lightbox */
+.uniform-lightbox {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.uniform-lightbox.active {
+    display: flex;
+    opacity: 1;
+}
+
+.uniform-lightbox-img {
+    max-width: 90%;
+    max-height: 80vh;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    animation: uniformLightboxZoom 0.25s ease;
+}
+
+@keyframes uniformLightboxZoom {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.uniform-lightbox-caption {
+    color: #fff;
+    margin-top: 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.uniform-lightbox-close {
+    position: absolute;
+    top: 20px;
+    right: 35px;
+    color: #fff;
+    font-size: 2.5rem;
+    font-weight: 300;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.uniform-lightbox-close:hover {
+    color: var(--gnc-tourism);
+}
+
 /* Career Opportunities section */
-.educ-careers {
+.tourism-careers {
     background-color: var(--gnc-cream);
 }
 
-.educ-careers-intro {
+.tourism-careers-intro {
     color: black;
     margin-bottom: 0;
 }
 
-.educ-career-card {
+.tourism-career-card {
     background: #fff;
     border-radius: 10px;
     padding: 0.75rem;
@@ -297,39 +379,39 @@ ELEMENTARY EDUCATION PROGRAM HERO
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.educ-career-card:hover {
+.tourism-career-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
 }
 
-.educ-career-img {
+.tourism-career-img {
     flex: 0 0 130px;
     border-radius: 8px;
     overflow: hidden;
 }
 
-.educ-career-img img {
+.tourism-career-img img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
 }
 
-.educ-career-content {
+.tourism-career-content {
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;  /* was: center */
+    justify-content: center;
     padding: 0.5rem 0.5rem 0.5rem 0;
 }
 
-.educ-career-title {
-    color: var(--gnc-elementary);
+.tourism-career-title {
+    color: var(--gnc-tourism);
     font-weight: 700;
     margin-bottom: 0.4rem;
     font-size: 1rem;
 }
 
-.educ-career-desc {
+.tourism-career-desc {
     color: black;
     font-size: 0.85rem;
     line-height: 1.5;
@@ -337,21 +419,31 @@ ELEMENTARY EDUCATION PROGRAM HERO
 }
 
 @media (max-width: 480px) {
-    .educ-career-card {
+    .tourism-career-card {
         flex-direction: column;
     }
 
-    .educ-career-img {
+    .tourism-career-img {
         flex: 0 0 160px;
         width: 100%;
     }
 }
 
+@media (max-width: 767px) {
+    .tourism-uniform-card {
+        margin-bottom: 0.5rem;
+    }
+}
+
 /* CTA banner */
-.educ-cta-card {
+.tourism-cta{
+    background-color: var(--gnc-cream);
+}
+
+.tourism-cta-card {
     background: #fff;
     border-radius: 10px;
-    border-left: 5px solid var(--gnc-elementary);
+    border-left: 5px solid var(--gnc-tourism);
     padding: 1.25rem 1.75rem;
     display: flex;
     align-items: center;
@@ -359,7 +451,7 @@ ELEMENTARY EDUCATION PROGRAM HERO
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
-.educ-cta-icon {
+.tourism-cta-icon {
     flex: 0 0 auto;
     width: 36px;
     height: 36px;
@@ -368,37 +460,37 @@ ELEMENTARY EDUCATION PROGRAM HERO
     justify-content: center;
 }
 
-.educ-cta-icon img {
+.tourism-cta-icon img {
     width: 100%;
     height: 100%;
     object-fit: contain;
 }
 
-.educ-cta-text {
+.tourism-cta-text {
     flex: 1 1 auto;
 }
 
-.educ-cta-title {
-    color: var(--gnc-elementary);
+.tourism-cta-title {
+    color: var(--gnc-tourism);
     font-weight: 700;
     font-size: 0.95rem;
     margin-bottom: 0.25rem;
 }
 
-.educ-cta-desc {
+.tourism-cta-desc {
     color: black;
     font-size: 0.82rem;
     margin-bottom: 0;
 }
 
-.educ-cta-action {
+.tourism-cta-action {
     flex: 0 0 auto;
 }
 
-.educ-cta-btn {
+.tourism-cta-btn {
     display: inline-block;
-    background-color: var(--gnc-elementary);
-    color: var(--gnc-white);
+    background-color: var(--gnc-tourism);
+    color: var(--gnc-tourism-light);
     font-weight: 700;
     font-size: 0.9rem;
     padding: 0.6rem 1.5rem;
@@ -408,21 +500,21 @@ ELEMENTARY EDUCATION PROGRAM HERO
     transition: background-color 0.2s ease;
 }
 
-.educ-cta-btn:hover {
-    background-color: var(--gnc-elementary-light);
-    color: var(--gnc-elementary);
+.tourism-cta-btn:hover {
+    background-color: var(--gnc-tourism-light);
+    color: var(--gnc-tourism);
 }
 
 @media (max-width: 767px) {
-    .educ-cta-card {
+    .tourism-cta-card {
         flex-wrap: wrap;
     }
 
-    .educ-cta-action {
+    .tourism-cta-action {
         width: 100%;
     }
 
-    .educ-cta-btn {
+    .tourism-cta-btn {
         width: 100%;
         text-align: center;
     }
@@ -430,22 +522,26 @@ ELEMENTARY EDUCATION PROGRAM HERO
 
 /* Responsive */
 @media (max-width: 991px) {
-    .educ-photo-wrap {
+    .tourism-photo-wrap {
         margin-top: 2rem;
         min-height: 260px;
     }
 
-    .educ-title {
-        font-size: 1.6rem;
+    .tourism-title {
+        font-size: 2.1rem;
+    }
+
+    .tourism-toc {
+        position: static; /* disable sticky on tablet/mobile where stacking makes it awkward */
     }
 }
 
 @media (max-width: 480px) {
-    .educ-badges {
+    .tourism-badges {
         gap: 0.5rem;
     }
 
-    .educ-badge {
+    .tourism-badge {
         padding: 0.45rem 0.75rem;
     }
 }
