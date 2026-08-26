@@ -1,0 +1,146 @@
+/* =============================================
+SKELETON LOADING
+Shared across all program pages. Wrap any <img> in
+a container with class "skeleton-wrap" to get a
+shimmer placeholder until the image finishes loading.
+
+Usage:
+  <div class="hospitality-career-img skeleton-wrap">
+      <img src="..." alt="..." loading="lazy">
+  </div>
+
+Pair with /assets/js/skeleton-loader.js, which toggles
+the "is-loaded" class once each image loads.
+============================================= */
+
+.skeleton-wrap {
+    position: relative;
+    overflow: hidden;
+    background-color: #e9e5e0;
+}
+
+.skeleton-wrap::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, #e9e5e0 25%, #f5f2ee 37%, #e9e5e0 63%);
+    background-size: 400% 100%;
+    animation: skeleton-shimmer 1.4s ease infinite;
+    z-index: 0;
+}
+
+.skeleton-wrap img {
+    position: relative;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+}
+
+.skeleton-wrap img.is-loaded {
+    opacity: 1;
+}
+
+/* once loaded, stop the shimmer and drop the placeholder background */
+.skeleton-wrap.is-loaded {
+    background-color: transparent;
+}
+
+.skeleton-wrap.is-loaded::before {
+    animation: none;
+    content: none;
+}
+
+@keyframes skeleton-shimmer {
+    0%   { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+
+/* Optional: skeleton for hero sections that use a CSS background-image
+   instead of an <img> tag. Add class "skeleton-hero" to the hero <section>
+   and the page's inline script (see skeleton-loader.js) will remove it
+   once the background image is confirmed loaded. */
+.skeleton-hero {
+    background-image: none !important;
+    background-color: #e9e5e0;
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, #e9e5e0 25%, #f5f2ee 37%, #e9e5e0 63%);
+    background-size: 400% 100%;
+    animation: skeleton-shimmer 1.4s ease infinite;
+    z-index: 0;
+}
+
+/* Text-line skeletons, for card titles/descriptions that you want to
+   keep in sync with a paired image (see .skeleton-group below), or for
+   content that comes from a database/API call rather than static markup. */
+.skeleton-line {
+    display: block;
+    height: 0.9em;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #e9e5e0 25%, #f5f2ee 37%, #e9e5e0 63%);
+    background-size: 400% 100%;
+    animation: skeleton-shimmer 1.4s ease infinite;
+    margin-bottom: 0.5em;
+}
+
+.skeleton-line--60 { width: 60%; }
+.skeleton-line--80 { width: 80%; }
+.skeleton-line--100 { width: 100%; }
+
+/* Taller variant for a title/heading line */
+.skeleton-line--title {
+    height: 1.3em;
+    margin-bottom: 0.75em;
+}
+
+/* =============================================
+SKELETON GROUPS
+Keeps a text skeleton in sync with a sibling image,
+so a card's text and image appear to finish loading
+at the same moment instead of independently.
+
+Usage:
+  <div class="skeleton-group">
+      <div class="skeleton-wrap">
+          <img src="..." alt="...">
+      </div>
+
+      <div class="skeleton-text-lines">
+          <span class="skeleton-line skeleton-line--title skeleton-line--60"></span>
+          <span class="skeleton-line skeleton-line--100"></span>
+          <span class="skeleton-line skeleton-line--100"></span>
+          <span class="skeleton-line skeleton-line--80"></span>
+      </div>
+
+      <div class="skeleton-real-content">
+          <h3>Actual title</h3>
+          <p>Actual paragraph text...</p>
+          <a href="#">Actual link</a>
+      </div>
+  </div>
+
+skeleton-loader.js adds "is-loaded" to the closest
+.skeleton-group once that group's image finishes
+loading (or errors), which swaps the two blocks below.
+============================================= */
+.skeleton-group .skeleton-text-lines {
+    display: block;
+}
+
+.skeleton-group .skeleton-real-content {
+    display: none;
+}
+
+.skeleton-group.is-loaded .skeleton-text-lines {
+    display: none;
+}
+
+.skeleton-group.is-loaded .skeleton-real-content {
+    display: block;
+}

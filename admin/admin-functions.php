@@ -19,14 +19,6 @@ function initSession() {
             session_regenerate_id(true);
             $_SESSION['_initiated'] = true;
         }
-        // Check session timeout
-        if (isset($_SESSION['last_activity'])) {
-            if (time() - $_SESSION['last_activity'] > SESSION_TIMEOUT) {
-                destroySession();
-                header('Location: admin/login.php?timeout=1');
-                exit;
-            }
-        }
         $_SESSION['last_activity'] = time();
     }
 }
@@ -533,6 +525,489 @@ function deleteAnnouncement(int $id): bool {
         return $result;
     } catch (Exception $e) {
         error_log('Delete announcement error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+// ============================================================
+// NEWS MANAGEMENT FUNCTIONS
+// ============================================================
+
+/**
+ * Canonical list of News categories. Unlike Announcements (which pull
+ * from the shared `categories` table), News uses a fixed set — stored
+ * directly in news.category as a string, validated against this list,
+ * the same way announcements.program is validated by
+ * normalizeProgramCategory().
+ */
+function getNewsCategories(): array {
+    return [
+        'School News'   => 'School News',
+        'Academic'      => 'Academic',
+        'Achievements'  => 'Achievements',
+        'Student Life'  => 'Student Life',
+        'Updates'       => 'Updates',
+        'Others'        => 'Others',
+    ];
+}
+
+/**
+ * Validate/normalize a submitted News category. Falls back to 'Others'
+ * for anything missing or not on the approved list, so a tampered or
+ * stale form value can never write an arbitrary string into the column.
+ */
+function normalizeNewsCategory(?string $category): string {
+    $valid = getNewsCategories();
+    return isset($valid[$category]) ? $category : 'Others';
+}
+
+/**
+ * Handle a single uploaded news image. Validates type/size, stores it
+ * under /uploads/news/, inserts into media_library, and returns the
+ * media_id. Returns null if no file was given / on failure.
+ *
+ * Mirrors uploadAnnouncementImage() so News stays on the same
+ * media_library-backed pattern as every other upload in this project.
+ */
+function uploadNewsImage(?array $file): ?int {
+    if (empty($file) || $file['error'] === UPLOAD_ERR_NO_FILE) {
+        return null; // no image provided — that's fine, it's optional
+    }
+
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        throw new Exception('Image upload failed. Please try again.');
+    }
+
+    // 10MB max
+    $maxBytes = 10 * 1024 * 1024;
+    if ($file['size'] > $maxBytes) {
+        throw new Exception('Image is too large. Maximum size is 10MB.');
+    }
+
+    $allowed = [
+        'image/jpeg' => 'jpg',
+        'image/png'  => 'png',
+        'image/gif'  => 'gif',
+        'image/webp' => 'webp',
+    ];
+
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime  = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+
+    if (!isset($allowed[$mime])) {
+        throw new Exception('Invalid image type. Allowed: JPG, PNG, GIF, WEBP.');
+    }
+
+    $ext = $allowed[$mime];
+    $filename = bin2hex(random_bytes(16)) . '.' . $ext;
+
+    $uploadDir = __DIR__ . '/../uploads/news/';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+
+    $destination = $uploadDir . $filename;
+    if (!move_uploaded_file($file['tmp_name'], $destination)) {
+        throw new Exception('Failed to save the uploaded image.');
+    }
+
+    $filePath = '/uploads/news/' . $filename;
+
+    // Insert into media_library table
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("
+            INSERT INTO media_library 
+            (file_name, file_type, file_size, file_path, created_by, created_at)
+            VALUES (?, ?, ?, ?, ?, NOW())
+        ");
+        
+        $stmt->execute([
+            $filename,
+            $ext,
+            $file['size'],
+            $filePath,
+            $_SESSION['user_id'] ?? null
+        ]);
+
+        return (int)$db->lastInsertId();
+    } catch (Exception $e) {
+        // Clean up the uploaded file if DB insert fails
+        @unlink($destination);
+        throw new Exception('Failed to store image in media library: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Handle multiple uploaded news images at once — e.g. $_FILES['images']
+ * from a `<input type="file" name="images[]" multiple>` field, still in
+ * PHP's native "array of arrays per key" shape.
+ *
+ * Uploads each file via uploadNewsImage() (so every image gets the same
+ * validation and the same media_library row), skipping empty slots.
+ * Returns the ordered list of new media_ids. Throws on the first
+ * invalid file, same as a single upload would.
+ */
+function uploadNewsImages(?array $files): array {
+    if (empty($files) || empty($files['name'])) {
+        return [];
+    }
+
+    $mediaIds = [];
+    $count = is_array($files['name']) ? count($files['name']) : 0;
+
+    for ($i = 0; $i < $count; $i++) {
+        if ($files['error'][$i] === UPLOAD_ERR_NO_FILE) {
+            continue; // empty slot — browsers can send these, just skip
+        }
+
+        $singleFile = [
+            'name'     => $files['name'][$i],
+            'type'     => $files['type'][$i],
+            'tmp_name' => $files['tmp_name'][$i],
+            'error'    => $files['error'][$i],
+            'size'     => $files['size'][$i],
+        ];
+
+        $mediaId = uploadNewsImage($singleFile);
+        if ($mediaId !== null) {
+            $mediaIds[] = $mediaId;
+        }
+    }
+
+    return $mediaIds;
+}
+
+/**
+ * Attach already-uploaded media to a news article's image gallery
+ * (news_images), appending after whatever's already there.
+ */
+function addNewsImages(int $newsId, array $mediaIds): bool {
+    if (empty($mediaIds)) return true;
+
+    try {
+        $db = getDB();
+
+        $stmt = $db->prepare("SELECT COALESCE(MAX(display_order), 0) FROM news_images WHERE news_id = ?");
+        $stmt->execute([$newsId]);
+        $nextOrder = (int)$stmt->fetchColumn() + 1;
+
+        $stmt = $db->prepare("
+            INSERT INTO news_images (news_id, media_id, display_order, created_at)
+            VALUES (?, ?, ?, NOW())
+        ");
+        foreach ($mediaIds as $mediaId) {
+            $stmt->execute([$newsId, $mediaId, $nextOrder++]);
+        }
+
+        return true;
+    } catch (Exception $e) {
+        error_log('Add news images error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Get every gallery image attached to a news article, in display order.
+ */
+function getNewsImages(int $newsId): array {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("
+            SELECT ni.image_id, ni.media_id, ni.display_order, m.file_path
+            FROM news_images ni
+            LEFT JOIN media_library m ON ni.media_id = m.media_id
+            WHERE ni.news_id = ?
+            ORDER BY ni.display_order ASC, ni.image_id ASC
+        ");
+        $stmt->execute([$newsId]);
+        return $stmt->fetchAll();
+    } catch (Exception $e) {
+        error_log('Get news images error: ' . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Remove one gallery image from a news article (by news_images.image_id,
+ * not media_id). Leaves the underlying media_library row/file alone —
+ * same "don't clean up orphaned media" behavior as the rest of this file.
+ */
+function removeNewsImage(int $imageId, int $newsId): bool {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("DELETE FROM news_images WHERE image_id = ? AND news_id = ?");
+        return $stmt->execute([$imageId, $newsId]);
+    } catch (Exception $e) {
+        error_log('Remove news image error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Create a news article.
+ * $data keys: title, content, author (optional byline text), category
+ *             (one of getNewsCategories()), featured_image (media_id or
+ *             null), status
+ */
+function createNews(array $data): ?int {
+    try {
+        $db = getDB();
+
+        // Validate required fields
+        if (empty($data['title'])) {
+            throw new Exception('Title is required.');
+        }
+        if (empty($data['content'])) {
+            throw new Exception('Content is required.');
+        }
+        if (!isset($_SESSION['user_id'])) {
+            throw new Exception('User session not found.');
+        }
+
+        $slug = generateSlug($data['title']);
+
+        $status = ($_SESSION['user_role'] === 'Super Admin' || $_SESSION['user_role'] === 'Content Admin')
+                ? $data['status'] ?? 'draft'
+                : 'pending';
+
+        $publishedAt = $status === 'published' ? date('Y-m-d H:i:s') : null;
+        $category = normalizeNewsCategory($data['category'] ?? null);
+
+        $stmt = $db->prepare("
+            INSERT INTO news
+            (user_id, category, title, slug, content, author, featured_image, status, published_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        ");
+
+        $result = $stmt->execute([
+            $_SESSION['user_id'],
+            $category,
+            $data['title'],
+            $slug,
+            $data['content'],
+            $data['author'] !== '' && $data['author'] !== null ? $data['author'] : null,
+            $data['featured_image'] ?? null,
+            $status,
+            $publishedAt,
+        ]);
+
+        if (!$result) {
+            throw new Exception('Database insert failed. Please check the error logs.');
+        }
+
+        $id = $db->lastInsertId();
+
+        if (!$id) {
+            throw new Exception('Failed to retrieve news ID after creation.');
+        }
+
+        logActivity($_SESSION['user_id'], 'CREATE', 'news', $id, 'Created news article: ' . $data['title']);
+
+        return $id;
+    } catch (Exception $e) {
+        $errorMsg = $e->getMessage();
+        error_log('Create news error: ' . $errorMsg);
+        error_log('Create news data: ' . json_encode($data));
+        throw $e;
+    }
+}
+
+/**
+ * Update a news article.
+ */
+function updateNews(int $id, array $data): bool {
+    try {
+        $db = getDB();
+        $news = getNewsById($id);
+
+        if (!$news) return false;
+
+        // Check ownership for Content Editors
+        if ($_SESSION['user_role'] === 'Content Editor' && $news['user_id'] !== $_SESSION['user_id']) {
+            return false;
+        }
+
+        $slug = generateSlug($data['title']);
+        $status = isset($data['status']) ? $data['status'] : $news['status'];
+
+        // Handle featured_image - only update if new media was provided or removal was requested
+        $featuredImage = $news['featured_image'];
+        if (array_key_exists('featured_image', $data)) {
+            $featuredImage = $data['featured_image']; // may be null (removed) or a new media_id
+        }
+
+        $author = array_key_exists('author', $data)
+            ? ($data['author'] !== '' ? $data['author'] : null)
+            : $news['author'];
+
+        $category = array_key_exists('category', $data)
+            ? normalizeNewsCategory($data['category'])
+            : ($news['category'] ?? 'Others');
+
+        // Set published_at the first time a status transitions to 'published';
+        // leave it alone on subsequent edits so the original publish date sticks.
+        $publishedAt = $news['published_at'];
+        if ($status === 'published' && empty($publishedAt)) {
+            $publishedAt = date('Y-m-d H:i:s');
+        }
+
+        $stmt = $db->prepare("
+            UPDATE news
+            SET title = ?, slug = ?, content = ?, author = ?, category = ?, featured_image = ?, status = ?, published_at = ?, updated_at = NOW()
+            WHERE news_id = ?
+        ");
+
+        $stmt->execute([
+            $data['title'],
+            $slug,
+            $data['content'],
+            $author,
+            $category,
+            $featuredImage,
+            $status,
+            $publishedAt,
+            $id
+        ]);
+
+        logActivity($_SESSION['user_id'], 'UPDATE', 'news', $id, 'Updated news article: ' . $data['title']);
+        return true;
+    } catch (Exception $e) {
+        error_log('Update news error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Get a news article by ID - joins media_library for the cover image and
+ * users for the poster. Does NOT include the gallery — call
+ * getNewsImages() separately for that.
+ */
+function getNewsById(int $id): ?array {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("
+            SELECT n.*, u.first_name, u.last_name,
+                m.file_path as image_path, m.media_id
+            FROM news n
+            LEFT JOIN users u ON n.user_id = u.user_id
+            LEFT JOIN media_library m ON n.featured_image = m.media_id
+            WHERE n.news_id = ?
+        ");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    } catch (Exception $e) {
+        error_log('Get news error: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Get a published news article by slug — for the public site.
+ */
+function getNewsBySlug(string $slug): ?array {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("
+            SELECT n.*, u.first_name, u.last_name,
+                m.file_path as image_path, m.media_id
+            FROM news n
+            LEFT JOIN users u ON n.user_id = u.user_id
+            LEFT JOIN media_library m ON n.featured_image = m.media_id
+            WHERE n.slug = ? AND n.status = 'published'
+        ");
+        $stmt->execute([$slug]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    } catch (Exception $e) {
+        error_log('Get news by slug error: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Get news articles with filters - mirrors getAnnouncements().
+ */
+function getNews(array $filters = [], int $limit = 20, int $offset = 0): array {
+    try {
+        $db = getDB();
+
+        $query = "
+            SELECT n.*, u.first_name, u.last_name,
+                   m.file_path as image_path, m.media_id
+            FROM news n
+            LEFT JOIN users u ON n.user_id = u.user_id
+            LEFT JOIN media_library m ON n.featured_image = m.media_id
+            WHERE 1=1
+        ";
+
+        $params = [];
+
+        if (isset($filters['status'])) {
+            $query .= " AND n.status = ?";
+            $params[] = $filters['status'];
+        }
+
+        if (isset($filters['category'])) {
+            $query .= " AND n.category = ?";
+            $params[] = $filters['category'];
+        }
+
+        if (isset($filters['search'])) {
+            // Escape LIKE wildcard characters, same reasoning as getAnnouncements().
+            $escapedSearch = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filters['search']);
+            $query .= " AND (n.title LIKE ? ESCAPE '\\\\' OR n.content LIKE ? ESCAPE '\\\\')";
+            $params[] = '%' . $escapedSearch . '%';
+            $params[] = '%' . $escapedSearch . '%';
+        }
+
+        if ($_SESSION['user_role'] === 'Content Editor') {
+            $query .= " AND n.user_id = ?";
+            $params[] = $_SESSION['user_id'];
+        }
+
+        $query .= " ORDER BY n.created_at DESC LIMIT ? OFFSET ?";
+        $params[] = $limit;
+        $params[] = $offset;
+
+        $stmt = $db->prepare($query);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    } catch (Exception $e) {
+        error_log('Get news error: ' . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Delete a news article. The `news_images` gallery rows cascade-delete
+ * via the FK (ON DELETE CASCADE) — see sql/add_news_gallery_and_category.sql.
+ */
+function deleteNews(int $id): bool {
+    try {
+        $db = getDB();
+        $news = getNewsById($id);
+
+        if (!$news) return false;
+
+        // Check permissions
+        $isOwner = $news['user_id'] == $_SESSION['user_id'];
+        if (!hasPermission('delete_news') && !(hasPermission('delete_own_news') && $isOwner)) {
+            return false;
+        }
+
+        $stmt = $db->prepare("DELETE FROM news WHERE news_id = ?");
+        $result = $stmt->execute([$id]);
+
+        if ($result) {
+            logActivity($_SESSION['user_id'], 'DELETE', 'news', $id, 'Deleted news article: ' . $news['title']);
+        }
+
+        return $result;
+    } catch (Exception $e) {
+        error_log('Delete news error: ' . $e->getMessage());
         return false;
     }
 }

@@ -60,7 +60,7 @@ $csrfToken   = generateCSRFToken();
             </a>
         </li>
         <li>
-            <a href="/admin/news/" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/news') !== false ? 'active' : '' ?>">
+            <a href="/admin/news.php" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/news') !== false ? 'active' : '' ?>">
                 <i class="bi bi-newspaper"></i> News
             </a>
         </li>
@@ -70,8 +70,8 @@ $csrfToken   = generateCSRFToken();
             </a>
         </li>
         <li>
-            <a href="/admin/section-edit.php" class="sidebar-link <?= $currentPage === 'section-edit' ? 'active' : '' ?>">
-                <i class="bi bi-grid-1x2"></i> Section Editor
+            <a href="/admin/content-edit.php" class="sidebar-link <?= $currentPage === 'content-edit' ? 'active' : '' ?>">
+                <i class="bi bi-grid-1x2"></i> Content Editor
             </a>
         </li>
     </ul>

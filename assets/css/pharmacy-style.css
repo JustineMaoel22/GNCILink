@@ -1,0 +1,547 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+:root {
+    --gnc-green:       #094024;
+    --gnc-green-dark:  #062018;
+    --gnc-green-mid:   #0d5c33;
+    --gnc-green-light: #287838;
+    --gnc-gold:        #EABA3B;
+    --gnc-gold-light:  #E2C06A;
+    --gnc-cream:       #F9F6F1;
+    --gnc-white:       #ffffff;
+    --gnc-pharmacy:     #5C198B;
+    --gnc-pharmacy-light: #EFE8F4;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: var(--gnc-cream) !important;
+}
+
+/* =============================================
+PHARMACY MANAGEMENT PROGRAM HERO
+============================================= */
+.pharmacy-hero {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    min-height: 500px;
+}
+
+.pharmacy-hero .container {
+    position: relative;
+    z-index: 2;
+}
+
+/* Breadcrumb */
+.pharmacy-breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    margin-bottom: 1rem;
+    margin-top: 30px;
+}
+
+.pharmacy-breadcrumb a {
+    color: var(--gnc-pharmacy);
+    text-decoration: none;
+}
+
+.pharmacy-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.pharmacy-breadcrumb span {
+    color: var(--gnc-pharmacy);
+}
+
+.pharmacy-breadcrumb i {
+    font-size: 0.6rem;
+    color: var(--gnc-pharmacy);
+    opacity: 0.7;
+}
+
+/* Title & copy */
+.pharmacy-hero-content {
+    max-width: 600px;
+    margin-top: 100px;
+    margin-bottom: 2rem;
+}
+
+.pharmacy-title {
+    font-family: 'Noto Serif', serif;
+    font-size: 2.75rem;
+    font-weight: 800;
+    color: var(--gnc-pharmacy);
+    margin-bottom: 0.35rem;
+    line-height: 1.1;
+}
+
+.pharmacy-subtitle {
+    font-size: 1rem;
+    font-weight: 700;
+    font-style: italic;
+    color: var(--gnc-pharmacy);
+    margin-bottom: 0.65rem;
+}
+
+.pharmacy-desc {
+    font-size: 0.9rem;
+    color: #3a2e2a;
+    max-width: 610px;
+    margin-bottom: 1.75rem;
+}
+
+/* Badges row */
+.pharmacy-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.75rem;
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 1.1rem 1.5rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+    width: fit-content;
+}
+
+.pharmacy-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+}
+
+.pharmacy-badge i {
+    font-size: 1.6rem;
+    color: var(--gnc-pharmacy);
+}
+
+.pharmacy-badge div {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.pharmacy-badge strong {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--gnc-pharmacy);
+}
+
+.pharmacy-badge span {
+    font-size: 0.75rem;
+    color: black;
+}
+
+.pharmacy-about {
+    background-color: #faf6f1;
+}
+
+/* Section title */
+.pharmacy-section-title {
+    color: var(--gnc-pharmacy);
+    font-weight: 700;
+    position: relative;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.pharmacy-section-title::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 40px;
+    height: 3px;
+    background-color: var(--gnc-pharmacy);
+}
+
+/* Modifier: gold underline (used on "About the Program") */
+.pharmacy-section-title--gold::after {
+    background-color: var(--gnc-gold);
+}
+
+.pharmacy-section-text {
+    color: black;
+    line-height: 1.7;
+}
+
+/* Mission card */
+.pharmacy-mission-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+}
+
+.pharmacy-mission-icon {
+    width: 60px;
+    height: 60px;
+    min-width: 60px;
+    border-radius: 50%;
+    background-color: var(--gnc-pharmacy-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pillar-icon-img {
+    width: 40px;
+    height: 40px;
+}
+
+.pharmacy-mission-title {
+    color: var(--gnc-pharmacy);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.pharmacy-mission-text {
+    color: black;
+    font-size: 0.92rem;
+    margin-bottom: 0;
+}
+
+/* Seal */
+.pharmacy-seal {
+    width: 300px;
+    height: 300px;
+    margin-left: 100px;
+}
+
+/* Why Choose section */
+.pharmacy-why {
+    background-color: var(--gnc-cream);
+}
+
+.pharmacy-why-intro {
+    color: black;
+    margin-bottom: 0;
+}
+
+.pharmacy-why-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 1.75rem 1.5rem;
+    height: 100%;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    text-align: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pharmacy-why-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+.pharmacy-why-img {
+    width: 100%;
+    max-width: 220px;
+    height: 160px;
+    object-fit: contain;
+    margin-bottom: 1rem;
+}
+
+.pharmacy-why-title {
+    color: var(--gnc-pharmacy);
+    font-weight: 700;
+    margin-bottom: 0.6rem;
+}
+
+.pharmacy-why-desc {
+    color: black;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-bottom: 0;
+}
+
+.pharmacy-uniform {
+    background-color: #faf6f1;
+}
+
+/* Uniform card clickable image */
+.pharmacy-uniform-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.75rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+}
+
+.pharmacy-uniform-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.pharmacy-uniform-card img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* Uniform Lightbox */
+.uniform-lightbox {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.uniform-lightbox.active {
+    display: flex;
+    opacity: 1;
+}
+
+.uniform-lightbox-img {
+    max-width: 90%;
+    max-height: 80vh;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    animation: uniformLightboxZoom 0.25s ease;
+}
+
+@keyframes uniformLightboxZoom {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.uniform-lightbox-caption {
+    color: #fff;
+    margin-top: 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.uniform-lightbox-close {
+    position: absolute;
+    top: 20px;
+    right: 35px;
+    color: #fff;
+    font-size: 2.5rem;
+    font-weight: 300;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.uniform-lightbox-close:hover {
+    color: var(--gnc-pharmacy);
+}
+
+/* Career Opportunities section */
+.pharmacy-careers {
+    background-color: var(--gnc-cream);
+}
+
+.pharmacy-careers-intro {
+    color: black;
+    margin-bottom: 0;
+}
+
+.pharmacy-career-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.75rem;
+    height: 100%;
+    display: flex;
+    align-items: stretch;
+    gap: 1rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pharmacy-career-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.pharmacy-career-img {
+    flex: 0 0 130px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.pharmacy-career-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.pharmacy-career-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0.5rem 0.5rem 0.5rem 0;
+}
+
+.pharmacy-career-title {
+    color: var(--gnc-pharmacy);
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+    font-size: 1rem;
+}
+
+.pharmacy-career-desc {
+    color: black;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin-bottom: 0;
+}
+
+@media (max-width: 480px) {
+    .pharmacy-career-card {
+        flex-direction: column;
+    }
+
+    .pharmacy-career-img {
+        flex: 0 0 160px;
+        width: 100%;
+    }
+}
+
+@media (max-width: 767px) {
+    .pharmacy-uniform-card {
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* CTA banner */
+.pharmacy-cta{
+    background-color: var(--gnc-cream);
+}
+
+.pharmacy-cta-card {
+    background: #fff;
+    border-radius: 10px;
+    border-left: 5px solid var(--gnc-pharmacy);
+    padding: 1.25rem 1.75rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.pharmacy-cta-icon {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pharmacy-cta-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.pharmacy-cta-text {
+    flex: 1 1 auto;
+}
+
+.pharmacy-cta-title {
+    color: var(--gnc-pharmacy);
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+}
+
+.pharmacy-cta-desc {
+    color: black;
+    font-size: 0.82rem;
+    margin-bottom: 0;
+}
+
+.pharmacy-cta-action {
+    flex: 0 0 auto;
+}
+
+.pharmacy-cta-btn {
+    display: inline-block;
+    background-color: var(--gnc-pharmacy);
+    color: var(--gnc-pharmacy-light);
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 0.6rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.2s ease;
+}
+
+.pharmacy-cta-btn:hover {
+    background-color: var(--gnc-pharmacy-light);
+    color: var(--gnc-pharmacy);
+}
+
+@media (max-width: 767px) {
+    .pharmacy-cta-card {
+        flex-wrap: wrap;
+    }
+
+    .pharmacy-cta-action {
+        width: 100%;
+    }
+
+    .pharmacy-cta-btn {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* Responsive */
+@media (max-width: 991px) {
+    .pharmacy-photo-wrap {
+        margin-top: 2rem;
+        min-height: 260px;
+    }
+
+    .pharmacy-title {
+        font-size: 2.1rem;
+    }
+
+    .pharmacy-toc {
+        position: static; /* disable sticky on tablet/mobile where stacking makes it awkward */
+    }
+}
+
+@media (max-width: 480px) {
+    .pharmacy-badges {
+        gap: 0.5rem;
+    }
+
+    .pharmacy-badge {
+        padding: 0.45rem 0.75rem;
+    }
+}

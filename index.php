@@ -37,6 +37,41 @@ foreach ($dbAnnouncements as $ann) {
 }
 
 // ---------------------------------------------------------------
+// Fetch the latest published News articles
+// ---------------------------------------------------------------
+try {
+    $stmt = $db->query("
+        SELECT n.news_id, n.title, n.slug, n.content, n.author, n.published_at, n.created_at,
+            m.file_path as image_path
+        FROM news n
+        LEFT JOIN media_library m ON n.featured_image = m.media_id
+        WHERE n.status = 'published'
+        ORDER BY COALESCE(n.published_at, n.created_at) DESC
+        LIMIT 6
+    ");
+    $dbNews = $stmt->fetchAll();
+} catch (Exception $e) {
+    $dbNews = [];
+}
+
+// Normalize DB rows into the shared feed shape — same shape as
+// $publicAnnouncements so index.php can merge/sort them together.
+$publicNews = [];
+foreach ($dbNews as $item) {
+    $excerpt = strip_tags($item['content']);
+    $excerpt = mb_strlen($excerpt) > 110 ? mb_substr($excerpt, 0, 110) . '…' : $excerpt;
+    $publicNews[] = [
+        'source'     => 'news',
+        'title'      => $item['title'],
+        'excerpt'    => $excerpt,
+        'image_path' => $item['image_path'],
+        'date'       => $item['published_at'] ?? $item['created_at'],
+        'link'       => 'news.php?slug=' . urlencode($item['slug']),
+        'author'     => $item['author'] ?? null,
+    ];
+}
+
+// ---------------------------------------------------------------
 // Fetch the latest Facebook Page posts (cached in the database to
 // avoid rate limits). Images are downloaded once and registered in
 // media_library — same as every other file in this project — so we
@@ -228,7 +263,7 @@ if ($isMobileUA) {
 // ---------------------------------------------------------------
 // Merge + sort combined feed, newest first, capped at 6
 // ---------------------------------------------------------------
-$publicAnnouncements = array_merge($publicAnnouncements, $facebookPosts);
+$publicAnnouncements = array_merge($publicAnnouncements, $publicNews, $facebookPosts);
 usort($publicAnnouncements, function ($a, $b) {
     return strtotime($b['date']) <=> strtotime($a['date']);
 });
@@ -335,6 +370,7 @@ try {
     <link href="assets/css/navbar-style.css" rel="stylesheet">
     <link href="assets/css/footer-style.css" rel="stylesheet">
     <link href="assets/css/index-style.css?v=3" rel="stylesheet">
+    <link href="assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="icon" type="image/x-icon" href="assets/images/logos/gnc-logo-v1.svg">
 </head>
@@ -381,8 +417,11 @@ try {
                 $mobileMediaPath = $slide['media_path_mobile'] ?: $slide['media_path'];
             ?>
                 <?php if ($isFirstSlide): ?>
-                <div class="slide-bg d-none d-md-block" style="background-image: url('<?= htmlspecialchars($slide['media_path']) ?>');"></div>
-                <div class="slide-bg d-md-none" style="background-image: url('<?= htmlspecialchars($mobileMediaPath) ?>');"></div>
+                <!-- First slide loads eagerly, so it gets a skeleton shimmer while
+                     the real image decodes. skeleton-loader.js preloads data-bg,
+                     then swaps it into background-image and drops .skeleton-hero. -->
+                <div class="slide-bg skeleton-hero d-none d-md-block" data-bg="<?= htmlspecialchars($slide['media_path']) ?>"></div>
+                <div class="slide-bg skeleton-hero d-md-none" data-bg="<?= htmlspecialchars($mobileMediaPath) ?>"></div>
                 <?php else: ?>
                 <div class="slide-bg lazy-bg d-none d-md-block" data-bg="<?= htmlspecialchars($slide['media_path']) ?>"></div>
                 <div class="slide-bg lazy-bg d-md-none" data-bg="<?= htmlspecialchars($mobileMediaPath) ?>"></div>
@@ -492,7 +531,7 @@ try {
         <div class="container">
             <div class="gnc-announce-header lazy-bg mb-5" data-bg="assets/images/Section Header.png">
                 <span class="d-inline-block mb-2" style="color:#EABA3B;font-weight:700;font-size:.78rem;letter-spacing:1.5px;text-transform:uppercase;">
-                    Latest Announcements
+                    News &amp; Announcements
                 </span>
                 <h2 class="mb-2" style="font-family: 'Noto Serif', serif; color:#1F5E2C;font-weight:800;">Stay Updated, Stay Informed</h2>
                 <p class="text-muted mb-0">Get the latest news, events, and important updates</p>
@@ -504,28 +543,49 @@ try {
                 <div class="row g-4">
                     <?php foreach ($publicAnnouncements as $item):
                         $isFacebook = $item['source'] === 'facebook';
+                        $isNews     = $item['source'] === 'news';
                         $linkTarget = $isFacebook ? ' target="_blank" rel="noopener"' : '';
+                        $fallbackIcon = $isFacebook ? 'bi-facebook' : ($isNews ? 'bi-newspaper' : 'bi-megaphone');
                     ?>
                     <div class="col-md-6 col-lg-4">
                         <div class="card h-100 border-0 gnc-announcement-card" style="position:relative;">
 
                             <?php if (!empty($item['image_path'])): ?>
-                            <img src="<?= htmlspecialchars($item['image_path']) ?>" class="card-img-top" alt="<?= htmlspecialchars($item['title'] ?? 'Facebook post') ?>" style="height:280px;object-fit:cover;" loading="lazy" decoding="async">
+                            <!-- DB / Facebook-sourced image: wrap in .skeleton-wrap so
+                                 skeleton-loader.js shimmers it until it finishes loading. -->
+                            <div class="skeleton-wrap" style="height:280px;">
+                                <img src="<?= htmlspecialchars($item['image_path']) ?>"
+                                     class="card-img-top"
+                                     alt="<?= htmlspecialchars($item['title'] ?? 'Facebook post') ?>"
+                                     style="height:100%;width:100%;object-fit:cover;"
+                                     loading="lazy" decoding="async">
+                            </div>
                             <?php else: ?>
                             <div style="height:280px;background:#eef1ee;display:flex;align-items:center;justify-content:center;color:#c3cbc4;">
-                                <i class="bi <?= $isFacebook ? 'bi-facebook' : 'bi-megaphone' ?>" style="font-size:2rem;"></i>
+                                <i class="bi <?= $fallbackIcon ?>" style="font-size:2rem;"></i>
                             </div>
                             <?php endif; ?>
 
                             <div class="card-body d-flex flex-column">
-                                <small class="text-muted mb-2 d-flex align-items-center gap-2">
+                                <small class="text-muted mb-2 d-flex align-items-center gap-2 flex-wrap">
                                     <i class="bi bi-calendar3"></i> <?= date('F d, Y', strtotime($item['date'])) ?>
                                     <?php if ($isFacebook): ?>
                                         <span class="badge" style="background:#e7f0fe;color:#1877F2;font-weight:600;font-size:.68rem;">
                                             <i class="bi bi-facebook"></i> From Facebook
                                         </span>
+                                    <?php elseif ($isNews): ?>
+                                        <span class="badge" style="background:rgba(201,162,39,0.16);color:#8a6d1f;font-weight:600;font-size:.68rem;border:1px solid rgba(201,162,39,0.35);">
+                                            <i class="bi bi-newspaper"></i> News
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="badge" style="background:rgba(31,94,44,0.1);color:#1f5e2c;font-weight:600;font-size:.68rem;border:1px solid rgba(31,94,44,0.3);">
+                                            <i class="bi bi-megaphone"></i> Announcement
+                                        </span>
                                     <?php endif; ?>
                                 </small>
+                                <?php if ($isNews && !empty($item['author'] ?? null)): ?>
+                                <small class="text-muted mb-2 d-block" style="font-size:.75rem;">By <?= htmlspecialchars($item['author']) ?></small>
+                                <?php endif; ?>
 
                                 <?php if (!empty($item['title'])): ?>
                                 <h5 class="card-title" style="font-family: 'Noto Serif', serif; color:#094024;font-weight:800;">
@@ -548,7 +608,7 @@ try {
                 </div>
 
                 <div class="text-center mt-5">
-                    <a href="announcements.php" class="btn gnc-view-all-btn">
+                    <a href="pages/news-and-announcement.php" class="btn gnc-view-all-btn">
                         View All Announcements &amp; News
                     </a>
                 </div>
@@ -848,5 +908,6 @@ try {
     </style>
     
     <script src="assets/js/index.js?v=2"></script>
+    <script src="assets/js/skeleton-loader.js"></script>
 </body>
 </html>

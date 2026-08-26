@@ -9,7 +9,8 @@
  *     <?php $activeSection = 'academics'; ?>
  *     <?php include __DIR__ . '/../components/index-nav.php'; ?>
  *
- * Valid values: 'home', 'about', 'academics', 'admissions', 'student-life'.
+ * Valid values: 'home', 'about', 'academics', 'admissions', 'student-life',
+ * 'news-and-announcement', 'contact-us'.
  * If a page doesn't declare $activeSection, we fall back to guessing from
  * the URL path (kept only for pages that haven't been updated yet) — but
  * the explicit variable is what you should rely on, since guessing from
@@ -31,6 +32,10 @@ if ($activeSection === null) {
         $activeSection = 'admissions';
     } elseif (strpos($currentPath, '/student-life/') !== false) {
         $activeSection = 'student-life';
+    } elseif (strpos($currentPath, 'news-and-announcement') !== false) {
+        $activeSection = 'news-and-announcement';
+    } elseif (strpos($currentPath, 'contact-us') !== false) {
+        $activeSection = 'contact-us';
     }
 }
 
@@ -39,6 +44,8 @@ $isAbout       = $activeSection === 'about';
 $isAcademics   = $activeSection === 'academics';
 $isAdmissions  = $activeSection === 'admissions';
 $isStudentLife = $activeSection === 'student-life';
+$isNewsAndAnnouncement = $activeSection === 'news-and-announcement';
+$isContactUs = $activeSection === 'contact-us';
 ?>
 
 <nav class="navbar gnc-navbar sticky-top navbar-expand-lg shadow-sm">
@@ -74,7 +81,7 @@ $isStudentLife = $activeSection === 'student-life';
                         <li><a class="dropdown-item" href="/about/vision-mission.php">Vision and Mission</a></li>
                         <li><a class="dropdown-item" href="/about/core-values.php">Core Values</a></li>
                         <li><a class="dropdown-item" href="/about/logo-meaning.php">Institutional Logo and Meaning</a></li>
-                        <li><a class="dropdown-item" href="/about/administration.php">Administration</a></li>
+                        <li><a class="dropdown-item" href="/pages/administration/administration.php">Administration</a></li>
                         <li><a class="dropdown-item" href="/about/accreditations.php">Accreditations and Recognitions</a></li>
                     </ul>
                 </li>
@@ -84,7 +91,7 @@ $isStudentLife = $activeSection === 'student-life';
                        data-bs-toggle="dropdown" aria-expanded="false">Academics</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="academicsDropdown">
                         <li><a class="dropdown-item" href="/academics/basic-education.php">Basic Education</a></li>
-                        <li><a class="dropdown-item" href="/pages/college-departments.php">College</a></li>
+                        <li><a class="dropdown-item" href="/pages/academics/college/college-departments.php">College</a></li>
                         <li><a class="dropdown-item" href="/academics/graduate-school.php">Graduate School</a></li>
                     </ul>
                 </li>
@@ -114,8 +121,12 @@ $isStudentLife = $activeSection === 'student-life';
                     </ul>
                 </li>
 
-                <li class="nav-item"><a class="nav-link" href="#">News & Events</a></li>
-                <li class="nav-item"><a class="nav-link" href="#">Contact Us</a></li>
+                <li class="nav-item <?= $isNewsAndAnnouncement ? 'active' : '' ?>">
+                    <a class="nav-link <?= $isNewsAndAnnouncement ? 'active' : '' ?>" href="/pages/news-and-announcement.php">News & Announcements</a>
+                </li>
+                <li class="nav-item <?= $isContactUs ? 'active' : '' ?>">
+                    <a class="nav-link <?= $isContactUs ? 'active' : '' ?>" href="#">Contact Us</a>
+                </li>
 
                 <li class="nav-item d-flex align-items-center">
                     <button id="search-toggle" class="btn-search" type="button" aria-label="Search">
@@ -228,14 +239,14 @@ $isStudentLife = $activeSection === 'student-life';
                 </div>
             </li>
 
-            <li class="gnc-mobile-item">
-                <a href="#" class="gnc-mobile-link">
+            <li class="gnc-mobile-item <?= $isNewsAndAnnouncement ? 'active' : '' ?>">
+                <a href="/pages/news-and-announcement.php" class="gnc-mobile-link">
                     <i class="bi bi-calendar-event-fill"></i>
-                    <span>News & Events</span>
+                    <span>News & Announcements</span>
                 </a>
             </li>
 
-            <li class="gnc-mobile-item">
+            <li class="gnc-mobile-item <?= $isContactUs ? 'active' : '' ?>">
                 <a href="#" class="gnc-mobile-link">
                     <i class="bi bi-envelope-fill"></i>
                     <span>Contact Us</span>

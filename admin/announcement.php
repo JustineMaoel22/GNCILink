@@ -131,7 +131,7 @@ include __DIR__ . '/../components/header-admin.php';
                     <th>Category</th>
                     <th>Program</th>
                     <th>Status</th>
-                    <th>Author</th>
+                    <th>Name</th>
                     <th>Date</th>
                     <th style="width:120px">Actions</th>
                 </tr>
