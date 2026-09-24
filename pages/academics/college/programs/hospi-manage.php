@@ -1,3 +1,7 @@
+<?php
+define('CURRENT_PROGRAM', 'BSHM');
+require_once __DIR__ . '/../../../../components/bulletin-board.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,6 +14,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link href="/assets/css/hospi-manage-style.css" rel="stylesheet">
     <link href="/assets/css/base-style.css" rel="stylesheet">
+    <link href="/assets/css/bulletin-board-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
@@ -291,7 +296,9 @@
             </div>
         </div>
     </section>
-    
+
+    <?php render_bulletin_board(); ?>
+
     <section class="hospitality-cta py-4">
         <div class="container">
             <div class="hospitality-cta-card">

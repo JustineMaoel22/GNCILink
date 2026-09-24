@@ -1,0 +1,228 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+body {
+    background-color: var(--gnc-cream);
+}
+
+.logo-meaning-hero {
+    position: relative;
+    background-color: var(--gnc-cream);
+    background-image: url('/assets/images/Section Header.png');
+    background-repeat: no-repeat;
+    background-position: right center;
+    background-size: cover;
+    border-bottom: 1px solid var(--gnc-border);
+}
+
+.logo-meaning-hero-inner {
+    padding: 40px 15px 44px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.logo-meaning-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #d3a63a;
+    margin-bottom: 14px;
+}
+
+.logo-meaning-breadcrumb i {
+    font-size: 10px;
+    color: #d3a63a;
+    opacity: 0.8;
+}
+
+.logo-meaning-hero h1 {
+    font-family: 'Noto Serif', serif;
+    font-weight: 700;
+    color: var(--gnc-green-light);
+    font-size: clamp(28px, 4vw, 40px);
+    margin: 0 0 8px;
+}
+
+.logo-meaning-hero p {
+    font-family: 'Inter', sans-serif;
+    color: var(--gnc-text-gray);
+    font-size: 14px;
+    margin: 0;
+}
+
+/* Logo Meaning Main Content Layout */
+.logo-meaning-content-section {
+    padding: 60px 0 80px;
+    background-color: var(--gnc-cream);
+}
+
+.logo-meaning-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 15px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 50px;
+}
+
+.logo-display-wrapper {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    position: relative;
+    min-width: 300px;
+}
+
+.logo-meaning-graphic {
+    max-width: 450px;
+    width: 100%;
+    height: auto;
+    position: relative;
+    z-index: 2;
+}
+
+.logo-display-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 15px; 
+    left: 10px; 
+    width: 130px; 
+    height: 130px; 
+    background-color: var(--gnc-gold, #EABA3B); 
+    border-radius: 16px; 
+    z-index: 1;
+}
+
+.logo-display-wrapper::after {
+    content: '';
+    position: absolute;
+    bottom: 25px;
+    right: 20px;
+    width: 100px;
+    height: 60px;
+    background-image: radial-gradient(circle, #094024 4px, transparent 5px);
+    background-size: 20px 20px; 
+    z-index: 1;
+}
+
+.logo-info-wrapper {
+    flex: 1.2;
+    min-width: 300px;
+}
+
+/* 1. Added the gold underline to the Header */
+.logo-info-wrapper h2 {
+    font-family: 'Noto Serif', serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--gnc-green-light, #1b4d3e);
+    margin-bottom: 15px;
+    position: relative;
+    padding-bottom: 12px;
+}
+
+.logo-info-wrapper h2::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 65px;
+    height: 3px;
+    background-color: #d3a63a;
+}
+
+.logo-info-wrapper > p {
+    font-family: 'Inter', sans-serif;
+    color: #4a4a4a;
+    font-size: 0.95rem;
+    margin-bottom: 35px;
+}
+
+/* Feature Item Rows - Increased padding for breathing room */
+.meaning-item {
+    display: flex;
+    align-items: center;
+    gap: 25px;
+    padding: 25px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.meaning-item:last-child {
+    border-bottom: none;
+}
+
+/* Icon Circle Box Styling - Strengthened shadows and gradients */
+.icon-circle-box {
+    width: 85px;
+    height: 85px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.icon-circle-box.crucifix-icon {
+    background: radial-gradient(circle, #ffffff 30%, #f9f2dd 100%);
+    box-shadow: 0 10px 25px rgba(211, 166, 58, 0.25);
+}
+
+.icon-circle-box.book-icon {
+    background: radial-gradient(circle, #ffffff 30%, #e2efe8 100%);
+    box-shadow: 0 10px 25px rgba(27, 77, 62, 0.25);
+}
+
+.icon-circle-box.sword-icon {
+    background: radial-gradient(circle, #ffffff 30%, #f6e6e6 100%);
+    box-shadow: 0 10px 25px rgba(168, 50, 50, 0.25);
+}
+
+/* Increased the SVG image size to match Figma */
+.icon-circle-box img {
+    width: 52px;
+    height: 52px;
+    object-fit: contain;
+}
+
+.meaning-text h3 {
+    font-family: 'Noto Serif', serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 4px;
+}
+
+/* 2. FIXED COLOR TARGETING: Uses the icon class to target the heading next to it */
+.icon-circle-box.crucifix-icon + .meaning-text h3 { color: var(--gnc-gold, #EABA3B); }
+.icon-circle-box.book-icon + .meaning-text h3 { color: var(--gnc-green-light, #094024); }
+.icon-circle-box.sword-icon + .meaning-text h3 { color: var(--gnc-red, #BA2A26); }
+
+.meaning-text p {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.88rem;
+    color: #555555;
+    margin: 0;
+    line-height: 1.4;
+}
+
+@media (max-width: 992px) {
+    .logo-meaning-container {
+        flex-direction: column;
+        text-align: center;
+    }
+    .meaning-item {
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+    }
+    .logo-info-wrapper h2::after {
+        left: 50%;
+        transform: translateX(-50%);
+    }
+}

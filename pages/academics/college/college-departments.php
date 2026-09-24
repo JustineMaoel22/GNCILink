@@ -124,7 +124,7 @@
                         <img class="cp-college-logo" src="/assets/images/logos/camp-logo.svg" alt="College of Allied Medical Programs logo">
                     </div>
                     <div class="cp-college-info">
-                        <h3>College of Medical Allied Programs</h3>
+                        <h3>College of Medical Technology and Pharmacy</h3>
                         <span class="cp-underline"></span>
                         <p>The prepares future medical technologists and healthcare professionals through rigorous, research-based education, building the analytical and critical thinking skills needed for accurate diagnostics, medical innovation, and quality patient care.</p>
                         <a href="/pages/academics/college/departments/camp.php" class="cp-view-link">View Programs <i class="bi bi-arrow-right"></i></a>
@@ -161,7 +161,7 @@
     </section>
 
     <?php include __DIR__ . '/../../../components/index-footer.php'; ?>
-
++
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
     <script src="/assets/js/skeleton-loader.js"></script>

@@ -4,7 +4,9 @@ require_once __DIR__ . '/config/config.php';
 $pageId = $_ENV['FB_PAGE_ID'];
 $token  = $_ENV['FB_ACCESS_TOKEN'];
 
-$url = "https://graph.facebook.com/v19.0/{$pageId}/posts?fields=id,message,created_time,permalink_url,full_picture&limit=6&access_token={$token}";
+$url = "https://graph.facebook.com/v21.0/{$pageId}/posts"
+    . "?fields=id,message,created_time,permalink_url,full_picture&limit=6"
+    . "&access_token={$accessToken}";
 
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);

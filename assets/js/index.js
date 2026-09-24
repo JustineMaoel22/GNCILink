@@ -119,30 +119,63 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+
+    // Fetches the events section (calendar + upcoming events list) for the
+    // given URL and swaps it into the current page in place — no navigation,
+    // no reload, no scroll jump. Used by both the month-nav arrows and the
+    // program filter dropdown below.
+    async function refreshEventsSection(url) {
+        const response = await fetch(url);
+        const html = await response.text();
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        const newCalendar = doc.querySelector('.gnc-cal-card');
+        const calCard = document.querySelector('.gnc-cal-card');
+        if (newCalendar && calCard) calCard.innerHTML = newCalendar.innerHTML;
+
+        const newUpcoming = doc.querySelector('.gnc-upcoming-card');
+        const upcomingCard = document.querySelector('.gnc-upcoming-card');
+        if (newUpcoming && upcomingCard) upcomingCard.innerHTML = newUpcoming.innerHTML;
+
+        window.history.pushState({}, '', url);
+    }
+
+    // Prev/Next month arrows
     document.body.addEventListener('click', async (e) => {
         const navLink = e.target.closest('.gnc-cal-nav');
         if (!navLink) return;
 
-        e.preventDefault(); 
-        
+        e.preventDefault();
         const url = navLink.href;
 
         try {
-            const response = await fetch(url);
-            const html = await response.text();
-
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const newCalendar = doc.querySelector('.gnc-cal-card').innerHTML;
-
-            document.querySelector('.gnc-cal-card').innerHTML = newCalendar;
-            
-            window.history.pushState({}, '', url);
+            await refreshEventsSection(url);
         } catch (error) {
             console.error('Failed to load calendar:', error);
             window.location.href = url;
         }
     });
+
+    // Program filter dropdown — stays exactly where the user is, no reload.
+    const programSelect = document.getElementById('evtProgramFilter');
+    if (programSelect) {
+        programSelect.addEventListener('change', async () => {
+            const form = programSelect.closest('form');
+            if (!form) return;
+
+            const params = new URLSearchParams(new FormData(form));
+            const url = form.action.split('#')[0] + '?' + params.toString();
+
+            try {
+                await refreshEventsSection(url);
+            } catch (error) {
+                console.error('Failed to filter events:', error);
+                form.submit();
+            }
+        });
+    }
 });
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -210,3 +243,32 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 });
+
+if (window.location.hash === '#events' && window.location.search.includes('evt_')) {
+    history.scrollRestoration = 'manual';
+
+    // Note: the page is already hidden by an inline <script> in <head>
+    // (runs before first paint) so there's nothing to see until we reveal it below.
+
+    function revealAtEvents() {
+        var target = document.getElementById('events');
+        if (target) {
+            target.scrollIntoView({ behavior: 'auto', block: 'start' });
+        }
+        document.documentElement.style.visibility = 'visible';
+    }
+
+    // Safety net: never leave the page hidden if 'load' is slow/unfired
+    // (e.g. a stalled video/image request).
+    var revealTimeout = setTimeout(revealAtEvents, 1500);
+
+    window.addEventListener('load', function () {
+        clearTimeout(revealTimeout);
+        // Two rAF calls: first lets the browser finish any pending
+        // layout from the load event, second scrolls after that
+        // layout has been painted — avoids a second late shift.
+        requestAnimationFrame(function () {
+            requestAnimationFrame(revealAtEvents);
+        });
+    });
+}

@@ -84,14 +84,16 @@ function getPermissions(string $role): array {
             'manage_news', 'create_news', 'edit_news', 'delete_news', 'publish_news',
             'manage_events', 'create_event', 'edit_event', 'delete_event', 'publish_event',
             'approve_content', 'reject_content', 'request_revision',
-            'view_logs', 'manage_approvals'
+            'view_logs', 'manage_approvals',
+            'manage_page_content'
         ],
         'Content Admin' => [
             'create_announcement', 'edit_announcement', 'delete_announcement', 'publish_announcement',
             'create_news', 'edit_news', 'delete_news', 'publish_news',
             'create_event', 'edit_event', 'delete_event', 'publish_event',
             'approve_content', 'reject_content', 'request_revision',
-            'manage_approvals'
+            'manage_approvals',
+            'manage_page_content'
         ],
         'Content Editor' => [
             'create_announcement', 'edit_own_announcement', 'delete_own_announcement',
@@ -1427,6 +1429,173 @@ function reorderHeroSlides(array $orderedIds): bool {
     } catch (Exception $e) {
         if (isset($db) && $db->inTransaction()) $db->rollBack();
         error_log('Reorder hero slides error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+// ============================================================
+// PAGE CONTENT CMS (Content Editor — page selector)
+// ============================================================
+// Generic Page → Section → Content structure so the Content Editor can
+// manage multiple website pages from one interface. The homepage
+// slideshow keeps using the dedicated hero_slides table above; this
+// section powers every other editable page (Vision & Mission, About Us,
+// History, etc.). Each section stores a published value plus an
+// optional draft value so admins can Save → Preview → Publish.
+
+/**
+ * Get every page registered in the Content Editor's page selector.
+ */
+function getEditablePages(): array {
+    try {
+        $db = getDB();
+        $stmt = $db->query("SELECT * FROM pages WHERE status = 'active' ORDER BY display_order ASC, title ASC");
+        return $stmt->fetchAll();
+    } catch (Exception $e) {
+        error_log('Get editable pages error: ' . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Get a single page's row by its slug (e.g. 'vision-mission').
+ */
+function getPageBySlug(string $slug): ?array {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("SELECT * FROM pages WHERE slug = ?");
+        $stmt->execute([$slug]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    } catch (Exception $e) {
+        error_log('Get page by slug error: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Get all editable sections for a page, in display order. Each section
+ * includes both `content` (currently published) and `draft_content`
+ * (unpublished edits, if any) so the editor can show "unpublished
+ * changes" state.
+ */
+function getPageSections(string $pageSlug): array {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("
+            SELECT ps.*
+            FROM page_sections ps
+            INNER JOIN pages p ON p.page_id = ps.page_id
+            WHERE p.slug = ?
+            ORDER BY ps.display_order ASC, ps.section_id ASC
+        ");
+        $stmt->execute([$pageSlug]);
+        return $stmt->fetchAll();
+    } catch (Exception $e) {
+        error_log('Get page sections error: ' . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Get one section's content by page slug + section key.
+ * Pass $preferDraft = true to get the unpublished draft when one exists
+ * (used for the admin's own Preview), otherwise the published value is
+ * returned (used by the public site).
+ */
+function getSectionContent(string $pageSlug, string $sectionKey, bool $preferDraft = false): ?string {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("
+            SELECT ps.content, ps.draft_content
+            FROM page_sections ps
+            INNER JOIN pages p ON p.page_id = ps.page_id
+            WHERE p.slug = ? AND ps.section_key = ?
+        ");
+        $stmt->execute([$pageSlug, $sectionKey]);
+        $row = $stmt->fetch();
+        if (!$row) return null;
+
+        if ($preferDraft && $row['draft_content'] !== null) {
+            return $row['draft_content'];
+        }
+        return $row['content'];
+    } catch (Exception $e) {
+        error_log('Get section content error: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Save a section's edits as a draft (does NOT touch the published
+ * `content` column, so the live public site is unaffected until Publish
+ * is called).
+ */
+function saveSectionDraft(string $pageSlug, string $sectionKey, string $content): bool {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("
+            UPDATE page_sections ps
+            INNER JOIN pages p ON p.page_id = ps.page_id
+            SET ps.draft_content = ?, ps.updated_by = ?, ps.updated_at = NOW()
+            WHERE p.slug = ? AND ps.section_key = ?
+        ");
+        $ok = $stmt->execute([$content, $_SESSION['user_id'] ?? null, $pageSlug, $sectionKey]);
+        if ($ok && $stmt->rowCount() > 0) {
+            logActivity($_SESSION['user_id'], 'UPDATE', 'page_sections', null, "Saved draft for {$pageSlug}/{$sectionKey}");
+        }
+        return $ok;
+    } catch (Exception $e) {
+        error_log('Save section draft error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Publish a section: copies draft_content into the live content column
+ * and clears the draft. If there is no pending draft, this is a no-op
+ * (returns true) since the section is already published as-is.
+ */
+function publishSection(string $pageSlug, string $sectionKey): bool {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("
+            UPDATE page_sections ps
+            INNER JOIN pages p ON p.page_id = ps.page_id
+            SET ps.content = COALESCE(ps.draft_content, ps.content),
+                ps.draft_content = NULL,
+                ps.status = 'published',
+                ps.updated_by = ?,
+                ps.updated_at = NOW()
+            WHERE p.slug = ? AND ps.section_key = ?
+        ");
+        $ok = $stmt->execute([$_SESSION['user_id'] ?? null, $pageSlug, $sectionKey]);
+        if ($ok) {
+            logActivity($_SESSION['user_id'], 'PUBLISH', 'page_sections', null, "Published {$pageSlug}/{$sectionKey}");
+        }
+        return $ok;
+    } catch (Exception $e) {
+        error_log('Publish section error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Discard the pending draft for a section, reverting the editor back to
+ * the currently published value.
+ */
+function discardSectionDraft(string $pageSlug, string $sectionKey): bool {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("
+            UPDATE page_sections ps
+            INNER JOIN pages p ON p.page_id = ps.page_id
+            SET ps.draft_content = NULL
+            WHERE p.slug = ? AND ps.section_key = ?
+        ");
+        return $stmt->execute([$pageSlug, $sectionKey]);
+    } catch (Exception $e) {
+        error_log('Discard section draft error: ' . $e->getMessage());
         return false;
     }
 }

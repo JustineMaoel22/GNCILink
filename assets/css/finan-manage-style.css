@@ -347,6 +347,239 @@ FINANCIAL MANAGEMENT PROGRAM HERO
     }
 }
 
+/* =====================================================================
+   BULLETIN BOARD
+   ===================================================================== */
+
+.bulletin-board {
+    background-color: var(--gnc-cream, #F9F6F1);
+}
+
+.bulletin-heading {
+    color: var(--gnc-finan);
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    position: relative;
+    padding-bottom: 0.5rem;
+}
+
+.bulletin-heading::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 40px;
+    height: 3px;
+    background-color: var(--gnc-gold);
+}
+
+.bulletin-subtext {
+    color: black;
+    margin-bottom: 0;
+}
+
+.bulletin-panel {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.bulletin-panel-header {
+    margin-bottom: 1rem;
+}
+
+.bulletin-panel-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--gnc-green-light);
+}
+
+.bulletin-panel-title--gold {
+    color: var(--gnc-gold);
+}
+
+.bulletin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    flex: 1 1 auto;
+}
+
+.bulletin-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    text-decoration: none;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid #f0eee9;
+}
+
+.bulletin-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.bulletin-item-icon {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    background-color: #f4f8f4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.bulletin-item-icon i {
+    color: var(--gnc-green-light);
+    font-size: 1.1rem;
+}
+
+.bulletin-item-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.bulletin-item-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--gnc-green-light);
+    margin-bottom: 0.1rem;
+}
+
+.bulletin-item-title--gold {
+    color: var(--gnc-gold);
+}
+
+.bulletin-item-excerpt {
+    font-size: 0.82rem;
+    color: #777;
+    margin-bottom: 0.2rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.bulletin-item-date,
+.bulletin-item-meta {
+    font-size: 0.75rem;
+    color: #999;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+/* Event rows */
+.bulletin-event-item {
+    align-items: stretch;
+}
+
+.bulletin-event-badge {
+    flex: 0 0 52px;
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.bulletin-event-month {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.bulletin-event-day {
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.badge-green {
+    background-color: var(--gnc-green-light);
+}
+
+.badge-gold {
+    background-color: var(--gnc-gold);
+    color: #3a2e2a;
+}
+
+.badge-maroon {
+    background-color: #7a1f2b;
+}
+
+/* Empty state */
+.bulletin-empty {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2.5rem 1rem;
+    color: #aaa;
+    text-align: center;
+}
+
+.bulletin-empty i {
+    font-size: 1.8rem;
+}
+
+.bulletin-empty p {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+/* Footer / view all */
+.bulletin-panel-footer {
+    margin-top: 1.1rem;
+    padding-top: 0.9rem;
+    text-align: center;
+    border-top: 1px solid #f0eee9;
+}
+
+.bulletin-view-all {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.bulletin-view-all--green {
+    color: var(--gnc-green-light);
+}
+
+.bulletin-view-all--gold {
+    color: var(--gnc-gold);
+}
+
+.bulletin-view-all:hover {
+    text-decoration: underline;
+}
+
+/* Accent bar under each panel */
+.col-lg-6:first-child .bulletin-panel {
+    border-bottom: 4px solid var(--gnc-green-light);
+}
+
+.col-lg-6:last-child .bulletin-panel {
+    border-bottom: 4px solid var(--gnc-gold);
+}
+
 /* CTA banner */
 .finan-cta-card {
     background: #fff;

@@ -1,0 +1,181 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+body {
+    background-color: var(--gnc-cream);
+
+}
+
+.vision-mission-hero {
+    position: relative;
+    background-color: var(--gnc-cream);
+    background-image: url('/assets/images/Section Header.png');
+    background-repeat: no-repeat;
+    background-position: right center;
+    background-size: cover;
+    border-bottom: 1px solid var(--gnc-border);
+}
+
+.vision-mission-hero-inner {
+    padding: 40px 15px 44px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.vision-mission-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #d3a63a;
+    margin-bottom: 14px;
+}
+
+.vision-mission-breadcrumb i {
+    font-size: 10px;
+    color: #d3a63a;
+    opacity: 0.8;
+}
+
+.vision-mission-hero h1 {
+    font-family: 'Noto Serif', serif;
+    font-weight: 700;
+    color: var(--gnc-green-light);
+    font-size: clamp(28px, 4vw, 40px);
+    margin: 0 0 8px;
+}
+
+.vision-mission-hero p {
+    font-family: 'Inter', sans-serif;
+    color: var(--gnc-text-gray);
+    font-size: 14px;
+    margin: 0;
+}
+
+/* --- Vision & Mission Cards Main Styles --- */
+.vm-card {
+    display: flex;
+    background-color: #ffffff;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    min-height: 320px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+/* Colored Left Panel */
+.vm-sidebar {
+    width: 120px;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+    z-index: 2;
+}
+
+.vm-bg-green {
+    background-color: var(--gnc-green-light);
+}
+
+.vm-bg-gold {
+    background-color: var(--gnc-gold);
+}
+
+/* --- Watermarks / Background Graphics --- */
+
+/* Seal Watermark (Inside the colored sidebar) */
+.vm-watermark-seal {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 250px;
+    height: 250px;
+    opacity: 0.15;
+    background-image: url('/assets/images/logos/gnc-logo-v1.svg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* Building Watermark */
+.vm-watermark-building {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 100%;
+    height: 140px;
+    background-image: url('/assets/images/svg/gnc-illustration.svg');
+    background-size: cover;
+    background-position: bottom center;
+    background-repeat: no-repeat;
+    z-index: 1;
+    pointer-events: none;
+    filter: invert(1);
+    mix-blend-mode: multiply;
+    opacity: 0.2;
+}
+
+/* --- Icon Circle Placed Inside Sidebar --- */
+.vm-icon-circle {
+    position: absolute;
+    top: 35px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 82px;
+    height: 82px;
+    background-color: #ffffff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+/* --- Text Content Area --- */
+.vm-content {
+    padding: 45px 35px 35px 40px;
+    flex-grow: 1;
+    position: relative;
+    z-index: 2;
+}
+
+.vm-title {
+    font-family: 'Noto Serif', serif;
+    font-weight: 700;
+    font-size: 32px;
+    margin-bottom: 25px;
+    position: relative;
+    display: inline-block;
+}
+
+.vm-title::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background-color: currentColor;
+}
+
+.text-green {
+    color: var(--gnc-green-light);
+}
+
+.text-gold {
+    color: var(--gnc-gold);
+}
+
+.vm-text {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    color: var(--gnc-text-dark);
+    font-size: 17px;
+    line-height: 1.5;
+    margin: 0;
+}

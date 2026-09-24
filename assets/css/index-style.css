@@ -315,6 +315,11 @@
 /* =============================================================
    ANNOUNCEMENTS
    ============================================================= */
+/* NOTE: `white-space: nowrap` used to live here. It forced the
+   "Stay Updated, Stay Informed" heading onto one unbreakable line,
+   which is wider than a 414px phone viewport — that widened the whole
+   page and created the horizontal scrollbar on mobile. The heading is
+   now allowed to wrap normally. */
 .gnc-announce-header {
     position: relative;
     max-width: none;
@@ -324,11 +329,18 @@
     overflow: hidden;
     background-size: cover;
     background-position: center;
-    white-space: nowrap;
 }
 .gnc-announce-header > * {
     max-width: 600px;
     text-align: left;
+}
+
+/* Keep the one-line look on wide screens only, where there's room for it.
+   Delete this block if you're happy for the heading to wrap on desktop too. */
+@media (min-width: 992px) {
+    .gnc-announce-header {
+        white-space: nowrap;
+    }
 }
 
 .gnc-announcement-card {
@@ -704,5 +716,19 @@
 @media (prefers-reduced-motion: reduce) {
     .hero-slide {
         transition: opacity 0.4s ease;
+    }
+}
+
+@media (max-width: 576px) {
+    #evtProgramFilter {
+        min-width: 110px !important;
+        max-width: 140px;
+        font-size: 0.78rem;
+        padding-left: 0.4rem;
+        padding-right: 1.4rem;
+    }
+    #programFilterForm label {
+        font-size: 0.72rem;
+        white-space: nowrap;
     }
 }

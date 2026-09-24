@@ -323,14 +323,15 @@ function na_url(array $overrides = []): string {
                         $linkTarget = $isFacebook ? ' target="_blank" rel="noopener"' : '';
                         $fallbackIcon = $isFacebook ? 'bi-facebook' : ($isNews ? 'bi-newspaper' : 'bi-megaphone');
                         $ribbonClass = $item['type_key'] === 'news' ? 'na-ribbon-news' : 'na-ribbon-announcement';
+                        $hasImage = !empty($item['image_path']);
                     ?>
                     <div class="col-md-6 col-lg-4">
-                        <div class="na-card">
+                        <div class="na-card skeleton-group">
                             <div class="na-ribbon <?= $ribbonClass ?>">
                                 <span>|</span> <?= strtoupper($item['type_label']) ?>
                             </div>
 
-                            <?php if (!empty($item['image_path'])): ?>
+                            <?php if ($hasImage): ?>
                             <div class="skeleton-wrap na-card-img-wrap">
                                 <img src="<?= htmlspecialchars($item['image_path']) ?>"
                                      alt="<?= htmlspecialchars($item['title'] ?? 'Facebook post') ?>"
@@ -344,37 +345,51 @@ function na_url(array $overrides = []): string {
                             <?php endif; ?>
 
                             <div class="na-card-body">
-                                <?php if (!empty($item['title'])): ?>
-                                    <h5 class="na-card-title"><?= htmlspecialchars($item['title']) ?></h5>
+                                <?php if ($hasImage): ?>
+                                    <div class="skeleton-text-lines">
+                                        <?php if (!empty($item['title'])): ?>
+                                            <span class="skeleton-line skeleton-line--title skeleton-line--80"></span>
+                                        <?php endif; ?>
+                                        <span class="skeleton-line skeleton-line--60"></span>
+                                        <span class="skeleton-line skeleton-line--100"></span>
+                                        <span class="skeleton-line skeleton-line--100"></span>
+                                        <span class="skeleton-line skeleton-line--80" style="margin-bottom:1em;"></span>
+                                    </div>
                                 <?php endif; ?>
 
-                                <div class="na-card-date">
-                                    <i class="bi bi-calendar3"></i> <?= date('F d, Y', strtotime($item['date'])) ?>
-                                </div>
-
-                                <?php if ($isNews && !empty($item['author'])): ?>
-                                    <div class="na-card-author">By <?= htmlspecialchars($item['author']) ?></div>
-                                <?php endif; ?>
-
-                                <p class="na-card-excerpt"><?= htmlspecialchars($item['excerpt']) ?></p>
-
-                                <hr class="na-card-divider">
-
-                                <div class="na-card-footer">
-                                    <span class="na-card-footer-date"><?= date('F d, Y', strtotime($item['date'])) ?></span>
-                                    <?php if ($isFacebook): ?>
-                                        <span class="na-badge na-badge-fb"><i class="bi bi-facebook"></i> From Facebook</span>
-                                    <?php elseif ($isNews): ?>
-                                        <span class="na-badge na-badge-news"><i class="bi bi-newspaper"></i> News</span>
-                                    <?php else: ?>
-                                        <span class="na-badge na-badge-ann"><i class="bi bi-megaphone"></i> Announcement</span>
+                                <div class="<?= $hasImage ? 'skeleton-real-content' : '' ?>">
+                                    <?php if (!empty($item['title'])): ?>
+                                        <h5 class="na-card-title"><?= htmlspecialchars($item['title']) ?></h5>
                                     <?php endif; ?>
-                                </div>
 
-                                <a href="<?= htmlspecialchars($item['link']) ?>"<?= $linkTarget ?> class="na-read-more">
-                                    <?= $isFacebook ? 'View on Facebook' : 'Read More' ?>
-                                    <i class="bi <?= $isFacebook ? 'bi-box-arrow-up-right' : 'bi-arrow-right' ?>"></i>
-                                </a>
+                                    <div class="na-card-date">
+                                        <i class="bi bi-calendar3"></i> <?= date('F d, Y', strtotime($item['date'])) ?>
+                                    </div>
+
+                                    <?php if ($isNews && !empty($item['author'])): ?>
+                                        <div class="na-card-author">By <?= htmlspecialchars($item['author']) ?></div>
+                                    <?php endif; ?>
+
+                                    <p class="na-card-excerpt"><?= htmlspecialchars($item['excerpt']) ?></p>
+
+                                    <hr class="na-card-divider">
+
+                                    <div class="na-card-footer">
+                                        <span class="na-card-footer-date"><?= date('F d, Y', strtotime($item['date'])) ?></span>
+                                        <?php if ($isFacebook): ?>
+                                            <span class="na-badge na-badge-fb"><i class="bi bi-facebook"></i> From Facebook</span>
+                                        <?php elseif ($isNews): ?>
+                                            <span class="na-badge na-badge-news"><i class="bi bi-newspaper"></i> News</span>
+                                        <?php else: ?>
+                                            <span class="na-badge na-badge-ann"><i class="bi bi-megaphone"></i> Announcement</span>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <a href="<?= htmlspecialchars($item['link']) ?>"<?= $linkTarget ?> class="na-read-more">
+                                        <?= $isFacebook ? 'View on Facebook' : 'Read More' ?>
+                                        <i class="bi <?= $isFacebook ? 'bi-box-arrow-up-right' : 'bi-arrow-right' ?>"></i>
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>

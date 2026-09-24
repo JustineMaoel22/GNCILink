@@ -142,13 +142,26 @@
 
                 <div class="dept-dean-photo-wrap">
                     <div class="dept-dean-square"></div>
+                    
                     <div class="dept-dean-photo skeleton-wrap">
                         <img src="/assets/images/maam-sampang.png" alt="Rowena R. Sampang, Dean of the College of Business Administration" loading="lazy">
+                        
+                        <!-- Layered Wave Pattern: Gold -> Maroon -> Light Green -->
+                        <div class="dept-dean-wave" aria-hidden="true">
+                            <svg viewBox="0 0 500 150" preserveAspectRatio="none">
+                                <path class="wave-gold" d="M0.00,30.98 C150.00,120.00 350.00,-20.00 500.00,30.98 L500.00,150.00 L0.00,150.00 Z"></path>
+                                <path class="wave-maroon" d="M0.00,49.98 C149.99,150.00 349.20,-49.98 500.00,49.98 L500.00,150.00 L0.00,150.00 Z"></path>
+                                <path class="wave-green" d="M0.00,79.98 C149.99,170.00 349.20,-20.98 500.00,79.98 L500.00,150.00 L0.00,150.00 Z"></path>
+                            </svg>
+                        </div>
+
+                        <!-- Glassmorphism Nameplate Badge -->
                         <div class="dept-dean-badge">
                             <span class="dept-dean-badge-title">Dean</span>
                             <span class="dept-dean-badge-sub">College of Business Administration</span>
                         </div>
                     </div>
+
                     <div class="dept-dean-accent" aria-hidden="true"></div>
                 </div>
 
@@ -162,19 +175,37 @@
 
                     <span class="dept-eyebrow">Get Connected</span>
 
-                    <div class="dept-dean-contact">
-                        <i class="bi bi-telephone"></i>
-                        <div>
-                            <span class="dept-contact-label">Contact Information</span>
-                            <span class="dept-contact-value">(045) 900-4473 Loc. 120</span>
+                    <div class="dept-dean-contacts-grid">
+                        <div class="dept-dean-contact">
+                            <i class="bi bi-telephone"></i>
+                            <div>
+                                <span class="dept-contact-label">Contact Information</span>
+                                <span class="dept-contact-value">(045) 900-4473 Loc. 106</span>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="dept-dean-contact">
-                        <i class="bi bi-envelope"></i>
-                        <div>
-                            <span class="dept-contact-label">Email Address</span>
-                            <span class="dept-contact-value">info@gnc.edu.ph</span>
+                        <div class="dept-dean-contact">
+                            <i class="bi bi-geo-alt"></i>
+                            <div>
+                                <span class="dept-contact-label">CBA Office</span>
+                                <span class="dept-contact-value">Limlingan Hall, Floor 2, Room 203</span>
+                            </div>
+                        </div>
+
+                        <div class="dept-dean-contact">
+                            <i class="bi bi-envelope"></i>
+                            <div>
+                                <span class="dept-contact-label">Email Address</span>
+                                <span class="dept-contact-value">info@gnc.edu.ph</span>
+                            </div>
+                        </div>
+
+                        <div class="dept-dean-contact">
+                            <i class="bi bi-clock"></i>
+                            <div>
+                                <span class="dept-contact-label">Operating Hours</span>
+                                <span class="dept-contact-value">Monday - Friday<br>8:00AM - 4:00PM</span>
+                            </div>
                         </div>
                     </div>
                 </div>

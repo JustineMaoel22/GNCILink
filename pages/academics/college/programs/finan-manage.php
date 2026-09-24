@@ -1,3 +1,7 @@
+<?php
+define('CURRENT_PROGRAM', 'BSBAFM');
+require_once __DIR__ . '/../../../../components/bulletin-board.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -260,6 +264,8 @@
             </div>
         </div>
     </section>
+
+    <?php render_bulletin_board(); ?>
 
     <section class="finan-cta py-4">
         <div class="container">

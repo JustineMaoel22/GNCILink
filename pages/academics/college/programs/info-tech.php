@@ -1,3 +1,7 @@
+<?php
+define('CURRENT_PROGRAM', 'BSIT');
+require_once __DIR__ . '/../../../../components/bulletin-board.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,6 +13,7 @@
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link href="/assets/css/comsci-it-style.css" rel="stylesheet">
+    <link href="/assets/css/bulletin-board-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
@@ -248,7 +253,7 @@
                         <div class="computer-career-content">
                             <h5 class="computer-career-title">Systems and Network Administrator</h5>
                             <p class="computer-career-desc">
-                                Manages and maintains an organization’s IT infrastructure, ensuring reliable network connectivity, system performance, security, and technical operations.
+                                Manages and maintains an organization's IT infrastructure, ensuring reliable network connectivity, system performance, security, and technical operations.
                             </p>
                         </div>
                     </div>
@@ -256,6 +261,8 @@
             </div>
         </div>
     </section>
+
+    <?php render_bulletin_board(); ?>
 
     <section class="computer-cta py-4">
         <div class="container">

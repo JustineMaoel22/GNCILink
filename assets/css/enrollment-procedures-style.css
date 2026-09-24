@@ -1,0 +1,237 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+.enrollment-intro,
+.enrollment-about,
+.enrollment-programs,
+.enrollment-dean,
+.enrollment-requirements {
+    --gnc-green: #0b4228;
+    --gnc-green-light: #1F5E2C;
+    --gnc-green-dark: #08331e;
+    --gnc-gold: #d3a63a;
+    --gnc-gold-light: #e9b93c;
+    --gnc-maroon: #8f1230;
+    --gnc-cream: #f9f6f1;
+    --gnc-text-dark: #202020;
+    --gnc-text-gray: #6b6b66;
+    --gnc-border: #e6e1d8;
+    font-family: 'Noto Serif', serif;
+}
+
+.enrollment-intro,
+.enrollment-about {
+    background-color: var(--gnc-cream);
+}
+
+/* ---------- Hero ---------- */
+.enrollment-hero {
+    position: relative;
+    background-color: var(--gnc-cream);
+    background-image: url('/assets/images/admission-header.png');
+    background-repeat: no-repeat;
+    background-position: right center;
+    background-size: cover;
+    border-bottom: 1px solid var(--gnc-border);
+}
+
+.enrollment-hero-inner {
+    padding: 40px 15px 44px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.enrollment-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: white;
+    margin-bottom: 14px;
+}
+
+.enrollment-breadcrumb a {
+    color: white;
+    text-decoration: none;
+}
+
+.enrollment-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.enrollment-breadcrumb i {
+    font-size: 10px;
+    color: white;
+    opacity: 0.8;
+}
+
+.enrollment-breadcrumb .enrollment-current {
+    color: white;
+}
+
+.enrollment-hero h1 {
+    font-family: 'Noto Serif', serif;
+    font-weight: 700;
+    color: var(--gnc-gold);
+    font-size: clamp(28px, 4vw, 40px);
+    margin: 0 0 8px;
+}
+
+.enrollment-hero p {
+    font-family: 'Inter', sans-serif;
+    color: white;
+    font-size: 14px;
+    max-width: 900px;
+    margin: 0;
+}
+
+.enrollment-procedures {
+    --gnc-green: #0b4228;
+    --gnc-gold: #d3a63a;
+    --gnc-cream: #f9f6f1;
+    --gnc-text-dark: #202020;
+    --gnc-text-gray: #6b6b66;
+    --gnc-border: #e6e1d8;
+    background-color: var(--gnc-cream);
+    font-family: 'Noto Serif', serif;
+    padding: 48px 15px 64px;
+}
+
+.enrollment-procedures-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* ---------- Tabs ---------- */
+.enrollment-tabs {
+    gap: 10px;
+    margin-bottom: 28px;
+}
+
+.enrollment-tabs .nav-link {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--gnc-green);
+    background-color: transparent;
+    border: 1px solid var(--gnc-green);
+    border-radius: 4px;
+    padding: 8px 18px;
+}
+
+.enrollment-tabs .nav-link.active {
+    background-color: var(--gnc-green);
+    color: white;
+}
+
+/* ---------- Pane header ---------- */
+.enrollment-pane-title {
+    font-family: 'Noto Serif', serif;
+    font-weight: 700;
+    color: var(--gnc-green-light);
+    font-size: 22px;
+    margin-bottom: 6px;
+}
+
+.enrollment-pane-desc {
+    font-family: 'Inter', sans-serif;
+    color: var(--gnc-text-gray);
+    font-size: 13px;
+    margin-bottom: 28px;
+}
+
+/* ---------- Step grid ---------- */
+.enrollment-steps-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 18px;
+}
+
+@media (max-width: 992px) {
+    .enrollment-steps-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 576px) {
+    .enrollment-steps-grid { grid-template-columns: 1fr; }
+}
+
+.enrollment-step-card {
+    background-color: white;
+    border: 1px solid var(--gnc-border);
+    border-radius: 6px;
+    padding: 24px 16px 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center; 
+    text-align: center; 
+    overflow: hidden;
+    position: relative; 
+}
+
+.enrollment-step-label {
+    font-family: 'Inter', sans-serif;
+    font-weight: 800;
+    font-size: 14px; 
+    letter-spacing: 0.03em;
+    color: var(--gnc-text-dark);
+    margin-bottom: 4px;
+}
+
+.enrollment-step-title {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--gnc-text-dark);
+}
+
+.enrollment-step-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--gnc-text-gray);
+    margin-top: 2px;
+}
+
+.enrollment-step-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100px; 
+    margin: 20px 0;
+    width: 100%;
+}
+
+.enrollment-step-icon img {
+    height: 100%;
+    width: auto;
+    object-fit: contain;
+}
+
+.enrollment-step-desc {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--gnc-text-gray);
+    text-align: center;
+    flex-grow: 1;
+    margin-bottom: 0;
+}
+
+.enrollment-step-bar {
+    position: absolute; 
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 8px; 
+    width: 100%;
+}
+
+.enrollment-step-bar--gold {
+    background-color: var(--gnc-gold);
+}
+
+.enrollment-step-bar--green {
+    background-color: var(--gnc-green);
+}

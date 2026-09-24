@@ -1,3 +1,7 @@
+<?php
+define('CURRENT_PROGRAM', 'BSED');
+require_once __DIR__ . '/../../../../components/bulletin-board.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -266,6 +270,8 @@
             </div>
         </div>
     </section>
+
+    <?php render_bulletin_board(); ?>
 
     <section class="educ-cta py-4">
         <div class="container">

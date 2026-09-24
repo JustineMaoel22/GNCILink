@@ -70,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             $startDate   = trim($_POST['start_date'] ?? '');
             $endDate     = trim($_POST['end_date'] ?? '') ?: null;
             $categoryId  = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
+            $program     = normalizeProgramCategory($_POST['program'] ?? null);
             $status      = in_array($_POST['status'] ?? '', ['draft','pending','published','archived'])
                             ? $_POST['status'] : 'pending';
 
@@ -86,10 +87,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
 
             if ($action === 'create') {
                 $stmt = $db->prepare("
-                    INSERT INTO events (category_id, user_id, title, description, location, start_date, end_date, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO events (category_id, program, user_id, title, description, location, start_date, end_date, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$categoryId, $userId, $title, $description, $location, $startDate, $endDate, $status]);
+                $stmt->execute([$categoryId, $program, $userId, $title, $description, $location, $startDate, $endDate, $status]);
                 $newId = $db->lastInsertId();
 
                 if (function_exists('logActivity')) {
@@ -104,11 +105,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 }
                 $stmt = $db->prepare("
                     UPDATE events
-                    SET category_id = ?, title = ?, description = ?, location = ?,
+                    SET category_id = ?, program = ?, title = ?, description = ?, location = ?,
                         start_date = ?, end_date = ?, status = ?
                     WHERE event_id = ?
                 ");
-                $stmt->execute([$categoryId, $title, $description, $location, $startDate, $endDate, $status, $eventId]);
+                $stmt->execute([$categoryId, $program, $title, $description, $location, $startDate, $endDate, $status, $eventId]);
 
                 if (function_exists('logActivity')) {
                     logActivity($userId, 'UPDATE', "Updated event: {$title}");
@@ -125,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 exit;
             }
             $stmt = $db->prepare("
-                SELECT event_id, category_id, title, description, location, start_date, end_date, status
+                SELECT event_id, category_id, program, title, description, location, start_date, end_date, status
                 FROM events WHERE event_id = ?
             ");
             $stmt->execute([$eventId]);
@@ -191,7 +192,7 @@ try {
 
     $stmt = $db->prepare("
         SELECT e.event_id, e.title, e.description, e.location, e.start_date, e.end_date,
-               e.status, e.category_id, c.category_name, c.category_color
+               e.status, e.category_id, e.program, c.category_name, c.category_color
         FROM events e
         LEFT JOIN categories c ON e.category_id = c.category_id
         WHERE e.start_date <= ?
@@ -227,7 +228,7 @@ foreach ($monthEvents as $ev) {
 // All events list (most recent first) for the management table below
 try {
     $allEvents = $db->query("
-        SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, e.category_id,
+        SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, e.category_id, e.program,
                c.category_name, c.category_color,
                CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,'')) AS author
         FROM events e
@@ -241,8 +242,16 @@ try {
     $allEvents = [];
 }
 
+// Only categories that make sense for an Event go in this dropdown.
+// "Reminder" belongs to Announcements only, so it's excluded here —
+// the category row itself isn't touched/deleted, just left out of this list.
 try {
-    $categories = $db->query("SELECT category_id, category_name, category_color FROM categories ORDER BY category_name ASC")->fetchAll();
+    $categories = $db->query("
+        SELECT category_id, category_name, category_color
+        FROM categories
+        WHERE category_name NOT IN ('Reminder')
+        ORDER BY category_name ASC
+    ")->fetchAll();
 } catch (Exception $e) {
     $categories = [];
 }
@@ -349,6 +358,7 @@ include __DIR__ . '/../components/header-admin.php';
                         <tr>
                             <th>Title</th>
                             <th>Category</th>
+                            <th>Program</th>
                             <th>Date</th>
                             <th>Status</th>
                             <th>Author</th>
@@ -357,7 +367,7 @@ include __DIR__ . '/../components/header-admin.php';
                     </thead>
                     <tbody id="eventsTableBody">
                         <?php if (empty($allEvents)): ?>
-                        <tr><td colspan="6" class="text-center py-4 text-muted">No events yet. Click "Add Event" or a calendar date to create one.</td></tr>
+                        <tr><td colspan="7" class="text-center py-4 text-muted">No events yet. Click "Add Event" or a calendar date to create one.</td></tr>
                         <?php else: foreach ($allEvents as $ev): ?>
                         <tr data-event-id="<?= $ev['event_id'] ?>">
                             <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
@@ -370,6 +380,15 @@ include __DIR__ . '/../components/header-admin.php';
                                     </span>
                                 <?php else: ?>
                                     <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if (($ev['program'] ?? 'ALL') !== 'ALL'): ?>
+                                    <span class="text-muted" style="font-size:.78rem;">
+                                        <?= htmlspecialchars($ev['program']) ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-muted" style="font-size:.78rem;">All Programs</span>
                                 <?php endif; ?>
                             </td>
                             <td style="font-size:.8rem">
@@ -465,6 +484,18 @@ include __DIR__ . '/../components/header-admin.php';
                                 <option value="archived">Archived</option>
                             </select>
                         </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Program</label>
+                        <select class="form-select" name="program" id="eventProgram">
+                            <?php foreach (getProgramCategories() as $code => $label):
+                                $optionText = $code === 'ALL' ? $label : "{$code} - {$label}";
+                            ?>
+                                <option value="<?= htmlspecialchars($code) ?>"<?= $code === 'ALL' ? ' selected' : '' ?>><?= htmlspecialchars($optionText) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text">Which program this event applies to. Choose "All Programs" if it's for everyone.</div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -579,6 +610,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('eventId').value = '';
         document.getElementById('eventFormAction').value = 'create';
         document.getElementById('eventStatus').value = 'pending';
+        document.getElementById('eventProgram').value = 'ALL';
         alertBox.classList.add('d-none');
         alertBox.textContent = '';
         modalLabel.textContent = 'Add Event';
@@ -668,6 +700,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('eventStartDate').value = ev.start_date ? ev.start_date.replace(' ', 'T').slice(0,16) : '';
                 document.getElementById('eventEndDate').value = ev.end_date ? ev.end_date.replace(' ', 'T').slice(0,16) : '';
                 document.getElementById('eventCategory').value = ev.category_id || '';
+                document.getElementById('eventProgram').value = ev.program || 'ALL';
                 document.getElementById('eventStatus').value = ev.status || 'pending';
                 updateCategoryDot();
                 eventModal.show();

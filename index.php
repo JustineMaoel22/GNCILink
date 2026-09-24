@@ -79,7 +79,7 @@ foreach ($dbNews as $item) {
 // ---------------------------------------------------------------
 function getFacebookPosts(): array {
     $db       = getDB();
-    $cacheTtl = 600; // 10 minutes
+    $cacheTtl = 300; // 5 minutes
 
     $lastFetchRow = $db->query("SELECT MAX(fetched_at) AS last_fetch FROM fb_posts_cache")->fetch();
     $isFresh = !empty($lastFetchRow['last_fetch'])
@@ -89,70 +89,135 @@ function getFacebookPosts(): array {
         return fetchCachedFbPostsFromDb($db);
     }
 
-    $pageId      = $_ENV['FB_PAGE_ID'];
-    $accessToken = $_ENV['FB_ACCESS_TOKEN'];
+    // ---------------------------------------------------------------
+    // Rate limiting, two layers:
+    //
+    // 1. A MySQL advisory lock so that when the cache expires and
+    //    several visitors hit the homepage around the same moment, only
+    //    ONE of them actually calls the Facebook API — the rest wait
+    //    briefly and then just read the cache the first one refreshed.
+    //    Without this, a traffic burst right as the cache goes stale
+    //    could fire off many simultaneous Graph API calls at once.
+    //
+    // 2. A hard cap on how many real Facebook calls we make per hour,
+    //    tracked in fb_api_call_log. Even under sustained traffic this
+    //    keeps us well under Facebook's own rate limits and gives a
+    //    predictable ceiling instead of "however busy the site gets".
+    // ---------------------------------------------------------------
+    $maxCallsPerHour = 60;
 
-    $url = "https://graph.facebook.com/v19.0/{$pageId}/posts"
-         . "?fields=id,message,created_time,permalink_url,full_picture&limit=6"
-         . "&access_token={$accessToken}";
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS fb_api_call_log (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            called_at DATETIME NOT NULL,
+            INDEX (called_at)
+        )
+    ");
 
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-    $raw = curl_exec($ch);
-    $curlErr = curl_error($ch);
-    curl_close($ch);
-
-    if ($raw === false) {
-        error_log("Facebook fetch failed: $curlErr");
-        return fetchCachedFbPostsFromDb($db); // serve whatever's already cached, even if stale
-    }
-
-    $response = json_decode($raw, true);
-
-    if (isset($response['error'])) {
-        error_log("Facebook API error: " . $response['error']['message']);
+    $gotLock = (bool) $db->query("SELECT GET_LOCK('fb_posts_fetch', 5)")->fetchColumn();
+    if (!$gotLock) {
+        // Someone else is already refreshing — just serve current cache
+        // rather than waiting indefinitely or piling on another call.
         return fetchCachedFbPostsFromDb($db);
     }
 
-    if (!empty($response['data'])) {
-        $existingStmt = $db->prepare("SELECT image_media_id FROM fb_posts_cache WHERE fb_post_id = ?");
-
-        $upsertStmt = $db->prepare("
-            INSERT INTO fb_posts_cache (fb_post_id, message, image_media_id, permalink_url, created_time, fetched_at)
-            VALUES (:fb_post_id, :message, :image_media_id, :permalink_url, :created_time, NOW())
-            ON DUPLICATE KEY UPDATE
-                message         = VALUES(message),
-                permalink_url   = VALUES(permalink_url),
-                created_time    = VALUES(created_time),
-                fetched_at      = NOW(),
-                image_media_id  = COALESCE(image_media_id, VALUES(image_media_id))
-        ");
-
-        foreach ($response['data'] as $post) {
-            if (empty($post['message']) || empty($post['id'])) continue; // skip photo-only / malformed posts
-
-            // Reuse the existing media_library row for this post if we already downloaded it
-            $existingStmt->execute([$post['id']]);
-            $imageMediaId = $existingStmt->fetchColumn() ?: null;
-
-            if (empty($imageMediaId) && !empty($post['full_picture'])) {
-                $imageMediaId = downloadAndStoreFbImageAsMedia($db, $post['id'], $post['full_picture']);
-            }
-
-            $upsertStmt->execute([
-                ':fb_post_id'     => $post['id'],
-                ':message'        => $post['message'],
-                ':image_media_id' => $imageMediaId,
-                ':permalink_url'  => $post['permalink_url'] ?? null,
-                ':created_time'   => date('Y-m-d H:i:s', strtotime($post['created_time'])),
-            ]);
+    try {
+        // Re-check freshness now that we hold the lock: another request
+        // may have already refreshed the cache while we were waiting.
+        $lastFetchRow = $db->query("SELECT MAX(fetched_at) AS last_fetch FROM fb_posts_cache")->fetch();
+        $isFresh = !empty($lastFetchRow['last_fetch'])
+            && (time() - strtotime($lastFetchRow['last_fetch']) < $cacheTtl);
+        if ($isFresh) {
+            return fetchCachedFbPostsFromDb($db);
         }
-    }
 
-    return fetchCachedFbPostsFromDb($db);
+        $callsThisHour = (int) $db->query("
+            SELECT COUNT(*) FROM fb_api_call_log WHERE called_at > NOW() - INTERVAL 1 HOUR
+        ")->fetchColumn();
+
+        if ($callsThisHour >= $maxCallsPerHour) {
+            error_log("Facebook fetch skipped: hourly rate limit ($maxCallsPerHour/hr) reached");
+            return fetchCachedFbPostsFromDb($db);
+        }
+
+        $db->exec("INSERT INTO fb_api_call_log (called_at) VALUES (NOW())");
+        $db->exec("DELETE FROM fb_api_call_log WHERE called_at <= NOW() - INTERVAL 1 HOUR"); // keep the table small
+
+        $pageId      = $_ENV['FB_PAGE_ID'];
+        $accessToken = $_ENV['FB_ACCESS_TOKEN'];
+
+        $url = "https://graph.facebook.com/v21.0/{$pageId}/posts"
+             . "?fields=id,message,created_time,permalink_url,full_picture&limit=6"
+             . "&access_token={$accessToken}";
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        $raw = curl_exec($ch);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+
+        if ($raw === false) {
+            error_log("Facebook fetch failed: $curlErr");
+            return fetchCachedFbPostsFromDb($db); // serve whatever's already cached, even if stale
+        }
+
+        $response = json_decode($raw, true);
+
+        if (isset($response['error'])) {
+            error_log("Facebook API error: " . $response['error']['message']);
+            return fetchCachedFbPostsFromDb($db);
+        }
+
+        if (!empty($response['data'])) {
+            $existingStmt = $db->prepare("SELECT image_media_id FROM fb_posts_cache WHERE fb_post_id = ?");
+
+            $upsertStmt = $db->prepare("
+                INSERT INTO fb_posts_cache (fb_post_id, message, image_media_id, permalink_url, created_time, fetched_at)
+                VALUES (:fb_post_id, :message, :image_media_id, :permalink_url, :created_time, NOW())
+                ON DUPLICATE KEY UPDATE
+                    message         = VALUES(message),
+                    permalink_url   = VALUES(permalink_url),
+                    created_time    = VALUES(created_time),
+                    fetched_at      = NOW(),
+                    image_media_id  = COALESCE(image_media_id, VALUES(image_media_id))
+            ");
+
+            foreach ($response['data'] as $post) {
+                // A post needs an id to key off of, and at least a message OR a
+                // photo to be worth showing. Photo-only posts (no caption) used
+                // to be skipped here because $post['message'] was empty — that
+                // silently dropped otherwise-valid posts from the feed.
+                if (empty($post['id'])) continue;
+                if (empty($post['message']) && empty($post['full_picture'])) continue;
+
+                // Reuse the existing media_library row for this post if we already downloaded it
+                $existingStmt->execute([$post['id']]);
+                $imageMediaId = $existingStmt->fetchColumn() ?: null;
+
+                if (empty($imageMediaId) && !empty($post['full_picture'])) {
+                    $imageMediaId = downloadAndStoreFbImageAsMedia($db, $post['id'], $post['full_picture']);
+                }
+
+                $upsertStmt->execute([
+                    ':fb_post_id'     => $post['id'],
+                    ':message'        => $post['message'] ?? '', // may be empty for photo-only posts
+                    ':image_media_id' => $imageMediaId,
+                    ':permalink_url'  => $post['permalink_url'] ?? null,
+                    ':created_time'   => date('Y-m-d H:i:s', strtotime($post['created_time'])),
+                ]);
+            }
+        }
+
+        return fetchCachedFbPostsFromDb($db);
+    } finally {
+        // Always release the lock, even if we returned early above or an
+        // exception was thrown — otherwise it'd stay held until this MySQL
+        // connection closes, blocking every other request from refreshing.
+        $db->exec("SELECT RELEASE_LOCK('fb_posts_fetch')");
+    }
 }
 
 /**
@@ -171,7 +236,11 @@ function fetchCachedFbPostsFromDb(PDO $db): array {
 
     $posts = [];
     foreach ($rows as $row) {
-        $excerpt = mb_strlen($row['message']) > 110 ? mb_substr($row['message'], 0, 110) . '…' : $row['message'];
+        // message can legitimately be empty for photo-only posts —
+        // don't let mb_substr/strlen choke on that, just show no excerpt.
+        $excerpt = !empty($row['message'])
+            ? (mb_strlen($row['message']) > 110 ? mb_substr($row['message'], 0, 110) . '…' : $row['message'])
+            : '';
         $posts[] = [
             'source'     => 'facebook',
             'title'      => null,
@@ -272,8 +341,15 @@ $publicAnnouncements = array_slice($publicAnnouncements, 0, 6);
 // ---------------------------------------------------------------
 // Events calendar (public, published only)
 // ---------------------------------------------------------------
+require_once __DIR__ . '/admin/admin-functions.php'; // for getProgramCategories() / normalizeProgramCategory()
+
 $evtMonth = isset($_GET['evt_month']) ? max(1, min(12, (int)$_GET['evt_month'])) : (int)date('n');
 $evtYear  = isset($_GET['evt_year'])  ? (int)$_GET['evt_year']                  : (int)date('Y');
+
+// Program filter — 'ALL' (the default) means "show every program's events".
+// Picking a specific program shows that program's events plus any event
+// tagged 'ALL' (i.e. events meant for everyone).
+$evtProgramFilter = normalizeProgramCategory($_GET['evt_program'] ?? null);
 
 $evtFirstOfMonth = mktime(0, 0, 0, $evtMonth, 1, $evtYear);
 $evtDaysInMonth  = (int)date('t', $evtFirstOfMonth);
@@ -305,16 +381,25 @@ try {
     // Overlap condition: include any event that touches this month at all,
     // not just ones that *start* in it — so multi-day events that started
     // last month but run into this one still show up.
-    $stmt = $db->prepare("
-        SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, c.category_name, c.category_color
+    $monthEventsSql = "
+        SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, e.program, c.category_name, c.category_color
         FROM events e
         LEFT JOIN categories c ON e.category_id = c.category_id
         WHERE e.status = 'published'
           AND e.start_date <= ?
           AND COALESCE(e.end_date, e.start_date) >= ?
-        ORDER BY e.start_date ASC
-    ");
-    $stmt->execute([$evtRangeEnd, $evtRangeStart]);
+    ";
+    $monthEventsParams = [$evtRangeEnd, $evtRangeStart];
+
+    if ($evtProgramFilter !== 'ALL') {
+        $monthEventsSql .= " AND (e.program = ? OR e.program = 'ALL')";
+        $monthEventsParams[] = $evtProgramFilter;
+    }
+
+    $monthEventsSql .= " ORDER BY e.start_date ASC";
+
+    $stmt = $db->prepare($monthEventsSql);
+    $stmt->execute($monthEventsParams);
     $publicMonthEvents = $stmt->fetchAll();
 } catch (Exception $e) {
     $publicMonthEvents = [];
@@ -345,15 +430,23 @@ foreach ($publicMonthEvents as $ev) {
 
 // Upcoming events (next 3 published, from today onward, any month)
 try {
-    $stmt = $db->prepare("
-        SELECT e.event_id, e.title, e.location, e.start_date, e.end_date, c.category_name, c.category_color
+    $upcomingSql = "
+        SELECT e.event_id, e.title, e.location, e.start_date, e.end_date, e.program, c.category_name, c.category_color
         FROM events e
         LEFT JOIN categories c ON e.category_id = c.category_id
         WHERE e.status = 'published' AND e.start_date >= ?
-        ORDER BY e.start_date ASC
-        LIMIT 3
-    ");
-    $stmt->execute([date('Y-m-d 00:00:00')]);
+    ";
+    $upcomingParams = [date('Y-m-d 00:00:00')];
+
+    if ($evtProgramFilter !== 'ALL') {
+        $upcomingSql .= " AND (e.program = ? OR e.program = 'ALL')";
+        $upcomingParams[] = $evtProgramFilter;
+    }
+
+    $upcomingSql .= " ORDER BY e.start_date ASC LIMIT 3";
+
+    $stmt = $db->prepare($upcomingSql);
+    $stmt->execute($upcomingParams);
     $upcomingEvents = $stmt->fetchAll();
 } catch (Exception $e) {
     $upcomingEvents = [];
@@ -362,6 +455,17 @@ try {
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+    // Must run first, before anything paints: if we're arriving from the
+    // program-filter reload (URL has #events + evt_* params), hide the
+    // page immediately so the user never sees the top of the page before
+    // we scroll to #events. index.js reveals it again once positioned.
+    (function () {
+        if (window.location.hash === '#events' && window.location.search.indexOf('evt_') !== -1) {
+            document.documentElement.style.visibility = 'hidden';
+        }
+    })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guagua National Colleges</title>
@@ -369,7 +473,7 @@ try {
     <link href="assets/css/base-style.css" rel="stylesheet">
     <link href="assets/css/navbar-style.css" rel="stylesheet">
     <link href="assets/css/footer-style.css" rel="stylesheet">
-    <link href="assets/css/index-style.css?v=3" rel="stylesheet">
+    <link href="assets/css/index-style.css?v=4" rel="stylesheet">
     <link href="assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="icon" type="image/x-icon" href="assets/images/logos/gnc-logo-v1.svg">
@@ -487,7 +591,7 @@ try {
     </div>
     <?php endif; ?>
 
-<div class="gnc-pillars">
+    <div class="gnc-pillars">
         <div class="container">
             <div class="pillar-card">
                 <div class="pillar-wrap">
@@ -593,9 +697,13 @@ try {
                                 </h5>
                                 <?php endif; ?>
 
+                                <?php if (!empty($item['excerpt'])): ?>
                                 <p class="card-text text-muted flex-grow-1" style="font-family: 'Inter', sans-serif; font-size: .9rem;">
                                     <?= htmlspecialchars($item['excerpt']) ?>
                                 </p>
+                                <?php else: ?>
+                                <div class="flex-grow-1"></div>
+                                <?php endif; ?>
 
                                 <a href="<?= htmlspecialchars($item['link']) ?>"<?= $linkTarget ?> class="gnc-read-more text-decoration-none mt-1">
                                     <?= $isFacebook ? 'View on Facebook' : 'Read More' ?>
@@ -616,19 +724,37 @@ try {
         </div>
     </section>
 
-    <section class="gnc-events-cal py-5" id="events" style="background:#f7f8f6;">
+    <section class="gnc-events-cal py-5" id="events" style="background:#F9F6F1;">
         <div class="container">
-            <h2 class="mb-4" style="font-family:'Noto Serif', serif; color:#1F5E2C; font-weight:800;">Calendar of Events</h2>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+                <h2 class="mb-0" style="font-family:'Noto Serif', serif; color:#1F5E2C; font-weight:800;">Calendar of Events</h2>
+
+                <form method="get" action="<?= htmlspecialchars(strtok($_SERVER['REQUEST_URI'], '?')) ?>#events" class="d-flex align-items-center gap-2" id="programFilterForm">
+                    <label for="evtProgramFilter" class="small text-muted mb-0">Filter by Program</label>
+                    <select name="evt_program" id="evtProgramFilter" class="form-select form-select-sm" style="width:auto;min-width:180px;">
+                        <?php foreach (getProgramCategories() as $code => $label):
+                            $optionText = $code === 'ALL' ? $label : "{$code} - {$label}";
+                        ?>
+                            <option value="<?= htmlspecialchars($code) ?>" <?= $code === $evtProgramFilter ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($optionText) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <input type="hidden" name="evt_month" value="<?= $evtMonth ?>">
+                    <input type="hidden" name="evt_year" value="<?= $evtYear ?>">
+                    <noscript><button type="submit" class="btn btn-sm btn-outline-secondary">Go</button></noscript>
+                </form>
+            </div>
 
             <div class="row g-4">
                 <div class="col-lg-7">
                     <div class="gnc-cal-card">
                         <div class="gnc-cal-header">
-                            <a href="?evt_month=<?= $evtPrevMonth ?>&evt_year=<?= $evtPrevYear ?>#events" class="gnc-cal-nav">
+                            <a href="?evt_month=<?= $evtPrevMonth ?>&evt_year=<?= $evtPrevYear ?>&evt_program=<?= urlencode($evtProgramFilter) ?>#events" class="gnc-cal-nav">
                                 <i class="bi bi-chevron-left"></i>
                             </a>
                             <span class="gnc-cal-title"><?= htmlspecialchars($evtMonthLabel) ?></span>
-                            <a href="?evt_month=<?= $evtNextMonth ?>&evt_year=<?= $evtNextYear ?>#events" class="gnc-cal-nav">
+                            <a href="?evt_month=<?= $evtNextMonth ?>&evt_year=<?= $evtNextYear ?>&evt_program=<?= urlencode($evtProgramFilter) ?>#events" class="gnc-cal-nav">
                                 <i class="bi bi-chevron-right"></i>
                             </a>
                         </div>
@@ -753,7 +879,7 @@ try {
                             <p class="gnc-program-desc">
                                 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
                             </p>
-                            <a href="#" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
+                            <a href="/pages/academics/basic-edu/basic-edu-dept.php" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
                         </div>
                     </div>
                 </div>
@@ -766,7 +892,7 @@ try {
                             <p class="gnc-program-desc">
                                 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
                             </p>
-                            <a href="/pages/college-departments.php" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
+                            <a href="/pages/academics/college/college-departments.php" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
                         </div>
                     </div>
                 </div>
@@ -779,7 +905,7 @@ try {
                             <p class="gnc-program-desc">
                                 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
                             </p>
-                            <a href="#" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
+                            <a href="/pages/academics/graduate-school/graduate-school.php" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
                         </div>
                     </div>
                 </div>
@@ -824,6 +950,8 @@ try {
                         Guagua National Colleges, Inc. boast of 100 plus years of giving quality education.&rdquo;
                     </p>
                 </div>
+            </div>
+        </div>
     </section>
 
     <?php include __DIR__ . '/components/index-footer.php'; ?>
@@ -865,11 +993,11 @@ try {
         }
         .gnc-cal-empty { background:none; min-height:auto; }
         .gnc-cal-daynum { line-height:1; }
-        .gnc-cal-today { background:#DDEBFD; font-weight:700; color:#094024; border:1px solid #1877F2; }
+        .gnc-cal-today { background:#E9E9E9; font-weight:700; color:#094024; border:1px solid #B0B0B0; }
         .gnc-cal-hasevent {
-            background:#f3f6f3; font-weight:700; cursor:default;
+            background:#E9E9E9; border-color:#B0B0B0;
         }
-        .gnc-cal-hasevent.gnc-cal-today { background:#DDEBFD; border-color:#1877F2; }
+        .gnc-cal-hasevent.gnc-cal-today { background:#E9E9E9; border-color:#B0B0B0; }
         .gnc-cal-events {
             display:flex; flex-direction:column; gap:2px; width:100%;
         }
@@ -906,8 +1034,9 @@ try {
         .gnc-upcoming-title { font-weight:700; color:#094024; font-size:.9rem; }
         .gnc-upcoming-date { font-size:.78rem; color:#888; margin-top:2px; }
     </style>
-    
-    <script src="assets/js/index.js?v=2"></script>
+
+    <script src="assets/js/index.js?v=4"></script>
     <script src="assets/js/skeleton-loader.js"></script>
+
 </body>
-</html>
+</html> 

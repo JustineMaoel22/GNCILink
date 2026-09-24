@@ -1,0 +1,311 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+:root {
+    --gnc-green:      #094024;
+    --gnc-green-light:#1F5E2C;
+    --gnc-gold:       #EABA3B;
+    --gnc-gold-light: #E2C06A;
+    --gnc-white:      #F9F6F1;
+    --gnc-dark:       #1a1a1a;
+}
+
+body {
+    background-color: var(--gnc-white);
+}
+
+/* Hero Section */
+.history-hero {
+    position: relative;
+    height: 200px;
+    /* Stronger gradient for better text readability */
+    background-image: 
+        linear-gradient(to bottom, rgba(9, 64, 36, 0.9) 0%, rgba(0, 0, 0, 0.6) 70%),
+        url('/assets/images/gnc-header.png'); 
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hero-title {
+    color: #FFFFFF;
+    font-family: 'Noto Serif', serif;
+    font-size: 3.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-shadow: 2px 4px 8px rgba(0, 0, 0, 0.8);
+    letter-spacing: 1px;
+    margin-bottom: 2rem; /* Leaves room for the curve */
+    z-index: 2;
+}
+
+/* Downward Curve SVG Divider */
+.curve-divider {
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 100%;
+    overflow: hidden;
+    line-height: 0;
+    z-index: 1;
+}
+
+.curve-divider svg {
+    display: block;
+    width: calc(100% + 1.3px);
+    height: 100px;
+}
+
+.curve-divider .shape-fill {
+    fill: var(--gnc-white);
+}
+
+/* Logo Overlapping */
+.logo-wrapper {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    z-index: 3;
+    margin-top: -80px; /* Moved up slightly */
+}
+
+.overlap-logo {
+    width: 100px;
+    height: 100px;
+    background-color: #fff;
+    border-radius: 50%;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    padding: 4px; 
+    object-fit: contain;
+}
+
+/* Content Section */
+.journey-section {
+    background-color: var(--gnc-white);
+    text-align: center;
+    padding: 3rem 1rem 5rem;
+}
+
+.journey-title {
+    color: var(--gnc-green-light);
+    font-family: 'Noto Serif', serif;
+    font-size: 2.4rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.title-underline {
+    width: 85px;
+    height: 3px;
+    background-color: var(--gnc-gold);
+    margin: 0.75rem auto 0;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .hero-title { font-size: 2.5rem; }
+    .history-hero { height: 220px; }
+    .overlap-logo { width: 80px; height: 80px; margin-top: -50px; } /* Moved up proportionally */
+    .journey-title { font-size: 1.8rem; }
+    .curve-divider svg { height: 60px; }
+}
+
+/* --- Timeline Section --- */
+.timeline-section {
+    background-color: var(--gnc-white);
+    padding: 0 1rem 5rem;
+}
+
+.timeline-container {
+    position: relative;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+/* The vertical center line */
+.timeline-container::before {
+    content: '';
+    position: absolute;
+    top: 14px; /* Fix: Changed from 0 to start exactly at the first dot */
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    background-color: var(--gnc-green);
+    transform: translateX(-50%);
+}
+
+/* Individual timeline row */
+.timeline-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    position: relative;
+    width: 100%;
+    margin-bottom: 4rem;
+}
+
+/* The gold dots */
+.timeline-dot {
+    position: absolute;
+    left: 50%;
+    top: 6px; /* Aligns dot with the top of the text */
+    width: 16px;
+    height: 16px;
+    background-color: var(--gnc-gold);
+    border-radius: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+}
+
+/* Half-width containers for content/images */
+.timeline-content {
+    width: 45%; /* Leaves a 10% gap in the middle for the line */
+}
+
+/* Typography styles */
+.timeline-text {
+    text-align: left;
+}
+
+/* Right-align the text for the even rows (left side) */
+.timeline-item:nth-child(even) .timeline-text {
+    text-align: right;
+}
+
+.timeline-year {
+    color: var(--gnc-green);
+    font-family: 'Noto Serif', serif;
+    font-size: 1.7rem;
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+}
+
+.timeline-subtitle {
+    color: #B53333; /* Mocked red color to match image */
+    font-family: 'Noto Serif', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.timeline-text p {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    color: var(--gnc-dark);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+
+/* Image Placeholders */
+.timeline-image-placeholder {
+    width: 100%;
+    height: 180px;
+    background-color: #D9D9D9;
+    border-radius: 4px;
+}
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 768px) {
+    /* Move the line to the left edge */
+    .timeline-container::before {
+        left: 20px;
+        transform: none;
+    }
+    
+    /* Stack elements vertically */
+    .timeline-item, .timeline-item:nth-child(even) {
+        flex-direction: column;
+        padding-left: 50px;
+    }
+
+    /* Adjust dot position */
+    .timeline-dot {
+        left: 12px;
+        transform: none;
+    }
+
+    /* Make content full width */
+    .timeline-content {
+        width: 100%;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Reset text alignment for mobile view */
+    .timeline-item:nth-child(even) .timeline-text {
+        text-align: left;
+    }
+}
+
+/* --- Quote Banner Section --- */
+.quote-banner-section {
+    background-color: var(--gnc-white);
+    padding: 0 1rem 5rem;
+}
+
+.quote-banner-box {
+    position: relative;
+    max-width: 1000px;
+    margin: 0 auto;
+    background-image: 
+        linear-gradient(to bottom, rgba(9, 64, 36, 0.92) 0%, rgba(9, 64, 36, 0.92) 100%),
+        url('/assets/images/gnc-header.png');
+    background-size: cover;
+    background-position: center;
+    border-radius: 6px;
+    padding: 3.5rem 5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.quote-text {
+    color: #FFFFFF;
+    font-family: 'Noto Serif', serif;
+    font-size: 1.3rem;
+    font-style: italic;
+    line-height: 1.6;
+    margin: 0;
+    max-width: 720px;
+}
+
+.quote-mark {
+    color: var(--gnc-gold);
+    font-size: 5rem;
+    font-family: 'Noto Serif', serif;
+    position: absolute;
+    line-height: 1;
+}
+
+.quote-left {
+    top: 1rem;
+    left: 2rem;
+}
+
+.quote-right {
+    bottom: -0.5rem;
+    right: 2rem;
+}
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 768px) {
+    .quote-banner-box {
+        padding: 3rem 2rem;
+    }
+    .quote-mark {
+        font-size: 3.5rem;
+    }
+    .quote-left {
+        top: 0.5rem;
+        left: 1rem;
+    }
+    .quote-right {
+        bottom: -1rem;
+        right: 1rem;
+    }
+    .quote-text {
+        font-size: 1.05rem;
+    }
+}

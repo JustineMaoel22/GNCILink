@@ -1,3 +1,14 @@
+<?php
+/**
+ * This page's program identifier — the ONLY thing the Bulletin Board
+ * needs to know about this page. Change this one line and every part
+ * of the Bulletin Board (filtering, "View All" links, empty states)
+ * follows automatically.
+ */
+define('CURRENT_PROGRAM', 'BAEL');
+
+require_once __DIR__ . '/../../../../components/bulletin-board.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,6 +20,7 @@
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link href="/assets/css/educ-style.css" rel="stylesheet">
+    <link href="/assets/css/bulletin-board.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
@@ -30,12 +42,10 @@
 
                 <div class="educ-hero-content">
                     <h1 class="educ-title">ENGLISH LANGUAGE</h1>
-                    <p class="educ-subtitle">Our program develops competent, compassionate, and innovative elementary educators who are committed to 
-                        learner-centered teaching, professional excellence, and the holistic development of children through effective pedagogy, ethical 
-                        practice, and lifelong learning.</p>
+                    <p class="educ-subtitle">Developing Effective Communicators and Language Professionals for a Global Society.</p>
                     <p class="educ-desc">
-                        Our program develops competent, compassionate, and innovative elementary educators who are committed to learner-centered teaching, 
-                        professional excellence, and the holistic development of children through effective pedagogy, ethical practice, and lifelong learning.
+                        The English Language program develops proficient and adaptable communicators equipped with strong language skills, 
+                        critical thinking, and practical expertise to thrive in diverse professional and global contexts.
                     </p>
                 </div>
 
@@ -170,7 +180,7 @@
 
                 <div class="col-lg-4 col-md-6">
                     <div class="educ-why-card">
-                        <img src="/assets/images/svg/college project-amico 1.svg" alt="Cultural Awareness and Heritage" class="educ-why-img" loading="lazy">
+                        <img src="/assets/images/svg/Globalization-amico 1.svg" alt="Cultural Awareness and Heritage" class="educ-why-img" loading="lazy">
                         <h5 class="educ-why-title">Cultural Awareness and Heritage</h5>
                         <p class="educ-why-desc">
                             Gain a deeper appreciation of Filipino language, history, and culture while contributing to their preservation and promotion.
@@ -258,6 +268,16 @@
             </div>
         </div>
     </section>
+
+    <?php
+    /**
+     * Bulletin Board — auto-filtered to CURRENT_PROGRAM ('BAEL') defined
+     * at the top of this file. Nothing else on this page changes when
+     * you copy this file for a different program; just update that one
+     * define().
+     */
+    render_bulletin_board();
+    ?>
 
     <section class="educ-cta py-4">
         <div class="container">

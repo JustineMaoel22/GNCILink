@@ -1,3 +1,7 @@
+<?php
+define('CURRENT_PROGRAM', 'BSAIS');
+require_once __DIR__ . '/../../../../components/bulletin-board.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,6 +13,7 @@
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link href="/assets/css/acct-style.css" rel="stylesheet">
+    <link href="/assets/css/bulletin-board-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
@@ -122,7 +127,7 @@
                         <img src="/assets/images/svg/Operating system upgrade-amico 1.svg" alt="Technical Accounting Expertise" class="acc-why-img" loading="lazy">
                         <h5 class="acc-why-title">Integrated Accounting and Information Technology</h5>
                         <p class="acc-why-desc">
-                            Build strong competencies in accounting principles, information systems, and business technology for today’s digital workplace.
+                            Build strong competencies in accounting principles, information systems, and business technology for today's digital workplace.
                         </p>
                     </div>
                 </div>
@@ -257,6 +262,8 @@
             </div>
         </div>
     </section>
+
+    <?php render_bulletin_board(); ?>
 
     <section class="acc-cta py-4">
         <div class="container">

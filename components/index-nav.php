@@ -77,11 +77,11 @@ $isContactUs = $activeSection === 'contact-us';
                     <a class="nav-link dropdown-toggle <?= $isAbout ? 'active' : '' ?>" href="#" id="aboutDropdown" role="button"
                        data-bs-toggle="dropdown" aria-expanded="false">About</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="aboutDropdown">
-                        <li><a class="dropdown-item" href="/about/history.php">History of GNC</a></li>
-                        <li><a class="dropdown-item" href="/about/vision-mission.php">Vision and Mission</a></li>
-                        <li><a class="dropdown-item" href="/about/core-values.php">Core Values</a></li>
-                        <li><a class="dropdown-item" href="/about/logo-meaning.php">Institutional Logo and Meaning</a></li>
-                        <li><a class="dropdown-item" href="/pages/administration/administration.php">Administration</a></li>
+                        <li><a class="dropdown-item" href="/pages/about/gnc-history.php">History of GNC</a></li>
+                        <li><a class="dropdown-item" href="/pages/about/vision-mission.php">Vision and Mission</a></li>
+                        <li><a class="dropdown-item" href="/pages/about/core-values.php">Core Values</a></li>
+                        <li><a class="dropdown-item" href="/pages/about/logo-meaning.php">Institutional Logo and Meaning</a></li>
+                        <li><a class="dropdown-item" href="/pages/about/administration.php">Administration</a></li>
                         <li><a class="dropdown-item" href="/about/accreditations.php">Accreditations and Recognitions</a></li>
                     </ul>
                 </li>
@@ -90,9 +90,9 @@ $isContactUs = $activeSection === 'contact-us';
                     <a class="nav-link dropdown-toggle <?= $isAcademics ? 'active' : '' ?>" href="#" id="academicsDropdown" role="button"
                        data-bs-toggle="dropdown" aria-expanded="false">Academics</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="academicsDropdown">
-                        <li><a class="dropdown-item" href="/academics/basic-education.php">Basic Education</a></li>
+                        <li><a class="dropdown-item" href="/pages/academics/basic-edu/basic-edu-dept.php">Basic Education</a></li>
                         <li><a class="dropdown-item" href="/pages/academics/college/college-departments.php">College</a></li>
-                        <li><a class="dropdown-item" href="/academics/graduate-school.php">Graduate School</a></li>
+                        <li><a class="dropdown-item" href="/pages/academics/graduate-school/graduate-school.php">Graduate School</a></li>
                     </ul>
                 </li>
 
@@ -100,8 +100,8 @@ $isContactUs = $activeSection === 'contact-us';
                     <a class="nav-link dropdown-toggle <?= $isAdmissions ? 'active' : '' ?>" href="#" id="admissionsDropdown" role="button"
                        data-bs-toggle="dropdown" aria-expanded="false">Admissions</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="admissionsDropdown">
-                        <li><a class="dropdown-item" href="/admissions/requirements.php">Admission Requirements</a></li>
-                        <li><a class="dropdown-item" href="/admissions/enrollment-procedures.php">Enrollment Procedures</a></li>
+                        <li><a class="dropdown-item" href="/pages/admission/admission-req.php">Admission Requirements</a></li>
+                        <li><a class="dropdown-item" href="/pages/admission/enrollment-procedures.php">Enrollment Procedures</a></li>
                         <li><a class="dropdown-item" href="/admissions/tuition-fees.php">Tuition and Fees</a></li>
                         <li><a class="dropdown-item" href="/admissions/scholarship.php">Scholarship</a></li>
                         <li><a class="dropdown-item" href="/admissions/faqs.php">FAQs</a></li>
@@ -179,11 +179,11 @@ $isContactUs = $activeSection === 'contact-us';
                 </a>
                 <div class="collapse gnc-submenu <?= $isAbout ? 'show' : '' ?>" id="mAbout">
                     <ul class="list-unstyled mb-0">
-                        <li><a href="/about/history.php">History of GNC</a></li>
-                        <li><a href="/about/vision-mission.php">Vision and Mission</a></li>
-                        <li><a href="/about/core-values.php">Core Values</a></li>
-                        <li><a href="/about/logo-meaning.php">Institutional Logo and Meaning</a></li>
-                        <li><a href="/about/administration.php">Administration</a></li>
+                        <li><a href="/pages/about/gnc-history.php">History of GNC</a></li>
+                        <li><a href="/pages/about/vision-mission.php">Vision and Mission</a></li>
+                        <li><a href="/pages/about/core-values.php">Core Values</a></li>
+                        <li><a href="/pages/about/logo-meaning.php">Institutional Logo and Meaning</a></li>
+                        <li><a href="/pages/about/administration.php">Administration</a></li>
                         <li><a href="/about/accreditations.php">Accreditations and Recognitions</a></li>
                     </ul>
                 </div>
@@ -197,9 +197,9 @@ $isContactUs = $activeSection === 'contact-us';
                 </a>
                 <div class="collapse gnc-submenu <?= $isAcademics ? 'show' : '' ?>" id="mAcademics">
                     <ul class="list-unstyled mb-0">
-                        <li><a href="/academics/basic-education.php">Basic Education</a></li>
-                        <li><a href="/pages/college-departments.php">College</a></li>
-                        <li><a href="/academics/graduate-school.php">Graduate School</a></li>
+                        <li><a href="/pages/academics/basic-edu/basic-edu-dept.php">Basic Education</a></li>
+                        <li><a href="/pages/academics/college/college-departments.php">College</a></li>
+                        <li><a href="/pages/academics/graduate-school/graduate-school.php">Graduate School</a></li>
                     </ul>
                 </div>
             </li>
@@ -212,8 +212,8 @@ $isContactUs = $activeSection === 'contact-us';
                 </a>
                 <div class="collapse gnc-submenu <?= $isAdmissions ? 'show' : '' ?>" id="mAdmissions">
                     <ul class="list-unstyled mb-0">
-                        <li><a href="/admissions/requirements.php">Admission Requirements</a></li>
-                        <li><a href="/admissions/enrollment-procedures.php">Enrollment Procedures</a></li>
+                        <li><a href="/pages/admission/admission-req.php">Admission Requirements</a></li>
+                        <li><a href="/pages/admission/enrollment-procedures.php">Enrollment Procedures</a></li>
                         <li><a href="/admissions/tuition-fees.php">Tuition and Fees</a></li>
                         <li><a href="/admissions/scholarship.php">Scholarship</a></li>
                         <li><a href="/admissions/faqs.php">FAQs</a></li>

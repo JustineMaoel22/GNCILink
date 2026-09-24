@@ -1,3 +1,7 @@
+<?php
+define('CURRENT_PROGRAM', 'BSN');
+require_once __DIR__ . '/../../../../components/bulletin-board.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,6 +14,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link href="/assets/css/nursing-style.css" rel="stylesheet">
     <link href="/assets/css/base-style.css" rel="stylesheet">
+    <link href="/assets/css/bulletin-board-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
@@ -142,7 +147,7 @@
                 <div class="col-lg-4 col-md-6">
                     <div class="nursing-why-card">
                         <img src="/assets/images/svg/Rheumatology-amico 1.svg" alt="Ethical & Legal Practice" class="nursing-why-img" loading="lazy">
-                        <h5 class="nursing-why-title">Ethical & Legal Practice</h5>
+                        <h5 class="nursing-why-title">Ethical &amp; Legal Practice</h5>
                         <p class="nursing-why-desc">
                             Master the application of moral, legal, and ethical principles to ensure professional
                             accountability in all clinical settings.
@@ -293,7 +298,9 @@
             </div>
         </div>
     </section>
-    
+
+    <?php render_bulletin_board(); ?>
+
     <section class="nursing-cta py-4">
         <div class="container">
             <div class="nursing-cta-card">

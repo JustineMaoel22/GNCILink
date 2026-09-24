@@ -1,3 +1,7 @@
+<?php
+define('CURRENT_PROGRAM', 'BSCS');
+require_once __DIR__ . '/../../../../components/bulletin-board.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -256,6 +260,8 @@
             </div>
         </div>
     </section>
+
+    <?php render_bulletin_board(); ?>
 
     <section class="computer-cta py-4">
         <div class="container">
