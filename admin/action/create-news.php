@@ -46,6 +46,30 @@ if ($postAction === 'delete') {
 }
 
 // ============================================================
+// PIN / UNPIN (homepage slideshow — max 3 items, shared with Announcements)
+// ============================================================
+if ($postAction === 'pin' || $postAction === 'unpin') {
+    $pinId = (int)($_POST['news_id'] ?? 0);
+
+    if (!hasPermission('publish_news')) {
+        $_SESSION['flash_errors'] = ['You do not have permission to pin news articles.'];
+    } elseif ($pinId) {
+        try {
+            if ($postAction === 'pin') {
+                pinNews($pinId);
+            } else {
+                unpinNews($pinId);
+            }
+        } catch (Exception $e) {
+            $_SESSION['flash_errors'] = [$e->getMessage()];
+        }
+    }
+
+    header('Location: /admin/news.php');
+    exit;
+}
+
+// ============================================================
 // CREATE / UPDATE
 // ============================================================
 if ($postAction === 'create' || $postAction === 'update') {

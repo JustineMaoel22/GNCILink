@@ -2,6 +2,40 @@
 require_once __DIR__ . '/../config/config.php';
 
 // ---------------------------------------------------------------
+// Search helpers
+// Facebook posts often use "fancy font" Unicode letters (e.g. styled
+// ADVISORY) that look like normal text but aren't, so a plain
+// strpos() can't find them. Normalise everything to plain lowercase.
+// ---------------------------------------------------------------
+if (!function_exists('gncNormalizeForSearch')) {
+    function gncNormalizeForSearch(string $text): string {
+        if (class_exists('Normalizer')) {
+            $n = Normalizer::normalize($text, Normalizer::FORM_KC);
+            if ($n !== false) $text = $n;
+        }
+        // Fallback: map U+1D400-U+1D7FF styled letters/digits to ASCII
+        $text = preg_replace_callback('/[\x{1D400}-\x{1D7FF}]/u', function ($m) {
+            $cp = mb_ord($m[0], 'UTF-8');
+            if ($cp >= 0x1D7CE) return (string)(($cp - 0x1D7CE) % 10);
+            if ($cp <= 0x1D6A3) {
+                $i = ($cp - 0x1D400) % 52;
+                return $i < 26 ? chr(65 + $i) : chr(97 + $i - 26);
+            }
+            return $m[0];
+        }, $text) ?? $text;
+        return mb_strtolower($text, 'UTF-8');
+    }
+}
+if (!function_exists('gncSearchText')) {
+    /** Build the full searchable text for one feed item (not truncated). */
+    function gncSearchText(array $parts): string {
+        $text = implode(' ', array_map(fn($p) => (string)($p ?? ''), $parts));
+        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return gncNormalizeForSearch(preg_replace('/\s+/u', ' ', $text));
+    }
+}
+
+// ---------------------------------------------------------------
 // Read filter/search/pagination params from the query string
 // ---------------------------------------------------------------
 $activeType   = $_GET['type'] ?? 'all';                 // all | announcement | news
@@ -16,7 +50,6 @@ $searchTerm   = trim($_GET['q'] ?? '');
 // ---------------------------------------------------------------
 $programOptions = [
     'ALL'     => 'All Programs',
-    'NONE'    => 'None',
     'BEEd'    => 'Bachelor of Elementary Education',
     'BSEd'    => 'Bachelor of Secondary Education',
     'BAEL'    => 'Bachelor of Arts in English Language',
@@ -32,8 +65,8 @@ $programOptions = [
     'BSPh'    => 'Bachelor of Science in Pharmacy',
     'BSN'     => 'Bachelor of Science in Nursing',
 ];
-$programFilter = $_GET['program'] ?? 'NONE';
-$programFilter = isset($programOptions[$programFilter]) ? $programFilter : 'NONE';
+$programFilter = $_GET['program'] ?? 'ALL';
+$programFilter = isset($programOptions[$programFilter]) ? $programFilter : 'ALL';
 
 // ---------------------------------------------------------------
 // Sort order (newest-first is the default)
@@ -42,12 +75,68 @@ $sortOrder = $_GET['sort'] ?? 'newest';
 $sortOrder = in_array($sortOrder, ['newest', 'oldest'], true) ? $sortOrder : 'newest';
 
 $currentPage  = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-const ITEMS_PER_PAGE = 15;
+const ITEMS_PER_PAGE = 12; // 2 cards per row
 
 try {
     $db = getDB();
 } catch (Exception $e) {
     $db = null;
+}
+
+// ---------------------------------------------------------------
+// Programs for the sidebar (same source as the homepage "Programs" card)
+// ---------------------------------------------------------------
+try {
+    $homePrograms = $db ? $db->query("
+        SELECT p.program_id, p.program_code, d.slug AS dept_slug
+        FROM programs p
+        LEFT JOIN departments d ON d.dept_id = p.dept_id
+        ORDER BY p.program_code ASC
+    ")->fetchAll() : [];
+} catch (Exception $e) {
+    $homePrograms = [];
+}
+$selectedProgram = ($programFilter !== 'ALL') ? $programFilter : null;
+
+// ---------------------------------------------------------------
+// Categories for the sidebar (Emergency, Holiday, Reminder, School Event…)
+// ---------------------------------------------------------------
+try {
+    $sidebarCategories = $db ? $db->query("
+        SELECT category_id, category_name, category_color
+        FROM categories
+        ORDER BY category_name ASC
+    ")->fetchAll() : [];
+} catch (Exception $e) {
+    $sidebarCategories = [];
+}
+$selectedCategory = null;
+if (isset($_GET['category']) && ctype_digit((string)$_GET['category'])) {
+    foreach ($sidebarCategories as $cat) {
+        if ((int)$cat['category_id'] === (int)$_GET['category']) {
+            $selectedCategory = (int)$cat['category_id'];
+            break;
+        }
+    }
+}
+
+// Upcoming events for the sidebar (next 3 published; narrowed to the
+// selected program when one is chosen, same as the homepage)
+try {
+    $evSql = "SELECT e.event_id, e.title, e.start_date, e.end_date
+              FROM events e
+              WHERE e.status = 'published' AND e.start_date >= ?";
+    $evParams = [date('Y-m-d 00:00:00')];
+    if ($selectedProgram !== null) {
+        $evSql .= " AND e.program = ?";
+        $evParams[] = $selectedProgram;
+    }
+    $evSql .= " ORDER BY e.start_date ASC LIMIT 3";
+    $evStmt = $db->prepare($evSql);
+    $evStmt->execute($evParams);
+    $sidebarEvents = $evStmt->fetchAll();
+} catch (Exception $e) {
+    $sidebarEvents = [];
 }
 
 // ---------------------------------------------------------------
@@ -74,6 +163,7 @@ if ($db) {
                 'type_label'    => 'Announcement',
                 'title'         => $ann['title'],
                 'excerpt'       => $excerpt,
+                'search_text'   => gncSearchText([$ann['title'], $ann['content'], $ann['category_name'], $ann['program']]),
                 'image_path'    => $ann['image_path'],
                 'date'          => $ann['published_at'] ?? $ann['created_at'],
                 'link'          => 'announcement.php?slug=' . urlencode($ann['slug']),
@@ -108,6 +198,7 @@ if ($db) {
                 'type_label'    => 'News',
                 'title'         => $item['title'],
                 'excerpt'       => $excerpt,
+                'search_text'   => gncSearchText([$item['title'], $item['content'], $item['category_name'], $item['author'] ?? '']),
                 'image_path'    => $item['image_path'],
                 'date'          => $item['published_at'] ?? $item['created_at'],
                 'link'          => 'news.php?slug=' . urlencode($item['slug']),
@@ -126,9 +217,10 @@ if ($db) {
     // -----------------------------------------------------------
     try {
         $rows = $db->query("
-            SELECT f.message, f.permalink_url, f.created_time, m.file_path
+            SELECT f.message, f.permalink_url, f.created_time, f.category_id, c.category_name, m.file_path
             FROM fb_posts_cache f
             LEFT JOIN media_library m ON f.image_media_id = m.media_id
+            LEFT JOIN categories c ON f.category_id = c.category_id
         ")->fetchAll();
 
         foreach ($rows as $row) {
@@ -139,11 +231,12 @@ if ($db) {
                 'type_label'    => 'Announcement',
                 'title'         => null,
                 'excerpt'       => $excerpt,
+                'search_text'   => gncSearchText([$row['message']]),
                 'image_path'    => $row['file_path'],
                 'date'          => $row['created_time'],
                 'link'          => $row['permalink_url'] ?? ('https://facebook.com/' . ($_ENV['FB_PAGE_ID'] ?? '')),
-                'category_id'   => null,
-                'category_name' => null,
+                'category_id'   => $row['category_id'],
+                'category_name' => $row['category_name'],
                 'program'       => null, // Facebook posts aren't tagged to a specific program
                 'author'        => null,
             ];
@@ -152,6 +245,117 @@ if ($db) {
         // leave $feedItems as-is
     }
 }
+
+// ---------------------------------------------------------------
+// Pinned announcements/news (up to 3, managed via the pin toggle in admin)
+// ---------------------------------------------------------------
+$pinnedFeedItems = [];
+
+/**
+ * Split announcement/news HTML into an intro sentence and up to 4 checklist
+ * points (taken from <li> items, or from following paragraphs/lines).
+ */
+function gncPinnedParse(string $html): array {
+    $points = [];
+    if (preg_match_all('/<li[^>]*>(.*?)<\/li>/is', $html, $m)) {
+        foreach ($m[1] as $li) {
+            $t = trim(html_entity_decode(strip_tags($li), ENT_QUOTES, 'UTF-8'));
+            if ($t !== '') $points[] = $t;
+        }
+        $html = preg_replace('/<(ul|ol)[^>]*>.*?<\/\1>/is', '', $html);
+    }
+    $text  = html_entity_decode(strip_tags(preg_replace('/<\/(p|div|br|h[1-6])>|<br\s*\/?>/i', "\n", $html)), ENT_QUOTES, 'UTF-8');
+    $lines = array_values(array_filter(array_map('trim', preg_split('/\R+/', $text)), fn($l) => $l !== ''));
+    $intro = $lines[0] ?? '';
+    if (!$points) {
+        $points = array_slice($lines, 1, 4);
+    }
+    $cut = fn($s, $n) => mb_strlen($s) > $n ? mb_substr($s, 0, $n) . '…' : $s;
+    return [$cut($intro, 160), array_map(fn($s) => $cut($s, 110), array_slice($points, 0, 4))];
+}
+if ($db) {
+    try {
+        $stmt = $db->query("
+            SELECT a.title, a.slug, a.content, a.pinned_at, a.published_at, a.created_at,
+                m.file_path AS image_path
+            FROM announcements a
+            LEFT JOIN media_library m ON a.featured_image = m.media_id
+            WHERE a.is_pinned = 1 AND a.status = 'published'
+        ");
+        foreach ($stmt->fetchAll() as $ann) {
+            $excerpt = strip_tags($ann['content']);
+            $excerpt = mb_strlen($excerpt) > 130 ? mb_substr($excerpt, 0, 130) . '…' : $excerpt;
+            [$pinIntro, $pinPoints] = gncPinnedParse($ann['content']);
+            $pinnedFeedItems[] = [
+                'intro'      => $pinIntro,
+                'points'     => $pinPoints,
+                'source'     => 'admin',
+                'type_label' => 'Announcement',
+                'title'      => $ann['title'],
+                'excerpt'    => $excerpt,
+                'image_path' => $ann['image_path'],
+                'date'       => $ann['published_at'] ?? $ann['created_at'],
+                'pinned_at'  => $ann['pinned_at'],
+                'link'       => 'announcement.php?slug=' . urlencode($ann['slug']),
+            ];
+        }
+
+        $stmt = $db->query("
+            SELECT n.title, n.slug, n.content, n.pinned_at, n.published_at, n.created_at,
+                m.file_path AS image_path
+            FROM news n
+            LEFT JOIN media_library m ON n.featured_image = m.media_id
+            WHERE n.is_pinned = 1 AND n.status = 'published'
+        ");
+        foreach ($stmt->fetchAll() as $item) {
+            $excerpt = strip_tags($item['content']);
+            $excerpt = mb_strlen($excerpt) > 130 ? mb_substr($excerpt, 0, 130) . '…' : $excerpt;
+            [$pinIntro, $pinPoints] = gncPinnedParse($item['content']);
+            $pinnedFeedItems[] = [
+                'intro'      => $pinIntro,
+                'points'     => $pinPoints,
+                'source'     => 'news',
+                'type_label' => 'News',
+                'title'      => $item['title'],
+                'excerpt'    => $excerpt,
+                'image_path' => $item['image_path'],
+                'date'       => $item['published_at'] ?? $item['created_at'],
+                'pinned_at'  => $item['pinned_at'],
+                'link'       => 'news.php?slug=' . urlencode($item['slug']),
+            ];
+        }
+
+        $stmt = $db->query("
+            SELECT f.message, f.permalink_url, f.created_time, f.pinned_at, m.file_path AS image_path
+            FROM fb_posts_cache f
+            LEFT JOIN media_library m ON f.image_media_id = m.media_id
+            WHERE f.is_pinned = 1
+        ");
+        foreach ($stmt->fetchAll() as $row) {
+            $excerpt = mb_strlen($row['message']) > 130 ? mb_substr($row['message'], 0, 130) . '…' : $row['message'];
+            $pinnedFeedItems[] = [
+                'intro'      => $excerpt,
+                'points'     => [],
+                'source'     => 'facebook',
+                'type_label' => 'Announcement',
+                'title'      => null,
+                'excerpt'    => $excerpt,
+                'image_path' => $row['image_path'],
+                'date'       => $row['created_time'],
+                'pinned_at'  => $row['pinned_at'],
+                'link'       => $row['permalink_url'] ?? ('https://facebook.com/' . ($_ENV['FB_PAGE_ID'] ?? '')),
+            ];
+        }
+
+        usort($pinnedFeedItems, fn($a, $b) => strtotime($b['pinned_at']) <=> strtotime($a['pinned_at']));
+        $pinnedFeedItems = array_slice($pinnedFeedItems, 0, 3);
+    } catch (Exception $e) {
+        $pinnedFeedItems = [];
+    }
+}
+
+// Only show the pinned slideshow on the first page when no search is active
+$showPinned = !empty($pinnedFeedItems) && $currentPage === 1 && $searchTerm === '' && $selectedCategory === null;
 
 // ---------------------------------------------------------------
 // Sort by date according to the selected sort order
@@ -164,30 +368,30 @@ usort($feedItems, function ($a, $b) use ($sortOrder) {
 // ---------------------------------------------------------------
 // Apply filters: type tab, search box, program dropdown
 // ---------------------------------------------------------------
-$filteredItems = array_filter($feedItems, function ($item) use ($activeType, $searchTerm, $programFilter) {
+$searchWords = $searchTerm === '' ? [] : array_values(array_filter(preg_split('/\s+/u', gncNormalizeForSearch($searchTerm)), 'strlen'));
+$filteredItems = array_filter($feedItems, function ($item) use ($activeType, $searchWords, $programFilter, $selectedCategory) {
     if ($activeType !== 'all' && $item['type_key'] !== $activeType) {
         return false;
     }
+    if ($selectedCategory !== null && (int)($item['category_id'] ?? 0) !== $selectedCategory) {
+        return false;
+    }
     if ($programFilter !== '' && $programFilter !== 'ALL') {
+        // Show items tagged with this exact program, or tagged 'ALL'
+        // (applies to every program). Items with no program (news,
+        // Facebook posts) are excluded once a specific program is chosen.
         $itemProgram = $item['program'] ?? null;
-        if ($programFilter === 'NONE') {
-            // "None" = items with no program tag at all (News, Facebook posts).
-            if ($itemProgram !== null) {
-                return false;
-            }
-        } else {
-            // Show items tagged with this exact program, or tagged 'ALL'
-            // (applies to every program). Items with no program (news,
-            // Facebook posts) are excluded once a specific program is chosen.
-            if ($itemProgram !== $programFilter && $itemProgram !== 'ALL') {
-                return false;
-            }
+        if ($itemProgram !== $programFilter && $itemProgram !== 'ALL') {
+            return false;
         }
     }
-    if ($searchTerm !== '') {
-        $haystack = strtolower(($item['title'] ?? '') . ' ' . $item['excerpt']);
-        if (strpos($haystack, strtolower($searchTerm)) === false) {
-            return false;
+    if (!empty($searchWords)) {
+        // Every word typed must appear somewhere in the item's full text
+        // (title, whole content, category, program, author) — not just the excerpt.
+        foreach ($searchWords as $w) {
+            if (mb_strpos($item['search_text'] ?? '', $w) === false) {
+                return false;
+            }
         }
     }
     return true;
@@ -204,10 +408,12 @@ $pageItems = array_slice($filteredItems, ($currentPage - 1) * ITEMS_PER_PAGE, IT
 
 // Helper to rebuild querystring while overriding a param
 function na_url(array $overrides = []): string {
+    global $programFilter, $selectedCategory;
     $params = array_merge([
         'type'     => $_GET['type'] ?? 'all',
         'q'        => $_GET['q'] ?? '',
-        'program'  => $_GET['program'] ?? '',
+        'program'  => $programFilter !== 'ALL' ? $programFilter : '',
+        'category' => $selectedCategory ?? '',
         'sort'     => $_GET['sort'] ?? 'newest',
         'page'     => $_GET['page'] ?? '1',
     ], $overrides);
@@ -226,8 +432,48 @@ function na_url(array $overrides = []): string {
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-    <link href="/assets/css/news-announcement-style.css" rel="stylesheet">
+    <link href="/assets/css/news-announcement-style.css?v=2" rel="stylesheet">
     <link href="/assets/css/skeleton-style.css?v=2" rel="stylesheet">
+    <style>
+        /* Programs sidebar (same look as the homepage card) */
+        .na-side-stack{position:sticky;top:90px;display:flex;flex-direction:column;gap:1.25rem}
+        .na-sidebar .gnc-upcoming-card{background:#fff;border:1px solid rgba(9,64,36,.12);border-radius:12px;overflow:hidden}
+        .na-events-card{background:#fff;border:1px solid rgba(9,64,36,.12);border-radius:12px;padding:1.4rem 1.4rem 1.1rem}
+        .na-events-title{font-family:'Noto Serif',Georgia,serif;font-weight:700;font-size:1.35rem;color:#0d4a26;margin:0 0 1.1rem}
+        .na-event-item{display:flex;align-items:flex-start;gap:1rem;margin-bottom:1.1rem}
+        .na-event-badge{flex:0 0 62px;border:1px solid rgba(0,0,0,.08);border-radius:8px;overflow:hidden;text-align:center;background:#fff}
+        .na-event-month{display:block;background:#094024;color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.04em;padding:.25rem 0}
+        .na-event-day{display:block;font-size:1.5rem;font-weight:700;color:#1a1a1a;padding:.2rem 0}
+        .na-event-name{font-family:'Noto Serif',Georgia,serif;font-weight:700;color:#0d4a26;line-height:1.3}
+        .na-event-date{font-size:.85rem;color:#777;margin-top:.2rem}
+        .na-events-link{display:block;text-align:center;font-family:'Noto Serif',Georgia,serif;font-weight:700;color:#0d4a26;text-decoration:none;padding-top:.3rem}
+        .na-events-link:hover{color:#094024;text-decoration:underline}
+        .na-sidebar .gnc-upcoming-header{background:#094024;color:#fff;padding:.85rem 1.1rem;font-weight:600}
+        .na-sidebar .gnc-upcoming-header i{margin-right:.4rem}
+        .na-sidebar .gnc-programs-count{background:rgba(255,255,255,.18);color:#fff;border-radius:999px;padding:.1rem .6rem;font-size:.78rem}
+        .na-sidebar .gnc-programs-list{max-height:340px;overflow-y:auto}
+        .na-sidebar .gnc-programs-list-item{display:flex;flex-direction:column;gap:.1rem;padding:.7rem 1.1rem;border-bottom:1px solid rgba(0,0,0,.06);color:#1a1a1a;border-left:4px solid transparent}
+        .na-sidebar .gnc-programs-list-item:hover{background:#eaf5ee}
+        .na-sidebar .gnc-programs-list-item-active{background:#eaf5ee;border-left-color:#EABA3B}
+        .na-sidebar .gnc-programs-code{font-weight:700;color:#094024}
+        .na-sidebar .gnc-programs-list-fullname{font-size:.8rem;color:#555}
+        .na-sidebar .gnc-cat-item{display:flex;align-items:center;gap:.6rem;padding:.7rem 1.1rem;border-bottom:1px solid rgba(0,0,0,.06);color:#1a1a1a;border-left:4px solid transparent}
+        .na-sidebar .gnc-cat-item:last-child{border-bottom:0}
+        .na-sidebar .gnc-cat-item:hover{background:#eaf5ee}
+        .na-sidebar .gnc-cat-item-active{background:#eaf5ee;border-left-color:#EABA3B}
+        .na-sidebar .gnc-cat-dot{width:10px;height:10px;border-radius:50%;flex:0 0 10px}
+        .na-sidebar .gnc-cat-name{font-weight:600;color:#094024;flex:1}
+        .na-sidebar .gnc-cat-count{font-size:.78rem;color:#666;background:rgba(9,64,36,.08);border-radius:999px;padding:.05rem .55rem}
+        /* Keep the whole sticky sidebar (Programs + Categories + Events) within the
+           viewport so Upcoming Events is always visible, not only at the page end.
+           The Programs list takes whatever height is left and scrolls inside itself. */
+        .na-sidebar .gnc-programs-list{max-height:clamp(150px, calc(100vh - 690px), 340px)}
+        .na-sidebar .gnc-cat-item{padding:.5rem 1.1rem}
+        .na-sidebar .gnc-upcoming-header{padding:.7rem 1.1rem}
+        @media (max-height:780px){.na-side-stack{position:static}}
+        .na-head .na-toolbar{flex-wrap:wrap;gap:.75rem}
+        .na-head .na-filters{flex-wrap:wrap}
+    </style>
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
@@ -247,6 +493,70 @@ function na_url(array $overrides = []): string {
     <section class="na-feed py-5">
         <div class="container">
 
+            <?php if ($showPinned): ?>
+            <div class="gnc-pinned-label"><i class="bi bi-pin-angle-fill"></i> Pinned</div>
+            <div id="gncPinnedCarousel" class="carousel slide gnc-pinned-carousel mb-5" data-bs-ride="carousel" data-bs-interval="7000">
+                <div class="carousel-inner">
+                    <?php foreach ($pinnedFeedItems as $i => $pin):
+                        $isFbPin = $pin['source'] === 'facebook';
+                        $badge   = $isFbPin ? 'From Facebook' : ($pin['type_label'] === 'News' ? 'Featured News' : 'Important Update');
+                    ?>
+                    <div class="carousel-item <?= $i === 0 ? 'active' : '' ?>">
+                        <article class="gnc-pinned-card">
+                            <div class="gnc-pinned-media skeleton-wrap">
+                                <?php if (!empty($pin['image_path'])): ?>
+                                <img src="<?= htmlspecialchars($pin['image_path']) ?>" alt="<?= htmlspecialchars($pin['title'] ?? 'Facebook post') ?>" loading="<?= $i === 0 ? 'eager' : 'lazy' ?>" decoding="async">
+                                <?php else: ?>
+                                <div class="gnc-pinned-slide-fallback">
+                                    <i class="bi <?= $isFbPin ? 'bi-facebook' : ($pin['type_label'] === 'News' ? 'bi-newspaper' : 'bi-megaphone') ?>"></i>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+
+                            <div class="gnc-pinned-body">
+                                <div class="gnc-pinned-content">
+                                    <div class="gnc-pinned-tags">
+                                        <span class="gnc-pinned-badge"><?= htmlspecialchars($badge) ?></span>
+                                    </div>
+                                    <?php if (!empty($pin['title'])): ?>
+                                    <h3 class="gnc-pinned-title"><?= htmlspecialchars($pin['title']) ?></h3>
+                                    <?php endif; ?>
+                                    <div class="gnc-pinned-date"><?= date('F d, Y', strtotime($pin['date'])) ?></div>
+
+                                    <?php if (!empty($pin['intro'])): ?>
+                                    <p class="gnc-pinned-intro"><?= htmlspecialchars($pin['intro']) ?></p>
+                                    <?php endif; ?>
+                                    <?php if (!empty($pin['points'])): ?>
+                                    <ul class="gnc-pinned-list">
+                                        <?php foreach ($pin['points'] as $pt): ?>
+                                        <li><i class="bi bi-check-circle-fill"></i><span><?= htmlspecialchars($pt) ?></span></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                    <?php endif; ?>
+                                </div>
+
+                                <div class="gnc-pinned-footer">
+                                    <a href="<?= htmlspecialchars($pin['link']) ?>"<?= $isFbPin ? ' target="_blank" rel="noopener"' : '' ?> class="gnc-pinned-btn">
+                                        <?= $isFbPin ? 'View on Facebook' : 'View Full Announcement' ?>
+                                        <i class="bi bi-arrow-right"></i>
+                                    </a>
+                                    <?php if (count($pinnedFeedItems) > 1): ?>
+                                    <div class="gnc-pinned-nav">
+                                        <button type="button" data-bs-target="#gncPinnedCarousel" data-bs-slide="prev" aria-label="Previous"><i class="bi bi-chevron-left"></i></button>
+                                        <button type="button" data-bs-target="#gncPinnedCarousel" data-bs-slide="next" aria-label="Next"><i class="bi bi-chevron-right"></i></button>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <div class="row na-head">
+            <div class="col-lg-8">
             <h2 class="na-feed-title">Latest Announcements</h2>
 
             <div class="na-toolbar">
@@ -274,18 +584,13 @@ function na_url(array $overrides = []): string {
                     </div>
                     <button type="submit" class="visually-hidden">Search</button>
 
-                    <div class="na-select">
-                        <i class="bi bi-mortarboard"></i>
-                        <select name="program" onchange="this.form.submit()">
-                            <?php foreach ($programOptions as $code => $label):
-                                $optionText = in_array($code, ['ALL', 'NONE'], true) ? $label : "$code - $label";
-                            ?>
-                                <option value="<?= htmlspecialchars($code) ?>" <?= $programFilter === $code ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($optionText) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+                    <?php if ($programFilter !== 'ALL'): ?>
+                    <input type="hidden" name="program" value="<?= htmlspecialchars($programFilter) ?>">
+                    <?php endif; ?>
+
+                    <?php if ($selectedCategory !== null): ?>
+                    <input type="hidden" name="category" value="<?= (int)$selectedCategory ?>">
+                    <?php endif; ?>
 
                     <input type="hidden" name="sort" value="<?= htmlspecialchars($sortOrder) ?>">
 
@@ -313,6 +618,11 @@ function na_url(array $overrides = []): string {
                 </form>
             </div>
 
+            </div>
+            </div>
+
+            <div class="row g-4 na-layout">
+            <div class="col-lg-8">
             <?php if (empty($pageItems)): ?>
                 <p class="text-muted text-center py-5">No announcements or news match your search.</p>
             <?php else: ?>
@@ -325,7 +635,7 @@ function na_url(array $overrides = []): string {
                         $ribbonClass = $item['type_key'] === 'news' ? 'na-ribbon-news' : 'na-ribbon-announcement';
                         $hasImage = !empty($item['image_path']);
                     ?>
-                    <div class="col-md-6 col-lg-4">
+                    <div class="col-md-6">
                         <div class="na-card skeleton-group">
                             <div class="na-ribbon <?= $ribbonClass ?>">
                                 <span>|</span> <?= strtoupper($item['type_label']) ?>
@@ -417,6 +727,98 @@ function na_url(array $overrides = []): string {
                 </nav>
                 <?php endif; ?>
             <?php endif; ?>
+            </div>
+
+            <aside class="col-lg-4 na-sidebar">
+              <div class="na-side-stack">
+                <div class="gnc-upcoming-card">
+                    <div class="gnc-upcoming-header d-flex align-items-center justify-content-between">
+                        <span><i class="bi bi-mortarboard-fill"></i> Programs</span>
+                        <?php if ($selectedProgram !== null): ?>
+                            <a href="<?= htmlspecialchars(na_url(['program' => '', 'page' => 1])) ?>" class="gnc-programs-count text-decoration-none">
+                                <?= htmlspecialchars($selectedProgram) ?> &times;
+                            </a>
+                        <?php elseif (!empty($homePrograms)): ?>
+                            <span class="gnc-programs-count"><?= count($homePrograms) ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="gnc-programs-list">
+                        <?php if (empty($homePrograms)): ?>
+                            <p class="text-muted px-3 py-4 mb-0">No programs available at this time.</p>
+                        <?php else: foreach ($homePrograms as $prog):
+                            $code     = $prog['program_code'];
+                            $full     = $programOptions[$code] ?? null;
+                            $isActive = ($selectedProgram === $code);
+                            // Clicking a program filters the feed; clicking the active one clears it.
+                            $progUrl  = na_url(['program' => $isActive ? '' : $code, 'page' => 1]);
+                        ?>
+                            <a href="<?= htmlspecialchars($progUrl) ?>" class="gnc-programs-list-item text-decoration-none<?= $isActive ? ' gnc-programs-list-item-active' : '' ?>">
+                                <span class="gnc-programs-code"><?= htmlspecialchars($code) ?></span>
+                                <?php if ($full): ?>
+                                    <span class="gnc-programs-list-fullname"><?= htmlspecialchars($full) ?></span>
+                                <?php endif; ?>
+                            </a>
+                        <?php endforeach; endif; ?>
+                    </div>
+                </div>
+
+                <?php if (!empty($sidebarCategories)):
+                    // Item counts per category (for the current type/search/program filters)
+                    $catCounts = [];
+                    foreach ($feedItems as $fi) {
+                        $cid = (int)($fi['category_id'] ?? 0);
+                        if ($cid) $catCounts[$cid] = ($catCounts[$cid] ?? 0) + 1;
+                    }
+                ?>
+                <div class="gnc-upcoming-card">
+                    <div class="gnc-upcoming-header d-flex align-items-center justify-content-between">
+                        <span><i class="bi bi-tags-fill"></i> Categories</span>
+                        <?php if ($selectedCategory !== null): ?>
+                            <a href="<?= htmlspecialchars(na_url(['category' => '', 'page' => 1])) ?>" class="gnc-programs-count text-decoration-none">
+                                Clear &times;
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                    <div class="gnc-cat-list">
+                        <?php foreach ($sidebarCategories as $cat):
+                            $cid      = (int)$cat['category_id'];
+                            $isActive = ($selectedCategory === $cid);
+                            // Clicking a category filters the feed; clicking the active one clears it.
+                            $catUrl   = na_url(['category' => $isActive ? '' : $cid, 'page' => 1]);
+                        ?>
+                        <a href="<?= htmlspecialchars($catUrl) ?>" class="gnc-cat-item text-decoration-none<?= $isActive ? ' gnc-cat-item-active' : '' ?>">
+                            <span class="gnc-cat-dot" style="background:<?= htmlspecialchars($cat['category_color'] ?: '#094024') ?>"></span>
+                            <span class="gnc-cat-name"><?= htmlspecialchars($cat['category_name']) ?></span>
+                            <span class="gnc-cat-count"><?= (int)($catCounts[$cid] ?? 0) ?></span>
+                        </a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <div class="na-events-card">
+                    <h3 class="na-events-title">Upcoming Events</h3>
+                    <?php if (empty($sidebarEvents)): ?>
+                        <p class="text-muted mb-3">
+                            <?= $selectedProgram !== null ? 'No upcoming events for ' . htmlspecialchars($selectedProgram) . '.' : 'No upcoming events at this time.' ?>
+                        </p>
+                    <?php else: foreach ($sidebarEvents as $ev): $ts = strtotime($ev['start_date']); ?>
+                        <div class="na-event-item">
+                            <div class="na-event-badge">
+                                <span class="na-event-month"><?= strtoupper(date('M', $ts)) ?></span>
+                                <span class="na-event-day"><?= date('d', $ts) ?></span>
+                            </div>
+                            <div class="na-event-info">
+                                <div class="na-event-name"><?= htmlspecialchars($ev['title']) ?></div>
+                                <div class="na-event-date"><?= date('F j, Y', $ts) ?></div>
+                            </div>
+                        </div>
+                    <?php endforeach; endif; ?>
+                    <a href="/index.php#events" class="na-events-link">View Calendar <i class="bi bi-arrow-right"></i></a>
+                </div>
+            </div>
+            </aside>
+            </div>
         </div>
     </section>
 

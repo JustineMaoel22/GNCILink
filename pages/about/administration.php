@@ -1,9 +1,4 @@
 <?php
-/**
- * Administration page — single file, section switched via ?section=
- * Sections: board-of-trustees | corporate-officers | board-of-administration | heads-of-student-services
- */
-
 $section = $_GET['section'] ?? 'board-of-trustees';
 
 $sections = [
@@ -108,12 +103,11 @@ $sections = [
                 'office' => 'Office of Student Affairs',
                 'contact' => [
                     'phone'    => '(045) 900-4473 Loc. 109',
-                    'email'    => 'osa@gnc.edu.ph', // TODO: confirm — hard to read in screenshot
+                    'email'    => 'osa@gnc.edu.ph', 
                     'location' => 'Limlingan Hall | Floor 2 | Room 100',
                     'hours'    => 'Monday - Friday | 8:00AM - 4:00PM',
                 ],
                 'services' => [
-                    // TODO: replace lorem ipsum with actual OSA services
                 ],
             ],
             [
@@ -160,7 +154,7 @@ $sections = [
                 ],
             ],
             [
-                'img'   => 'elementary-library-head.png', // TODO: no photo shown in screenshot yet — placeholder filename
+                'img'   => 'elementary-library-head.png', 
                 'name'  => 'Marivic Lansang, MLIS',
                 'role'  => 'OIC, Elementary Library',
                 'office' => 'Elementary Library',
@@ -257,7 +251,7 @@ $sections = [
                 ],
             ],
             [
-                'img'   => 'mis-office-head.png', // TODO: no photo shown in screenshot yet — placeholder filename
+                'img'   => 'mis-office-head.png', 
                 'name'  => 'Michael P. Maglanque, MBA',
                 'role'  => 'Network Administrator',
                 'office' => 'MIS Office',
@@ -276,7 +270,7 @@ $sections = [
                 ],
             ],
             [
-                'img'   => 'computer-technician-office-head.png', // TODO: no photo shown in screenshot yet — placeholder filename
+                'img'   => 'computer-technician-office-head.png', 
                 'name'  => 'Harry P. Samonte',
                 'role'  => 'Head Technician',
                 'office' => 'Computer Technician Office',
@@ -287,11 +281,11 @@ $sections = [
                     'hours'    => 'Monday - Friday | 8:00AM - 5:00PM',
                 ],
                 'services' => [
-                    // TODO: replace lorem ipsum with actual Computer Technician Office services
+    
                 ],
             ],
             [
-                'img'   => 'centralized-laboratory-stockroom-head.png', // TODO: no photo shown in screenshot yet — placeholder filename
+                'img'   => 'centralized-laboratory-stockroom-head.png', 
                 'name'  => 'Ricardo Antonio L. Libuna',
                 'role'  => 'Laboratory Technician',
                 'office' => 'Centralized Laboratory Stockroom',
@@ -310,7 +304,7 @@ $sections = [
                 ],
             ],
             [
-                'img'   => 'printing-nstp-office-head.png', // TODO: no photo shown in screenshot yet — placeholder filename
+                'img'   => 'printing-nstp-office-head.png', 
                 'name'  => 'Evangeline Gagui',
                 'role'  => 'Head, Printing Office and NSTP Office',
                 'office' => 'Printing Office and NSTP Office',
@@ -332,7 +326,7 @@ $sections = [
                 ],
             ],
             [
-                'img'   => 'sports-office-head.png', // TODO: no photo shown in screenshot yet — placeholder filename
+                'img'   => 'sports-office-head.png', 
                 'name'  => 'Eduardo V. Gozun Jr.',
                 'role'  => 'GNCI Sports Coordinator',
                 'office' => 'Sports Office',
@@ -394,7 +388,7 @@ $current = $sections[$section];
         </div>
     </section>
 
-    <!-- Sub-navigation Tabs -->
+    <!-- Sub navigation Tabs -->
     <section class="admin-tabs-wrap">
         <div class="admin-tabs-inner">
             <nav class="admin-tabs" aria-label="Administration sections">
@@ -526,7 +520,7 @@ $current = $sections[$section];
 
             <?php else: ?>
 
-                <!-- Grid layout for Trustees/Administration -->
+                <!-- Grid layout Trustees/Administration -->
                 <div class="admin-grid">
                     <?php foreach ($current['people'] as $person): ?>
                         <div class="admin-card-wrap skeleton-group">

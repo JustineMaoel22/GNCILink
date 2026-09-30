@@ -306,3 +306,150 @@
     box-shadow: none;
     color: white;
 }
+
+/* =============================================================
+   ACADEMICS NESTED DROPDOWN — DESKTOP FLYOUTS
+   (only the Academics menu uses these classes)
+   ============================================================= */
+.gnc-navbar .gnc-dropdown-submenu {
+    position: relative;
+}
+
+/* Row = clickable label + separate chevron button */
+.gnc-navbar .gnc-submenu-row {
+    display: flex;
+    align-items: stretch;
+    transition: background-color 0.15s;
+}
+
+.gnc-navbar .gnc-submenu-row > .dropdown-item {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    white-space: normal;
+}
+
+/* Row itself carries the highlight, so label + chevron light up together */
+.gnc-navbar .gnc-submenu-row > .dropdown-item:hover,
+.gnc-navbar .gnc-submenu-row > .dropdown-item:focus {
+    background-color: transparent;
+}
+
+.gnc-navbar .gnc-dropdown-submenu.show > .gnc-submenu-row {
+    background-color: rgba(234, 186, 59, 0.18);
+}
+
+.gnc-navbar .gnc-submenu-toggle {
+    display: flex;
+    align-items: center;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 0.7rem;
+    padding: 0 0.85rem;
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.gnc-navbar .gnc-submenu-toggle:hover,
+.gnc-navbar .gnc-submenu-toggle:focus-visible {
+    color: var(--gnc-gold);
+}
+
+.gnc-navbar .gnc-submenu-toggle:focus-visible {
+    outline: 2px solid var(--gnc-gold);
+    outline-offset: -2px;
+}
+
+/* Flyout panel (intentionally NOT a Bootstrap .dropdown-menu, so Bootstrap's
+   dropdown JS leaves it alone; visibility is handled by hover / .show) */
+.gnc-navbar .gnc-nested-menu {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 100%;
+    z-index: 1031;
+    list-style: none;
+    text-align: left;
+    width: max-content;
+    min-width: 260px;
+    max-width: 340px;
+    margin: calc(-0.4rem - 1px) 0 0 0;
+}
+
+.gnc-navbar .gnc-nested-menu.open-left {
+    left: auto;
+    right: 100%;
+}
+
+.gnc-navbar .gnc-nested-menu .dropdown-item {
+    white-space: normal;
+}
+
+.gnc-navbar .gnc-dropdown-submenu.show > .gnc-nested-menu {
+    display: block;
+}
+
+/* Mouse users: open on hover (touch users use the chevron button) */
+@media (min-width: 992px) and (hover: hover) and (pointer: fine) {
+    .gnc-navbar .gnc-dropdown-submenu:hover > .gnc-nested-menu {
+        display: block;
+    }
+    .gnc-navbar .gnc-dropdown-submenu:hover > .gnc-submenu-row {
+        background-color: rgba(234, 186, 59, 0.18);
+    }
+}
+
+
+/* =============================================================
+   ACADEMICS NESTED DROPDOWN — MOBILE OFFCANVAS ACCORDIONS
+   ============================================================= */
+.gnc-submenu .gnc-mobile-subrow {
+    display: flex;
+    align-items: stretch;
+}
+
+.gnc-submenu .gnc-mobile-subrow > a {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.gnc-mobile-subtoggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    background: none;
+    border: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.75);
+    padding: 0 0.9rem;
+    cursor: pointer;
+    transition: color 0.15s, background-color 0.15s;
+}
+
+.gnc-mobile-subtoggle:hover,
+.gnc-mobile-subtoggle:focus-visible {
+    color: var(--gnc-gold);
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.gnc-mobile-subtoggle[aria-expanded="true"] .gnc-chevron {
+    transform: rotate(180deg);
+}
+
+/* Deeper levels get a slightly darker panel and extra indent */
+.gnc-submenu .gnc-subsubmenu {
+    background-color: rgba(0, 0, 0, 0.14);
+}
+
+.gnc-submenu .gnc-mobile-depth-2 > a,
+.gnc-submenu .gnc-mobile-depth-2 > .gnc-mobile-subrow > a {
+    padding-left: 4.15rem;
+}
+
+.gnc-submenu .gnc-mobile-depth-3 > a,
+.gnc-submenu .gnc-mobile-depth-3 > .gnc-mobile-subrow > a {
+    padding-left: 5.15rem;
+    font-size: 0.78rem;
+}

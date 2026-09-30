@@ -315,32 +315,40 @@
 /* =============================================================
    ANNOUNCEMENTS
    ============================================================= */
-/* NOTE: `white-space: nowrap` used to live here. It forced the
-   "Stay Updated, Stay Informed" heading onto one unbreakable line,
-   which is wider than a 414px phone viewport — that widened the whole
-   page and created the horizontal scrollbar on mobile. The heading is
-   now allowed to wrap normally. */
 .gnc-announce-header {
     position: relative;
     max-width: none;
-    padding: 2.25rem 2rem;
+    min-height: 0;
+    padding: 1.75rem 3rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     text-align: left;
-    border-radius: 10px;
+    border-radius: 14px;
     overflow: hidden;
     background-size: cover;
     background-position: center;
 }
 .gnc-announce-header > * {
-    max-width: 600px;
+    max-width: 780px;
     text-align: left;
 }
-
-/* Keep the one-line look on wide screens only, where there's room for it.
-   Delete this block if you're happy for the heading to wrap on desktop too. */
-@media (min-width: 992px) {
-    .gnc-announce-header {
-        white-space: nowrap;
-    }
+.gnc-announce-eyebrow {
+    color: #EABA3B;
+    font-weight: 700;
+    font-size: .9rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+.gnc-announce-title {
+    font-family: 'Noto Serif', serif;
+    color: #1F5E2C;
+    font-weight: 800;
+    font-size: 32px;
+    line-height: 1.15;
+}
+.gnc-announce-header p {
+    font-size: clamp(1rem, 1.4vw, 1.15rem);
 }
 
 .gnc-announcement-card {
@@ -349,19 +357,67 @@
     overflow: hidden;
     box-shadow: 0 4px 18px rgba(9, 64, 36, 0.08);
     transition: transform .2s ease, box-shadow .2s ease;
+    position: relative;
 }
 .gnc-announcement-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 10px 26px rgba(9, 64, 36, 0.14);
 }
+.gnc-announcement-img-wrap {
+    height: 280px;
+}
 .gnc-announcement-card .card-img-top {
     border-radius: 0;
-    height: 280px;
+    height: 100%;
+    width: 100%;
     object-fit: cover;
+}
+.gnc-announcement-fallback {
+    height: 280px;
+    background: #eef1ee;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #c3cbc4;
+}
+.gnc-announcement-fallback i {
+    font-size: 2rem;
 }
 .gnc-announcement-card .card-body {
     padding: 1.5rem 1.35rem 1.35rem;
     min-height: 230px;
+}
+.badge-facebook {
+    background: #e7f0fe;
+    color: #1877F2;
+    font-weight: 600;
+    font-size: .68rem;
+}
+.badge-news {
+    background: rgba(201,162,39,0.16);
+    color: #8a6d1f;
+    font-weight: 600;
+    font-size: .68rem;
+    border: 1px solid rgba(201,162,39,0.35);
+}
+.badge-announcement {
+    background: rgba(31,94,44,0.1);
+    color: #1f5e2c;
+    font-weight: 600;
+    font-size: .68rem;
+    border: 1px solid rgba(31,94,44,0.3);
+}
+.gnc-announcement-author {
+    font-size: .75rem;
+}
+.gnc-announcement-card-title {
+    font-family: 'Noto Serif', serif;
+    color: #094024;
+    font-weight: 800;
+}
+.gnc-announcement-card-text {
+    font-family: 'Inter', sans-serif;
+    font-size: .9rem;
 }
 
 .gnc-read-more {
@@ -391,6 +447,374 @@
 
 
 /* =============================================================
+   PINNED ANNOUNCEMENTS
+   ============================================================= */
+.gnc-pinned-carousel,
+.gnc-pinned-carousel .carousel-inner,
+.gnc-pinned-carousel .carousel-item {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: 0;
+}
+.gnc-pinned-carousel .carousel-inner {
+    border-radius: 20px;
+}
+.gnc-pinned-card {
+    box-shadow: none !important;
+    display: flex;
+    background: #fff;
+    border-radius: 20px;
+    padding: 12px;
+    gap: 28px;
+    height: 420px;
+    overflow: hidden;
+    border: 1px solid rgba(9, 64, 36, .08);
+}
+.gnc-pinned-media {
+    flex: 0 0 46%;
+    max-width: 46%;
+    min-height: 0;
+    height: 100%;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #eef1ee;
+}
+.gnc-pinned-media img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.gnc-pinned-slide-fallback {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    color: #c3cbc4; font-size: 3rem;
+}
+.gnc-pinned-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 14px 16px 6px 0;
+}
+.gnc-pinned-badge {
+    display: inline-block;
+    background: #FBE7A6; color: #7a5a00;
+    border: 1px solid #EABA3B;
+    font-family: 'Inter', sans-serif;
+    font-weight: 700; font-size: .68rem; letter-spacing: .05em;
+    text-transform: uppercase;
+    padding: 4px 12px; border-radius: 6px;
+}
+.gnc-pinned-tags {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 1rem;
+}
+.gnc-pinned-label {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: .8rem; font-weight: 700;
+    color: #8a6d1f;
+    margin-bottom: .6rem;
+}
+.gnc-pinned-label i { color: #EABA3B; font-size: .95rem; }
+.gnc-pinned-title {
+    font-family: 'Noto Serif', serif;
+    font-weight: 700; font-size: 1.7rem; line-height: 1.25;
+    color: #094024;
+    margin-bottom: .35rem;
+}
+.gnc-pinned-date {
+    font-family: 'Inter', sans-serif;
+    font-size: .92rem; color: #3b4a40;
+    margin-bottom: 1rem;
+}
+.gnc-pinned-intro {
+    font-family: 'Inter', sans-serif;
+    font-size: .85rem; color: #33413a;
+    margin-bottom: .8rem;
+}
+.gnc-pinned-list {
+    list-style: none; padding: 0; margin: 0;
+    display: flex; flex-direction: column; gap: 10px;
+}
+.gnc-pinned-list li {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-family: 'Inter', sans-serif;
+    font-size: .85rem; color: #33413a; line-height: 1.4;
+}
+.gnc-pinned-list li i {
+    color: #1F5E2C; font-size: .95rem; margin-top: 1px; flex-shrink: 0;
+}
+.gnc-pinned-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-top: 1.5rem;
+}
+.gnc-pinned-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #094024; color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600; font-size: .85rem;
+    padding: 10px 20px; border-radius: 8px;
+    text-decoration: none;
+    transition: background .2s, color .2s;
+}
+.gnc-pinned-btn:hover { background: #EABA3B; color: #094024; }
+.gnc-pinned-nav { display: flex; gap: 10px; }
+.gnc-pinned-nav button {
+    width: 42px; height: 42px; border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #fff; color: #094024;
+    border: 1px solid #d5dbd6; font-size: .95rem;
+    transition: background .2s, border-color .2s;
+}
+.gnc-pinned-nav button:hover { background: #f1f5f2; border-color: #094024; }
+
+@media (max-width: 768px) {
+    .gnc-pinned-card { flex-direction: column; gap: 16px; height: auto; }
+    .gnc-pinned-media { flex: none; max-width: 100%; height: auto; aspect-ratio: 4 / 3; }
+    .gnc-pinned-body { padding: 0 8px 8px; }
+    .gnc-pinned-title { font-size: 1.35rem; }
+}
+
+/* =============================================================
+   EVENTS CALENDAR
+   ============================================================= */
+.gnc-events-cal {
+    background: #F9F6F1;
+}
+.gnc-events-title {
+    font-family: 'Noto Serif', serif; 
+    color: #1F5E2C; 
+    font-weight: 800;
+}
+.gnc-cal-card, .gnc-upcoming-card {
+    background: #fff; border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    overflow: hidden; height: 100%;
+}
+.gnc-cal-header {
+    display: flex; align-items: center; gap: .75rem;
+    padding: 1rem 1.25rem; border-bottom: 1px solid #f0f0f0;
+}
+.gnc-cal-title { font-weight: 700; color: #1F5E2C; font-size: 1.05rem; }
+.gnc-cal-nav {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: #f5f5f5; color: #094024; text-decoration: none;
+    transition: background .15s;
+}
+.gnc-cal-nav:hover { background: #e8e8e8; }
+.gnc-cal-nav:last-of-type { margin-left: auto; }
+.gnc-cal-grid {
+    display: grid; grid-template-columns: repeat(7,1fr);
+    gap: 2px; padding: 1rem 1.25rem;
+}
+.gnc-cal-dow {
+    text-align: center; font-size: .68rem; font-weight: 700;
+    color: #999; text-transform: none; padding-bottom: 6px;
+}
+.gnc-cal-cell {
+    min-height: 88px; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start;
+    font-size: .82rem; color: #444; border-radius: 6px; position: relative;
+    padding: 5px 4px; gap: 3px; overflow: hidden;
+}
+.gnc-cal-empty { background: none; min-height: auto; }
+.gnc-cal-daynum { line-height: 1; }
+.gnc-cal-today { background: #DDEBFD; font-weight: 700; color: #094024; border: 1px solid #1877F2; }
+.gnc-cal-hasevent {
+    background: #f3f6f3; font-weight: 700; cursor: default;
+}
+.gnc-cal-hasevent.gnc-cal-today { background: #DDEBFD; border-color: #1877F2; }
+.gnc-cal-events {
+    display: flex; flex-direction: column; gap: 2px; width: 100%;
+}
+.gnc-cal-event-chip {
+    display: flex; align-items: center; gap: 4px;
+    font-size: .62rem; font-weight: 600; line-height: 1.2;
+    padding: 2px 4px; border-radius: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 100%;
+}
+.gnc-cal-event-more {
+    font-size: .6rem; font-weight: 600; color: #888; padding: 0 4px;
+}
+.gnc-cal-dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.gnc-cal-legend {
+    display: flex; flex-wrap: wrap; gap: 14px; padding: 0 1.25rem 1rem;
+    font-size: .78rem; color: #555;
+}
+.gnc-cal-legend .gnc-cal-dot { width: 9px; height: 9px; margin-right: 5px; }
+.gnc-cal-dot-holiday { background: #EABA3B; }
+.gnc-cal-dot-school { background: #1F5E2C; }
+.gnc-cal-dot-emergency { background: #B3312D; }
+
+.gnc-upcoming-header {
+    background: #094024; color: #fff; font-weight: 700;
+    padding: 1rem 1.25rem; font-size: .95rem;
+}
+.gnc-upcoming-header i { color: #EABA3B; margin-right: .4rem; }
+.gnc-upcoming-item {
+    display: flex; gap: .75rem; align-items: flex-start;
+    padding: .9rem 1.25rem; border-bottom: 1px solid #f5f5f5;
+}
+.gnc-upcoming-item:last-child { border-bottom: none; }
+.gnc-upcoming-icon { font-size: 1.1rem; margin-top: 2px; }
+.gnc-upcoming-title { font-weight: 700; color: #094024; font-size: .9rem; }
+.gnc-upcoming-date { font-size: .78rem; color: #888; margin-top: 2px; }
+
+.gnc-programs-count {
+    background: rgba(234,186,59,0.18);
+    color: #EABA3B;
+    font-size: .72rem;
+    font-weight: 700;
+    padding: .2rem .55rem;
+    border-radius: 999px;
+    line-height: 1.4;
+}
+a.gnc-programs-count {
+    transition: background .15s, color .15s;
+    cursor: pointer;
+}
+a.gnc-programs-count:hover {
+    background: rgba(234,186,59,0.32);
+}
+
+.gnc-programs-list-item-active {
+    background: #eaf5ee;
+}
+.gnc-programs-list-item-active .gnc-programs-code {
+    background: #1F5E2C;
+    color: #fff;
+}
+.gnc-programs-list-item-active .gnc-programs-list-fullname {
+    color: #094024;
+}
+
+.gnc-programs-list {
+    max-height: 340px;
+    overflow-y: auto;
+}
+.gnc-programs-list-item {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    padding: .65rem 1.25rem;
+    border-bottom: 1px solid #f5f5f5;
+    line-height: 1.35;
+    color: inherit;
+    transition: background .15s;
+}
+.gnc-programs-list-item:hover { background: #f6faf7; }
+.gnc-programs-list-item:last-child { border-bottom: none; }
+.gnc-programs-code {
+    flex: 0 0 auto;
+    background: #eaf5ee;
+    color: #094024;
+    font-weight: 800;
+    font-size: .72rem;
+    letter-spacing: .02em;
+    padding: .28rem .55rem;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+.gnc-programs-list-fullname {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 600;
+    color: #333;
+    font-size: .83rem;
+    text-align: justify;
+    text-justify: inter-word;
+}
+.gnc-programs-list::-webkit-scrollbar { width: 6px; }
+.gnc-programs-list::-webkit-scrollbar-thumb { background: #d8d8d8; border-radius: 3px; }
+.gnc-programs-list::-webkit-scrollbar-track { background: transparent; }
+
+.gnc-events-side-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    height: 100%;
+}
+.gnc-events-side-stack .gnc-upcoming-card {
+    height: auto;
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+.gnc-events-side-stack .gnc-upcoming-list,
+.gnc-events-side-stack .gnc-programs-list {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    max-height: none;
+}
+
+/* Keep the Programs card from ever collapsing/hiding inside the side stack */
+.gnc-events-side-stack .gnc-upcoming-card {
+    min-height: 220px;
+    flex-shrink: 0;
+}
+.gnc-events-side-stack .gnc-programs-list {
+    min-height: 160px;
+    max-height: 340px;
+}
+@media (max-width: 991px) {
+    .gnc-events-side-stack { height: auto; }
+}
+
+/* =============================================================
+   FACEBOOK BANNER
+   ============================================================= */
+.gnc-fb-banner {
+    background: #eaf5ee;
+    border: 1px solid rgba(9,64,36,0.15);
+    border-radius: 10px;
+}
+.gnc-fb-icon-wrap {
+    background: #094024;
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.gnc-fb-icon-wrap i {
+    font-size: 0.85rem;
+}
+.gnc-fb-text {
+    font-size: 0.88rem;
+    color: #333;
+}
+.gnc-fb-btn {
+    background: #fff;
+    border: 1px solid rgba(9,64,36,0.15);
+    border-radius: 8px;
+    padding: 0.55rem 1.1rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #1a1a1a;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+.gnc-fb-btn-icon {
+    color: #1877F2;
+    font-size: 1rem;
+}
+.gnc-fb-btn-arrow {
+    font-size: 0.8rem;
+    color: #555;
+}
+
+/* =============================================================
    ACADEMIC PROGRAMS
    ============================================================= */
 .gnc-programs {
@@ -400,28 +824,43 @@
 .gnc-programs-header {
     position: relative;
     max-width: none;
-    padding: 2.25rem 2rem;
+    min-height: 0;
+    padding: 1.75rem 3rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     text-align: left;
-    border-radius: 10px;
+    border-radius: 14px;
     overflow: hidden;
     background-size: cover;
     background-position: center;
+}
+
+.gnc-programs-header > * {
+    max-width: 780px;
+    text-align: left;
+}
+
+.gnc-programs-header p {
+    font-size: clamp(1rem, 1.4vw, 1.15rem);
 }
 
 .gnc-eyebrow {
     display: inline-block;
     color: var(--gnc-gold);
     font-weight: 700;
-    font-size: .78rem;
-    letter-spacing: 1.5px;
+    font-size: .9rem;
+    letter-spacing: 2px;
     text-transform: uppercase;
     margin-bottom: .5rem;
 }
 
 .gnc-section-title {
     font-family: 'Noto Serif', serif;
-    color: var(--gnc-green);
+    color: #1F5E2C;
     font-weight: 800;
+    font-size: 32px;
+    line-height: 1.15;
     margin-bottom: .5rem;
 }
 
@@ -612,14 +1051,14 @@
 
 .gnc-president-eyebrow {
     font-family: 'Noto Serif', serif;
-    color: var(--gnc-green);
+    color: #1F5E2C;
     font-size: 1.3rem;
     margin-bottom: -0.25rem;
 }
 
 .gnc-president-title {
     font-family: 'Noto Serif', serif;
-    color: var(--gnc-green);
+    color: #1F5E2C;
     font-weight: 800;
     font-size: 2.35rem;
     line-height: 1.15;
@@ -665,12 +1104,77 @@
 /* =============================================================
    RESPONSIVE OVERRIDES
    ============================================================= */
+@media (max-width: 991px) {
+    /* Center Headers on Tablets & Mobile */
+    .gnc-programs-header,
+    .gnc-announce-header {
+        max-width: 100%;
+        text-align: center;
+    }
+    .gnc-programs-header > *,
+    .gnc-announce-header > * {
+        text-align: center;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* Pillars - Wrap neatly on tablet instead of squishing */
+    .gnc-pillars {
+        margin-top: -40px;
+    }
+    .gnc-pillars .pillar-wrap {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .gnc-pillars .pillar-item {
+        flex: 1 1 300px; /* Allows pillars to drop to the next row if they run out of space */
+        padding: 1rem;
+        justify-content: center;
+    }
+    .gnc-pillars .pillar-item:not(:last-child)::after { 
+        display: none; 
+    }
+
+    /* President Section */
+    .gnc-president {
+        text-align: center;
+    }
+    .gnc-president-label {
+        justify-content: center;
+    }
+    .gnc-president-card {
+        margin: 0 auto 2.5rem auto;
+    }
+    .gnc-president-title::after {
+        left: 50%;
+        transform: translateX(-50%);
+    }
+}
+
 @media (max-width: 768px) {
+    /* Hero Content */
     .hero-title-gold,
     .hero-title-white {
         font-size: 1.8rem;
     }
+    .hero-content {
+        text-align: center;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .hero-ctas {
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+    }
+    .btn-enroll, .btn-explore {
+        width: 100%;
+        justify-content: center;
+    }
 
+    /* Arrows */
     .slide-arrow {
         width: 36px;
         height: 36px;
@@ -678,34 +1182,70 @@
     .slide-arrow-prev { left: 0.6rem; }
     .slide-arrow-next { right: 0.6rem; }
 
+    /* Pillars Mobile Stack */
     .gnc-pillars {
-        margin-top: -40px;
         padding: 0 0.75rem;
     }
     .gnc-pillars .pillar-wrap {
         flex-direction: column;
+        align-items: center;
     }
-    .gnc-pillars .pillar-item:not(:last-child)::after { display: none; }
     .gnc-pillars .pillar-item {
+        flex: 0 1 auto; /* Override desktop's flex:1 — in a column layout that
+                           was stretching each item to fill 1/3 of the total
+                           height instead of hugging its own content. */
         width: 100%;
-        padding: 0.75rem 1rem;
+        flex-direction: column;
+        text-align: center;
+        padding: 1.5rem 1rem;
         border-bottom: 1px solid rgba(0,0,0,0.08);
     }
     .gnc-pillars .pillar-item:last-child {
         border-bottom: none;
     }
-
-    .gnc-programs-header {
-        max-width: 100%;
-    }
 }
 
 @media (max-width: 576px) {
-    .gnc-announce-header {
+    .gnc-announce-header,
+    .gnc-programs-header {
+        min-height: 0;
         padding: 1.5rem 1.25rem;
     }
-    .gnc-announce-header > * {
+    .gnc-announce-header > *,
+    .gnc-programs-header > * {
         max-width: 100%;
+    }
+    .gnc-pinned-footer { flex-wrap: wrap; }
+
+    .gnc-cal-grid {
+        padding: 1rem 0.5rem; 
+        gap: 2px; 
+    }
+    .gnc-cal-dow {
+        font-size: 0.6rem; 
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: clip; 
+    }
+    .gnc-cal-cell {
+        min-height: 65px; 
+        padding: 4px 2px; 
+        font-size: 0.75rem;
+    }
+    .gnc-cal-event-chip {
+        font-size: 0.55rem;
+        padding: 2px 3px;
+    }
+    .gnc-cal-header {
+        padding: 0.75rem 1rem;
+    }
+    .gnc-cal-title {
+        font-size: 0.95rem;
+    }
+    .gnc-cal-legend {
+        padding: 0 1rem 1rem;
+        gap: 10px;
+        justify-content: center;
     }
 }
 
@@ -719,16 +1259,88 @@
     }
 }
 
-@media (max-width: 576px) {
-    #evtProgramFilter {
-        min-width: 110px !important;
-        max-width: 140px;
-        font-size: 0.78rem;
-        padding-left: 0.4rem;
-        padding-right: 1.4rem;
+
+/* =============================================================
+   TALL / PORTRAIT TABLET FIX
+   100vh on a narrow-but-tall viewport (Surface Pro, iPad portrait,
+   etc.) makes the hero far too tall, forcing background-size:cover
+   to zoom deep into the image and crop it awkwardly. Cap the height
+   instead of letting it scale with the full viewport on these.
+   ============================================================= */
+@media (min-width: 768px) and (orientation: portrait) {
+    .hero-slideshow,
+    .hero-slide .container {
+        min-height: 640px;
     }
-    #programFilterForm label {
-        font-size: 0.72rem;
+}
+
+
+/* =============================================================
+   HEADER BANNERS - keep text on a single line (tablet & desktop)
+   Font sizes scale with viewport width so nothing gets clipped.
+   Phones (<768px) still wrap normally.
+   ============================================================= */
+@media (min-width: 768px) {
+    .gnc-announce-header > *,
+    .gnc-programs-header > * {
+        max-width: none;
         white-space: nowrap;
+    }
+    .gnc-announce-header p,
+    .gnc-programs-header p {
+        font-size: clamp(.8rem, 1.3vw, 1.05rem);
+    }
+}
+
+
+/* Tighter vertical spacing around the News & Announcements header */
+.gnc-announcements {
+    padding-top: 1.5rem !important;
+}
+.gnc-announce-header.mb-5 {
+    margin-bottom: 1.25rem !important;
+}
+
+
+/* =============================================================
+   HEADER BANNERS - mobile (<768px): one line per text, smaller font
+   Font sizes are calculated from the screen width so they always fit.
+   (64px = 48px side padding + 16px safety; tweak the divisors to resize)
+   ============================================================= */
+@media (max-width: 767px) {
+    .gnc-announce-header,
+    .gnc-programs-header {
+        padding: 1.5rem .75rem;
+    }
+
+    /* gold label */
+    .gnc-announce-eyebrow,
+    .gnc-eyebrow {
+        font-size: .8rem;
+        letter-spacing: 1.5px;
+        white-space: nowrap;
+    }
+
+    /* green heading */
+    .gnc-announce-title,
+    .gnc-section-title {
+        white-space: nowrap;
+    }
+    .gnc-announce-title {
+        font-size: min(32px, calc((100vw - 64px) / 15.2));
+    }
+    .gnc-section-title {
+        font-size: min(32px, calc((100vw - 64px) / 17.5));
+    }
+
+    /* gray subtitles */
+    .gnc-announce-header p {
+        font-size: min(16px, calc((100vw - 64px) / 27.5));
+        white-space: nowrap;
+    }
+    /* Academic Programs subtitle is a long sentence: it may wrap on phones */
+    .gnc-programs-header p {
+        font-size: .875rem;
+        white-space: normal;
     }
 }

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/config/fb-categorizer.php';
 
 // ---------------------------------------------------------------
 // Fetch the latest published admin announcements
@@ -79,7 +80,7 @@ foreach ($dbNews as $item) {
 // ---------------------------------------------------------------
 function getFacebookPosts(): array {
     $db       = getDB();
-    $cacheTtl = 300; // 5 minutes
+    $cacheTtl = 600; // 10 minutes
 
     $lastFetchRow = $db->query("SELECT MAX(fetched_at) AS last_fetch FROM fb_posts_cache")->fetch();
     $isFresh = !empty($lastFetchRow['last_fetch'])
@@ -90,134 +91,95 @@ function getFacebookPosts(): array {
     }
 
     // ---------------------------------------------------------------
-    // Rate limiting, two layers:
-    //
-    // 1. A MySQL advisory lock so that when the cache expires and
-    //    several visitors hit the homepage around the same moment, only
-    //    ONE of them actually calls the Facebook API — the rest wait
-    //    briefly and then just read the cache the first one refreshed.
-    //    Without this, a traffic burst right as the cache goes stale
-    //    could fire off many simultaneous Graph API calls at once.
-    //
-    // 2. A hard cap on how many real Facebook calls we make per hour,
-    //    tracked in fb_api_call_log. Even under sustained traffic this
-    //    keeps us well under Facebook's own rate limits and gives a
-    //    predictable ceiling instead of "however busy the site gets".
+    // Rate limiting: a hard cap on how many real Facebook calls we make
+    // per hour, tracked in fb_api_call_log (created once, manually — see
+    // setup note). This keeps us well under Facebook's own rate limits
+    // no matter how busy the site gets, using just two lightweight
+    // queries instead of anything that creates tables or takes locks on
+    // every request.
     // ---------------------------------------------------------------
     $maxCallsPerHour = 60;
 
-    $db->exec("
-        CREATE TABLE IF NOT EXISTS fb_api_call_log (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            called_at DATETIME NOT NULL,
-            INDEX (called_at)
-        )
-    ");
+    $callsThisHour = (int) $db->query("
+        SELECT COUNT(*) FROM fb_api_call_log WHERE called_at > NOW() - INTERVAL 1 HOUR
+    ")->fetchColumn();
 
-    $gotLock = (bool) $db->query("SELECT GET_LOCK('fb_posts_fetch', 5)")->fetchColumn();
-    if (!$gotLock) {
-        // Someone else is already refreshing — just serve current cache
-        // rather than waiting indefinitely or piling on another call.
+    if ($callsThisHour >= $maxCallsPerHour) {
+        error_log("Facebook fetch skipped: hourly rate limit ($maxCallsPerHour/hr) reached");
         return fetchCachedFbPostsFromDb($db);
     }
 
-    try {
-        // Re-check freshness now that we hold the lock: another request
-        // may have already refreshed the cache while we were waiting.
-        $lastFetchRow = $db->query("SELECT MAX(fetched_at) AS last_fetch FROM fb_posts_cache")->fetch();
-        $isFresh = !empty($lastFetchRow['last_fetch'])
-            && (time() - strtotime($lastFetchRow['last_fetch']) < $cacheTtl);
-        if ($isFresh) {
-            return fetchCachedFbPostsFromDb($db);
-        }
+    $db->exec("INSERT INTO fb_api_call_log (called_at) VALUES (NOW())");
+    $db->exec("DELETE FROM fb_api_call_log WHERE called_at <= NOW() - INTERVAL 1 HOUR"); // keep the table small
 
-        $callsThisHour = (int) $db->query("
-            SELECT COUNT(*) FROM fb_api_call_log WHERE called_at > NOW() - INTERVAL 1 HOUR
-        ")->fetchColumn();
+    $pageId      = $_ENV['FB_PAGE_ID'];
+    $accessToken = $_ENV['FB_ACCESS_TOKEN'];
 
-        if ($callsThisHour >= $maxCallsPerHour) {
-            error_log("Facebook fetch skipped: hourly rate limit ($maxCallsPerHour/hr) reached");
-            return fetchCachedFbPostsFromDb($db);
-        }
+    $url = "https://graph.facebook.com/v19.0/{$pageId}/posts"
+         . "?fields=id,message,created_time,permalink_url,full_picture&limit=6"
+         . "&access_token={$accessToken}";
 
-        $db->exec("INSERT INTO fb_api_call_log (called_at) VALUES (NOW())");
-        $db->exec("DELETE FROM fb_api_call_log WHERE called_at <= NOW() - INTERVAL 1 HOUR"); // keep the table small
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    $raw = curl_exec($ch);
+    $curlErr = curl_error($ch);
+    curl_close($ch);
 
-        $pageId      = $_ENV['FB_PAGE_ID'];
-        $accessToken = $_ENV['FB_ACCESS_TOKEN'];
+    if ($raw === false) {
+        error_log("Facebook fetch failed: $curlErr");
+        return fetchCachedFbPostsFromDb($db); // serve whatever's already cached, even if stale
+    }
 
-        $url = "https://graph.facebook.com/v21.0/{$pageId}/posts"
-             . "?fields=id,message,created_time,permalink_url,full_picture&limit=6"
-             . "&access_token={$accessToken}";
+    $response = json_decode($raw, true);
 
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 8);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        $raw = curl_exec($ch);
-        $curlErr = curl_error($ch);
-        curl_close($ch);
+    if (isset($response['error'])) {
+        error_log("Facebook API error: " . $response['error']['message']);
+        return fetchCachedFbPostsFromDb($db);
+    }
 
-        if ($raw === false) {
-            error_log("Facebook fetch failed: $curlErr");
-            return fetchCachedFbPostsFromDb($db); // serve whatever's already cached, even if stale
-        }
+    if (!empty($response['data'])) {
+        $existingStmt = $db->prepare("SELECT image_media_id FROM fb_posts_cache WHERE fb_post_id = ?");
 
-        $response = json_decode($raw, true);
+        $categoryMap = gncLoadCategoryMap($db);
 
-        if (isset($response['error'])) {
-            error_log("Facebook API error: " . $response['error']['message']);
-            return fetchCachedFbPostsFromDb($db);
-        }
+        $upsertStmt = $db->prepare("
+            INSERT INTO fb_posts_cache (fb_post_id, message, image_media_id, category_id, permalink_url, created_time, fetched_at)
+            VALUES (:fb_post_id, :message, :image_media_id, :category_id, :permalink_url, :created_time, NOW())
+            ON DUPLICATE KEY UPDATE
+                message         = VALUES(message),
+                permalink_url   = VALUES(permalink_url),
+                created_time    = VALUES(created_time),
+                fetched_at      = NOW(),
+                image_media_id  = COALESCE(image_media_id, VALUES(image_media_id)),
+                category_id     = IF(category_locked = 1, category_id, VALUES(category_id))
+        ");
 
-        if (!empty($response['data'])) {
-            $existingStmt = $db->prepare("SELECT image_media_id FROM fb_posts_cache WHERE fb_post_id = ?");
+        foreach ($response['data'] as $post) {
+            if (empty($post['message']) || empty($post['id'])) continue; // skip photo-only / malformed posts
 
-            $upsertStmt = $db->prepare("
-                INSERT INTO fb_posts_cache (fb_post_id, message, image_media_id, permalink_url, created_time, fetched_at)
-                VALUES (:fb_post_id, :message, :image_media_id, :permalink_url, :created_time, NOW())
-                ON DUPLICATE KEY UPDATE
-                    message         = VALUES(message),
-                    permalink_url   = VALUES(permalink_url),
-                    created_time    = VALUES(created_time),
-                    fetched_at      = NOW(),
-                    image_media_id  = COALESCE(image_media_id, VALUES(image_media_id))
-            ");
+            // Reuse the existing media_library row for this post if we already downloaded it
+            $existingStmt->execute([$post['id']]);
+            $imageMediaId = $existingStmt->fetchColumn() ?: null;
 
-            foreach ($response['data'] as $post) {
-                // A post needs an id to key off of, and at least a message OR a
-                // photo to be worth showing. Photo-only posts (no caption) used
-                // to be skipped here because $post['message'] was empty — that
-                // silently dropped otherwise-valid posts from the feed.
-                if (empty($post['id'])) continue;
-                if (empty($post['message']) && empty($post['full_picture'])) continue;
-
-                // Reuse the existing media_library row for this post if we already downloaded it
-                $existingStmt->execute([$post['id']]);
-                $imageMediaId = $existingStmt->fetchColumn() ?: null;
-
-                if (empty($imageMediaId) && !empty($post['full_picture'])) {
-                    $imageMediaId = downloadAndStoreFbImageAsMedia($db, $post['id'], $post['full_picture']);
-                }
-
-                $upsertStmt->execute([
-                    ':fb_post_id'     => $post['id'],
-                    ':message'        => $post['message'] ?? '', // may be empty for photo-only posts
-                    ':image_media_id' => $imageMediaId,
-                    ':permalink_url'  => $post['permalink_url'] ?? null,
-                    ':created_time'   => date('Y-m-d H:i:s', strtotime($post['created_time'])),
-                ]);
+            if (empty($imageMediaId) && !empty($post['full_picture'])) {
+                $imageMediaId = downloadAndStoreFbImageAsMedia($db, $post['id'], $post['full_picture']);
             }
-        }
 
-        return fetchCachedFbPostsFromDb($db);
-    } finally {
-        // Always release the lock, even if we returned early above or an
-        // exception was thrown — otherwise it'd stay held until this MySQL
-        // connection closes, blocking every other request from refreshing.
-        $db->exec("SELECT RELEASE_LOCK('fb_posts_fetch')");
+            $upsertStmt->execute([
+                ':fb_post_id'     => $post['id'],
+                ':message'        => $post['message'],
+                ':image_media_id' => $imageMediaId,
+                ':category_id'    => gncCategoryIdForMessage($post['message'], $categoryMap), // auto-detected
+                ':permalink_url'  => $post['permalink_url'] ?? null,
+                ':created_time'   => date('Y-m-d H:i:s', strtotime($post['created_time'])),
+            ]);
+        }
     }
+
+    return fetchCachedFbPostsFromDb($db);
 }
 
 /**
@@ -236,11 +198,7 @@ function fetchCachedFbPostsFromDb(PDO $db): array {
 
     $posts = [];
     foreach ($rows as $row) {
-        // message can legitimately be empty for photo-only posts —
-        // don't let mb_substr/strlen choke on that, just show no excerpt.
-        $excerpt = !empty($row['message'])
-            ? (mb_strlen($row['message']) > 110 ? mb_substr($row['message'], 0, 110) . '…' : $row['message'])
-            : '';
+        $excerpt = mb_strlen($row['message']) > 110 ? mb_substr($row['message'], 0, 110) . '…' : $row['message'];
         $posts[] = [
             'source'     => 'facebook',
             'title'      => null,
@@ -309,6 +267,115 @@ function downloadAndStoreFbImageAsMedia(PDO $db, string $postId, string $remoteU
 $facebookPosts = getFacebookPosts();
 
 // ---------------------------------------------------------------
+// Pinned announcements/news (managed from Admin > Announcements /
+// Admin > News, via the pin toggle — up to 3 items combined). These
+// power the small featured slideshow above the News & Announcements
+// grid below.
+// ---------------------------------------------------------------
+$pinnedFeedItems = [];
+
+/**
+ * Split announcement/news HTML into an intro sentence and up to 4 checklist
+ * points (taken from <li> items, or from following paragraphs/lines).
+ */
+function gncPinnedParse(string $html): array {
+    $points = [];
+    if (preg_match_all('/<li[^>]*>(.*?)<\/li>/is', $html, $m)) {
+        foreach ($m[1] as $li) {
+            $t = trim(html_entity_decode(strip_tags($li), ENT_QUOTES, 'UTF-8'));
+            if ($t !== '') $points[] = $t;
+        }
+        $html = preg_replace('/<(ul|ol)[^>]*>.*?<\/\1>/is', '', $html);
+    }
+    $text  = html_entity_decode(strip_tags(preg_replace('/<\/(p|div|br|h[1-6])>|<br\s*\/?>/i', "\n", $html)), ENT_QUOTES, 'UTF-8');
+    $lines = array_values(array_filter(array_map('trim', preg_split('/\R+/', $text)), fn($l) => $l !== ''));
+    $intro = $lines[0] ?? '';
+    if (!$points) {
+        $points = array_slice($lines, 1, 4);
+    }
+    $cut = fn($s, $n) => mb_strlen($s) > $n ? mb_substr($s, 0, $n) . '…' : $s;
+    return [$cut($intro, 160), array_map(fn($s) => $cut($s, 110), array_slice($points, 0, 4))];
+}
+try {
+    $stmt = $db->query("
+        SELECT a.title, a.slug, a.content, a.pinned_at, a.published_at, a.created_at,
+            m.file_path AS image_path
+        FROM announcements a
+        LEFT JOIN media_library m ON a.featured_image = m.media_id
+        WHERE a.is_pinned = 1 AND a.status = 'published'
+    ");
+    foreach ($stmt->fetchAll() as $ann) {
+        $excerpt = strip_tags($ann['content']);
+        $excerpt = mb_strlen($excerpt) > 130 ? mb_substr($excerpt, 0, 130) . '…' : $excerpt;
+        [$pinIntro, $pinPoints] = gncPinnedParse($ann['content']);
+        $pinnedFeedItems[] = [
+            'intro'      => $pinIntro,
+            'points'     => $pinPoints,
+            'source'     => 'admin',
+            'type_label' => 'Announcement',
+            'title'      => $ann['title'],
+            'excerpt'    => $excerpt,
+            'image_path' => $ann['image_path'],
+            'date'       => $ann['published_at'] ?? $ann['created_at'],
+            'pinned_at'  => $ann['pinned_at'],
+            'link'       => 'announcement.php?slug=' . urlencode($ann['slug']),
+        ];
+    }
+
+    $stmt = $db->query("
+        SELECT n.title, n.slug, n.content, n.pinned_at, n.published_at, n.created_at,
+            m.file_path AS image_path
+        FROM news n
+        LEFT JOIN media_library m ON n.featured_image = m.media_id
+        WHERE n.is_pinned = 1 AND n.status = 'published'
+    ");
+    foreach ($stmt->fetchAll() as $item) {
+        $excerpt = strip_tags($item['content']);
+        $excerpt = mb_strlen($excerpt) > 130 ? mb_substr($excerpt, 0, 130) . '…' : $excerpt;
+        [$pinIntro, $pinPoints] = gncPinnedParse($item['content']);
+        $pinnedFeedItems[] = [
+            'intro'      => $pinIntro,
+            'points'     => $pinPoints,
+            'source'     => 'news',
+            'type_label' => 'News',
+            'title'      => $item['title'],
+            'excerpt'    => $excerpt,
+            'image_path' => $item['image_path'],
+            'date'       => $item['published_at'] ?? $item['created_at'],
+            'pinned_at'  => $item['pinned_at'],
+            'link'       => 'news.php?slug=' . urlencode($item['slug']),
+        ];
+    }
+
+    $stmt = $db->query("
+        SELECT f.message, f.permalink_url, f.created_time, f.pinned_at, m.file_path AS image_path
+        FROM fb_posts_cache f
+        LEFT JOIN media_library m ON f.image_media_id = m.media_id
+        WHERE f.is_pinned = 1
+    ");
+    foreach ($stmt->fetchAll() as $row) {
+        $excerpt = mb_strlen($row['message']) > 130 ? mb_substr($row['message'], 0, 130) . '…' : $row['message'];
+        $pinnedFeedItems[] = [
+            'intro'      => $excerpt,
+            'points'     => [],
+            'source'     => 'facebook',
+            'type_label' => 'Announcement',
+            'title'      => null,
+            'excerpt'    => $excerpt,
+            'image_path' => $row['image_path'],
+            'date'       => $row['created_time'],
+            'pinned_at'  => $row['pinned_at'],
+            'link'       => $row['permalink_url'] ?? ('https://facebook.com/' . FB_PAGE_ID),
+        ];
+    }
+
+    usort($pinnedFeedItems, fn($a, $b) => strtotime($b['pinned_at']) <=> strtotime($a['pinned_at']));
+    $pinnedFeedItems = array_slice($pinnedFeedItems, 0, 3);
+} catch (Exception $e) {
+    $pinnedFeedItems = [];
+}
+
+// ---------------------------------------------------------------
 // Homepage slideshow (managed via Admin > Section Editor)
 // ---------------------------------------------------------------
 try {
@@ -341,15 +408,8 @@ $publicAnnouncements = array_slice($publicAnnouncements, 0, 6);
 // ---------------------------------------------------------------
 // Events calendar (public, published only)
 // ---------------------------------------------------------------
-require_once __DIR__ . '/admin/admin-functions.php'; // for getProgramCategories() / normalizeProgramCategory()
-
 $evtMonth = isset($_GET['evt_month']) ? max(1, min(12, (int)$_GET['evt_month'])) : (int)date('n');
 $evtYear  = isset($_GET['evt_year'])  ? (int)$_GET['evt_year']                  : (int)date('Y');
-
-// Program filter — 'ALL' (the default) means "show every program's events".
-// Picking a specific program shows that program's events plus any event
-// tagged 'ALL' (i.e. events meant for everyone).
-$evtProgramFilter = normalizeProgramCategory($_GET['evt_program'] ?? null);
 
 $evtFirstOfMonth = mktime(0, 0, 0, $evtMonth, 1, $evtYear);
 $evtDaysInMonth  = (int)date('t', $evtFirstOfMonth);
@@ -381,25 +441,16 @@ try {
     // Overlap condition: include any event that touches this month at all,
     // not just ones that *start* in it — so multi-day events that started
     // last month but run into this one still show up.
-    $monthEventsSql = "
-        SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, e.program, c.category_name, c.category_color
+    $stmt = $db->prepare("
+        SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, c.category_name, c.category_color
         FROM events e
         LEFT JOIN categories c ON e.category_id = c.category_id
         WHERE e.status = 'published'
           AND e.start_date <= ?
           AND COALESCE(e.end_date, e.start_date) >= ?
-    ";
-    $monthEventsParams = [$evtRangeEnd, $evtRangeStart];
-
-    if ($evtProgramFilter !== 'ALL') {
-        $monthEventsSql .= " AND (e.program = ? OR e.program = 'ALL')";
-        $monthEventsParams[] = $evtProgramFilter;
-    }
-
-    $monthEventsSql .= " ORDER BY e.start_date ASC";
-
-    $stmt = $db->prepare($monthEventsSql);
-    $stmt->execute($monthEventsParams);
+        ORDER BY e.start_date ASC
+    ");
+    $stmt->execute([$evtRangeEnd, $evtRangeStart]);
     $publicMonthEvents = $stmt->fetchAll();
 } catch (Exception $e) {
     $publicMonthEvents = [];
@@ -428,44 +479,97 @@ foreach ($publicMonthEvents as $ev) {
     }
 }
 
-// Upcoming events (next 3 published, from today onward, any month)
+// ---------------------------------------------------------------
+// Program filter for the "Upcoming Events" card
+// ---------------------------------------------------------------
+// Canonical code -> full name list, kept identical to getProgramCategories()
+// in admin-functions.php so names match everywhere on the site.
+$programFullNames = [
+    'ALL'     => 'All Programs',
+    'BEEd'    => 'Bachelor of Elementary Education',
+    'BSEd'    => 'Bachelor of Secondary Education',
+    'BAEL'    => 'Bachelor of Arts in English Language',
+    'BSCE'    => 'Bachelor of Science in Civil Engineering',
+    'BSAIS'   => 'Bachelor of Science in Accounting Information Systems',
+    'BSA'     => 'Bachelor of Science in Accountancy',
+    'BSBA-FM' => 'Bachelor of Science in Business Administration major in Financial Management',
+    'BSCS'    => 'Bachelor of Science in Computer Science',
+    'BSIT'    => 'Bachelor of Science in Information Technology',
+    'BSHM'    => 'Bachelor of Science in Hospitality Management',
+    'BSTM'    => 'Bachelor of Science in Tourism Management',
+    'BSMLS'   => 'Bachelor of Science in Medical Laboratory Science',
+    'BSPh'    => 'Bachelor of Science in Pharmacy',
+    'BSN'     => 'Bachelor of Science in Nursing',
+];
+
+// A specific program is "selected" when ?program=CODE is a real, known
+// code and isn't the 'ALL' placeholder. Anything unrecognized (missing,
+// tampered, typo'd) safely falls back to no filter at all — same
+// fail-safe pattern as normalizeProgramCategory() in admin-functions.php.
+$selectedProgram = $_GET['program'] ?? null;
+if ($selectedProgram === 'ALL' || !isset($programFullNames[$selectedProgram])) {
+    $selectedProgram = null;
+}
+
+// Time is optional on events; 00:00:00 means "no time set".
+function evt_timeLabel($dt) {
+    if (empty($dt)) return '';
+    $ts = strtotime($dt);
+    return date('H:i:s', $ts) !== '00:00:00' ? date('g:i A', $ts) : '';
+}
+
+// Upcoming events (next 3 published, from today onward, any month;
+// filtered to $selectedProgram when one is chosen)
 try {
-    $upcomingSql = "
-        SELECT e.event_id, e.title, e.location, e.start_date, e.end_date, e.program, c.category_name, c.category_color
-        FROM events e
-        LEFT JOIN categories c ON e.category_id = c.category_id
-        WHERE e.status = 'published' AND e.start_date >= ?
-    ";
-    $upcomingParams = [date('Y-m-d 00:00:00')];
-
-    if ($evtProgramFilter !== 'ALL') {
-        $upcomingSql .= " AND (e.program = ? OR e.program = 'ALL')";
-        $upcomingParams[] = $evtProgramFilter;
+    if ($selectedProgram !== null) {
+        // A specific program is selected: show ONLY events tagged with
+        // that exact program code. General ('ALL') / other-program events
+        // do not appear here.
+        $stmt = $db->prepare("
+            SELECT e.event_id, e.title, e.location, e.start_date, e.end_date, e.program, c.category_name, c.category_color
+            FROM events e
+            LEFT JOIN categories c ON e.category_id = c.category_id
+            WHERE e.status = 'published' AND e.start_date >= ? AND e.program = ?
+            ORDER BY e.start_date ASC
+            LIMIT 3
+        ");
+        $stmt->execute([date('Y-m-d 00:00:00'), $selectedProgram]);
+    } else {
+        // No program selected: the general/College Department view,
+        // unfiltered, same behavior as before this feature existed.
+        $stmt = $db->prepare("
+            SELECT e.event_id, e.title, e.location, e.start_date, e.end_date, e.program, c.category_name, c.category_color
+            FROM events e
+            LEFT JOIN categories c ON e.category_id = c.category_id
+            WHERE e.status = 'published' AND e.start_date >= ?
+            ORDER BY e.start_date ASC
+            LIMIT 3
+        ");
+        $stmt->execute([date('Y-m-d 00:00:00')]);
     }
-
-    $upcomingSql .= " ORDER BY e.start_date ASC LIMIT 3";
-
-    $stmt = $db->prepare($upcomingSql);
-    $stmt->execute($upcomingParams);
     $upcomingEvents = $stmt->fetchAll();
 } catch (Exception $e) {
     $upcomingEvents = [];
+}
+
+// ---------------------------------------------------------------
+// Fetch programs for the homepage "Programs" card
+// ---------------------------------------------------------------
+try {
+    $stmt = $db->query("
+        SELECT p.program_id, p.program_code, d.slug AS dept_slug
+        FROM programs p
+        LEFT JOIN departments d ON d.dept_id = p.dept_id
+        ORDER BY p.program_code ASC
+    ");
+    $homePrograms = $stmt->fetchAll();
+} catch (Exception $e) {
+    $homePrograms = [];
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script>
-    // Must run first, before anything paints: if we're arriving from the
-    // program-filter reload (URL has #events + evt_* params), hide the
-    // page immediately so the user never sees the top of the page before
-    // we scroll to #events. index.js reveals it again once positioned.
-    (function () {
-        if (window.location.hash === '#events' && window.location.search.indexOf('evt_') !== -1) {
-            document.documentElement.style.visibility = 'hidden';
-        }
-    })();
-    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guagua National Colleges</title>
@@ -473,7 +577,7 @@ try {
     <link href="assets/css/base-style.css" rel="stylesheet">
     <link href="assets/css/navbar-style.css" rel="stylesheet">
     <link href="assets/css/footer-style.css" rel="stylesheet">
-    <link href="assets/css/index-style.css?v=4" rel="stylesheet">
+    <link href="assets/css/index-style.css?v=6" rel="stylesheet">
     <link href="assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="icon" type="image/x-icon" href="assets/images/logos/gnc-logo-v1.svg">
@@ -591,7 +695,7 @@ try {
     </div>
     <?php endif; ?>
 
-    <div class="gnc-pillars">
+<div class="gnc-pillars">
         <div class="container">
             <div class="pillar-card">
                 <div class="pillar-wrap">
@@ -633,13 +737,75 @@ try {
 
     <section class="gnc-announcements py-5" id="announcements">
         <div class="container">
-            <div class="gnc-announce-header lazy-bg mb-5" data-bg="assets/images/Section Header.png">
-                <span class="d-inline-block mb-2" style="color:#EABA3B;font-weight:700;font-size:.78rem;letter-spacing:1.5px;text-transform:uppercase;">
+            <div class="gnc-announce-header lazy-bg mb-5">
+                <span class="gnc-announce-eyebrow d-inline-block mb-2">
                     News &amp; Announcements
                 </span>
-                <h2 class="mb-2" style="font-family: 'Noto Serif', serif; color:#1F5E2C;font-weight:800;">Stay Updated, Stay Informed</h2>
+                <h2 class="gnc-announce-title mb-2">Stay Updated, Stay Informed</h2>
                 <p class="text-muted mb-0">Get the latest news, events, and important updates</p>
             </div>
+
+            <?php if (!empty($pinnedFeedItems)): ?>
+            <div class="gnc-pinned-label"><i class="bi bi-pin-angle-fill"></i> Pinned</div>
+            <div id="gncPinnedCarousel" class="carousel slide gnc-pinned-carousel mb-5" data-bs-ride="carousel" data-bs-interval="7000">
+                <div class="carousel-inner">
+                    <?php foreach ($pinnedFeedItems as $i => $pin):
+                        $isFbPin = $pin['source'] === 'facebook';
+                        $badge   = $isFbPin ? 'From Facebook' : ($pin['type_label'] === 'News' ? 'Featured News' : 'Important Update');
+                    ?>
+                    <div class="carousel-item <?= $i === 0 ? 'active' : '' ?>">
+                        <article class="gnc-pinned-card">
+                            <div class="gnc-pinned-media skeleton-wrap">
+                                <?php if (!empty($pin['image_path'])): ?>
+                                <img src="<?= htmlspecialchars($pin['image_path']) ?>" alt="<?= htmlspecialchars($pin['title'] ?? 'Facebook post') ?>" loading="<?= $i === 0 ? 'eager' : 'lazy' ?>" decoding="async">
+                                <?php else: ?>
+                                <div class="gnc-pinned-slide-fallback">
+                                    <i class="bi <?= $isFbPin ? 'bi-facebook' : ($pin['type_label'] === 'News' ? 'bi-newspaper' : 'bi-megaphone') ?>"></i>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+
+                            <div class="gnc-pinned-body">
+                                <div class="gnc-pinned-content">
+                                    <div class="gnc-pinned-tags">
+                                        <span class="gnc-pinned-badge"><?= htmlspecialchars($badge) ?></span>
+                                    </div>
+                                    <?php if (!empty($pin['title'])): ?>
+                                    <h3 class="gnc-pinned-title"><?= htmlspecialchars($pin['title']) ?></h3>
+                                    <?php endif; ?>
+                                    <div class="gnc-pinned-date"><?= date('F d, Y', strtotime($pin['date'])) ?></div>
+
+                                    <?php if (!empty($pin['intro'])): ?>
+                                    <p class="gnc-pinned-intro"><?= htmlspecialchars($pin['intro']) ?></p>
+                                    <?php endif; ?>
+                                    <?php if (!empty($pin['points'])): ?>
+                                    <ul class="gnc-pinned-list">
+                                        <?php foreach ($pin['points'] as $pt): ?>
+                                        <li><i class="bi bi-check-circle-fill"></i><span><?= htmlspecialchars($pt) ?></span></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                    <?php endif; ?>
+                                </div>
+
+                                <div class="gnc-pinned-footer">
+                                    <a href="<?= htmlspecialchars($pin['link']) ?>"<?= $isFbPin ? ' target="_blank" rel="noopener"' : '' ?> class="gnc-pinned-btn">
+                                        <?= $isFbPin ? 'View on Facebook' : 'View Full Announcement' ?>
+                                        <i class="bi bi-arrow-right"></i>
+                                    </a>
+                                    <?php if (count($pinnedFeedItems) > 1): ?>
+                                    <div class="gnc-pinned-nav">
+                                        <button type="button" data-bs-target="#gncPinnedCarousel" data-bs-slide="prev" aria-label="Previous"><i class="bi bi-chevron-left"></i></button>
+                                        <button type="button" data-bs-target="#gncPinnedCarousel" data-bs-slide="next" aria-label="Next"><i class="bi bi-chevron-right"></i></button>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <?php if (empty($publicAnnouncements)): ?>
                 <p class="text-muted text-center">No announcements have been posted yet. Please check back soon.</p>
@@ -697,13 +863,9 @@ try {
                                 </h5>
                                 <?php endif; ?>
 
-                                <?php if (!empty($item['excerpt'])): ?>
                                 <p class="card-text text-muted flex-grow-1" style="font-family: 'Inter', sans-serif; font-size: .9rem;">
                                     <?= htmlspecialchars($item['excerpt']) ?>
                                 </p>
-                                <?php else: ?>
-                                <div class="flex-grow-1"></div>
-                                <?php endif; ?>
 
                                 <a href="<?= htmlspecialchars($item['link']) ?>"<?= $linkTarget ?> class="gnc-read-more text-decoration-none mt-1">
                                     <?= $isFacebook ? 'View on Facebook' : 'Read More' ?>
@@ -726,41 +888,23 @@ try {
 
     <section class="gnc-events-cal py-5" id="events" style="background:#F9F6F1;">
         <div class="container">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
-                <h2 class="mb-0" style="font-family:'Noto Serif', serif; color:#1F5E2C; font-weight:800;">Calendar of Events</h2>
-
-                <form method="get" action="<?= htmlspecialchars(strtok($_SERVER['REQUEST_URI'], '?')) ?>#events" class="d-flex align-items-center gap-2" id="programFilterForm">
-                    <label for="evtProgramFilter" class="small text-muted mb-0">Filter by Program</label>
-                    <select name="evt_program" id="evtProgramFilter" class="form-select form-select-sm" style="width:auto;min-width:180px;">
-                        <?php foreach (getProgramCategories() as $code => $label):
-                            $optionText = $code === 'ALL' ? $label : "{$code} - {$label}";
-                        ?>
-                            <option value="<?= htmlspecialchars($code) ?>" <?= $code === $evtProgramFilter ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($optionText) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <input type="hidden" name="evt_month" value="<?= $evtMonth ?>">
-                    <input type="hidden" name="evt_year" value="<?= $evtYear ?>">
-                    <noscript><button type="submit" class="btn btn-sm btn-outline-secondary">Go</button></noscript>
-                </form>
-            </div>
+            <h2 class="mb-4" style="font-family:'Noto Serif', serif; color:#1F5E2C; font-weight:800;">Calendar of Events</h2>
 
             <div class="row g-4">
                 <div class="col-lg-7">
                     <div class="gnc-cal-card">
                         <div class="gnc-cal-header">
-                            <a href="?evt_month=<?= $evtPrevMonth ?>&evt_year=<?= $evtPrevYear ?>&evt_program=<?= urlencode($evtProgramFilter) ?>#events" class="gnc-cal-nav">
+                            <a href="?evt_month=<?= $evtPrevMonth ?>&evt_year=<?= $evtPrevYear ?>#events" class="gnc-cal-nav">
                                 <i class="bi bi-chevron-left"></i>
                             </a>
                             <span class="gnc-cal-title"><?= htmlspecialchars($evtMonthLabel) ?></span>
-                            <a href="?evt_month=<?= $evtNextMonth ?>&evt_year=<?= $evtNextYear ?>&evt_program=<?= urlencode($evtProgramFilter) ?>#events" class="gnc-cal-nav">
+                            <a href="?evt_month=<?= $evtNextMonth ?>&evt_year=<?= $evtNextYear ?>#events" class="gnc-cal-nav">
                                 <i class="bi bi-chevron-right"></i>
                             </a>
                         </div>
 
                         <div class="gnc-cal-grid">
-                            <?php foreach (['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] as $dow): ?>
+                            <?php foreach (['Sun','Mon','Tue','Wed','Thur','Fri','Sat'] as $dow): ?>
                                 <div class="gnc-cal-dow"><?= $dow ?></div>
                             <?php endforeach; ?>
 
@@ -772,7 +916,10 @@ try {
                                 $isToday = ($day == (int)date('j') && $evtMonth == (int)date('n') && $evtYear == (int)date('Y'));
                                 $dayEvents = $publicEventsByDay[$day] ?? [];
                                 $dayHasEvent = !empty($dayEvents);
-                                $dayTitles = $dayHasEvent ? implode("\n", array_map(fn($e) => $e['title'], $dayEvents)) : '';
+                                $dayTitles = $dayHasEvent ? implode("\n", array_map(function ($e) {
+                                    $t = evt_timeLabel($e['start_date']);
+                                    return $e['title'] . ($t !== '' ? ' (' . $t . ')' : '');
+                                }, $dayEvents)) : '';
                                 $visibleEvents = array_slice($dayEvents, 0, 2);
                                 $extraCount = count($dayEvents) - count($visibleEvents);
                             ?>
@@ -806,22 +953,41 @@ try {
                 </div>
 
                 <div class="col-lg-5">
-                    <div class="gnc-upcoming-card">
-                        <div class="gnc-upcoming-header">
-                            <i class="bi bi-calendar-event-fill"></i> Upcoming Events
+                    <div class="gnc-events-side-stack">
+                        <div class="gnc-upcoming-card">
+                        <div class="gnc-upcoming-header d-flex align-items-center justify-content-between">
+                            <span><i class="bi bi-calendar-event-fill"></i> Upcoming Events</span>
+                            <?php if ($selectedProgram !== null): ?>
+                                <a href="?#events" class="gnc-programs-count text-decoration-none">
+                                    <?= htmlspecialchars($selectedProgram) ?> &times;
+                                </a>
+                            <?php endif; ?>
                         </div>
                         <div class="gnc-upcoming-list">
                             <?php if (empty($upcomingEvents)): ?>
-                                <p class="text-muted px-3 py-4 mb-0">No upcoming events at this time.</p>
+                                <p class="text-muted px-3 py-4 mb-0">
+                                    <?php if ($selectedProgram !== null): ?>
+                                        No upcoming events for <?= htmlspecialchars($selectedProgram) ?> at this time.
+                                    <?php else: ?>
+                                        No upcoming events at this time.
+                                    <?php endif; ?>
+                                </p>
                             <?php else: foreach ($upcomingEvents as $ev): ?>
                                 <div class="gnc-upcoming-item" style="border-left: 4px solid <?= evt_categoryColor($ev['category_color'] ?? null, $ev['category_name'] ?? null) ?>;">
                                     <i class="bi bi-calendar3 gnc-upcoming-icon" style="color: <?= evt_categoryColor($ev['category_color'] ?? null, $ev['category_name'] ?? null) ?>;"></i>
                                     <div>
                                         <div class="gnc-upcoming-title"><?= htmlspecialchars($ev['title']) ?></div>
                                         <div class="gnc-upcoming-date">
-                                            <?= date('F j, Y', strtotime($ev['start_date'])) ?>
-                                            <?php if (!empty($ev['end_date']) && date('Y-m-d', strtotime($ev['end_date'])) !== date('Y-m-d', strtotime($ev['start_date']))): ?>
-                                                &ndash; <?= date('F j, Y', strtotime($ev['end_date'])) ?>
+                                            <?php
+                                                $stLabel = evt_timeLabel($ev['start_date']);
+                                                $enLabel = evt_timeLabel($ev['end_date'] ?? null);
+                                                $multiDay = !empty($ev['end_date']) && date('Y-m-d', strtotime($ev['end_date'])) !== date('Y-m-d', strtotime($ev['start_date']));
+                                            ?>
+                                            <?= date('F j, Y', strtotime($ev['start_date'])) ?><?= $stLabel !== '' ? ', ' . htmlspecialchars($stLabel) : '' ?>
+                                            <?php if ($multiDay): ?>
+                                                &ndash; <?= date('F j, Y', strtotime($ev['end_date'])) ?><?= $enLabel !== '' ? ', ' . htmlspecialchars($enLabel) : '' ?>
+                                            <?php elseif ($stLabel !== '' && $enLabel !== ''): ?>
+                                                &ndash; <?= htmlspecialchars($enLabel) ?>
                                             <?php endif; ?>
                                             <?php if (!empty($ev['location'])): ?>
                                                 · <?= htmlspecialchars($ev['location']) ?>
@@ -831,6 +997,37 @@ try {
                                 </div>
                             <?php endforeach; endif; ?>
                         </div>
+                    </div>
+
+                    <div class="gnc-upcoming-card">
+                        <div class="gnc-upcoming-header d-flex align-items-center justify-content-between">
+                            <span><i class="bi bi-mortarboard-fill"></i> Programs</span>
+                            <?php if (!empty($homePrograms)): ?>
+                                <span class="gnc-programs-count"><?= count($homePrograms) ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="gnc-programs-list">
+                            <?php if (empty($homePrograms)): ?>
+                                <p class="text-muted px-3 py-4 mb-0">No programs available at this time.</p>
+                            <?php else: foreach ($homePrograms as $prog):
+                                $code      = $prog['program_code'];
+                                $full      = $programFullNames[$code] ?? null;
+                                $isActive  = ($selectedProgram === $code);
+                                // Clicking a program filters the Upcoming Events card above to
+                                // that exact program (?program=CODE), on this same page — no
+                                // redirect anywhere. Clicking an already-active program clears
+                                // the filter back to the general view.
+                                $progUrl = $isActive ? '?#events' : '?program=' . rawurlencode($code) . '#events';
+                            ?>
+                                <a href="<?= htmlspecialchars($progUrl) ?>" class="gnc-programs-list-item text-decoration-none<?= $isActive ? ' gnc-programs-list-item-active' : '' ?>">
+                                    <span class="gnc-programs-code"><?= htmlspecialchars($code) ?></span>
+                                    <?php if ($full): ?>
+                                        <span class="gnc-programs-list-fullname"><?= htmlspecialchars($full) ?></span>
+                                    <?php endif; ?>
+                                </a>
+                            <?php endforeach; endif; ?>
+                        </div>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -862,7 +1059,7 @@ try {
 
     <section class="gnc-programs py-5" id="programs">
         <div class="container">
-            <div class="gnc-programs-header lazy-bg" data-bg="assets/images/Section Header.png">
+            <div class="gnc-programs-header lazy-bg">
                 <span class="gnc-eyebrow">Academic Programs</span>
                 <h2 class="gnc-section-title" style="color: #1F5E2C;">Shaping Minds, Building Futures</h2>
                 <p class="text-muted mb-0">
@@ -950,93 +1147,13 @@ try {
                         Guagua National Colleges, Inc. boast of 100 plus years of giving quality education.&rdquo;
                     </p>
                 </div>
-            </div>
-        </div>
     </section>
 
     <?php include __DIR__ . '/components/index-footer.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
-    <style>
-
-        .gnc-cal-card, .gnc-upcoming-card {
-            background:#fff; border-radius:12px;
-            box-shadow:0 2px 10px rgba(0,0,0,0.06);
-            overflow:hidden; height:100%;
-        }
-        .gnc-cal-header {
-            display:flex; align-items:center; gap:.75rem;
-            padding:1rem 1.25rem; border-bottom:1px solid #f0f0f0;
-        }
-        .gnc-cal-title { font-weight:700; color:#1F5E2C; font-size:1.05rem; }
-        .gnc-cal-nav {
-            width:32px; height:32px; border-radius:8px;
-            display:flex; align-items:center; justify-content:center;
-            background:#f5f5f5; color:#094024; text-decoration:none;
-            transition:background .15s;
-        }
-        .gnc-cal-nav:hover { background:#e8e8e8; }
-        .gnc-cal-nav:last-of-type { margin-left:auto; }
-        .gnc-cal-grid {
-            display:grid; grid-template-columns:repeat(7,1fr);
-            gap:2px; padding:1rem 1.25rem;
-        }
-        .gnc-cal-dow {
-            text-align:center; font-size:.68rem; font-weight:700;
-            color:#999; text-transform:uppercase; padding-bottom:6px;
-        }
-        .gnc-cal-cell {
-            min-height:88px; display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start;
-            font-size:.82rem; color:#444; border-radius:6px; position:relative;
-            padding:5px 4px; gap:3px; overflow:hidden;
-        }
-        .gnc-cal-empty { background:none; min-height:auto; }
-        .gnc-cal-daynum { line-height:1; }
-        .gnc-cal-today { background:#E9E9E9; font-weight:700; color:#094024; border:1px solid #B0B0B0; }
-        .gnc-cal-hasevent {
-            background:#E9E9E9; border-color:#B0B0B0;
-        }
-        .gnc-cal-hasevent.gnc-cal-today { background:#E9E9E9; border-color:#B0B0B0; }
-        .gnc-cal-events {
-            display:flex; flex-direction:column; gap:2px; width:100%;
-        }
-        .gnc-cal-event-chip {
-            display:flex; align-items:center; gap:4px;
-            font-size:.62rem; font-weight:600; line-height:1.2;
-            padding:2px 4px; border-radius:4px;
-            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-            max-width:100%;
-        }
-        .gnc-cal-event-more {
-            font-size:.6rem; font-weight:600; color:#888; padding:0 4px;
-        }
-        .gnc-cal-dot {
-            display:inline-block; width:6px; height:6px; border-radius:50%; flex-shrink:0;
-        }
-        .gnc-cal-legend {
-            display:flex; flex-wrap:wrap; gap:14px; padding:0 1.25rem 1rem;
-            font-size:.78rem; color:#555;
-        }
-        .gnc-cal-legend .gnc-cal-dot { width:9px; height:9px; margin-right:5px; }
-
-        .gnc-upcoming-header {
-            background:#094024; color:#fff; font-weight:700;
-            padding:1rem 1.25rem; font-size:.95rem;
-        }
-        .gnc-upcoming-header i { color:#EABA3B; margin-right:.4rem; }
-        .gnc-upcoming-item {
-            display:flex; gap:.75rem; align-items:flex-start;
-            padding:.9rem 1.25rem; border-bottom:1px solid #f5f5f5;
-        }
-        .gnc-upcoming-item:last-child { border-bottom:none; }
-        .gnc-upcoming-icon { color:#EABA3B; font-size:1.1rem; margin-top:2px; }
-        .gnc-upcoming-title { font-weight:700; color:#094024; font-size:.9rem; }
-        .gnc-upcoming-date { font-size:.78rem; color:#888; margin-top:2px; }
-    </style>
-
-    <script src="assets/js/index.js?v=4"></script>
+    <script src="assets/js/index.js?v=2"></script>
     <script src="assets/js/skeleton-loader.js"></script>
-
 </body>
-</html> 
+</html>

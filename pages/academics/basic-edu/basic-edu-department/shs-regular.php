@@ -76,7 +76,7 @@
                         <img src="/assets/images/test-image.png" alt="Bachelor of Science in Business Administration major in Financial Management" loading="lazy">
                     </div>
                     <div class="dept-program-body">
-                        <h3>Science, Technology, Engineering, and Mathematics (STEM) Track</h3>
+                        <h3>Health & Allied Sciences</h3>
                         <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
                     </div>
                 </div>
@@ -86,7 +86,7 @@
                         <img src="/assets/images/test-image.png" alt="Bachelor of Science in Computer Science" loading="lazy">
                     </div>
                     <div class="dept-program-body">
-                        <h3>Accountancy, Business, and Management (ABM) Track</h3>
+                        <h3>Information & Digital Technologies</h3>
                         <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
                     </div>
                 </div>
@@ -96,7 +96,27 @@
                         <img src="/assets/images/test-image.png" alt="Bachelor of Science in Information Technology" loading="lazy">
                     </div>
                     <div class="dept-program-body">
-                        <h3>Humanities and Social Sciences (HUMSS) Track</h3>
+                        <h3>Education, Humanities, & Social Sciences</h3>
+                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+                    </div>
+                </div>
+
+                <div class="dept-program-card">
+                    <div class="dept-program-img skeleton-wrap">
+                        <img src="/assets/images/test-image.png" alt="Bachelor of Science in Information Technology" loading="lazy">
+                    </div>
+                    <div class="dept-program-body">
+                        <h3>Architecture & Engineering</h3>
+                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+                    </div>
+                </div>
+
+                <div class="dept-program-card">
+                    <div class="dept-program-img skeleton-wrap">
+                        <img src="/assets/images/test-image.png" alt="Bachelor of Science in Information Technology" loading="lazy">
+                    </div>
+                    <div class="dept-program-body">
+                        <h3>Accountancy, Business, & Entrepreneurship</h3>
                         <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
                     </div>
                 </div>

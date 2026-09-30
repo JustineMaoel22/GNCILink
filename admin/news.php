@@ -37,6 +37,7 @@ if ($search !== '') $filters['search'] = $search;
 
 $newsList       = getNews($filters, 50, 0);
 $newsCategories = getNewsCategories();
+$pinnedCount    = countPinnedItems();
 
 // Which modal (if any) should auto-open on load
 $modalMode    = $_GET['modal'] ?? '';   // '', 'create', or 'edit'
@@ -88,7 +89,22 @@ include __DIR__ . '/../components/header-admin.php';
             display: none; /* hide Category column on small screens */
         }
     }
+    .btn-pin-toggle.is-pinned {
+        background: #EABA3B;
+        border-color: #EABA3B;
+        color: #1F5E2C;
+    }
 </style>
+
+<?php if (!empty($flashErrors) && !in_array($modalMode, ['create', 'edit'], true)): ?>
+<div class="alert alert-danger">
+    <ul class="mb-0">
+        <?php foreach ($flashErrors as $err): ?>
+        <li><?= htmlspecialchars($err) ?></li>
+        <?php endforeach; ?>
+    </ul>
+</div>
+<?php endif; ?>
 
 <div class="data-card">
     <div class="data-card-header flex-wrap gap-3 align-items-center">
@@ -130,14 +146,15 @@ include __DIR__ . '/../components/header-admin.php';
                     <th>Category</th>
                     <th>Author</th>
                     <th>Status</th>
+                    <th style="width:80px">Pinned</th>
                     <th>Posted By</th>
                     <th>Date</th>
-                    <th style="width:120px">Actions</th>
+                    <th style="width:150px">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($newsList)): ?>
-                <tr><td colspan="8" class="text-center py-5 text-muted">No news articles found.</td></tr>
+                <tr><td colspan="9" class="text-center py-5 text-muted">No news articles found.</td></tr>
                 <?php else: foreach ($newsList as $n): ?>
                 <tr>
                     <td>
@@ -155,10 +172,31 @@ include __DIR__ . '/../components/header-admin.php';
                     <td><span class="news-category-badge"><?= htmlspecialchars($n['category'] ?? 'Others') ?></span></td>
                     <td style="font-size:.82rem;color:#666"><?= htmlspecialchars($n['author'] ?? '—') ?></td>
                     <td><span class="status-badge <?= $n['status'] ?>"><?= ucfirst($n['status']) ?></span></td>
+                    <td class="text-center">
+                        <?php if (!empty($n['is_pinned'])): ?>
+                        <i class="bi bi-pin-angle-fill" style="color:#EABA3B" title="Pinned to homepage slideshow"></i>
+                        <?php endif; ?>
+                    </td>
                     <td style="font-size:.82rem"><?= htmlspecialchars(trim(($n['first_name'] ?? '') . ' ' . ($n['last_name'] ?? '')) ?: '—') ?></td>
                     <td style="font-size:.78rem;color:#888"><?= date('M d, Y', strtotime($n['created_at'])) ?></td>
                     <td>
                         <?php $isOwner = $n['user_id'] == ($_SESSION['user_id'] ?? null); ?>
+                        <?php if (hasPermission('publish_news')): ?>
+                        <form method="POST" action="/admin/action/create-news.php" style="display:inline">
+                            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                            <input type="hidden" name="action" value="<?= !empty($n['is_pinned']) ? 'unpin' : 'pin' ?>">
+                            <input type="hidden" name="news_id" value="<?= $n['news_id'] ?>">
+                            <button type="submit"
+                                    class="btn btn-sm btn-outline-secondary btn-pin-toggle<?= !empty($n['is_pinned']) ? ' is-pinned' : '' ?>"
+                                    <?php if (empty($n['is_pinned']) && $pinnedCount >= 3): ?>
+                                    disabled title="3 items are already pinned. Unpin one first."
+                                    <?php else: ?>
+                                    title="<?= !empty($n['is_pinned']) ? 'Unpin from homepage slideshow' : 'Pin to homepage slideshow' ?>"
+                                    <?php endif; ?>>
+                                <i class="bi <?= !empty($n['is_pinned']) ? 'bi-pin-angle-fill' : 'bi-pin-angle' ?>"></i>
+                            </button>
+                        </form>
+                        <?php endif; ?>
                         <?php if (hasPermission('edit_news') || (hasPermission('edit_own_news') && $isOwner)): ?>
                         <?php $rowGallery = getNewsImages($n['news_id']); ?>
                         <button type="button" class="btn btn-sm btn-outline-secondary btn-edit-news"

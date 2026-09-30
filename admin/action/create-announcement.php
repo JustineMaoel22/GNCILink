@@ -46,6 +46,75 @@ if ($postAction === 'delete') {
 }
 
 // ============================================================
+// PIN / UNPIN A FACEBOOK POST (listed in the Announcements table)
+// ============================================================
+if ($postAction === 'pin_facebook' || $postAction === 'unpin_facebook') {
+    $fbPostId = trim($_POST['fb_post_id'] ?? '');
+
+    if (!hasPermission('publish_announcement')) {
+        $_SESSION['flash_errors'] = ['You do not have permission to pin Facebook posts.'];
+    } elseif ($fbPostId !== '') {
+        try {
+            if ($postAction === 'pin_facebook') {
+                if (!pinFacebookPost($fbPostId)) {
+                    $_SESSION['flash_errors'] = ['Facebook post not found.'];
+                }
+            } else {
+                unpinFacebookPost($fbPostId);
+            }
+        } catch (Exception $e) {
+            $_SESSION['flash_errors'] = [$e->getMessage()];
+        }
+    }
+
+    header('Location: /admin/announcement.php');
+    exit;
+}
+
+// ============================================================
+// CHANGE THE CATEGORY OF A FACEBOOK POST (manual override of auto-detect)
+// ============================================================
+if ($postAction === 'set_fb_category') {
+    $fbPostId = trim($_POST['fb_post_id'] ?? '');
+    $choice   = trim($_POST['category_choice'] ?? '');
+
+    if (!hasPermission('publish_announcement')) {
+        $_SESSION['flash_errors'] = ['You do not have permission to change Facebook post categories.'];
+    } elseif ($fbPostId === '' || $choice === '') {
+        $_SESSION['flash_errors'] = ['Invalid request.'];
+    } elseif (!setFacebookPostCategory($fbPostId, $choice)) {
+        $_SESSION['flash_errors'] = ['Could not update the Facebook post category.'];
+    }
+
+    header('Location: /admin/announcement.php');
+    exit;
+}
+
+// ============================================================
+// PIN / UNPIN (homepage slideshow — max 3 items, shared with News)
+// ============================================================
+if ($postAction === 'pin' || $postAction === 'unpin') {
+    $pinId = (int)($_POST['announcement_id'] ?? 0);
+
+    if (!hasPermission('publish_announcement')) {
+        $_SESSION['flash_errors'] = ['You do not have permission to pin announcements.'];
+    } elseif ($pinId) {
+        try {
+            if ($postAction === 'pin') {
+                pinAnnouncement($pinId);
+            } else {
+                unpinAnnouncement($pinId);
+            }
+        } catch (Exception $e) {
+            $_SESSION['flash_errors'] = [$e->getMessage()];
+        }
+    }
+
+    header('Location: /admin/announcement.php');
+    exit;
+}
+
+// ============================================================
 // CREATE / UPDATE
 // ============================================================
 if ($postAction === 'create' || $postAction === 'update') {
@@ -89,6 +158,7 @@ if ($postAction === 'create' || $postAction === 'update') {
                 'content'     => $content,
                 'category_id' => !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
                 'program'     => normalizeProgramCategory($_POST['program'] ?? null),
+                'dept_id'     => $_POST['dept_id'] ?? null, // validated in create/updateAnnouncement
             ];
 
             if ($isUpdate) {

@@ -16,6 +16,7 @@
 <body>
     <?php $activeSection = 'academics'; ?>
     <?php include_once __DIR__ . '/../../../components/index-nav.php'; ?>
+    <?php require_once __DIR__ . '/../../../components/department-public.php'; ?>
 
     <section class="gnc-college-programs">
 
@@ -84,9 +85,14 @@
             <div class="cp-college-row">
 
                 <div class="cp-college">
+                    <?php $logoUrl = (publicDepartment('cased')['logo_url'] ?? null); ?>
+                    <?php if ($logoUrl): ?>
                     <div class="skeleton-wrap" style="flex:none;">
-                        <img class="cp-college-logo" src="/assets/images/logos/cased-logo.svg" alt="College of Arts, Sciences, and Education logo">
+                        <img class="cp-college-logo" src="<?= htmlspecialchars($logoUrl) ?>" alt="College of Arts, Sciences, and Education logo">
                     </div>
+                    <?php else: ?>
+                    <div class="cp-college-logo" style="flex:none;" aria-hidden="true"></div>
+                    <?php endif; ?>
                     <div class="cp-college-info">
                         <h3>College of Arts, Sciences, and Education</h3>
                         <span class="cp-underline"></span>
@@ -96,9 +102,14 @@
                 </div>
 
                 <div class="cp-college">
+                    <?php $logoUrl = (publicDepartment('cba')['logo_url'] ?? null); ?>
+                    <?php if ($logoUrl): ?>
                     <div class="skeleton-wrap" style="flex:none;">
-                        <img class="cp-college-logo" src="/assets/images/logos/cba-logo.svg" alt="College of Business Administration logo">
+                        <img class="cp-college-logo" src="<?= htmlspecialchars($logoUrl) ?>" alt="College of Business Administration logo">
                     </div>
+                    <?php else: ?>
+                    <div class="cp-college-logo" style="flex:none;" aria-hidden="true"></div>
+                    <?php endif; ?>
                     <div class="cp-college-info">
                         <h3>College of Business Administration</h3>
                         <span class="cp-underline"></span>
@@ -108,9 +119,14 @@
                 </div>
 
                 <div class="cp-college">
+                    <?php $logoUrl = (publicDepartment('coe')['logo_url'] ?? null); ?>
+                    <?php if ($logoUrl): ?>
                     <div class="skeleton-wrap" style="flex:none;">
-                        <img class="cp-college-logo" src="/assets/images/logos/coe-logo.svg" alt="College of Engineering logo">
+                        <img class="cp-college-logo" src="<?= htmlspecialchars($logoUrl) ?>" alt="College of Engineering logo">
                     </div>
+                    <?php else: ?>
+                    <div class="cp-college-logo" style="flex:none;" aria-hidden="true"></div>
+                    <?php endif; ?>
                     <div class="cp-college-info">
                         <h3>College of Engineering</h3>
                         <span class="cp-underline"></span>
@@ -120,9 +136,14 @@
                 </div>
 
                 <div class="cp-college">
+                    <?php $logoUrl = (publicDepartment('camp')['logo_url'] ?? null); ?>
+                    <?php if ($logoUrl): ?>
                     <div class="skeleton-wrap" style="flex:none;">
-                        <img class="cp-college-logo" src="/assets/images/logos/camp-logo.svg" alt="College of Allied Medical Programs logo">
+                        <img class="cp-college-logo" src="<?= htmlspecialchars($logoUrl) ?>" alt="College of Allied Medical Programs logo">
                     </div>
+                    <?php else: ?>
+                    <div class="cp-college-logo" style="flex:none;" aria-hidden="true"></div>
+                    <?php endif; ?>
                     <div class="cp-college-info">
                         <h3>College of Medical Technology and Pharmacy</h3>
                         <span class="cp-underline"></span>
@@ -132,9 +153,14 @@
                 </div>
 
                 <div class="cp-college">
+                    <?php $logoUrl = (publicDepartment('coa')['logo_url'] ?? null); ?>
+                    <?php if ($logoUrl): ?>
                     <div class="skeleton-wrap" style="flex:none;">
-                        <img class="cp-college-logo" src="/assets/images/logos/coa-logo.svg" alt="College of Accountancy logo">
+                        <img class="cp-college-logo" src="<?= htmlspecialchars($logoUrl) ?>" alt="College of Accountancy logo">
                     </div>
+                    <?php else: ?>
+                    <div class="cp-college-logo" style="flex:none;" aria-hidden="true"></div>
+                    <?php endif; ?>
                     <div class="cp-college-info">
                         <h3>College of Accountancy</h3>
                         <span class="cp-underline"></span>
@@ -144,9 +170,14 @@
                 </div>
 
                 <div class="cp-college">
+                    <?php $logoUrl = (publicDepartment('conursing')['logo_url'] ?? null); ?>
+                    <?php if ($logoUrl): ?>
                     <div class="skeleton-wrap" style="flex:none;">
-                        <img class="cp-college-logo" src="/assets/images/logos/con-logo.svg" alt="College of Nursing logo">
+                        <img class="cp-college-logo" src="<?= htmlspecialchars($logoUrl) ?>" alt="College of Nursing logo">
                     </div>
+                    <?php else: ?>
+                    <div class="cp-college-logo" style="flex:none;" aria-hidden="true"></div>
+                    <?php endif; ?>
                     <div class="cp-college-info">
                         <h3>College of Nursing</h3>
                         <span class="cp-underline"></span>
@@ -161,7 +192,7 @@
     </section>
 
     <?php include __DIR__ . '/../../../components/index-footer.php'; ?>
-+
+
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
     <script src="/assets/js/skeleton-loader.js"></script>

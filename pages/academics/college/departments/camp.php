@@ -16,6 +16,14 @@
 <body>
     <?php $activeSection = 'academics'; ?>
     <?php include_once __DIR__ . '/../../../../components/index-nav.php'; ?>
+    <?php require_once __DIR__ . '/../../../../components/department-public.php'; ?>
+    <?php
+        // Logo and PDF come from this department's record, so changing them in
+        // Content Editor → College Departments updates this page automatically.
+        $dept    = publicDepartment('camp');
+        $logoUrl = $dept['logo_url'] ?? null;
+        $dean    = publicDepartmentDean($dept);
+    ?>
 
     <section class="dept-intro">
         <div class="dept-hero">
@@ -38,9 +46,11 @@
 
             <div class="dept-logo-wrap">
                 <div class="dept-logo-square"></div>
+                <?php if ($logoUrl): ?>
                 <div class="skeleton-wrap">
-                    <img src="/assets/images/logos/camp-logo.svg" alt="College of Medical Allied Programs seal" class="dept-logo">
+                    <img src="<?= htmlspecialchars($logoUrl) ?>" alt="College of Medical Allied Programs seal" class="dept-logo">
                 </div>
+                <?php endif; ?>
                 <div class="dept-dots" aria-hidden="true"></div>
             </div>
 
@@ -82,8 +92,8 @@
                         </div>
                         <div class="skeleton-real-content">
                             <h3>Bachelor of Science in Medical Laboratory Science</h3>
-                            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                            <a href="/pages/academics/college/programs/medtech.php" class="dept-program-link">
+                            <p>The Bachelor of Science in Medical Laboratory Science (BSMLS) program develops competent, ethical, and skilled professionals essential to disease detection, diagnosis, and...</p>
+                            <a href="/pages/academics/college/programs/bsmls.php" class="dept-program-link">
                                 VIEW DETAILS <i class="bi bi-arrow-right"></i>
                             </a>
                         </div>
@@ -103,8 +113,8 @@
                         </div>
                         <div class="skeleton-real-content">
                             <h3>Bachelor of Science in Pharmacy</h3>
-                            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                            <a href="/pages/academics/college/programs/pharmacy.php" class="dept-program-link">
+                            <p>The Bachelor of Science in Pharmacy program prepares scientifically competent and research-oriented professionals dedicated to delivering the full spectrum of pharmaceutical...</p>
+                            <a href="/pages/academics/college/programs/bsph.php" class="dept-program-link">
                                 VIEW DETAILS <i class="bi bi-arrow-right"></i>
                             </a>
                         </div>
@@ -114,6 +124,17 @@
             </div>
         </div>
     </section>
+
+    <?php if (!empty($dept['pdf_url'])): ?>
+    <!-- Department PDF (uploaded in Content Editor → College Departments) -->
+    <section class="dept-programs">
+        <div class="dept-programs-inner">
+            <span class="dept-eyebrow">Resources</span>
+            <h2>Department Document</h2>
+            <?php renderDepartmentPdfViewer($dept, ['title' => '']); ?>
+        </div>
+    </section>
+    <?php endif; ?>
 
     <section class="dept-dean">
         <div class="dept-dean-inner">
@@ -131,7 +152,7 @@
                     
                     <div class="dept-dean-photo">
                         <div class="skeleton-wrap">
-                            <img src="/assets/images/sir-capati.png" alt="Juan Paolo S. Capati, Dean of the College of Medical Technology and Pharmacy">
+                            <img src="<?= htmlspecialchars($dean['photo_url'] ?: '/assets/images/sir-capati.png') ?>" alt="<?= htmlspecialchars($dean['name'] ?: 'Juan Paolo S. Capati') ?>, Dean of the College of Medical Technology and Pharmacy">
                         </div>
 
                         <!-- Layered Wave Pattern: Gold -> Maroon -> Light Green -->
@@ -145,7 +166,7 @@
 
                         <!-- Glassmorphism Nameplate Badge -->
                         <div class="dept-dean-badge">
-                            <span class="dept-dean-badge-title">Dean</span>
+                            <span class="dept-dean-badge-title"><?= htmlspecialchars($dean['title'] ?: 'Dean') ?></span>
                             <span class="dept-dean-badge-sub">College of Medical Technology and Pharmacy</span>
                         </div>
                     </div>
@@ -166,9 +187,9 @@
                     </div>
                     <div class="skeleton-real-content">
                         <span class="dept-eyebrow">Meet the Dean</span>
-                        <h3>Juan Paolo S. Capati, RMT, RPh</h3>
+                        <h3><?= htmlspecialchars($dean['name'] ?: 'Juan Paolo S. Capati, RMT, RPh') ?></h3>
                         <div class="dept-dean-rule"></div>
-                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+                        <p><?= nl2br(htmlspecialchars($dean['bio'] ?: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.')) ?></p>
 
                         <hr class="dept-dean-divider">
 
@@ -179,7 +200,7 @@
                                 <i class="bi bi-telephone"></i>
                                 <div>
                                     <span class="dept-contact-label">Contact Information</span>
-                                    <span class="dept-contact-value">(045) 900-4473 Loc. 137</span>
+                                    <span class="dept-contact-value"><?= htmlspecialchars($dean['phone'] ?: '(045) 900-4473 Loc. 137') ?></span>
                                 </div>
                             </div>
 
@@ -187,7 +208,7 @@
                                 <i class="bi bi-geo-alt"></i>
                                 <div>
                                     <span class="dept-contact-label">CAMP Office</span>
-                                    <span class="dept-contact-value">Limlingan Hall, Floor 2, Room 206</span>
+                                    <span class="dept-contact-value"><?= htmlspecialchars($dean['office'] ?: 'Limlingan Hall, Floor 2, Room 206') ?></span>
                                 </div>
                             </div>
 
@@ -195,7 +216,7 @@
                                 <i class="bi bi-envelope"></i>
                                 <div>
                                     <span class="dept-contact-label">Email Address</span>
-                                    <span class="dept-contact-value">info@gnc.edu.ph</span>
+                                    <span class="dept-contact-value"><?= htmlspecialchars($dean['email'] ?: 'info@gnc.edu.ph') ?></span>
                                 </div>
                             </div>
 
@@ -203,7 +224,7 @@
                                 <i class="bi bi-clock"></i>
                                 <div>
                                     <span class="dept-contact-label">Operating Hours</span>
-                                    <span class="dept-contact-value">Monday - Friday<br>8:00AM - 4:00PM</span>
+                                    <span class="dept-contact-value"><?= nl2br(htmlspecialchars($dean['hours'] ?: "Monday - Friday\n8:00AM - 4:00PM")) ?></span>
                                 </div>
                             </div>
                         </div>

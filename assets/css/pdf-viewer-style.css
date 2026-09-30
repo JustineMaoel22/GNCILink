@@ -1,0 +1,298 @@
+/* GNC PDF Viewer - Dark Toolbar Layout */
+
+.gnc-pdf-viewer {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    height: 75vh;
+    min-height: 600px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    font-family: inherit;
+    position: relative;
+    margin: 1.5rem 0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .06);
+}
+
+/* ── Fixed Single-Row Dark Toolbar ── */
+.gnc-pdf-toolbar {
+    display: flex;
+    flex-wrap: nowrap;          /* Forces single row */
+    align-items: center;
+    justify-content: space-between;
+    background-color: #323639;  /* Dark grey matching browser PDF viewers */
+    color: #f1f1f1;
+    padding: 0.5rem 1rem;
+    height: 48px;               /* Fixed height */
+    box-sizing: border-box;
+    width: 100%;
+    user-select: none;
+    z-index: 5;
+}
+
+.gnc-pdf-left, 
+.gnc-pdf-center, 
+.gnc-pdf-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+/* Let the center controls stay centered if there is space */
+.gnc-pdf-center {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.gnc-pdf-title {
+    font-size: 0.95rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+    color: #f1f1f1;
+    margin-left: 0.5rem;
+}
+
+/* Controls structure */
+.gnc-pdf-pageinfo, 
+.gnc-pdf-zoom, 
+.gnc-pdf-tools {
+    display: flex;
+    align-items: center;
+}
+
+.gnc-pdf-toolbar input[type="text"] {
+    background: #202124;
+    border: 1px solid transparent;
+    color: #f1f1f1;
+    text-align: center;
+    border-radius: 4px;
+    padding: 0.2rem 0.3rem;
+    font-size: 0.85rem;
+}
+
+.gnc-pdf-toolbar input[type="text"]:focus {
+    border-color: #8ab4f8;
+    outline: none;
+}
+
+[data-role="page-input"] {
+    width: 36px;
+}
+
+[data-role="zoom-input"] {
+    width: 50px;
+}
+
+.gnc-pdf-of {
+    margin: 0 0.4rem;
+    font-size: 0.85rem;
+}
+
+.gnc-pdf-sep {
+    width: 1px;
+    height: 18px;
+    background-color: rgba(255, 255, 255, 0.2);
+    margin: 0 0.5rem;
+}
+
+.gnc-pdf-icon, 
+.gnc-pdf-step {
+    background: transparent;
+    border: none;
+    color: #f1f1f1;
+    cursor: pointer;
+    padding: 0.3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 1rem;
+    text-decoration: none;
+    line-height: 1;
+}
+
+.gnc-pdf-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.gnc-pdf-icon:hover:not(:disabled), 
+.gnc-pdf-step:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.gnc-pdf-icon:disabled, 
+.gnc-pdf-step:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* More Menu Dropdown */
+.gnc-pdf-menuwrap {
+    position: relative;
+}
+
+.gnc-pdf-menu {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 8px;
+    background: #28292c;
+    border: 1px solid #3c4043;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    display: flex;
+    flex-direction: column;
+    min-width: 180px;
+    z-index: 10;
+}
+
+.gnc-pdf-menu[hidden] {
+    display: none;
+}
+
+.gnc-pdf-menu a, 
+.gnc-pdf-menu button {
+    background: transparent;
+    border: none;
+    color: #f1f1f1;
+    padding: 0.6rem 1rem;
+    text-align: left;
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.gnc-pdf-menu a:hover, 
+.gnc-pdf-menu button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Viewer Body ── */
+.gnc-pdf-body {
+    position: relative;
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    background-color: #525659; /* Dark grey backdrop for pages */
+}
+
+/* Sidebar & Thumbnails */
+.gnc-pdf-sidebar {
+    width: 0;
+    background: #323639;
+    overflow-y: auto;
+    transition: width 0.2s ease;
+    border-right: 1px solid #202124;
+}
+
+.gnc-pdf-viewer.has-sidebar .gnc-pdf-sidebar {
+    width: 200px;
+}
+
+.gnc-pdf-thumbs {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 0;
+}
+
+.gnc-pdf-thumb {
+    background: transparent;
+    border: 2px solid transparent;
+    padding: 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 80%;
+}
+
+.gnc-pdf-thumb.is-current {
+    border-color: #8ab4f8;
+}
+
+.gnc-pdf-thumb canvas {
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    width: 100% !important;
+    height: auto !important;
+}
+
+.gnc-pdf-thumb span {
+    color: #f1f1f1;
+    font-size: 0.75rem;
+    margin-top: 6px;
+}
+
+/* PDF Stage */
+.gnc-pdf-stage {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    padding: 2rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    outline: none;
+}
+
+.gnc-pdf-pages {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.gnc-pdf-page {
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* Status Layer */
+.gnc-pdf-status {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(32, 33, 36, 0.9);
+    color: #fff;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    z-index: 10;
+}
+
+.gnc-pdf-status[hidden] {
+    display: none;
+}
+
+.gnc-pdf-fallback {
+    padding: 2rem;
+    text-align: center;
+    color: #f1f1f1;
+}
+
+/* Responsive handling for smaller screens */
+@media (max-width: 768px) {
+    .gnc-pdf-center {
+        position: static;
+        transform: none;
+    }
+    .gnc-pdf-title {
+        max-width: 120px;
+    }
+    .gnc-pdf-sep {
+        display: none;
+    }
+}

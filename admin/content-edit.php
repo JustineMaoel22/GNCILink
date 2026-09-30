@@ -65,7 +65,7 @@ include __DIR__ . '/../components/header-admin.php';
     </button>
 </div>
 
-<div class="row g-3">
+<div class="row g-3 mb-4">
     <!-- ══════════════════ Slide Order ══════════════════ -->
     <div class="col-lg-5">
         <div class="data-card h-100">
@@ -286,19 +286,42 @@ include __DIR__ . '/../components/header-admin.php';
     </div>
 </div>
 
+<?php if (hasPermission('manage_page_content')): ?>
+    <hr style="margin: 2rem 0; border-top: 1px solid #e5e5e5;">
+    <div style="margin-top: 2rem;">
+        <?php include __DIR__ . '/../components/homepage-president-manager.php'; ?>
+    </div>
+<?php endif; ?>
+
 </div><!-- /#page-panel-home -->
 
 <!-- ══════════════════ Generic section-based pages (Vision & Mission, About Us, etc.) ══════════════════ -->
 <?php foreach ($sectionPages as $sp):
     $sections = getPageSections($sp['slug']);
+    // College Departments / Programs have no free-text sections to edit:
+    // department logos + Head of Office live in `departments`, and each
+    // program's curriculum PDF lives in `programs`.
+    $isDeptPage      = ($sp['slug'] === 'college-departments');
+    $isProgramsPage  = ($sp['slug'] === 'programs');
+    $hasCustomPanel  = $isDeptPage || $isProgramsPage;
 ?>
 <div class="page-panel" id="page-panel-<?= htmlspecialchars($sp['slug']) ?>" style="<?= $activeSlug === $sp['slug'] ? '' : 'display:none' ?>">
     <div class="page-header">
         <div>
             <h1><?= htmlspecialchars($sp['title']) ?></h1>
-            <p>Edit the content sections for this page, then save, preview, and publish your changes.</p>
+            <p><?= $isDeptPage
+                ? 'Manage each department\'s logo and Head of Office. Changes go live everywhere the department appears.'
+                : ($isProgramsPage
+                    ? 'Upload the curriculum PDF for each program. It appears in the Program Curriculum section of that program\'s page.'
+                    : 'Edit the content sections for this page, then save, preview, and publish your changes.') ?></p>
         </div>
     </div>
+
+    <?php if ($canManagePages && $isDeptPage): ?>
+        <?php include __DIR__ . '/../components/department-media-manager.php'; ?>
+    <?php elseif ($canManagePages && $isProgramsPage): ?>
+        <?php include __DIR__ . '/../components/program-pdf-manager.php'; ?>
+    <?php endif; ?>
 
     <?php if (!$canManagePages): ?>
         <div class="data-card">
@@ -307,6 +330,8 @@ include __DIR__ . '/../components/header-admin.php';
                 <p>You don't have permission to edit this page's content.</p>
             </div>
         </div>
+    <?php elseif (empty($sections) && $hasCustomPanel): ?>
+        <?php /* nothing else to edit on this page */ ?>
     <?php elseif (empty($sections)): ?>
         <div class="data-card">
             <div class="empty-state">
@@ -639,6 +664,14 @@ include __DIR__ . '/../components/header-admin.php';
     color: #fff;
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   Slide preview — mirrors the real homepage hero (assets/css/index-style.css:
+   .hero-slide / .hero-content / .hero-title-line / .btn-enroll / .btn-explore /
+   .slide-arrow / .hero-dots). Every size is written in cqw (1% of the preview's
+   width) and is the real site's px value divided by a 1440px desktop viewport
+   (390px for the mobile preview), so the preview is a true scaled-down copy.
+   If the site's hero CSS changes, update the numbers here to match.
+   ───────────────────────────────────────────────────────────────────── */
 .mini-hero-wrap {
     display: flex;
     justify-content: center;
@@ -648,73 +681,15 @@ include __DIR__ . '/../components/header-admin.php';
 .mini-hero {
     position: relative;
     width: 100%;
-    aspect-ratio: 16/8;
+    aspect-ratio: 1440 / 720;
     border-radius: 12px;
     overflow: hidden;
     background: var(--gnc-green-dark);
     color: #fff;
     display: flex;
     align-items: center;
+    container-type: inline-size;
     transition: aspect-ratio var(--transition), max-width var(--transition);
-}
-
-/* Mobile preview: simulate a phone-shaped frame instead of the wide desktop banner */
-/* Mobile preview: an edge-to-edge phone-width viewport, not a decorative device
-   mockup — this should track the real public site's mobile hero as closely as
-   possible. NOTE: font sizes / exact spacing below are still an approximation;
-   see /* PENDING */ note — swap in the real site's CSS values once available. */
-.mini-hero-wrap.preview-mobile {
-    background: #f4f4f4;
-    border-radius: 12px;
-    padding: 1.25rem 0;
-}
-
-.mini-hero-wrap.preview-mobile .mini-hero {
-    aspect-ratio: 9 / 17.5;
-    max-width: 260px;
-    border-radius: 0;
-    box-shadow: 0 0 0 1px #ddd;
-    align-items: center; /* real site's .container appears vertically centered, not bottom-anchored */
-}
-
-.mini-hero-wrap.preview-mobile .mini-hero-content {
-    max-width: 100%;
-    padding: 0 7%;
-}
-
-.mini-hero-wrap.preview-mobile .mini-title {
-    font-size: clamp(.78rem, 5vw, 1rem);
-}
-
-.mini-hero-wrap.preview-mobile .mini-sub {
-    font-size: .64rem;
-    margin-top: .3rem;
-}
-
-.mini-hero-wrap.preview-mobile .mini-btn {
-    font-size: .56rem;
-    padding: .3rem .65rem;
-}
-
-.mini-hero-wrap.preview-mobile .mini-arrow {
-    width: 22px;
-    height: 22px;
-    font-size: .7rem;
-}
-
-.mini-hero-wrap.preview-mobile .mini-dots span {
-    width: 5px;
-    height: 5px;
-}
-
-.bg-media-field-label {
-    font-size: .78rem;
-    font-weight: 600;
-    color: #555;
-    margin-bottom: .4rem;
-    display: flex;
-    align-items: center;
-    gap: .35rem;
 }
 
 .mini-hero-bg {
@@ -730,52 +705,71 @@ include __DIR__ . '/../components/header-admin.php';
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: center;
 }
 
+/* same gradient as .slide-overlay */
 .mini-hero-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(90deg, rgba(9, 64, 36, .85) 10%, rgba(9, 64, 36, .35) 60%, rgba(9, 64, 36, .15) 100%);
+    background: linear-gradient(105deg, rgba(9, 64, 36, .72) 0%, rgba(0, 0, 0, .45) 55%, rgba(0, 0, 0, .15) 100%);
+    z-index: 1;
 }
 
+/* .container (left edge ≈ 72px @1440) + .hero-content (max-width 600px) */
 .mini-hero-content {
     position: relative;
     z-index: 2;
-    padding: 0 8%;
-    max-width: 70%;
+    box-sizing: border-box;
+    padding-left: 5cqw;
+    max-width: 46.67cqw;
+    text-align: left;
 }
 
 .mini-title {
     font-family: 'Noto Serif', serif;
-    font-weight: bold;
-    font-size: clamp(1rem, 2.6vw, 1.7rem);
-    line-height: 1.15;
+    font-weight: 800;
+    font-size: 3.333cqw;      /* 3rem */
+    line-height: 1.1;
+    letter-spacing: .01em;
     color: var(--gnc-gold);
     text-transform: uppercase;
-    white-space: pre-line;
+    margin: 0 0 1.111cqw;
 }
 
 .mini-sub {
     font-family: 'Inter', sans-serif;
-    font-size: .8rem;
-    color: #f1f1f1;
-    margin-top: .4rem;
-    max-width: 420px;
+    font-size: 1.056cqw;      /* .95rem */
+    line-height: 1.6;
+    color: rgba(255, 255, 255, .88);
+    margin: 0 0 2cqw;
+    max-width: 29.17cqw;      /* 420px */
+}
+
+.mini-title:empty,
+.mini-sub:empty {
+    display: none;
 }
 
 .mini-ctas {
     display: flex;
-    gap: .5rem;
-    margin-top: .9rem;
+    gap: 1.111cqw;
     flex-wrap: wrap;
 }
 
 .mini-btn {
-    font-size: .7rem;
+    display: inline-flex;
+    align-items: center;
+    gap: .417cqw;
+    font-family: 'Inter', sans-serif;
+    font-size: .911cqw;       /* .82rem */
     font-weight: 700;
-    padding: .4rem .9rem;
-    border-radius: 30px;
-    letter-spacing: .03em;
+    line-height: 1.5;
+    padding: .722cqw 1.667cqw;
+    border: .14cqw solid transparent;
+    border-radius: .417cqw;
+    letter-spacing: .06em;
+    text-transform: uppercase;
 }
 
 .mini-btn:empty {
@@ -784,11 +778,22 @@ include __DIR__ . '/../components/header-admin.php';
 
 .mini-btn-primary {
     background: var(--gnc-gold);
+    border-color: var(--gnc-gold);
     color: var(--gnc-green);
 }
 
+/* the arrow the real "Enroll Now" button has */
+.mini-btn-primary::after {
+    content: '';
+    width: .903cqw;
+    height: .903cqw;
+    background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z'/%3E%3C/svg%3E") center / contain no-repeat;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
 .mini-btn-secondary {
-    border: 1.5px solid #fff;
+    border-color: rgba(255, 255, 255, .6);
     color: #fff;
 }
 
@@ -797,44 +802,137 @@ include __DIR__ . '/../components/header-admin.php';
     top: 50%;
     transform: translateY(-50%);
     z-index: 3;
-    width: 30px;
-    height: 30px;
+    width: 3.056cqw;          /* 44px */
+    height: 3.056cqw;
     border-radius: 50%;
-    background: rgba(255, 255, 255, .2);
+    background: rgba(255, 255, 255, .12);
+    border: 1px solid rgba(255, 255, 255, .25);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
+    font-size: 1.2cqw;
 }
 
-.mini-arrow-prev {
-    left: 12px;
-}
-
-.mini-arrow-next {
-    right: 12px;
-}
+.mini-arrow-prev { left: 1.389cqw; }
+.mini-arrow-next { right: 1.389cqw; }
 
 .mini-dots {
     position: absolute;
-    bottom: 10px;
+    bottom: 5.556cqw;         /* 80px */
     left: 0;
     right: 0;
     display: flex;
     justify-content: center;
-    gap: 5px;
+    align-items: center;
+    gap: .556cqw;
     z-index: 3;
 }
 
 .mini-dots span {
-    width: 6px;
-    height: 6px;
+    width: .556cqw;
+    height: .556cqw;
     border-radius: 50%;
-    background: rgba(255, 255, 255, .5);
+    background: rgba(255, 255, 255, .4);
 }
 
 .mini-dots span.active {
+    width: 1.944cqw;
+    border-radius: .278cqw;
     background: var(--gnc-gold);
+}
+
+/* ── Mobile preview: same rules as the site's @media (max-width:768px),
+   measured against a 390px-wide phone. Content is centered, buttons stack
+   full-width, title stays at clamp()'s 2rem floor. */
+.mini-hero-wrap.preview-mobile {
+    background: #f4f4f4;
+    border-radius: 12px;
+    padding: 1.25rem 0;
+}
+
+.mini-hero-wrap.preview-mobile .mini-hero {
+    aspect-ratio: 390 / 736;
+    max-width: 300px;
+    border-radius: 0;
+    box-shadow: 0 0 0 1px #ddd;
+}
+
+.mini-hero-wrap.preview-mobile .mini-hero-content {
+    width: 100%;
+    max-width: 100%;
+    padding: 0 3.08cqw;       /* container gutter 12px */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.mini-hero-wrap.preview-mobile .mini-title {
+    font-size: 8.205cqw;      /* 2rem */
+    margin-bottom: 4.1cqw;
+}
+
+.mini-hero-wrap.preview-mobile .mini-sub {
+    font-size: 3.897cqw;
+    margin-bottom: 7.38cqw;
+    max-width: 100%;
+}
+
+.mini-hero-wrap.preview-mobile .mini-ctas {
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    gap: 4.1cqw;
+}
+
+.mini-hero-wrap.preview-mobile .mini-btn {
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
+    font-size: 3.364cqw;
+    padding: 2.667cqw 6.154cqw;
+    border-width: .513cqw;
+    border-radius: 1.538cqw;
+    gap: 1.538cqw;
+}
+
+.mini-hero-wrap.preview-mobile .mini-btn-primary::after {
+    width: 3.333cqw;
+    height: 3.333cqw;
+}
+
+.mini-hero-wrap.preview-mobile .mini-arrow {
+    width: 9.23cqw;           /* 36px */
+    height: 9.23cqw;
+    font-size: 3.6cqw;
+}
+
+.mini-hero-wrap.preview-mobile .mini-arrow-prev { left: 2.46cqw; }
+.mini-hero-wrap.preview-mobile .mini-arrow-next { right: 2.46cqw; }
+
+.mini-hero-wrap.preview-mobile .mini-dots {
+    bottom: 20.5cqw;
+    gap: 2.05cqw;
+}
+
+.mini-hero-wrap.preview-mobile .mini-dots span {
+    width: 2.05cqw;
+    height: 2.05cqw;
+}
+
+.mini-hero-wrap.preview-mobile .mini-dots span.active {
+    width: 7.18cqw;
+    border-radius: 1.026cqw;
+}
+
+.bg-media-field-label {
+    font-size: .78rem;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: .4rem;
+    display: flex;
+    align-items: center;
+    gap: .35rem;
 }
 
 .media-swatch {
@@ -893,7 +991,7 @@ include __DIR__ . '/../components/header-admin.php';
 <script>
     window.SLIDE_EDITOR_CONFIG = {
         csrfToken: <?= json_encode($csrfToken) ?>,
-        ajaxUrl: '/admin/action/hero-slides-handler.php'
+        ajaxUrl: '/admin/action/page-content-handler.php'
     };
 </script>
 <script src="/assets/js/content-edit.js"></script>

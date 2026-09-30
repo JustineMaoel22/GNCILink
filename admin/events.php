@@ -65,32 +65,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
     try {
         if ($action === 'create' || $action === 'update') {
             $title       = trim($_POST['title'] ?? '');
-            $description = trim($_POST['description'] ?? '');
             $location    = trim($_POST['location'] ?? '');
-            $startDate   = trim($_POST['start_date'] ?? '');
-            $endDate     = trim($_POST['end_date'] ?? '') ?: null;
+            // Date is required; time is optional. No time is stored as 00:00:00.
+            $startD      = trim($_POST['start_date'] ?? '');
+            $startT      = trim($_POST['start_time'] ?? '');
+            $endD        = trim($_POST['end_date'] ?? '');
+            $endT        = trim($_POST['end_time'] ?? '');
+            $startDate   = $startD;
+            $endDate     = null;
             $categoryId  = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
             $program     = normalizeProgramCategory($_POST['program'] ?? null);
             $status      = in_array($_POST['status'] ?? '', ['draft','pending','published','archived'])
                             ? $_POST['status'] : 'pending';
 
-            if ($title === '' || $startDate === '') {
+            if ($title === '' || $startD === '') {
                 echo json_encode(['success' => false, 'message' => 'Title and start date are required.']);
                 exit;
             }
 
-            // basic datetime sanity check
-            if (!strtotime($startDate) || ($endDate && !strtotime($endDate))) {
-                echo json_encode(['success' => false, 'message' => 'Invalid date format.']);
+            // basic date/time sanity check
+            $validDate = function ($d) { return (bool)preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) && strtotime($d) !== false; };
+            $validTime = function ($t) { return $t === '' || strtotime('1970-01-01 ' . $t) !== false; };
+            if (!$validDate($startD) || !$validTime($startT)
+                || ($endD !== '' && !$validDate($endD)) || !$validTime($endT)) {
+                echo json_encode(['success' => false, 'message' => 'Invalid date or time format.']);
                 exit;
+            }
+
+            $startDate = $startD . ' ' . ($startT !== '' ? date('H:i:s', strtotime('1970-01-01 ' . $startT)) : '00:00:00');
+            if ($endD !== '') {
+                $endDate = $endD . ' ' . ($endT !== '' ? date('H:i:s', strtotime('1970-01-01 ' . $endT)) : '00:00:00');
             }
 
             if ($action === 'create') {
                 $stmt = $db->prepare("
-                    INSERT INTO events (category_id, program, user_id, title, description, location, start_date, end_date, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO events (category_id, program, user_id, title, location, start_date, end_date, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$categoryId, $program, $userId, $title, $description, $location, $startDate, $endDate, $status]);
+                $stmt->execute([$categoryId, $program, $userId, $title, $location, $startDate, $endDate, $status]);
                 $newId = $db->lastInsertId();
 
                 if (function_exists('logActivity')) {
@@ -105,11 +117,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 }
                 $stmt = $db->prepare("
                     UPDATE events
-                    SET category_id = ?, program = ?, title = ?, description = ?, location = ?,
+                    SET category_id = ?, program = ?, title = ?, location = ?,
                         start_date = ?, end_date = ?, status = ?
                     WHERE event_id = ?
                 ");
-                $stmt->execute([$categoryId, $program, $title, $description, $location, $startDate, $endDate, $status, $eventId]);
+                $stmt->execute([$categoryId, $program, $title, $location, $startDate, $endDate, $status, $eventId]);
 
                 if (function_exists('logActivity')) {
                     logActivity($userId, 'UPDATE', "Updated event: {$title}");
@@ -126,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 exit;
             }
             $stmt = $db->prepare("
-                SELECT event_id, category_id, program, title, description, location, start_date, end_date, status
+                SELECT event_id, category_id, program, title, location, start_date, end_date, status
                 FROM events WHERE event_id = ?
             ");
             $stmt->execute([$eventId]);
@@ -191,7 +203,7 @@ try {
     $rangeEnd   = date('Y-m-d 23:59:59', mktime(0, 0, 0, $month, $daysInMonth, $year));
 
     $stmt = $db->prepare("
-        SELECT e.event_id, e.title, e.description, e.location, e.start_date, e.end_date,
+        SELECT e.event_id, e.title, e.location, e.start_date, e.end_date,
                e.status, e.category_id, e.program, c.category_name, c.category_color
         FROM events e
         LEFT JOIN categories c ON e.category_id = c.category_id
@@ -394,6 +406,9 @@ include __DIR__ . '/../components/header-admin.php';
                             <td style="font-size:.8rem">
                                 <?php
                                     $startLabel = date('M d, Y', strtotime($ev['start_date']));
+                                    if (date('H:i:s', strtotime($ev['start_date'])) !== '00:00:00') {
+                                        $startLabel .= ' ' . date('g:i A', strtotime($ev['start_date']));
+                                    }
                                     if (!empty($ev['end_date']) && date('Y-m-d', strtotime($ev['end_date'])) !== date('Y-m-d', strtotime($ev['start_date']))) {
                                         echo htmlspecialchars($startLabel . ' – ' . date('M d, Y', strtotime($ev['end_date'])));
                                     } else {
@@ -442,11 +457,6 @@ include __DIR__ . '/../components/header-admin.php';
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea class="form-control" name="description" id="eventDescription" rows="3"></textarea>
-                    </div>
-
-                    <div class="mb-3">
                         <label class="form-label">Location</label>
                         <input type="text" class="form-control" name="location" id="eventLocation" maxlength="500">
                     </div>
@@ -454,11 +464,19 @@ include __DIR__ . '/../components/header-admin.php';
                     <div class="row">
                         <div class="col-6 mb-3">
                             <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                            <input type="datetime-local" class="form-control" name="start_date" id="eventStartDate" required>
+                            <input type="date" class="form-control" name="start_date" id="eventStartDate" required>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Start Time <span class="text-muted fw-normal">(optional)</span></label>
+                            <input type="time" class="form-control" name="start_time" id="eventStartTime">
                         </div>
                         <div class="col-6 mb-3">
                             <label class="form-label">End Date</label>
-                            <input type="datetime-local" class="form-control" name="end_date" id="eventEndDate">
+                            <input type="date" class="form-control" name="end_date" id="eventEndDate">
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">End Time <span class="text-muted fw-normal">(optional)</span></label>
+                            <input type="time" class="form-control" name="end_time" id="eventEndTime">
                         </div>
                     </div>
 
@@ -629,7 +647,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // if they clicked an existing event pill, edit that event instead
             if (e.target.closest('.evt-cal-pill')) return;
             resetForm();
-            document.getElementById('eventStartDate').value = cell.dataset.date + 'T09:00';
+            document.getElementById('eventStartDate').value = cell.dataset.date;
             eventModal.show();
         });
     });
@@ -695,10 +713,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('eventFormAction').value = 'update';
                 document.getElementById('eventId').value = ev.event_id;
                 document.getElementById('eventTitle').value = ev.title || '';
-                document.getElementById('eventDescription').value = ev.description || '';
                 document.getElementById('eventLocation').value = ev.location || '';
-                document.getElementById('eventStartDate').value = ev.start_date ? ev.start_date.replace(' ', 'T').slice(0,16) : '';
-                document.getElementById('eventEndDate').value = ev.end_date ? ev.end_date.replace(' ', 'T').slice(0,16) : '';
+                // 00:00 means "no time set" -> leave the time inputs blank
+                const splitDT = (v) => {
+                    if (!v) return ['', ''];
+                    const t = v.slice(11, 16);
+                    return [v.slice(0, 10), t === '00:00' ? '' : t];
+                };
+                const [sd, st] = splitDT(ev.start_date);
+                const [ed, et] = splitDT(ev.end_date);
+                document.getElementById('eventStartDate').value = sd;
+                document.getElementById('eventStartTime').value = st;
+                document.getElementById('eventEndDate').value = ed;
+                document.getElementById('eventEndTime').value = et;
                 document.getElementById('eventCategory').value = ev.category_id || '';
                 document.getElementById('eventProgram').value = ev.program || 'ALL';
                 document.getElementById('eventStatus').value = ev.status || 'pending';

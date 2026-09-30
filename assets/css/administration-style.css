@@ -188,7 +188,7 @@
     }
 }
 
-/* Card Wrap & Background Gold Square Accents */
+/* Background Gold Square */
 .admin-card-wrap {
     position: relative;
     padding: 24px 20px;
@@ -265,7 +265,7 @@
     fill: #1F5E2C;
 }
 
-/* Glassmorphism Nameplate Badge */
+/* Glassmorphism Nameplate */
 .admin-badge {
     position: absolute;
     bottom: 12px;
@@ -299,9 +299,7 @@
     display: block;
 }
 
-/* ============================================
-   Heads of Student Services — Flip Cards
-   ============================================ */
+/* Heads of Student Services — Flip Cards */
 
 .hss-grid {
     display: grid;
@@ -344,7 +342,6 @@
     transform: rotateY(180deg);
 }
 
-/* Shared face styling */
 .hss-face {
     position: absolute;
     inset: 0;
@@ -475,7 +472,6 @@
 
 
 /* Bottom Nameplate Overlay */
-/* Bottom Nameplate Overlay */
 .hss-badge {
     position: absolute;
     bottom: 20px;
@@ -483,10 +479,10 @@
     width: calc(100% - 40px);
     
     /* Glass Effect Properties */
-    background: rgba(8, 51, 30, 0.75); /* Dark green with 75% opacity */
+    background: rgba(8, 51, 30, 0.75); 
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.15); /* Subtle light border for the edge */
+    border: 1px solid rgba(255, 255, 255, 0.15);
     
     border-radius: 6px;
     padding: 14px 18px;
@@ -551,7 +547,7 @@
     flex-shrink: 0;
 }
 
-/* "Tap to flip" hint */
+/* Tap to flip hint */
 .hss-flip-hint {
     position: absolute;
     bottom: 16px;

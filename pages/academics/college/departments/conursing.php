@@ -16,6 +16,14 @@
 <body>
     <?php $activeSection = 'academics'; ?>
     <?php include_once __DIR__ . '/../../../../components/index-nav.php'; ?>
+    <?php require_once __DIR__ . '/../../../../components/department-public.php'; ?>
+    <?php
+        // Logo and PDF come from this department's record, so changing them in
+        // Content Editor → College Departments updates this page automatically.
+        $dept    = publicDepartment('conursing');
+        $logoUrl = $dept['logo_url'] ?? null;
+        $dean    = publicDepartmentDean($dept);
+    ?>
 
     <section class="dept-intro">
         <div class="dept-hero">
@@ -38,9 +46,11 @@
 
             <div class="dept-logo-wrap">
                 <div class="dept-logo-square"></div>
+                <?php if ($logoUrl): ?>
                 <div class="skeleton-wrap" style="display:inline-block;">
-                    <img src="/assets/images/logos/con-logo.svg" alt="College of Nursing seal" class="dept-logo">
+                    <img src="<?= htmlspecialchars($logoUrl) ?>" alt="College of Nursing seal" class="dept-logo">
                 </div>
+                <?php endif; ?>
                 <div class="dept-dots" aria-hidden="true"></div>
             </div>
 
@@ -82,8 +92,8 @@
                         </div>
                         <div class="skeleton-real-content">
                             <h3>Bachelor of Science in Nursing</h3>
-                            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                            <a href="/pages/academics/college/programs/nursing.php" class="dept-program-link">
+                            <p>The Bachelor of Science in Nursing program is designed to mold young individuals in according to current nursing health care service standards, acquire virtues from the practice of...</p>
+                            <a href="/pages/academics/college/programs/bsn.php" class="dept-program-link">
                                 VIEW DETAILS <i class="bi bi-arrow-right"></i>
                             </a>
                         </div>
@@ -93,6 +103,17 @@
             </div>
         </div>
     </section>
+
+    <?php if (!empty($dept['pdf_url'])): ?>
+    <!-- Department PDF (uploaded in Content Editor → College Departments) -->
+    <section class="dept-programs">
+        <div class="dept-programs-inner">
+            <span class="dept-eyebrow">Resources</span>
+            <h2>Department Document</h2>
+            <?php renderDepartmentPdfViewer($dept, ['title' => '']); ?>
+        </div>
+    </section>
+    <?php endif; ?>
 
     <section class="dept-dean">
         <div class="dept-dean-inner">
@@ -110,7 +131,7 @@
                     
                     <div class="dept-dean-photo">
                         <div class="skeleton-wrap">
-                            <img src="/assets/images/maam-bernardo.png" alt="Wilhelmina G. Bernardo, Dean of the College of Nursing">
+                            <img src="<?= htmlspecialchars($dean['photo_url'] ?: '/assets/images/maam-bernardo.png') ?>" alt="<?= htmlspecialchars($dean['name'] ?: 'Wilhelmina G. Bernardo') ?>, Dean of the College of Nursing">
                         </div>
                         
                         <!-- Layered Wave Pattern: Gold -> Maroon -> Light Green -->
@@ -124,7 +145,7 @@
 
                         <!-- Glassmorphism Nameplate Badge -->
                         <div class="dept-dean-badge">
-                            <span class="dept-dean-badge-title">Dean</span>
+                            <span class="dept-dean-badge-title"><?= htmlspecialchars($dean['title'] ?: 'Dean') ?></span>
                             <span class="dept-dean-badge-sub">College of Nursing</span>
                         </div>
                     </div>
@@ -145,9 +166,9 @@
                     </div>
                     <div class="skeleton-real-content">
                         <span class="dept-eyebrow">Meet the Dean</span>
-                        <h3>Wilhelmina G. Bernardo, MAN, RN, RM</h3>
+                        <h3><?= htmlspecialchars($dean['name'] ?: 'Wilhelmina G. Bernardo, MAN, RN, RM') ?></h3>
                         <div class="dept-dean-rule"></div>
-                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+                        <p><?= nl2br(htmlspecialchars($dean['bio'] ?: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.')) ?></p>
 
                         <hr class="dept-dean-divider">
 
@@ -158,7 +179,7 @@
                                 <i class="bi bi-telephone"></i>
                                 <div>
                                     <span class="dept-contact-label">Contact Information</span>
-                                    <span class="dept-contact-value">(045) 900-4473 Loc. 120</span>
+                                    <span class="dept-contact-value"><?= htmlspecialchars($dean['phone'] ?: '(045) 900-4473 Loc. 120') ?></span>
                                 </div>
                             </div>
 
@@ -166,7 +187,7 @@
                                 <i class="bi bi-geo-alt"></i>
                                 <div>
                                     <span class="dept-contact-label">Nursing Office</span>
-                                    <span class="dept-contact-value">Limlingan Hall, Floor 2, Room 208</span>
+                                    <span class="dept-contact-value"><?= htmlspecialchars($dean['office'] ?: 'Limlingan Hall, Floor 2, Room 208') ?></span>
                                 </div>
                             </div>
 
@@ -174,7 +195,7 @@
                                 <i class="bi bi-envelope"></i>
                                 <div>
                                     <span class="dept-contact-label">Email Address</span>
-                                    <span class="dept-contact-value">info@gnc.edu.ph</span>
+                                    <span class="dept-contact-value"><?= htmlspecialchars($dean['email'] ?: 'info@gnc.edu.ph') ?></span>
                                 </div>
                             </div>
 
@@ -182,7 +203,7 @@
                                 <i class="bi bi-clock"></i>
                                 <div>
                                     <span class="dept-contact-label">Operating Hours</span>
-                                    <span class="dept-contact-value">Monday - Friday<br>8:00AM - 4:00PM</span>
+                                    <span class="dept-contact-value"><?= nl2br(htmlspecialchars($dean['hours'] ?: "Monday - Friday\n8:00AM - 4:00PM")) ?></span>
                                 </div>
                             </div>
                         </div>

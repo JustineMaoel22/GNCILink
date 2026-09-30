@@ -46,6 +46,143 @@ $isAdmissions  = $activeSection === 'admissions';
 $isStudentLife = $activeSection === 'student-life';
 $isNewsAndAnnouncement = $activeSection === 'news-and-announcement';
 $isContactUs = $activeSection === 'contact-us';
+
+/* =============================================================
+   ACADEMICS MENU DATA (single source of truth)
+   -------------------------------------------------------------
+   Used to render BOTH the desktop dropdown and the mobile sidebar,
+   so the structure only has to be edited here.
+
+   - 'href'     : where clicking the label goes. Parent items keep
+                  their own link; the submenu is opened separately
+                  with the chevron button.
+   - 'children' : optional nested items (any depth).
+   - href '#'   : placeholder for pages that don't exist yet. For a
+                  parent item, clicking a '#' label just toggles its
+                  submenu instead of jumping to the top of the page.
+                  Replace '#' with the real route when the page exists.
+   ============================================================= */
+$academicsMenu = [
+    [
+        'label'    => 'Basic Education',
+        'href'     => '/pages/academics/basic-edu/basic-edu-dept.php',
+        'children' => [
+            ['label' => 'JHS Regular',                        'href' => 'pages/academics/basic-edu/basic-edu-department/jhs-regular.php'],
+            ['label' => 'CASA and Grade School Montessori',   'href' => 'pages/academics/basic-edu/basic-edu-department/casa-gradeschool.php'],
+            ['label' => 'SHS Regular',                        'href' => 'pages/academics/basic-edu/basic-edu-department/shs-regular.php'],
+            ['label' => 'HS Montessori',                      'href' => 'pages/academics/basic-edu/basic-edu-department/hs-monte.php'],
+        ],
+    ],
+    [
+        'label'    => 'College',
+        'href'     => '/pages/academics/college/college-departments.php',
+        'children' => [
+            [
+                'label'    => 'College of Arts, Science, and Education',
+                'href'     => '/pages/academics/college/departments/cased.php',
+                'children' => [
+                    ['label' => 'Bachelor of Elementary Education',       'href' => '/pages/academics/college/programs/beed.php'],
+                    ['label' => 'Bachelor of Secondary Education',        'href' => '/pages/academics/college/programs/bsed.php'],
+                    ['label' => 'Bachelor of Arts in English Language',   'href' => '/pages/academics/college/programs/bael.php'],
+                ],
+            ],
+            [
+                'label'    => 'College of Business Administration',
+                'href'     => '/pages/academics/college/departments/cba.php',
+                'children' => [
+                    ['label' => 'Bachelor of Science in Business Administration Major in Financial Management', 'href' => '/pages/academics/college/programs/bsba-fm.php'],
+                    ['label' => 'Bachelor of Science in Computer Science',         'href' => '/pages/academics/college/programs/bscs.php'],
+                    ['label' => 'Bachelor of Science in Information Technology',   'href' => '/pages/academics/college/programs/bsit.php'],
+                    ['label' => 'Bachelor of Science in Hospitality Management',   'href' => '/pages/academics/college/programs/bshm.php'],
+                    ['label' => 'Bachelor of Science in Tourism Management',       'href' => '/pages/academics/college/programs/bstm.php'],
+                ],
+            ],
+            [
+                'label'    => 'College of Engineering',
+                'href'     => '/pages/academics/college/departments/coe.php',
+                'children' => [
+                    ['label' => 'Bachelor of Science in Civil Engineering', 'href' => '/pages/academics/college/programs/bsce.php'],
+                ],
+            ],
+            [
+                'label'    => 'College of Medical Technology and Pharmacy',
+                'href'     => '/pages/academics/college/departments/camp.php',
+                'children' => [
+                    ['label' => 'Bachelor of Science in Medical Laboratory Science', 'href' => '/pages/academics/college/programs/bsmls.php'],
+                    ['label' => 'Bachelor of Science in Pharmacy',                   'href' => '/pages/academics/college/programs/bsph.php'],
+                ],
+            ],
+            [
+                'label'    => 'College of Accountancy',
+                'href'     => '/pages/academics/college/departments/coa.php',
+                'children' => [
+                    ['label' => 'Bachelor of Science in Accounting Information System', 'href' => '/pages/academics/college/programs/bsais.php'],
+                    ['label' => 'Bachelor of Science in Accountancy',                   'href' => '/pages/academics/college/programs/bsa.php'],
+                ],
+            ],
+            [
+                'label'    => 'College of Nursing',
+                'href'     => '/pages/academics/college/departments/conursing.php',
+                'children' => [
+                    ['label' => 'Bachelor of Science in Nursing', 'href' => '/pages/academics/college/programs/bsn.php'],
+                ],
+            ],
+        ],
+    ],
+    [
+        'label' => 'Graduate School',
+        'href'  => '/pages/academics/graduate-school/graduate-school.php',
+    ],
+];
+
+$e = function ($s) {
+    return htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+};
+
+/* Desktop renderer (recursive): link + separate chevron button for parents */
+$renderDesktopMenu = function (array $items) use (&$renderDesktopMenu, $e) {
+    foreach ($items as $item) {
+        if (empty($item['children'])) {
+            echo '<li><a class="dropdown-item" href="' . $e($item['href']) . '">' . $e($item['label']) . '</a></li>' . "\n";
+            continue;
+        }
+        echo '<li class="gnc-dropdown-submenu">' . "\n";
+        echo '  <div class="gnc-submenu-row">' . "\n";
+        echo '    <a class="dropdown-item" href="' . $e($item['href']) . '">' . $e($item['label']) . '</a>' . "\n";
+        echo '    <button type="button" class="gnc-submenu-toggle" aria-haspopup="true" aria-expanded="false" aria-label="Toggle ' . $e($item['label']) . ' submenu">';
+        echo '<i class="bi bi-chevron-right" aria-hidden="true"></i></button>' . "\n";
+        echo '  </div>' . "\n";
+        echo '  <ul class="gnc-dropdown-menu gnc-nested-menu">' . "\n";
+        $renderDesktopMenu($item['children']);
+        echo '  </ul>' . "\n";
+        echo '</li>' . "\n";
+    }
+};
+
+/* Mobile renderer (recursive): link + separate chevron button targeting a Bootstrap collapse */
+$mobileSubmenuCount = 0;
+$renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e, &$mobileSubmenuCount) {
+    echo '<ul class="list-unstyled mb-0">' . "\n";
+    foreach ($items as $item) {
+        if (empty($item['children'])) {
+            echo '<li class="gnc-mobile-depth-' . (int) $depth . '"><a href="' . $e($item['href']) . '">' . $e($item['label']) . '</a></li>' . "\n";
+            continue;
+        }
+        $mobileSubmenuCount++;
+        $id = 'mAcademicsSub' . $mobileSubmenuCount;
+        echo '<li class="gnc-mobile-depth-' . (int) $depth . '">' . "\n";
+        echo '  <div class="gnc-mobile-subrow">' . "\n";
+        echo '    <a href="' . $e($item['href']) . '">' . $e($item['label']) . '</a>' . "\n";
+        echo '    <button type="button" class="gnc-mobile-subtoggle" data-bs-toggle="collapse" data-bs-target="#' . $id . '" aria-expanded="false" aria-controls="' . $id . '" aria-label="Toggle ' . $e($item['label']) . ' submenu">';
+        echo '<i class="bi bi-chevron-down gnc-chevron" aria-hidden="true"></i></button>' . "\n";
+        echo '  </div>' . "\n";
+        echo '  <div class="collapse gnc-subsubmenu" id="' . $id . '">' . "\n";
+        $renderMobileMenu($item['children'], $depth + 1);
+        echo '  </div>' . "\n";
+        echo '</li>' . "\n";
+    }
+    echo '</ul>' . "\n";
+};
 ?>
 
 <nav class="navbar gnc-navbar sticky-top navbar-expand-lg shadow-sm">
@@ -90,9 +227,7 @@ $isContactUs = $activeSection === 'contact-us';
                     <a class="nav-link dropdown-toggle <?= $isAcademics ? 'active' : '' ?>" href="#" id="academicsDropdown" role="button"
                        data-bs-toggle="dropdown" aria-expanded="false">Academics</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="academicsDropdown">
-                        <li><a class="dropdown-item" href="/pages/academics/basic-edu/basic-edu-dept.php">Basic Education</a></li>
-                        <li><a class="dropdown-item" href="/pages/academics/college/college-departments.php">College</a></li>
-                        <li><a class="dropdown-item" href="/pages/academics/graduate-school/graduate-school.php">Graduate School</a></li>
+                        <?php $renderDesktopMenu($academicsMenu); ?>
                     </ul>
                 </li>
 
@@ -196,11 +331,7 @@ $isContactUs = $activeSection === 'contact-us';
                     <i class="bi bi-chevron-down gnc-chevron ms-auto"></i>
                 </a>
                 <div class="collapse gnc-submenu <?= $isAcademics ? 'show' : '' ?>" id="mAcademics">
-                    <ul class="list-unstyled mb-0">
-                        <li><a href="/pages/academics/basic-edu/basic-edu-dept.php">Basic Education</a></li>
-                        <li><a href="/pages/academics/college/college-departments.php">College</a></li>
-                        <li><a href="/pages/academics/graduate-school/graduate-school.php">Graduate School</a></li>
-                    </ul>
+                    <?php $renderMobileMenu($academicsMenu, 1); ?>
                 </div>
             </li>
 
@@ -269,3 +400,114 @@ $isContactUs = $activeSection === 'contact-us';
         </div>
     </div>
 </div>
+
+<!-- Nested Academics submenus (desktop flyouts + mobile placeholder-link handling) -->
+<script>
+(function () {
+    'use strict';
+
+    /* ---------- Desktop: Academics flyouts ---------- */
+    var academicsToggle = document.getElementById('academicsDropdown');
+    var academicsItem = academicsToggle ? academicsToggle.closest('.nav-item') : null;
+
+    if (academicsItem) {
+        var canHover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+        var toggleOf = function (li) {
+            return li.querySelector(':scope > .gnc-submenu-row > .gnc-submenu-toggle');
+        };
+        var menuOf = function (li) {
+            return li.querySelector(':scope > .gnc-nested-menu');
+        };
+
+        // Flip a flyout to the left if it would run off the right edge of the screen.
+        var position = function (li) {
+            var menu = menuOf(li);
+            if (!menu) return;
+            window.requestAnimationFrame(function () {
+                menu.classList.remove('open-left');
+                if (li.parentElement.classList.contains('open-left')) {
+                    menu.classList.add('open-left');
+                    return;
+                }
+                var r = menu.getBoundingClientRect();
+                if (r.width && r.right > window.innerWidth - 8) {
+                    menu.classList.add('open-left');
+                }
+            });
+        };
+
+        var setOpen = function (li, open) {
+            li.classList.toggle('show', open);
+            var btn = toggleOf(li);
+            if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open) {
+                position(li);
+            } else {
+                li.querySelectorAll('.gnc-dropdown-submenu.show').forEach(function (d) {
+                    setOpen(d, false);
+                });
+            }
+        };
+
+        var closeSiblings = function (li) {
+            Array.prototype.forEach.call(li.parentElement.children, function (sib) {
+                if (sib !== li && sib.classList.contains('show')) setOpen(sib, false);
+            });
+        };
+
+        var resetAll = function () {
+            academicsItem.querySelectorAll('.gnc-dropdown-submenu.show').forEach(function (li) {
+                setOpen(li, false);
+            });
+        };
+
+        academicsItem.querySelectorAll('.gnc-dropdown-submenu').forEach(function (li) {
+            var btn = toggleOf(li);
+            var link = li.querySelector(':scope > .gnc-submenu-row > a');
+
+            // Chevron button opens/closes the submenu without touching the link.
+            if (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation(); // keep Bootstrap from closing the whole Academics dropdown
+                    var willOpen = !li.classList.contains('show');
+                    if (willOpen) closeSiblings(li);
+                    setOpen(li, willOpen);
+                });
+            }
+
+            // Parent labels with no real page yet ('#') just toggle their submenu.
+            if (link && link.getAttribute('href') === '#' && btn) {
+                link.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    btn.click();
+                });
+            }
+
+            // Mouse users: hover opens (CSS); make sure click-opened siblings close and flyouts fit.
+            li.addEventListener('mouseenter', function () {
+                if (!canHover) return;
+                closeSiblings(li);
+                position(li);
+            });
+        });
+
+        academicsItem.addEventListener('hidden.bs.dropdown', resetAll);
+        academicsItem.addEventListener('mouseleave', function () {
+            if (canHover) resetAll();
+        });
+    }
+
+    /* ---------- Mobile: placeholder ('#') parent labels toggle their submenu ---------- */
+    document.querySelectorAll('#mAcademics .gnc-mobile-subrow > a').forEach(function (a) {
+        if (a.getAttribute('href') !== '#') return;
+        a.addEventListener('click', function (e) {
+            e.preventDefault();
+            var btn = a.parentElement.querySelector('.gnc-mobile-subtoggle');
+            if (btn) btn.click();
+        });
+    });
+})();
+</script>
