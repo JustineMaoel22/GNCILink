@@ -6,7 +6,8 @@
  * Slideshow editor (hero-slides-handler.php was merged in here —
  * actions 'list' / 'get' / 'save' / 'delete' / 'reorder' below).
  *
- * Also handles College Departments logo changes (save_department_media) and
+ * Also handles College Departments name changes (save_department_name), logo
+ * changes (save_department_media) and
  * College Programs curriculum PDFs (save_program_pdf), which arrive as
  * multipart form data because they carry file uploads.
  */
@@ -45,6 +46,17 @@ if (in_array($action, $heroStateChanging, true)) {
 
 try {
     switch ($action) {
+        case 'save_basic_education_content':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Please refresh the page and try again.']);
+                break;
+            }
+            $texts = json_decode((string)($_POST['texts'] ?? '{}'), true);
+            if (!is_array($texts)) throw new Exception('Invalid text changes.');
+            saveBasicEducationContent((string)($_POST['page'] ?? ''), $texts, $_FILES);
+            echo json_encode(['success' => true]);
+            break;
 
         // ══════════════════ Hero Slideshow (merged from hero-slides-handler.php) ══════════════════
 
@@ -192,6 +204,27 @@ try {
             break;
 
         // ── Save edits as a draft (does not touch the live site) ──
+        case 'save_section_image':
+            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
+                http_response_code(419);
+                echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
+                break;
+            }
+            if (($_POST['page'] ?? '') !== 'history') {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Images can only be changed for History timeline entries here.']);
+                break;
+            }
+            try {
+                $path = saveHistorySectionImage(trim((string)($_POST['section_key'] ?? '')), $_FILES['image'] ?? null, ($_POST['remove_image'] ?? '') === '1');
+                echo json_encode(['success' => true, 'image_url' => $path]);
+            } catch (Throwable $e) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // ── Save edits as a draft (does not touch the live site) ──
         case 'save_draft':
             if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
                 http_response_code(419);
@@ -279,6 +312,37 @@ try {
             } catch (Exception $e) {
                 // saveDepartmentMedia() only throws user-safe messages
                 // (bad file type, too large, not found, ...).
+                http_response_code(422);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // ── College Departments: rename a department ──
+        // POST: dept_id, name. Only the display name changes; the slug (page
+        // filename / links) stays the same.
+        case 'save_department_name':
+            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
+                http_response_code(419);
+                echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
+                break;
+            }
+            $deptId = (int)($_POST['dept_id'] ?? 0);
+            if ($deptId <= 0) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Missing department.']);
+                break;
+            }
+
+            try {
+                $dept = saveDepartmentName($deptId, $_POST['name'] ?? '');
+                echo json_encode([
+                    'success'    => true,
+                    'message'    => 'Department name saved.',
+                    'department' => departmentAdminPayload($dept),
+                ]);
+            } catch (Exception $e) {
+                // saveDepartmentName() only throws user-safe messages
+                // (missing name, too long, duplicate, not found, ...).
                 http_response_code(422);
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
             }
@@ -392,6 +456,280 @@ try {
             } catch (Exception $e) {
                 // saveHomepagePresident() only throws user-safe messages
                 // (bad file type, too large, ...).
+                http_response_code(422);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // ── Homepage: save edited headings / intro lines / program cards ──
+        // Multipart POST: texts = JSON {key: new text} (only what changed); optional picture files named
+        // img_<key>; reset_images = JSON list of keys whose picture goes back to the original.
+        case 'save_home_content':
+            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
+                http_response_code(419);
+                echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
+                break;
+            }
+            try {
+                $texts  = json_decode((string)($_POST['texts'] ?? '{}'), true);
+                $resets = json_decode((string)($_POST['reset_images'] ?? '[]'), true);
+                if (!is_array($texts) || !is_array($resets)) throw new Exception('The changes could not be read. Please try again.');
+                $images = [];
+                foreach ($_FILES as $field => $file) {
+                    if (strpos($field, 'img_') === 0 && ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) $images[substr($field, 4)] = $file;
+                }
+                foreach ($resets as $k) { if (is_string($k) && !isset($images[$k])) $images[$k] = 'reset'; }
+                $content = saveHomeContent($texts, $images);
+                echo json_encode(['success' => true, 'message' => 'Homepage saved.', 'content' => $content]);
+            } catch (Exception $e) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // ══════════════════ Administration page (Content Editor → Administration) ══════════════════
+        // Every admin_* action below needs a valid CSRF token, and each one
+        // answers with the refreshed list of sections so the editor can
+        // simply re-render. Multipart POSTs carry the optional photo.
+
+        // ── Edit a tab's title + description ──
+        case 'admin_save_section':
+        // ── Add / edit one person card (Trustees, Officers, Administration) ──
+        case 'admin_save_person':
+        // ── Add / edit one Heads of Student Services office ──
+        case 'admin_save_office':
+        // ── Delete a person card / an office ──
+        case 'admin_delete_person':
+        case 'admin_delete_office':
+        // ── Archive (hide from the website, keep) or restore a person card / an office ──
+        case 'admin_archive_person':
+        case 'admin_archive_office':
+        // ── Drag-and-drop order for the cards of one section ──
+        case 'admin_reorder':
+            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
+                http_response_code(419);
+                echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
+                break;
+            }
+
+            try {
+                $message = 'Saved.';
+                if ($action === 'admin_save_section') {
+                    saveAdministrationSection(
+                        trim($_POST['section_key'] ?? ''),
+                        $_POST['title'] ?? '',
+                        $_POST['description'] ?? ''
+                    );
+                    $message = 'Section saved.';
+                } elseif ($action === 'admin_save_person') {
+                    saveAdministrationPerson(
+                        (int)($_POST['person_id'] ?? 0),
+                        trim($_POST['section_key'] ?? ''),
+                        $_POST['name'] ?? '',
+                        $_POST['role'] ?? '',
+                        $_FILES['photo'] ?? null,
+                        ($_POST['remove_photo'] ?? '') === '1'
+                    );
+                    $message = 'Saved.';
+                } elseif ($action === 'admin_save_office') {
+                    saveAdministrationOffice(
+                        (int)($_POST['office_id'] ?? 0),
+                        trim($_POST['section_key'] ?? ''),
+                        $_POST['office_name'] ?? '',
+                        $_POST['head_name'] ?? '',
+                        $_POST['head_role'] ?? '',
+                        $_POST['phone'] ?? '',
+                        $_POST['email'] ?? '',
+                        $_POST['location'] ?? '',
+                        $_POST['hours'] ?? '',
+                        $_POST['services'] ?? '',
+                        $_FILES['photo'] ?? null,
+                        ($_POST['remove_photo'] ?? '') === '1'
+                    );
+                    $message = 'Office saved.';
+                } elseif ($action === 'admin_delete_person') {
+                    deleteAdministrationPerson((int)($_POST['person_id'] ?? 0));
+                    $message = 'Deleted.';
+                } elseif ($action === 'admin_delete_office') {
+                    deleteAdministrationOffice((int)($_POST['office_id'] ?? 0));
+                    $message = 'Office deleted.';
+                } elseif ($action === 'admin_archive_person' || $action === 'admin_archive_office') {
+                    // archived = '1' archives (default), '0' restores
+                    $archive = ($_POST['archived'] ?? '1') !== '0';
+                    if ($action === 'admin_archive_person') {
+                        archiveAdministrationPerson((int)($_POST['person_id'] ?? 0), $archive);
+                    } else {
+                        archiveAdministrationOffice((int)($_POST['office_id'] ?? 0), $archive);
+                    }
+                    $message = $archive
+                        ? 'Archived. It is hidden from the website; restore it any time from the Archived list.'
+                        : 'Restored. It is showing on the website again.';
+                } else { // admin_reorder
+                    $ids = json_decode($_POST['order'] ?? '[]', true);
+                    if (!is_array($ids) || empty($ids)) {
+                        throw new Exception('Invalid order data.');
+                    }
+                    reorderAdministration(trim($_POST['section_key'] ?? ''), $ids);
+                    $message = 'Order saved.';
+                }
+
+                echo json_encode([
+                    'success'  => true,
+                    'message'  => $message,
+                    'sections' => administrationAdminPayload(),
+                ]);
+            } catch (Exception $e) {
+                // The Administration functions only throw user-safe messages
+                // (validation, bad file type, too large, not found, ...).
+                http_response_code(422);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // ── College Departments: create a department, or update one's details ──
+        // POST: dept_id (0 = create), dept_name, description, hero_text,
+        // about_text, facebook_url, office_label, theme_color.
+        case 'save_department_details':
+            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
+                http_response_code(419);
+                echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
+                break;
+            }
+
+            try {
+                $isNew = (int)($_POST['dept_id'] ?? 0) <= 0;
+                $dept  = saveDepartmentDetails([
+                    'dept_id'      => (int)($_POST['dept_id'] ?? 0),
+                    'dept_name'    => $_POST['dept_name']    ?? '',
+                    'description'  => $_POST['description']  ?? '',
+                    'hero_text'    => $_POST['hero_text']    ?? '',
+                    'about_text'   => $_POST['about_text']   ?? '',
+                    'facebook_url' => $_POST['facebook_url'] ?? '',
+                    'office_label' => $_POST['office_label'] ?? '',
+                    'theme_color'  => $_POST['theme_color']  ?? '',
+                ]);
+                echo json_encode([
+                    'success'    => true,
+                    'message'    => $isNew
+                        ? 'Department created. It is now live on the College Departments page — add its logo and page text below.'
+                        : 'Department details saved.',
+                    'department' => departmentAdminPayload($dept),
+                ]);
+            } catch (Exception $e) {
+                // saveDepartmentDetails() only throws user-safe messages.
+                http_response_code(422);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // ── College Departments: permanently delete one ──
+        // Programs/announcements that belong to it are detached (their
+        // dept_id becomes NULL), not deleted.
+        case 'delete_department':
+            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
+                http_response_code(419);
+                echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
+                break;
+            }
+            $deptId = (int)($_POST['dept_id'] ?? 0);
+            if ($deptId <= 0) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Missing department.']);
+                break;
+            }
+
+            try {
+                deleteDepartment($deptId);
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Department deleted. It no longer appears on the website.',
+                ]);
+            } catch (Exception $e) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // ── College Departments: hide from / restore to the public website ──
+        // archived = '1' archives (default), '0' restores.
+        case 'archive_department':
+            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
+                http_response_code(419);
+                echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
+                break;
+            }
+            $deptId = (int)($_POST['dept_id'] ?? 0);
+            if ($deptId <= 0) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Missing department.']);
+                break;
+            }
+
+            try {
+                $archive = ($_POST['archived'] ?? '1') !== '0';
+                $dept    = setDepartmentArchived($deptId, $archive);
+                echo json_encode([
+                    'success'    => true,
+                    'message'    => $archive
+                        ? 'Department hidden from the website. Restore it any time.'
+                        : 'Department restored. It is showing on the website again.',
+                    'department' => departmentAdminPayload($dept),
+                ]);
+            } catch (Exception $e) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // ── College Programs: create / update a program (code, department, description, card image) ──
+        // Multipart POST: program_id (0 = create), program_code, dept_id, description,
+        // optional image file, optional remove_image flag ('1').
+        case 'save_program':
+            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
+                http_response_code(419);
+                echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
+                break;
+            }
+
+            try {
+                $isNew   = (int)($_POST['program_id'] ?? 0) <= 0;
+                $program = saveProgramFull([
+                    'program_id'   => (int)($_POST['program_id'] ?? 0),
+                    'program_code' => $_POST['program_code'] ?? '',
+                    'dept_id'      => (int)($_POST['dept_id'] ?? 0),
+                    'description'  => $_POST['description'] ?? '',
+                ], $_FILES['image'] ?? null, ($_POST['remove_image'] ?? '') === '1');
+
+                echo json_encode([
+                    'success' => true,
+                    'message' => $isNew ? 'Program added.' : 'Program saved.',
+                    'program' => programFullAdminPayload($program),
+                ]);
+            } catch (Exception $e) {
+                // saveProgramFull() only throws user-safe messages.
+                http_response_code(422);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // ── College Programs: permanently delete one ──
+        case 'delete_program':
+            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
+                http_response_code(419);
+                echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
+                break;
+            }
+            $programId = (int)($_POST['program_id'] ?? 0);
+            if ($programId <= 0) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Missing program.']);
+                break;
+            }
+
+            try {
+                deleteProgramFull($programId);
+                echo json_encode(['success' => true, 'message' => 'Program deleted.']);
+            } catch (Exception $e) {
                 http_response_code(422);
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
             }

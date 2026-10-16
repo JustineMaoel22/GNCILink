@@ -9,12 +9,13 @@
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link href="/assets/css/enrollment-procedures-style.css" rel="stylesheet">
+    <link href="/assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
 
     <?php $activeSection = 'admissions'; ?>
-    <?php include_once __DIR__ . '/../../components/index-nav.php'; ?>
+    <?php include_once __DIR__ . '/../../components/navbar.php'; ?>
 
     <section class="enrollment-intro">
         <div class="enrollment-hero">
@@ -88,8 +89,8 @@
                                     <div class="enrollment-step-sub"><?= htmlspecialchars($step['sub']); ?></div>
                                 <?php endif; ?>
 
-                                <div class="enrollment-step-icon">
-                                    <img src="<?= $step['icon']; ?>" alt="<?= htmlspecialchars($step['title']); ?>">
+                                <div class="enrollment-step-icon skeleton-wrap">
+                                    <img src="<?= $step['icon']; ?>" alt="<?= htmlspecialchars($step['title']); ?>" width="100" height="100" loading="lazy">
                                 </div>
 
                                 <p class="enrollment-step-desc"><?= htmlspecialchars($step['desc']); ?></p>
@@ -129,8 +130,8 @@
                                     <div class="enrollment-step-sub"><?= htmlspecialchars($step['sub']); ?></div>
                                 <?php endif; ?>
 
-                                <div class="enrollment-step-icon">
-                                    <img src="<?= $step['icon']; ?>" alt="<?= htmlspecialchars($step['title']); ?>">
+                                <div class="enrollment-step-icon skeleton-wrap">
+                                    <img src="<?= $step['icon']; ?>" alt="<?= htmlspecialchars($step['title']); ?>" width="100" height="100" loading="lazy">
                                 </div>
 
                                 <p class="enrollment-step-desc"><?= htmlspecialchars($step['desc']); ?></p>
@@ -168,8 +169,8 @@
                                     <div class="enrollment-step-sub"><?= htmlspecialchars($step['sub']); ?></div>
                                 <?php endif; ?>
 
-                                <div class="enrollment-step-icon">
-                                    <img src="<?= $step['icon']; ?>" alt="<?= htmlspecialchars($step['title']); ?>">
+                                <div class="enrollment-step-icon skeleton-wrap">
+                                    <img src="<?= $step['icon']; ?>" alt="<?= htmlspecialchars($step['title']); ?>" width="100" height="100" loading="lazy">
                                 </div>
 
                                 <p class="enrollment-step-desc"><?= htmlspecialchars($step['desc']); ?></p>
@@ -185,10 +186,52 @@
         </div>
     </section>
 
-    <?php include_once __DIR__ . '/../../components/index-footer.php'; ?>
+    <?php include_once __DIR__ . '/../../components/footer.php'; ?>
+    <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>
+    
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
+    <script src="/assets/js/skeleton-loader.js"></script>
+
+    <script>
+    (function () {
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+            !('IntersectionObserver' in window)) { return; }
+        document.documentElement.classList.add('js-reveal');
+
+        var observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (!entry.isIntersecting) { return; }
+                var card = entry.target;
+                card.classList.add('reveal-animating', 'is-visible');
+                observer.unobserve(card);
+                // Remove the stagger transition once done so hover stays snappy
+                setTimeout(function () { card.classList.remove('reveal-animating'); }, 1200);
+            });
+        }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+
+        function observePane(pane) {
+            pane.querySelectorAll('.enrollment-step-card:not(.is-visible)').forEach(function (card, i) {
+                card.style.setProperty('--i', i % 5);
+                observer.observe(card);
+            });
+        }
+
+        document.querySelectorAll('.tab-pane').forEach(observePane);
+
+        // Replay the reveal each time a tab is shown
+        document.querySelectorAll('#enrollmentTab [data-bs-toggle="pill"]').forEach(function (btn) {
+            btn.addEventListener('shown.bs.tab', function () {
+                var pane = document.querySelector(btn.getAttribute('data-bs-target'));
+                pane.querySelectorAll('.enrollment-step-card').forEach(function (card) {
+                    card.classList.remove('is-visible', 'reveal-animating');
+                });
+                requestAnimationFrame(function () { observePane(pane); });
+            });
+        });
+    })();
+    </script>
 
 </body>
 </html>

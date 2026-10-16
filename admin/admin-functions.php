@@ -8,6 +8,9 @@
 // SESSION MANAGEMENT
 // ============================================================
 
+require_once __DIR__ . '/photo-check.php';
+require_once __DIR__ . '/basic-education-content.php';
+
 /**
  * Initialize secure session
  */
@@ -85,7 +88,8 @@ function getPermissions(string $role): array {
             'manage_events', 'create_event', 'edit_event', 'delete_event', 'publish_event',
             'approve_content', 'reject_content', 'request_revision',
             'view_logs', 'manage_approvals',
-            'manage_page_content'
+            'manage_page_content',
+            'view_analytics'
         ],
         'Content Admin' => [
             'create_announcement', 'edit_announcement', 'delete_announcement', 'publish_announcement',
@@ -93,9 +97,11 @@ function getPermissions(string $role): array {
             'create_event', 'edit_event', 'delete_event', 'publish_event',
             'approve_content', 'reject_content', 'request_revision',
             'manage_approvals',
-            'manage_page_content'
+            'manage_page_content',
+            'view_analytics'
         ],
         'Content Editor' => [
+            'edit_page_content',
             'create_announcement', 'edit_own_announcement', 'delete_own_announcement',
             'create_news', 'edit_own_news', 'delete_own_news',
             'create_event', 'edit_own_event', 'delete_own_event'
@@ -182,6 +188,28 @@ function getActivityLogs(int $limit = 50, int $offset = 0): array {
  * same thing as an empty/unfiltered list selection in the UI.
  */
 function getProgramCategories(): array {
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $cache = getProgramCategoriesBuiltIn();
+    // Programs added (or renamed) in Content Editor -> Programs live in the
+    // `programs` table; they join this list so announcements can be tagged
+    // with them too. Before the program-page migration there is no
+    // program_name column: the built-in list alone is used.
+    try {
+        $rows = getDB()->query("SELECT program_code, program_name FROM programs WHERE program_name IS NOT NULL AND program_name <> ''")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as $r) {
+            $cache[$r['program_code']] = $r['program_name'];
+        }
+    } catch (Throwable $e) {
+        // keep the built-in list
+    }
+    return $cache;
+}
+
+/** The programs the site shipped with (fallback + 'ALL'). */
+function getProgramCategoriesBuiltIn(): array {
     return [
         'ALL'     => 'All Programs',
         'BEEd'    => 'Bachelor of Elementary Education',
@@ -339,7 +367,7 @@ function createAnnouncement(array $data): ?int {
             throw new Exception('User session not found.');
         }
         
-        $slug = generateSlug($data['title']);
+        $slug = uniqueContentSlug('announcements', 'announcement_id', $data['title']);
         
         $status = ($_SESSION['user_role'] === 'Super Admin' || $_SESSION['user_role'] === 'Content Admin') 
                 ? $data['status'] ?? 'draft' 
@@ -402,7 +430,7 @@ function updateAnnouncement(int $id, array $data): bool {
             return false;
         }
         
-        $slug = generateSlug($data['title']);
+        $slug = uniqueContentSlug('announcements', 'announcement_id', $data['title'], $id);
         $status = isset($data['status']) ? $data['status'] : $announcement['status'];
 
         // Handle featured_image - only update if new media was provided or removal was requested
@@ -534,6 +562,104 @@ function getAnnouncements(array $filters = [], int $limit = 20, int $offset = 0)
 }
 
 /**
+ * Handle several uploaded announcement photos at once ($_FILES['gallery_images'],
+ * from <input type="file" name="gallery_images[]" multiple>).
+ * Every file goes through uploadAnnouncementImage() (same checks, same
+ * media_library row). Returns the ordered list of new media_ids.
+ */
+function uploadAnnouncementImages(?array $files): array {
+    if (empty($files) || empty($files['name']) || !is_array($files['name'])) {
+        return [];
+    }
+
+    $mediaIds = [];
+    $count = count($files['name']);
+
+    for ($i = 0; $i < $count; $i++) {
+        if ($files['error'][$i] === UPLOAD_ERR_NO_FILE) {
+            continue; // empty slot
+        }
+
+        $mediaId = uploadAnnouncementImage([
+            'name'     => $files['name'][$i],
+            'type'     => $files['type'][$i],
+            'tmp_name' => $files['tmp_name'][$i],
+            'error'    => $files['error'][$i],
+            'size'     => $files['size'][$i],
+        ]);
+        if ($mediaId !== null) {
+            $mediaIds[] = $mediaId;
+        }
+    }
+
+    return $mediaIds;
+}
+
+/**
+ * Attach uploaded media to an announcement's photo gallery
+ * (announcement_images), after whatever is already there.
+ */
+function addAnnouncementImages(int $announcementId, array $mediaIds): bool {
+    if (empty($mediaIds)) return true;
+
+    try {
+        $db = getDB();
+
+        $stmt = $db->prepare("SELECT COALESCE(MAX(display_order), 0) FROM announcement_images WHERE announcement_id = ?");
+        $stmt->execute([$announcementId]);
+        $nextOrder = (int)$stmt->fetchColumn() + 1;
+
+        $stmt = $db->prepare("
+            INSERT INTO announcement_images (announcement_id, media_id, display_order, created_at)
+            VALUES (?, ?, ?, NOW())
+        ");
+        foreach ($mediaIds as $mediaId) {
+            $stmt->execute([$announcementId, $mediaId, $nextOrder++]);
+        }
+
+        return true;
+    } catch (Exception $e) {
+        error_log('Add announcement images error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Get every gallery photo of an announcement, in display order.
+ */
+function getAnnouncementImages(int $announcementId): array {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("
+            SELECT ai.image_id, ai.media_id, ai.display_order, m.file_path
+            FROM announcement_images ai
+            LEFT JOIN media_library m ON ai.media_id = m.media_id
+            WHERE ai.announcement_id = ?
+            ORDER BY ai.display_order ASC, ai.image_id ASC
+        ");
+        $stmt->execute([$announcementId]);
+        return $stmt->fetchAll();
+    } catch (Exception $e) {
+        error_log('Get announcement images error: ' . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Remove one gallery photo from an announcement (by announcement_images.image_id).
+ */
+function removeAnnouncementImage(int $imageId, int $announcementId): bool {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("DELETE FROM announcement_images WHERE image_id = ? AND announcement_id = ?");
+        return $stmt->execute([$imageId, $announcementId]);
+    } catch (Exception $e) {
+        error_log('Remove announcement image error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
  * Delete announcement
  */
 function deleteAnnouncement(int $id): bool {
@@ -567,7 +693,7 @@ function deleteAnnouncement(int $id): bool {
  * Homepage slideshow: how many items (announcements + news, combined)
  * may be pinned at once.
  */
-const MAX_PINNED_ITEMS = 3;
+const MAX_PINNED_ITEMS = 5;
 
 /**
  * How many announcements + news items are currently pinned, combined.
@@ -867,7 +993,7 @@ function createNews(array $data): ?int {
             throw new Exception('User session not found.');
         }
 
-        $slug = generateSlug($data['title']);
+        $slug = uniqueContentSlug('news', 'news_id', $data['title']);
 
         $status = ($_SESSION['user_role'] === 'Super Admin' || $_SESSION['user_role'] === 'Content Admin')
                 ? $data['status'] ?? 'draft'
@@ -930,7 +1056,7 @@ function updateNews(int $id, array $data): bool {
             return false;
         }
 
-        $slug = generateSlug($data['title']);
+        $slug = uniqueContentSlug('news', 'news_id', $data['title'], $id);
         $status = isset($data['status']) ? $data['status'] : $news['status'];
 
         // Handle featured_image - only update if new media was provided or removal was requested
@@ -1200,6 +1326,9 @@ function normalizeForSearch(string $text): string {
 function getFacebookPostsAdminList(int $limit = 50, string $search = ''): array {
     try {
         $db = getDB();
+        // Keep auto-categories current (manually edited/locked posts are skipped).
+        require_once __DIR__ . '/../config/fb-categorizer.php';
+        gncAutoCategorizeFbPosts($db);
         $searching = $search !== '';
 
         // When searching, scan a much larger window (not just the newest $limit)
@@ -1356,7 +1485,7 @@ function getPinnedFeedItems(int $limit = MAX_PINNED_ITEMS): array {
                 'date'       => $ann['published_at'] ?? $ann['created_at'],
                 'pinned_at'  => $ann['pinned_at'],
                 'author'     => null,
-                'link'       => 'announcement.php?slug=' . urlencode($ann['slug']),
+                'link'       => '/announcement-article.php?slug=' . urlencode($ann['slug']),
             ];
         }
 
@@ -1379,7 +1508,7 @@ function getPinnedFeedItems(int $limit = MAX_PINNED_ITEMS): array {
                 'date'       => $item['published_at'] ?? $item['created_at'],
                 'pinned_at'  => $item['pinned_at'],
                 'author'     => $item['author'] ?? null,
-                'link'       => 'news.php?slug=' . urlencode($item['slug']),
+                'link'       => '/news-article.php?slug=' . urlencode($item['slug']),
             ];
         }
 
@@ -1494,6 +1623,34 @@ function generateSlug(string $text): string {
     $text = preg_replace('/[\s_]+/', '-', $text);
     $text = preg_replace('/^-+|-+$/', '', $text);
     return $text;
+}
+
+/**
+ * Make a web address ("slug") from a title that no other row of the table is using.
+ * "Test" -> test, then test-2, test-3 ... so two articles with the same title
+ * never open each other. $excludeId lets an item keep its own slug when it is edited.
+ * Only the tables listed here are allowed.
+ */
+function uniqueContentSlug(string $table, string $idColumn, string $title, ?int $excludeId = null): string {
+    $allowed = ['news' => 'news_id', 'announcements' => 'announcement_id'];
+    if (!isset($allowed[$table]) || $allowed[$table] !== $idColumn) {
+        return generateSlug($title);
+    }
+
+    $base = mb_substr(generateSlug($title), 0, 200);
+    if ($base === '') {
+        $base = $table === 'news' ? 'news' : 'announcement'; // title had no letters or numbers
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare("SELECT COUNT(*) FROM `$table` WHERE slug = ? AND `$idColumn` <> ?");
+    $slug = $base;
+    $n = 2;
+    while (true) {
+        $stmt->execute([$slug, (int)$excludeId]);
+        if ((int)$stmt->fetchColumn() === 0) return $slug;
+        $slug = $base . '-' . $n++;
+    }
 }
 
 /**
@@ -1871,6 +2028,36 @@ function getPageBySlug(string $slug): ?array {
     }
 }
 
+/** Ensure the History page has editable rows in the existing page_sections CMS. */
+function ensureHistoryPageSections(): void {
+    $defaults = [
+        ['history_hero_eyebrow', 'History hero eyebrow', 'Since 1918'],
+        ['history_hero_title', 'History hero title', 'History of GNC'],
+        ['history_intro_title', 'Journey heading', 'The Journey Through Time'],
+        ['history_intro_text', 'Journey introduction', 'Scroll down to follow our story, from a parochial school in 1918 to the college we are today.'],
+        ['history_1918', '1918 — The Beginning', '<h2>1918</h2><h3>The Beginning</h3><p>In June 18, 1918, Rev. Fr. Nicanor Banzali, then parish priest of Guagua, founded a parochial school initially housed at the Catholic Convent in the town plaza.</p>'],
+        ['history_1922_1941', '1922 and 1941 — Growth and Expansion', '<h2>1922 and 1941</h2><h3>Growth and Expansion</h3><p>The school became the Guagua National Institute (GNI) when it started to offer high school courses in 1922 and in 1941, the institution offered college courses.</p>'],
+        ['history_1941_1948', '1941–1948 — Trials and Resilience', '<h2>1941 — 1948</h2><h3>Trials and Resilience</h3><p>However, on December 8, 1941, upon the outbreak of World War II, GNI had to temporarily close its doors.</p><p>On February 10, 1942, its three school buildings were razed to the ground by a fire of incendiary (flammable) origin. Hundreds of alumni served in World War II (WW II), and among them was Capt. Euben Sangco, one of the notable heroes of Pampanga.</p>'],
+        ['history_1948', '1948 — A New Beginning', '<h2>1948</h2><h3>A New Beginning</h3><p>On June 1, 1948, GNI reopened its doors in spite of the uncertainty of a place to house the school. Classes were held under ‘Gampalati’ trees and in makeshift tents.</p><p>The determination to move on in spite of the odds finds a parallel event in 1991, when a week after the eruption of Mt. Pinatubo, GNI resumed regular classes. The aim was to instill in the community and in the youth the importance of acting with dispatch in times of crisis.</p>'],
+        ['history_1949', '1949 — A Legacy of Excellence', '<h2>1949</h2><h3>A Legacy of Excellence</h3><p>In 1949, the Institute became a College. GNI was, therefore, renamed to Guagua National Colleges, Inc. (GNC).</p><p>Being a Catholic co-educational institution with its high quality of instruction, GNC has produced outstanding alumni who have distinguished themselves locally, countrywide, and abroad.</p><p>GNC is a private college and a member in good standing of the Catholic Educational Association of the Philippines (CEAP).</p>'],
+        ['history_present', 'Present — Moving Forward Together', '<h2>Present</h2><h3>Moving Forward Together</h3><p>At present, GNC’s officials and administrators, educators, staff and students are united in carrying out the school’s mission with vigor and is dedicated to the pursuit of quality education and academic excellence.</p>'],
+        ['history_quote', 'History closing statement', '<p>From humble beginnings to a legacy of service and excellence, GNC continues to educate, inspire, and transform lives.</p>'],
+    ];
+    try {
+        $db = getDB();
+        $page = getPageBySlug('history');
+        if (!$page) return;
+        $check = $db->prepare('SELECT 1 FROM page_sections WHERE page_id = ? AND section_key = ? LIMIT 1');
+        $insert = $db->prepare("INSERT INTO page_sections (page_id, section_key, title, content, status, display_order) VALUES (?, ?, ?, ?, 'published', ?)");
+        foreach ($defaults as $order => $row) {
+            $check->execute([(int)$page['page_id'], $row[0]]);
+            if (!$check->fetchColumn()) $insert->execute([(int)$page['page_id'], $row[0], $row[1], $row[2], $order + 1]);
+        }
+    } catch (Throwable $e) {
+        error_log('Ensure History page sections error: ' . $e->getMessage());
+    }
+}
+
 /**
  * Get all editable sections for a page, in display order. Each section
  * includes both `content` (currently published) and `draft_content`
@@ -1922,6 +2109,46 @@ function getSectionContent(string $pageSlug, string $sectionKey, bool $preferDra
         error_log('Get section content error: ' . $e->getMessage());
         return null;
     }
+}
+
+/** Return the validated public path for a page section's attached image. */
+function getPageSectionImagePath(string $pageSlug, string $sectionKey): ?string {
+    try {
+        $stmt = getDB()->prepare('SELECT m.file_path FROM page_sections ps INNER JOIN pages p ON p.page_id = ps.page_id INNER JOIN media_library m ON m.media_id = ps.media_id WHERE p.slug = ? AND ps.section_key = ? LIMIT 1');
+        $stmt->execute([$pageSlug, $sectionKey]);
+        $path = (string)($stmt->fetchColumn() ?: '');
+        if (strpos($path, '/uploads/') !== 0 || strpos($path, '..') !== false || !is_file(__DIR__ . '/..' . $path)) return null;
+        return $path;
+    } catch (Throwable $e) {
+        error_log('Get page section image error: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/** Attach or remove an image on an approved History timeline section. */
+function saveHistorySectionImage(string $sectionKey, ?array $file, bool $remove): ?string {
+    if (!preg_match('/^history_(1918|1922_1941|1941_1948|1948|1949|present)$/', $sectionKey)) {
+        throw new Exception('That History photo slot is not valid.');
+    }
+    $db = getDB();
+    $stmt = $db->prepare("SELECT ps.media_id FROM page_sections ps INNER JOIN pages p ON p.page_id = ps.page_id WHERE p.slug = 'history' AND ps.section_key = ? LIMIT 1");
+    $stmt->execute([$sectionKey]);
+    $oldId = $stmt->fetchColumn();
+    if ($oldId === false) throw new Exception('History section not found. Refresh the editor and try again.');
+    $stored = $file && ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE ? storeDepartmentUpload($file, 'history_image') : null;
+    if (!$stored && !$remove) throw new Exception('Choose an image to upload.');
+    $newId = $stored ? (int)$stored['media_id'] : null;
+    try {
+        $stmt = $db->prepare("UPDATE page_sections ps INNER JOIN pages p ON p.page_id = ps.page_id SET ps.media_id = ? WHERE p.slug = 'history' AND ps.section_key = ?");
+        $stmt->execute([$newId, $sectionKey]);
+    } catch (Throwable $e) {
+        if ($stored) deleteMediaIfUnreferenced($newId);
+        error_log('Save History section image error: ' . $e->getMessage());
+        throw new Exception('Could not save the History photo. Please try again.');
+    }
+    if ($oldId !== null && $oldId !== false && (int)$oldId !== (int)$newId) deleteMediaIfUnreferenced((int)$oldId);
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'UPDATE', 'page_sections', null, 'Updated History photo: ' . $sectionKey);
+    return $newId ? getPageSectionImagePath('history', $sectionKey) : null;
 }
 
 /**
@@ -2000,6 +2227,318 @@ function discardSectionDraft(string $pageSlug, string $sectionKey): bool {
 
 
 // ============================================================
+// PAGE CONTENT — rich text + approval workflow
+// (used by the redesigned Content Editor, admin/content-edit.php)
+// ============================================================
+// Roles (see getPermissions):
+//   Super Admin / Content Admin  manage_page_content  -> edit AND publish directly, and approve/reject
+//   Content Editor               edit_page_content    -> save drafts and SUBMIT them for approval
+// A submitted draft waits in page_sections.review_status = 'pending'.
+// The public site only ever reads page_sections.content, which changes
+// only on publish / approve. Needs sql/page-approval-migration.sql.
+
+/** True once sql/page-approval-migration.sql has been run. */
+function pageReviewReady(): bool {
+    static $ready = null;
+    if ($ready !== null) return $ready;
+    try {
+        $ready = (bool)getDB()->query("SHOW COLUMNS FROM page_sections LIKE 'review_status'")->fetch();
+    } catch (Throwable $e) {
+        $ready = false;
+    }
+    return $ready;
+}
+
+/** Does stored text contain formatting (as opposed to plain text)? */
+function richTextLooksLikeHtml(string $s): bool {
+    return (bool)preg_match('#<(p|br|h[2-4]|strong|em|u|ul|ol|li|a|blockquote)[\s>/]#i', $s);
+}
+
+/**
+ * Clean HTML from the rich-text editor down to a safe allow-list:
+ * paragraphs, headings (h2-h4), bold, italic, underline, lists, links,
+ * block quotes and text alignment. Everything else (scripts, styles,
+ * event handlers, unknown tags, odd link types) is removed. Always run
+ * this on the SERVER; never trust what the browser sends.
+ */
+function richTextSanitize(string $html): string {
+    $html = trim($html);
+    if ($html === '') return '';
+    if (strlen($html) > 200000) $html = substr($html, 0, 200000);
+
+    $doc  = new DOMDocument();
+    $prev = libxml_use_internal_errors(true);
+    $doc->loadHTML('<?xml encoding="UTF-8"><div id="rt-root">' . $html . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+    libxml_clear_errors();
+    libxml_use_internal_errors($prev);
+
+    $root = $doc->getElementsByTagName('div')->item(0);
+    if (!$root) return '';
+
+    $dropWithContent = ['script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'head', 'title', 'meta', 'link',
+                        'noscript', 'template', 'form', 'input', 'textarea', 'select', 'button', 'audio', 'video', 'img'];
+    $aligned = ['p', 'h2', 'h3', 'h4', 'blockquote', 'li'];
+
+    $align = function (DOMElement $el): string {
+        $a = '';
+        if (preg_match('/text-align\s*:\s*(left|center|right|justify)\b/i', (string)$el->getAttribute('style'), $m)) {
+            $a = strtolower($m[1]);
+        } elseif (in_array(strtolower((string)$el->getAttribute('align')), ['left', 'center', 'right', 'justify'], true)) {
+            $a = strtolower($el->getAttribute('align'));
+        }
+        return ($a !== '' && $a !== 'left') ? ' style="text-align:' . $a . '"' : '';
+    };
+
+    $walk = function (DOMNode $node) use (&$walk, $dropWithContent, $aligned, $align): string {
+        $out = '';
+        foreach ($node->childNodes as $c) {
+            if ($c->nodeType === XML_TEXT_NODE) {
+                $out .= htmlspecialchars((string)$c->nodeValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                continue;
+            }
+            if ($c->nodeType !== XML_ELEMENT_NODE) continue;
+            $tag = strtolower($c->nodeName);
+            if (in_array($tag, $dropWithContent, true)) continue;
+
+            if ($tag === 'br') { $out .= '<br>'; continue; }
+            $inner = $walk($c);
+
+            if ($tag === 'b') $tag = 'strong';
+            if ($tag === 'i') $tag = 'em';
+            if ($tag === 'div') $tag = 'p';        // browsers add <div> for new lines
+
+            if ($tag === 'a') {
+                $href = trim((string)$c->getAttribute('href'));
+                $href = preg_replace('/[\x00-\x1F\x7F\s]+/', '', $href);
+                if ($href === '' || !preg_match('#^(https?://|mailto:|tel:|/(?!/)|\#)#i', $href)) { $out .= $inner; continue; }
+                $ext = preg_match('#^https?://#i', $href);
+                $out .= '<a href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8') . '"'
+                      . ($ext ? ' target="_blank" rel="noopener noreferrer"' : '') . '>' . $inner . '</a>';
+                continue;
+            }
+            if (in_array($tag, ['p', 'h2', 'h3', 'h4', 'blockquote', 'ul', 'ol', 'li', 'strong', 'em', 'u'], true)) {
+                $attr = in_array($tag, $aligned, true) ? $align($c) : '';
+                $out .= '<' . $tag . $attr . '>' . $inner . '</' . $tag . '>';
+                continue;
+            }
+            $out .= $inner;                          // unknown tag: keep its text, drop the tag
+        }
+        return $out;
+    };
+
+    $clean = $walk($root);
+    // tidy: empty paragraphs/formatting and runs of <br>
+    $clean = preg_replace('#<p(?: style="[^"]*")?>(?:\s|<br>|&nbsp;)*</p>#i', '', $clean);
+    $clean = preg_replace('#<(strong|em|u)>\s*</\1>#i', '', $clean);
+    return trim($clean);
+}
+
+/**
+ * What gets stored in page_sections. Text with no formatting stays PLAIN
+ * TEXT (paragraphs separated by a blank line), exactly as before, so pages
+ * that print it as text keep working. Only text that really uses formatting
+ * (bold, lists, headings, links, alignment...) is stored as clean HTML.
+ */
+function richTextToStorage(string $html): string {
+    $clean = richTextSanitize($html);
+    if ($clean === '') return '';
+    if (!preg_match('#<(?!/?(?:p|br)\b)[a-z]#i', $clean) && strpos($clean, 'style=') === false) {
+        $t = preg_replace('#<br\s*/?>#i', "\n", $clean);
+        $t = preg_replace('#</p>\s*<p>#i', "\n\n", $t);
+        $t = preg_replace('#</?p>#i', '', $t);
+        return trim(html_entity_decode($t, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
+    return $clean;
+}
+
+/** Stored text (plain or HTML) -> safe HTML for the editor. */
+function sectionToEditorHtml(?string $stored): string {
+    $s = (string)$stored;
+    if (trim($s) === '') return '';
+    if (richTextLooksLikeHtml($s)) return richTextSanitize($s);
+    $paras = preg_split('/\R{2,}/', trim($s)) ?: [];
+    return implode('', array_map(function ($p) {
+        return '<p>' . nl2br(htmlspecialchars(trim($p), ENT_QUOTES, 'UTF-8'), false) . '</p>';
+    }, $paras));
+}
+
+/**
+ * Use this on PUBLIC pages wherever a section's text is printed:
+ *   echo renderSectionContent(getSectionContent('vision-mission', 'vision'));
+ * Plain text is escaped (line breaks kept); formatted text is printed as
+ * sanitised HTML, so bold, lists, links etc. show up on the website.
+ */
+function renderSectionContent(?string $stored): string {
+    $s = (string)$stored;
+    if (trim($s) === '') return '';
+    if (richTextLooksLikeHtml($s)) return richTextSanitize($s);
+    return nl2br(htmlspecialchars($s, ENT_QUOTES, 'UTF-8'));
+}
+
+/** One section with the names of the people involved (editor UI). */
+function getSectionDetailed(string $pageSlug, string $sectionKey): ?array {
+    try {
+        $db = getDB();
+        $ready = pageReviewReady();
+        $stmt = $db->prepare("
+            SELECT ps.*, p.slug AS page_slug, p.title AS page_title,
+                   CONCAT(COALESCE(ue.first_name, ''), ' ', COALESCE(ue.last_name, '')) AS updated_by_name"
+                   . ($ready ? ", CONCAT(COALESCE(us.first_name, ''), ' ', COALESCE(us.last_name, '')) AS submitted_by_name" : "") . "
+            FROM page_sections ps
+            INNER JOIN pages p ON p.page_id = ps.page_id
+            LEFT JOIN users ue ON ue.user_id = ps.updated_by"
+            . ($ready ? " LEFT JOIN users us ON us.user_id = ps.submitted_by" : "") . "
+            WHERE p.slug = ? AND ps.section_key = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$pageSlug, $sectionKey]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        $row['review_status'] = $row['review_status'] ?? 'none';
+        return $row;
+    } catch (Throwable $e) {
+        error_log('Get section detailed error: ' . $e->getMessage());
+        return null;
+    }
+}
+
+function getPageSectionsDetailed(string $pageSlug): array {
+    $out = [];
+    foreach (getPageSections($pageSlug) as $s) {
+        $d = getSectionDetailed($pageSlug, (string)$s['section_key']);
+        if ($d) $out[] = $d;
+    }
+    return $out;
+}
+
+/** Back to "not submitted" (used when the author edits or withdraws). */
+function resetSectionReview(string $pageSlug, string $sectionKey): void {
+    if (!pageReviewReady()) return;
+    $row = getSectionDetailed($pageSlug, $sectionKey);
+    if (!$row || $row['review_status'] === 'none') return;
+    $stmt = getDB()->prepare("UPDATE page_sections SET review_status = 'none', review_note = NULL WHERE section_id = ?");
+    $stmt->execute([(int)$row['section_id']]);
+}
+
+/** Send a saved draft to the approvers. Throws Exception with a user-safe message. */
+function submitSectionForReview(string $pageSlug, string $sectionKey): void {
+    if (!pageReviewReady()) throw new Exception('The approval feature is not set up yet. Ask your developer to run sql/page-approval-migration.sql.');
+    $row = getSectionDetailed($pageSlug, $sectionKey);
+    if (!$row) throw new Exception('That section was not found.');
+    if ($row['draft_content'] === null) throw new Exception('There is nothing new to submit. Make a change first.');
+    $stmt = getDB()->prepare("
+        UPDATE page_sections
+        SET review_status = 'pending', submitted_by = ?, submitted_at = ?, review_note = NULL, reviewed_by = NULL, reviewed_at = NULL
+        WHERE section_id = ?
+    ");
+    $stmt->execute([$_SESSION['user_id'] ?? null, date('Y-m-d H:i:s'), (int)$row['section_id']]);
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'SUBMIT', 'page_sections', (int)$row['section_id'], "Submitted {$pageSlug}/{$sectionKey} for approval");
+}
+
+/** Approver publishes a pending submission (reuses publishSection). */
+function approveSection(string $pageSlug, string $sectionKey): void {
+    if (!pageReviewReady()) throw new Exception('The approval feature is not set up yet.');
+    $row = getSectionDetailed($pageSlug, $sectionKey);
+    if (!$row) throw new Exception('That section was not found.');
+    if ($row['review_status'] !== 'pending') throw new Exception('This change is not waiting for approval (someone may have already reviewed it).');
+    if (!publishSection($pageSlug, $sectionKey)) throw new Exception('Could not publish. Please try again.');
+    $stmt = getDB()->prepare("UPDATE page_sections SET review_status = 'none', reviewed_by = ?, reviewed_at = ?, review_note = NULL WHERE section_id = ?");
+    $stmt->execute([$_SESSION['user_id'] ?? null, date('Y-m-d H:i:s'), (int)$row['section_id']]);
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'APPROVE', 'page_sections', (int)$row['section_id'], "Approved and published {$pageSlug}/{$sectionKey}");
+}
+
+/** Approver sends a pending submission back with a note. The draft is kept. */
+function rejectSection(string $pageSlug, string $sectionKey, string $note): void {
+    if (!pageReviewReady()) throw new Exception('The approval feature is not set up yet.');
+    $note = trim(preg_replace('/\s+/', ' ', $note));
+    if ($note === '') throw new Exception('Please write a short note so the editor knows what to change.');
+    if (mb_strlen($note) > 500) throw new Exception('The note is too long (maximum 500 characters).');
+    $row = getSectionDetailed($pageSlug, $sectionKey);
+    if (!$row) throw new Exception('That section was not found.');
+    if ($row['review_status'] !== 'pending') throw new Exception('This change is not waiting for approval (someone may have already reviewed it).');
+    $stmt = getDB()->prepare("UPDATE page_sections SET review_status = 'rejected', reviewed_by = ?, reviewed_at = ?, review_note = ? WHERE section_id = ?");
+    $stmt->execute([$_SESSION['user_id'] ?? null, date('Y-m-d H:i:s'), $note !== '' ? $note : null, (int)$row['section_id']]);
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'REJECT', 'page_sections', (int)$row['section_id'], "Requested changes on {$pageSlug}/{$sectionKey}");
+}
+
+/** Everything waiting for approval, oldest first. */
+function getPendingSections(): array {
+    if (!pageReviewReady()) return [];
+    try {
+        return getDB()->query("
+            SELECT ps.section_id, ps.section_key, ps.title AS section_title, ps.content, ps.draft_content,
+                   ps.submitted_at, p.slug AS page_slug, p.title AS page_title,
+                   CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS submitted_by_name
+            FROM page_sections ps
+            INNER JOIN pages p ON p.page_id = ps.page_id
+            LEFT JOIN users u ON u.user_id = ps.submitted_by
+            WHERE ps.review_status = 'pending'
+            ORDER BY ps.submitted_at ASC, ps.section_id ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('Get pending sections error: ' . $e->getMessage());
+        return [];
+    }
+}
+
+/** Pages + their combined status, for the Content Editor's content list. */
+function getContentHubPages(): array {
+    try {
+        $ready = pageReviewReady();
+        return getDB()->query("
+            SELECT p.page_id, p.slug, p.title, p.page_type, p.description, p.updated_at AS page_updated,
+                   MAX(ps.updated_at) AS sections_updated,
+                   COUNT(ps.section_id) AS section_count,
+                   SUM(CASE WHEN ps.draft_content IS NOT NULL THEN 1 ELSE 0 END) AS drafts"
+                   . ($ready ? ",
+                   SUM(CASE WHEN ps.review_status = 'pending'  THEN 1 ELSE 0 END) AS pending,
+                   SUM(CASE WHEN ps.review_status = 'rejected' THEN 1 ELSE 0 END) AS rejected" : ",
+                   0 AS pending, 0 AS rejected") . "
+            FROM pages p
+            LEFT JOIN page_sections ps ON ps.page_id = p.page_id
+            WHERE p.status = 'active'
+            GROUP BY p.page_id, p.slug, p.title, p.page_type, p.description, p.updated_at, p.display_order
+            ORDER BY p.display_order ASC, p.title ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('Get content hub pages error: ' . $e->getMessage());
+        return [];
+    }
+}
+
+function getContentHubPrograms(): array {
+    try {
+        return getDB()->query("
+            SELECT p.program_id, p.program_code, p.program_name, p.is_published, d.dept_name
+            FROM programs p LEFT JOIN departments d ON d.dept_id = p.dept_id
+            ORDER BY p.dept_id IS NULL, p.dept_id ASC, p.program_id ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('Get content hub programs error: ' . $e->getMessage());
+        return [];
+    }
+}
+
+function getContentHubEvents(): array {
+    try {
+        return getDB()->query("SELECT event_id, title, status, start_date, user_id FROM events ORDER BY start_date DESC LIMIT 200")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('Get content hub events error: ' . $e->getMessage());
+        return [];
+    }
+}
+
+function getContentHubDepartments(): array {
+    try {
+        return getDB()->query("SELECT dept_id, dept_name, slug, archived_at FROM departments ORDER BY dept_id ASC")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('Get content hub departments error: ' . $e->getMessage());
+        return [];
+    }
+}
+
+
+// ============================================================
 // COLLEGE DEPARTMENTS — CENTRALIZED LOGO + DEAN
 // ============================================================
 // One row in `departments` is the single source of truth for a
@@ -2016,6 +2555,7 @@ const DEPT_LOGO_MAX_BYTES = 5 * 1024 * 1024;   // 5 MB
 const DEPT_PDF_MAX_BYTES  = 20 * 1024 * 1024;  // 20 MB
 const DEPT_DEAN_PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const PRESIDENT_PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const ADMIN_PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB (Administration page photos)
 
 /**
  * Turn a PHP upload error code into a message an admin can act on.
@@ -2137,6 +2677,28 @@ function storeDepartmentUpload(array $file, string $kind): array {
             'mimes' => ['application/pdf' => 'pdf'],
             'bad'   => 'Invalid file. Only PDF files (.pdf) can be uploaded here.',
         ],
+        'program_image' => [
+            'label' => 'picture',
+            'max'   => 5 * 1024 * 1024,
+            'dir'   => 'programs',
+            'mimes' => ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'],
+            'bad'   => 'Invalid image type. Allowed: JPG, PNG, GIF, WEBP, SVG.',
+        ],
+        'history_image' => [
+            'label' => 'history photo',
+            'max'   => 10 * 1024 * 1024,
+            'dir'   => 'history',
+            'mimes' => ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'],
+            'bad'   => 'Invalid image type. Allowed: JPG, PNG, WEBP.',
+        ],
+        // Facility pictures (Programs > Facilities): same folder as other program pictures, but up to 10 MB.
+        'facility_image' => [
+            'label' => 'picture',
+            'max'   => PROGRAM_FACILITY_IMAGE_MAX_BYTES,
+            'dir'   => 'programs',
+            'mimes' => ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'],
+            'bad'   => 'Invalid image type. Allowed: JPG, PNG, WEBP.',
+        ],
         'dean_photo' => [
             'label' => 'dean photo',
             'max'   => DEPT_DEAN_PHOTO_MAX_BYTES,
@@ -2148,6 +2710,20 @@ function storeDepartmentUpload(array $file, string $kind): array {
             'label' => 'president photo',
             'max'   => PRESIDENT_PHOTO_MAX_BYTES,
             'dir'   => 'homepage',
+            'mimes' => ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'],
+            'bad'   => 'Invalid image type. Allowed: JPG, PNG, WEBP.',
+        ],
+        'homepage_image' => [
+            'label' => 'picture',
+            'max'   => 5 * 1024 * 1024,
+            'dir'   => 'homepage',
+            'mimes' => ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'],
+            'bad'   => 'Invalid image type. Allowed: JPG, PNG, GIF, WEBP.',
+        ],
+        'admin_photo' => [
+            'label' => 'photo',
+            'max'   => ADMIN_PHOTO_MAX_BYTES,
+            'dir'   => 'administration',
             'mimes' => ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'],
             'bad'   => 'Invalid image type. Allowed: JPG, PNG, WEBP.',
         ],
@@ -2170,7 +2746,7 @@ function storeDepartmentUpload(array $file, string $kind): array {
 
     $origExt = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
 
-    if ($kind === 'logo' && $origExt === 'svg') {
+    if (($kind === 'logo' || $kind === 'program_image') && $origExt === 'svg') {
         // SVG is checked and cleaned by parsing it (finfo can't be trusted to
         // recognise every valid SVG), then stored as a plain .svg.
         if (!sanitizeSvgFile($file['tmp_name'])) {
@@ -2204,6 +2780,10 @@ function storeDepartmentUpload(array $file, string $kind): array {
     }
 
     $filename = bin2hex(random_bytes(16)) . '.' . $ext;
+
+    if (in_array($kind, ['dean_photo', 'president_photo', 'admin_photo'], true)) {
+        photoCheckEnforce($file['tmp_name']);
+    }
 
     $uploadDir = __DIR__ . '/../uploads/' . $cfg['dir'] . '/';
     if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
@@ -2280,8 +2860,14 @@ function deleteMediaIfUnreferenced(int $mediaId): bool {
         ['page_sections',  'media_id'],
         ['departments',    'media_id'],
         ['programs',       'pdf_media_id'],
+        ['programs',       'image_media_id'],
+        ['programs',       'hero_media_id'],
+        ['programs',       'seal_media_id'],
+        ['program_items',  'image_media_id'],
         ['departments',    'dean_media_id'],
         ['homepage_president', 'media_id'],
+        ['admin_people',   'media_id'],
+        ['admin_offices',  'media_id'],
     ];
 
     try {
@@ -2401,6 +2987,185 @@ function getDepartmentBySlug(string $slug): ?array {
     } catch (Exception $e) {
         error_log('Get department by slug error: ' . $e->getMessage());
         return null;
+    }
+}
+
+/**
+ * Ensure the Graduate School has a department record so it can reuse the
+ * existing department and program editors. Existing records/content are left
+ * untouched. The four old static program pages are registered once so their
+ * programs can move onto the shared database-backed program template; the old
+ * PHP pages remain available for existing bookmarks during migration.
+ */
+function ensureGraduateSchoolDepartment(): ?array {
+    $dept = getDepartmentBySlug('graduate-school');
+    $created = false;
+    if (!$dept) {
+        try {
+            $dept = saveDepartmentDetails([
+                'dept_name' => 'Graduate School',
+                'description' => 'Postgraduate programs in education, business, and public administration.',
+                'hero_text' => 'Graduate School',
+                'about_text' => 'The Graduate School is committed to providing quality postgraduate education that develops highly competent professionals, responsible leaders, and innovative researchers. Through advanced learning, research, and professional development, the school prepares graduates to address emerging challenges in education, business, public administration, and other fields while contributing to the sustainable development of the nation and the preservation of Philippine culture and heritage.\n\nThrough these learning opportunities, the College prepares future educators and professionals to become competent, innovative, and socially responsible individuals who can effectively respond to the needs of their learners, communities, and professions.',
+                'facebook_url' => '', 'office_label' => 'Graduate School Office', 'theme_color' => '',
+            ]);
+            $created = true;
+        } catch (Throwable $e) {
+            error_log('Ensure Graduate School department error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    if ($created && $dept) {
+        try {
+            saveDepartmentDean((int)$dept['dept_id'], 'Lolita D. Nazal, Ed. D.', 'Dean',
+                'The Graduate School advances academic excellence, innovation, and service through postgraduate education.',
+                '(045) 900-4473 Loc. 106', 'info@gnc.edu.ph', 'BETA Hall, Floor 2, Room 202',
+                'Monday - Friday, 8:00 AM - 4:00 PM', null, false);
+        } catch (Throwable $e) {
+            error_log('Graduate School leadership migration error: ' . $e->getMessage());
+        }
+    }
+
+    if (!$dept || empty($dept['dept_id'])) return $dept;
+    $legacyPrograms = [
+        ['GS-PHD', 'Doctor of Philosophy (Educational Management)', 'The Ph.D. in Educational Management prepares educational leaders, researchers, and innovators through advanced study and research.'],
+        ['GS-MAED', 'Master of Arts in Education (Educational Management)', 'The Master of Arts in Education develops reflective, research-oriented education professionals and leaders.'],
+        ['GS-MBA', 'Master in Business Administration', 'The MBA develops strategic business leaders equipped to make sound decisions and support sustainable growth.'],
+        ['GS-MPA', 'Master in Public Administration', 'The MPA prepares public leaders for effective governance, responsive service, and community development.'],
+    ];
+    foreach ($legacyPrograms as [$code, $name, $description]) {
+        try {
+            $stmt = getDB()->prepare('SELECT program_id FROM programs WHERE program_code = ? LIMIT 1');
+            $stmt->execute([$code]);
+            $id = $stmt->fetchColumn();
+            if ($id === false) {
+                $id = createProgramPage([
+                    'program_code' => $code, 'program_name' => $name,
+                    'dept_id' => (int)$dept['dept_id'], 'theme' => 'green',
+                ]);
+                $stmt = getDB()->prepare('UPDATE programs SET description = ? WHERE program_id = ? AND dept_id = ?');
+                $stmt->execute([$description, $id, (int)$dept['dept_id']]);
+            } else {
+                $id = (int)$id;
+            }
+            graduateSchoolImportLegacyProgram((int)$id, $code);
+        } catch (Throwable $e) {
+            // Keep the rest of the site usable if a legacy code is already in
+            // use or the optional program-page schema is not installed yet.
+            error_log('Graduate School program migration error (' . $code . '): ' . $e->getMessage());
+        }
+    }
+    return getDepartmentBySlug('graduate-school') ?? $dept;
+}
+
+/** Import the text and card copy from a legacy static program page once. */
+function graduateSchoolImportLegacyProgram(int $programId, string $code): void {
+    $files = [
+        'GS-PHD' => 'phd-educ-mgt.php', 'GS-MAED' => 'ma-educ.php',
+        'GS-MBA' => 'ma-business-admin.php', 'GS-MPA' => 'ma-public-admin.php',
+    ];
+    if (!isset($files[$code])) return;
+    $source = __DIR__ . '/../pages/academics/graduate-school/programs/' . $files[$code];
+    $html = is_file($source) ? file_get_contents($source) : false;
+    if (!is_string($html) || $html === '') return;
+
+    require_once __DIR__ . '/../components/program-page-public.php';
+    $current = getProgramPageById($programId);
+    if (!$current) return;
+    $stored = json_decode((string)($current['page_content'] ?? ''), true);
+    if (is_array($stored) && $stored) return; // never overwrite editor changes
+
+    $text = static function (string $markup): string {
+        $value = html_entity_decode(strip_tags($markup), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return trim(preg_replace('/\s+/u', ' ', $value) ?? $value);
+    };
+    $section = static function (string $markup, string $class): string {
+        $q = preg_quote($class, '~');
+        return preg_match('~<section\b(?=[^>]*\bclass=["\'][^"\']*\b' . $q . '\b)[^>]*>(.*?)</section>~is', $markup, $m) ? $m[1] : '';
+    };
+    $firstClass = static function (string $markup, string $class) use ($text): string {
+        $q = preg_quote($class, '~');
+        if (!preg_match('~<([a-z0-9]+)\b(?=[^>]*\bclass=["\'][^"\']*\b' . $q . '\b)[^>]*>(.*?)</\1>~is', $markup, $m)) return '';
+        return $text($m[2]);
+    };
+    $firstAll = static function (string $markup, string $class) use ($text): array {
+        $q = preg_quote($class, '~');
+        preg_match_all('~<([a-z0-9]+)\b(?=[^>]*\bclass=["\'][^"\']*\b' . $q . '\b)[^>]*>(.*?)</\1>~is', $markup, $matches);
+        return array_map($text, $matches[2] ?? []);
+    };
+    $about = $section($html, 'template-about');
+    $why = $section($html, 'template-why');
+    $curriculum = $section($html, 'template-curriculum');
+    $career = $section($html, 'template-career');
+    $cta = $section($html, 'template-cta');
+    $texts = [
+        'subtitle' => $firstClass($html, 'template-subtitle'),
+        'hero_desc' => $firstClass($html, 'template-desc'),
+        'about_title' => $firstClass($about, 'template-section-title'),
+        'about_text' => $firstClass($about, 'template-section-text'),
+        'vision_title' => $firstClass($about, 'template-vm-card-title'),
+        'vision_text' => $firstClass($about, 'template-vm-card-text'),
+        'mission_title' => ($firstAll($about, 'template-vm-card-title')[1] ?? ''),
+        'mission_text' => ($firstAll($about, 'template-vm-card-text')[1] ?? ''),
+        'why_title' => $firstClass($why, 'template-section-title'),
+        'why_intro' => $firstClass($why, 'whychoose-subtitle'),
+        'curriculum_title' => $firstClass($curriculum, 'template-section-title'),
+        'curriculum_intro' => $firstClass($curriculum, 'template-section-text'),
+        'career_title' => $firstClass($career, 'template-section-title'),
+        'cta_title' => $firstClass($cta, 'template-cta-title'),
+        'cta_text' => $firstClass($cta, 'template-cta-desc'),
+        'cta_button' => $firstClass($cta, 'template-cta-btn'),
+    ];
+    if (preg_match('~data-bg=["\']([^"\']+)["\']~i', $html, $heroImage)
+        || preg_match('~background-image:\s*url\(["\']?([^"\')]+)["\']?\)~i', $html, $heroImage)) {
+        $texts['hero_image_path'] = $heroImage[1];
+    }
+    if (preg_match('~<img\b(?=[^>]*class=["\'][^"\']*\btemplate-seal\b)[^>]*src=["\']([^"\']+)["\']~i', $html, $sealImage)) {
+        $texts['seal_path'] = $sealImage[1];
+    }
+    $content = [];
+    foreach (array_keys(programPageContentFields()) as $key) $content[$key] = $texts[$key] ?? '';
+    $stmt = getDB()->prepare('UPDATE programs SET page_content = ? WHERE program_id = ? AND (page_content IS NULL OR page_content = "")');
+    $stmt->execute([json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $programId]);
+
+    // The text card rows use the same item saver as visual edits. Skip a list
+    // when it has already been migrated or edited.
+    foreach ([['whychoose-card', 'why', 'whychoose-title', 'whychoose-desc'], ['career-card', 'career', 'career-title', 'career-desc']] as [$cardClass, $type, $titleClass, $bodyClass]) {
+        $check = getDB()->prepare('SELECT COUNT(*) FROM program_items WHERE program_id = ? AND item_type = ?');
+        $check->execute([$programId, $type]);
+        if ((int)$check->fetchColumn() > 0) continue;
+        $fragment = $type === 'why' ? $why : $career;
+        $q = preg_quote($cardClass, '~');
+        preg_match_all('~<div\b(?=[^>]*\bclass=["\'][^"\']*\b' . $q . '\b)[^>]*>(.*?)(?=<div\b(?=[^>]*\bclass=["\'][^"\']*\b' . $q . '\b)[^>]*>|$)~is', $fragment, $cards);
+        $rows = [];
+        $images = [];
+        foreach ($cards[1] ?? [] as $card) {
+            $title = $firstClass($card, $titleClass);
+            if ($title === '') continue;
+            $rows[] = ['title' => $title, 'body' => $firstClass($card, $bodyClass)];
+            $images[] = preg_match('~<img\b[^>]*src=["\']([^"\']+)["\']~i', $card, $image) ? $image[1] : null;
+        }
+        if ($rows) {
+            $rows = array_slice($rows, 0, $type === 'why' ? 6 : 12);
+            saveProgramPageItems($programId, $type, $rows);
+            if ($type === 'career') {
+                $update = getDB()->prepare('UPDATE program_items SET image_path = ? WHERE program_id = ? AND item_type = ? AND display_order = ?');
+                foreach (array_slice($images, 0, count($rows)) as $i => $path) {
+                    if (is_string($path) && preg_match('~^/assets/images/[a-z0-9_./() -]+\.(?:png|jpe?g|webp|svg)$~i', $path)) {
+                        $update->execute([$path, $programId, 'career', $i + 1]);
+                    }
+                }
+            }
+        }
+    }
+
+    $check = getDB()->prepare('SELECT COUNT(*) FROM program_items WHERE program_id = ? AND item_type = ?');
+    $check->execute([$programId, 'badge']);
+    if ((int)$check->fetchColumn() === 0 && preg_match_all("~\\['icon'\\s*=>\\s*'([^']*)',\\s*'title'\\s*=>\\s*'([^']*)',\\s*'subtitle'\\s*=>\\s*'([^']*)'\\]~", $html, $badges, PREG_SET_ORDER)) {
+        $rows = [];
+        foreach ($badges as $badge) $rows[] = ['icon' => $badge[1], 'title' => $badge[2], 'subtitle' => $badge[3]];
+        if ($rows) saveProgramPageItems($programId, 'badge', array_slice($rows, 0, 6));
     }
 }
 
@@ -2555,12 +3320,82 @@ function saveDepartmentDean(
 }
 
 /**
+ * Rename one department: the name shown on the College Departments page and
+ * in each program's breadcrumb.
+ *
+ *  - Only the display name (dept_name) changes. The slug — which the page
+ *    filenames, links and logic use — is never touched, so no URL breaks.
+ *  - The name is trimmed and runs of whitespace are collapsed to one space.
+ *  - It is required, at most 255 characters (the column size), and can't be
+ *    the name of another department (so two cards never look identical).
+ *  - Saving the name it already has is not an error and changes nothing.
+ *
+ * Returns the refreshed department row. Throws Exception with a
+ * user-friendly message on validation failure.
+ */
+function saveDepartmentName(int $deptId, string $name): array {
+    $dept = getDepartmentById($deptId);
+    if (!$dept) {
+        throw new Exception('Department not found.');
+    }
+
+    $clean = preg_replace('/\s+/u', ' ', trim($name));
+    if ($clean === null) {
+        throw new Exception('The department name contains characters that can\'t be saved.');
+    }
+    $clean = trim($clean);
+    if ($clean === '') {
+        throw new Exception('Please enter a department name.');
+    }
+    if (mb_strlen($clean) > 255) {
+        throw new Exception('The department name is too long (maximum 255 characters).');
+    }
+
+    if ($clean === $dept['dept_name']) {
+        return $dept; // nothing changed
+    }
+
+    try {
+        $db = getDB();
+
+        // The column's collation is case-insensitive, so this also catches "college of nursing".
+        $stmt = $db->prepare("SELECT 1 FROM departments WHERE dept_id <> ? AND dept_name = ? LIMIT 1");
+        $stmt->execute([$deptId, $clean]);
+        if ($stmt->fetchColumn() !== false) {
+            throw new Exception('Another department is already named "' . $clean . '". Please choose a different name.');
+        }
+
+        $stmt = $db->prepare("UPDATE departments SET dept_name = ? WHERE dept_id = ?");
+        $stmt->execute([$clean, $deptId]);
+    } catch (PDOException $e) {
+        error_log('Save department name error: ' . $e->getMessage());
+        throw new Exception('Could not rename the department. Please try again.');
+    }
+
+    logActivity(
+        (int)($_SESSION['user_id'] ?? 0), 'UPDATE', 'departments', $deptId,
+        "Renamed department \"{$dept['dept_name']}\" to \"{$clean}\""
+    );
+
+    return getDepartmentById($deptId) ?? $dept;
+}
+
+/**
  * The slice of a department the Content Editor needs (JSON-safe).
  */
 function departmentAdminPayload(array $dept): array {
     return [
         'dept_id'         => (int)$dept['dept_id'],
+        'slug'            => $dept['slug'] ?? null,
         'name'            => $dept['dept_name'],
+        'dept_name'       => $dept['dept_name'],   // the editor's field key
+        'description'     => $dept['description']  ?? null,
+        'hero_text'       => $dept['hero_text']    ?? null,
+        'about_text'      => $dept['about_text']   ?? null,
+        'facebook_url'    => $dept['facebook_url'] ?? null,
+        'office_label'    => $dept['office_label'] ?? null,
+        'theme_color'     => $dept['theme_color']  ?? null,
+        'archived'        => !empty($dept['archived_at']),
         'logo_url'        => $dept['logo_url'] ?? null,
         'logo_name'       => !empty($dept['logo_url']) ? ($dept['logo_name'] ?? null) : null,
         'dean_name'       => $dept['dean_name']   ?? null,
@@ -2573,6 +3408,266 @@ function departmentAdminPayload(array $dept): array {
         'dean_photo_url'  => $dept['dean_photo_url']  ?? null,
         'dean_photo_name' => !empty($dept['dean_photo_url']) ? ($dept['dean_photo_name'] ?? null) : null,
     ];
+}
+
+// ============================================================
+// COLLEGE DEPARTMENTS — FULL CRUD
+// ============================================================
+// Everything below powers the Content Editor's College Departments
+// manager: creating departments, editing their core details, archiving
+// (hiding from the public site without losing data) and deleting them.
+// The public College Departments page and the generic department.php
+// template read the same `departments` rows, so every change here is
+// reflected on the website immediately. No department names, slugs or
+// IDs are hardcoded anywhere in the frontend.
+
+/**
+ * Generate a slug that is unique among `departments` (the column's
+ * collation is case-insensitive, so "CBA" and "cba" collide — that's
+ * intended). $excludeDeptId keeps a department's own slug out of the
+ * collision check when it is being regenerated around an existing row.
+ */
+function uniqueDepartmentSlug(string $name, ?int $excludeDeptId = null): string {
+    $base = generateSlug($name);
+    if ($base === '') {
+        $base = 'department';
+    }
+
+    $db   = getDB();
+    $slug = $base;
+    $i    = 2;
+    while (true) {
+        if ($excludeDeptId !== null) {
+            $stmt = $db->prepare("SELECT 1 FROM departments WHERE slug = ? AND dept_id <> ? LIMIT 1");
+            $stmt->execute([$slug, $excludeDeptId]);
+        } else {
+            $stmt = $db->prepare("SELECT 1 FROM departments WHERE slug = ? LIMIT 1");
+            $stmt->execute([$slug]);
+        }
+        if ($stmt->fetchColumn() === false) {
+            return $slug;
+        }
+        $slug = $base . '-' . $i++;
+    }
+}
+
+/**
+ * Validate + normalize the department "details" form. Returns the cleaned
+ * fields with empty strings converted to NULL (matching how the rest of
+ * this file stores optional text). Throws Exception with a user-safe
+ * message on any validation failure.
+ */
+function cleanDepartmentDetails(array $data): array {
+    $name = preg_replace('/\s+/u', ' ', trim((string)($data['dept_name'] ?? '')));
+    if ($name === null || trim($name) === '') {
+        throw new Exception('Please enter a department name.');
+    }
+    $name = trim($name);
+    if (mb_strlen($name) > 255) {
+        throw new Exception('The department name is too long (maximum 255 characters).');
+    }
+
+    $description = trim((string)($data['description'] ?? ''));
+    $aboutText   = trim((string)($data['about_text'] ?? ''));
+    if (mb_strlen($description) > 10000 || mb_strlen($aboutText) > 10000) {
+        throw new Exception('The description/about text is too long (maximum 10000 characters).');
+    }
+
+    $heroText = trim((string)($data['hero_text'] ?? ''));
+    if (mb_strlen($heroText) > 255) {
+        throw new Exception('The hero text is too long (maximum 255 characters).');
+    }
+
+    $officeLabel = trim((string)($data['office_label'] ?? ''));
+    if (mb_strlen($officeLabel) > 100) {
+        throw new Exception('The office label is too long (maximum 100 characters).');
+    }
+
+    $facebookUrl = trim((string)($data['facebook_url'] ?? ''));
+    if ($facebookUrl !== '') {
+        if (!preg_match('#^https?://#i', $facebookUrl)) {
+            throw new Exception('The Facebook URL must start with http:// or https:// (or leave it empty).');
+        }
+        if (mb_strlen($facebookUrl) > 255) {
+            throw new Exception('The Facebook URL is too long (maximum 255 characters).');
+        }
+    }
+
+    $themeColor = trim((string)($data['theme_color'] ?? ''));
+    if ($themeColor !== '' && !preg_match('/^#[0-9a-fA-F]{6}$/', $themeColor)) {
+        throw new Exception('The theme color must be a #RRGGBB value (e.g. #1F5E2C) or empty.');
+    }
+
+    $nullIfEmpty = fn(string $v): ?string => $v === '' ? null : $v;
+
+    return [
+        'dept_name'    => $name,
+        'description'  => $nullIfEmpty($description),
+        'about_text'   => $nullIfEmpty($aboutText),
+        'hero_text'    => $nullIfEmpty($heroText),
+        'facebook_url' => $nullIfEmpty($facebookUrl),
+        'office_label' => $nullIfEmpty($officeLabel),
+        'theme_color'  => $nullIfEmpty($themeColor),
+    ];
+}
+
+/**
+ * Two departments must never share a display name (the column collation is
+ * case-insensitive, so this also catches "college of nursing").
+ */
+function assertDepartmentNameAvailable(string $name, ?int $excludeDeptId): void {
+    $db = getDB();
+    if ($excludeDeptId !== null) {
+        $stmt = $db->prepare("SELECT 1 FROM departments WHERE dept_id <> ? AND dept_name = ? LIMIT 1");
+        $stmt->execute([$excludeDeptId, $name]);
+    } else {
+        $stmt = $db->prepare("SELECT 1 FROM departments WHERE dept_name = ? LIMIT 1");
+        $stmt->execute([$name]);
+    }
+    if ($stmt->fetchColumn() !== false) {
+        throw new Exception('Another department is already named "' . $name . '". Please choose a different name.');
+    }
+}
+
+/**
+ * Create (dept_id = 0) or update a department's core details: name,
+ * card description, department-page texts, Facebook URL, office label
+ * and theme color. The slug is generated automatically at creation and
+ * never changes afterwards, so renaming a department can never break an
+ * existing URL (see saveDepartmentName()).
+ *
+ * Returns the refreshed department row. Throws Exception with a
+ * user-friendly message on validation/storage failure.
+ */
+function saveDepartmentDetails(array $data): array {
+    $db      = getDB();
+    $deptId  = (int)($data['dept_id'] ?? 0);
+    $details = cleanDepartmentDetails($data);
+
+    try {
+        if ($deptId > 0) {
+            if (!getDepartmentById($deptId)) {
+                throw new Exception('Department not found.');
+            }
+            assertDepartmentNameAvailable($details['dept_name'], $deptId);
+
+            $stmt = $db->prepare("
+                UPDATE departments
+                SET dept_name = ?, description = ?, about_text = ?, hero_text = ?,
+                    facebook_url = ?, office_label = ?, theme_color = ?
+                WHERE dept_id = ?
+            ");
+            $stmt->execute([
+                $details['dept_name'],
+                $details['description'],
+                $details['about_text'],
+                $details['hero_text'],
+                $details['facebook_url'],
+                $details['office_label'],
+                $details['theme_color'],
+                $deptId,
+            ]);
+            logActivity((int)($_SESSION['user_id'] ?? 0), 'UPDATE', 'departments', $deptId,
+                'Updated details for ' . $details['dept_name']);
+        } else {
+            assertDepartmentNameAvailable($details['dept_name'], null);
+            $slug = uniqueDepartmentSlug($details['dept_name']);
+
+            $stmt = $db->prepare("
+                INSERT INTO departments (dept_name, slug, description, about_text, hero_text,
+                                         facebook_url, office_label, theme_color)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $details['dept_name'],
+                $slug,
+                $details['description'],
+                $details['about_text'],
+                $details['hero_text'],
+                $details['facebook_url'],
+                $details['office_label'],
+                $details['theme_color'],
+            ]);
+            $deptId = (int)$db->lastInsertId();
+            logActivity((int)($_SESSION['user_id'] ?? 0), 'CREATE', 'departments', $deptId,
+                'Created department: ' . $details['dept_name'] . ' (slug: ' . $slug . ')');
+        }
+    } catch (PDOException $e) {
+        error_log('Save department details error: ' . $e->getMessage());
+        throw new Exception('Could not save the department. Please try again.');
+    }
+
+    $dept = getDepartmentById($deptId);
+    if (!$dept) {
+        throw new Exception('Department not found.');
+    }
+    return $dept;
+}
+
+/**
+ * Permanently delete a department. Programs and announcements that point
+ * at it are NOT deleted — the FK constraints (fk_programs_dept,
+ * fk_ann_dept) detach them with ON DELETE SET NULL. The department's
+ * logo and dean photo are removed from disk/media_library only when no
+ * other record references them.
+ */
+function deleteDepartment(int $deptId): void {
+    $dept = getDepartmentById($deptId);
+    if (!$dept) {
+        throw new Exception('That department was already removed. Please refresh the page.');
+    }
+
+    $db = getDB();
+    try {
+        $stmt = $db->prepare("DELETE FROM departments WHERE dept_id = ?");
+        $stmt->execute([$deptId]);
+    } catch (PDOException $e) {
+        error_log('Delete department error: ' . $e->getMessage());
+        throw new Exception('Could not delete the department. Please try again.');
+    }
+
+    if (!empty($dept['media_id'])) {
+        deleteMediaIfUnreferenced((int)$dept['media_id']);
+    }
+    if (!empty($dept['dean_media_id'])) {
+        deleteMediaIfUnreferenced((int)$dept['dean_media_id']);
+    }
+
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'DELETE', 'departments', $deptId,
+        'Deleted department: ' . $dept['dept_name']);
+}
+
+/**
+ * Archive (hide from the public website, keep the data) or restore a
+ * department. Restoring puts it back on the College Departments page.
+ * Doing something that's already done is not an error.
+ */
+function setDepartmentArchived(int $deptId, bool $archive): array {
+    $dept = getDepartmentById($deptId);
+    if (!$dept) {
+        throw new Exception('Department not found.');
+    }
+
+    $isArchived = !empty($dept['archived_at']);
+    if ($isArchived === $archive) {
+        return $dept; // already in the requested state
+    }
+
+    $db = getDB();
+    try {
+        $stmt = $db->prepare($archive
+            ? "UPDATE departments SET archived_at = NOW() WHERE dept_id = ?"
+            : "UPDATE departments SET archived_at = NULL WHERE dept_id = ?");
+        $stmt->execute([$deptId]);
+    } catch (PDOException $e) {
+        error_log('Archive department error: ' . $e->getMessage());
+        throw new Exception('Could not update the department. Please try again.');
+    }
+
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'UPDATE', 'departments', $deptId,
+        ($archive ? 'Archived department: ' : 'Restored department: ') . $dept['dept_name']);
+
+    return getDepartmentById($deptId) ?? $dept;
 }
 
 // ============================================================
@@ -2733,7 +3828,8 @@ function homepagePresidentAdminPayload(array $row): array {
  *   dept_name / dept_slug — the department the program belongs to
  */
 function hydrateProgram(array $row): array {
-    $row['program_name'] = getProgramCategoryLabel($row['program_code'] ?? null);
+    $own = trim((string)($row['program_name'] ?? ''));          // programs.program_name (set in Content Editor)
+    $row['program_name'] = $own !== '' ? $own : getProgramCategoryLabel($row['program_code'] ?? null);
     $row['pdf_url']      = departmentFileExists($row['pdf_path'] ?? null) ? $row['pdf_path'] : null;
     if ($row['pdf_url'] === null) {
         $row['pdf_name'] = null;
@@ -2855,4 +3951,1904 @@ function programAdminPayload(array $program): array {
         'pdf_name'     => $program['pdf_name'] ?? null,
         'pdf_size'     => isset($program['pdf_size']) ? (int)$program['pdf_size'] : null,
     ];
+}
+
+
+// ============================================================
+// ADMINISTRATION PAGE  (About → Administration)
+// ============================================================
+// The four tabs of the public Administration page live in three tables:
+//   admin_sections — one row per tab (title, description, layout)
+//   admin_people   — the cards of the three "people" tabs
+//                    (Board of Trustees, Corporate Officers, Board of Administration)
+//   admin_offices  — the cards of "Heads of Student Services"
+//
+// Photos go through media_library like every other upload (media_id).
+// image_path always holds the card's current photo URL; for the photos that
+// shipped with the site it is the only value (/assets/images/...), because
+// those were never uploaded through the admin panel.
+//
+// A card can be ARCHIVED (archived_at set): it disappears from the public
+// page but stays in the database and can be restored from the editor.
+// Needs sql/administration-archive-migration.sql; until that is run the
+// editor simply hides its Archive buttons and everything else keeps working.
+//
+// Edited in:  Content Editor → Administration (components/administration-manager.php)
+// Saved by:   the admin_* actions in action/page-content-handler.php
+// Read by:    pages/about/administration.php via getAdministrationContent()
+//
+// Every function below that the editor calls throws an Exception with a
+// message that is safe to show to the admin; database errors are logged and
+// replaced with a generic message.
+
+/**
+ * Public URL of an Administration photo, or null when there is none or the
+ * file is missing on disk (so the page shows the school logo instead of a
+ * broken image). Allowed: uploaded photos and the photos bundled with the site.
+ */
+function administrationPhotoUrl(?string $webPath): ?string {
+    if (!$webPath || strpos($webPath, '..') !== false) {
+        return null;
+    }
+    if (strpos($webPath, '/uploads/') !== 0 && strpos($webPath, '/assets/images/') !== 0) {
+        return null;
+    }
+    return is_file(__DIR__ . '/..' . $webPath) ? $webPath : null;
+}
+
+/**
+ * True once sql/administration-archive-migration.sql has been run (both
+ * Administration card tables have an `archived_at` column). Checked once per
+ * request. When false, nothing is ever treated as archived.
+ */
+function administrationArchiveSupported(): bool {
+    static $supported = null;
+    if ($supported === null) {
+        $supported = true;
+        try {
+            $db = getDB();
+            foreach (['admin_people', 'admin_offices'] as $table) {
+                $stmt = $db->query("SHOW COLUMNS FROM `{$table}` LIKE 'archived_at'");
+                if (!$stmt || !$stmt->fetch()) {
+                    $supported = false;
+                    break;
+                }
+            }
+        } catch (Exception $e) {
+            $supported = false;
+        }
+    }
+    return $supported;
+}
+
+/**
+ * Every section with its cards, keyed by section key, in display order.
+ * Archived cards are left out unless $includeArchived is true (the editor).
+ * Shape (shared by the public page and the editor):
+ *   key, title, desc, layout ('people'|'offices'), can_archive,
+ *   people  => [ [id, name, role, image, archived, archived_at], ... ]
+ *   offices => [ [id, office, name, role, image, archived, archived_at,
+ *                 contact => [phone, email, location, hours],
+ *                 services => [string, ...]], ... ]
+ * Returns [] when the tables are missing or empty.
+ */
+function fetchAdministrationSections(bool $includeArchived = false): array {
+    try {
+        $db = getDB();
+        $canArchive = administrationArchiveSupported();
+
+        $rows = $db->query("
+            SELECT section_key, title, description, layout
+            FROM admin_sections
+            ORDER BY display_order ASC, section_key ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) {
+            return [];
+        }
+
+        $sections = [];
+        foreach ($rows as $r) {
+            $sections[$r['section_key']] = [
+                'key'     => $r['section_key'],
+                'title'   => (string)$r['title'],
+                'desc'    => (string)($r['description'] ?? ''),
+                'layout'  => $r['layout'] === 'offices' ? 'offices' : 'people',
+                'can_archive' => $canArchive,
+                'people'  => [],
+                'offices' => [],
+            ];
+        }
+
+        $archivedCol = $canArchive ? 'p.archived_at' : 'NULL';
+        $archivedFilter = ($canArchive && !$includeArchived) ? 'WHERE p.archived_at IS NULL' : '';
+        $people = $db->query("
+            SELECT p.person_id, p.section_key, p.name, p.role,
+                   COALESCE(m.file_path, p.image_path) AS photo,
+                   {$archivedCol} AS archived_at
+            FROM admin_people p
+            LEFT JOIN media_library m ON m.media_id = p.media_id
+            {$archivedFilter}
+            ORDER BY p.display_order ASC, p.person_id ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($people as $p) {
+            if (!isset($sections[$p['section_key']])) continue;
+            $sections[$p['section_key']]['people'][] = [
+                'id'    => (int)$p['person_id'],
+                'name'  => (string)$p['name'],
+                'role'  => (string)$p['role'],
+                'image' => administrationPhotoUrl($p['photo']),
+                'archived'    => $p['archived_at'] !== null,
+                'archived_at' => $p['archived_at'],
+            ];
+        }
+
+        $officeFilter = ($canArchive && !$includeArchived) ? 'WHERE o.archived_at IS NULL' : '';
+        $offices = $db->query("
+            SELECT o.*, COALESCE(m.file_path, o.image_path) AS photo
+            FROM admin_offices o
+            LEFT JOIN media_library m ON m.media_id = o.media_id
+            {$officeFilter}
+            ORDER BY o.display_order ASC, o.office_id ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($offices as $o) {
+            if (!isset($sections[$o['section_key']])) continue;
+            $services = preg_split('/\r\n|\r|\n/', (string)($o['services'] ?? ''));
+            $services = array_values(array_filter(array_map('trim', $services), 'strlen'));
+            $sections[$o['section_key']]['offices'][] = [
+                'id'       => (int)$o['office_id'],
+                'office'   => (string)$o['office_name'],
+                'name'     => (string)$o['head_name'],
+                'role'     => (string)$o['head_role'],
+                'image'    => administrationPhotoUrl($o['photo']),
+                'archived'    => $canArchive && ($o['archived_at'] ?? null) !== null,
+                'archived_at' => $canArchive ? ($o['archived_at'] ?? null) : null,
+                'contact'  => [
+                    'phone'    => (string)($o['phone'] ?? ''),
+                    'email'    => (string)($o['email'] ?? ''),
+                    'location' => (string)($o['location'] ?? ''),
+                    'hours'    => (string)($o['hours'] ?? ''),
+                ],
+                'services' => $services,
+            ];
+        }
+
+        return $sections;
+    } catch (Exception $e) {
+        error_log('Fetch administration sections error: ' . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Content for the public Administration page, keyed by section key — or
+ * null when the tables aren't set up / are empty, so the page can fall back
+ * to its built-in defaults. Archived cards are never included.
+ */
+function getAdministrationContent(): ?array {
+    $sections = fetchAdministrationSections();
+    return $sections ?: null;
+}
+
+/**
+ * The same content as a plain list (JSON-safe) for the Content Editor,
+ * archived cards included (flagged `archived`). An empty array means
+ * "tables not set up yet".
+ */
+function administrationAdminPayload(): array {
+    return array_values(fetchAdministrationSections(true));
+}
+
+/**
+ * One section row (key, title, layout), or null if it doesn't exist.
+ */
+function getAdministrationSectionRow(string $key): ?array {
+    try {
+        $stmt = getDB()->prepare("SELECT section_key, title, layout FROM admin_sections WHERE section_key = ?");
+        $stmt->execute([$key]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    } catch (Exception $e) {
+        error_log('Get administration section error: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Clean a single-line text field: collapse whitespace/newlines to single
+ * spaces, enforce the maximum length (in characters) and "required".
+ * $label is a phrase that reads naturally in the messages, e.g. "the name":
+ * "Please enter the name." / "The name is too long (maximum 255 characters)."
+ */
+function administrationCleanLine(string $value, int $max, string $label, bool $required = false): string {
+    $clean = preg_replace('/\s+/u', ' ', trim($value));
+    if ($clean === null) {
+        throw new Exception(ucfirst($label) . ' contains characters that can\'t be saved.');
+    }
+    $clean = trim($clean);
+    if ($required && $clean === '') {
+        throw new Exception('Please enter ' . $label . '.');
+    }
+    if (mb_strlen($clean) > $max) {
+        throw new Exception(ucfirst($label) . " is too long (maximum {$max} characters).");
+    }
+    return $clean;
+}
+
+/**
+ * Clean a multi-line text field (operating hours, services): one entry per
+ * line, each line trimmed, empty lines dropped, stored with "\n" newlines.
+ */
+function administrationCleanLines(string $value, int $max, string $label): string {
+    $lines = preg_split('/\r\n|\r|\n/', $value);
+    $lines = array_values(array_filter(array_map('trim', $lines), 'strlen'));
+    $clean = implode("\n", $lines);
+    if (mb_strlen($clean) > $max) {
+        throw new Exception("There's too much text in {$label} (maximum {$max} characters).");
+    }
+    return $clean;
+}
+
+/**
+ * Decide what an admin's photo choice means for one card:
+ *   new file uploaded  → store it (throws, storing nothing, if it's invalid)
+ *   "remove" ticked    → no photo
+ *   neither            → keep the current photo
+ * Returns [media_id|null, image_path|null, stored upload|null].
+ */
+function administrationResolvePhoto(?array $file, bool $remove, ?int $currentMediaId, ?string $currentPath): array {
+    $hasFile = !empty($file) && ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+    if ($hasFile) {
+        $stored = storeDepartmentUpload($file, 'admin_photo');
+        return [$stored['media_id'], $stored['path'], $stored];
+    }
+    if ($remove) {
+        return [null, null, null];
+    }
+    return [$currentMediaId, $currentPath, null];
+}
+
+/**
+ * Edit a tab's title and description.
+ */
+function saveAdministrationSection(string $sectionKey, string $title, string $description): void {
+    $title = administrationCleanLine($title, 255, 'the section title', true);
+
+    $description = trim(str_replace(["\r\n", "\r"], "\n", $description));
+    if (mb_strlen($description) > 2000) {
+        throw new Exception('The description is too long (maximum 2000 characters).');
+    }
+
+    if (!getAdministrationSectionRow($sectionKey)) {
+        throw new Exception('That section no longer exists. Please refresh the page.');
+    }
+
+    try {
+        $stmt = getDB()->prepare("
+            UPDATE admin_sections
+            SET title = ?, description = ?, updated_by = ?
+            WHERE section_key = ?
+        ");
+        $stmt->execute([$title, $description === '' ? null : $description, $_SESSION['user_id'] ?? null, $sectionKey]);
+    } catch (PDOException $e) {
+        error_log('Save administration section error: ' . $e->getMessage());
+        throw new Exception('Could not save the section. Please try again.');
+    }
+
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'UPDATE', 'admin_sections', null, "Administration: updated the \"{$title}\" heading");
+}
+
+/**
+ * Add a person card, or edit one ($personId > 0).
+ * New cards go to the end of their section.
+ */
+function saveAdministrationPerson(
+    int $personId,
+    string $sectionKey,
+    string $name,
+    string $role,
+    ?array $photoFile,
+    bool $removePhoto
+): void {
+    // Validate everything BEFORE storing the photo, so a bad form leaves nothing behind.
+    $name = administrationCleanLine($name, 255, 'the name', true);
+    $role = administrationCleanLine($role, 500, 'the position');
+
+    $db = getDB();
+    $current = null;
+
+    if ($personId > 0) {
+        try {
+            $stmt = $db->prepare("SELECT person_id, section_key, media_id, image_path FROM admin_people WHERE person_id = ?");
+            $stmt->execute([$personId]);
+            $current = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('Load administration person error: ' . $e->getMessage());
+            throw new Exception('Could not load this card. Please try again.');
+        }
+        if (!$current) {
+            throw new Exception('That card no longer exists. Please refresh the page.');
+        }
+        $sectionKey = $current['section_key'];
+    } else {
+        $section = getAdministrationSectionRow($sectionKey);
+        if (!$section || $section['layout'] !== 'people') {
+            throw new Exception('Please choose a valid section.');
+        }
+    }
+
+    $oldMediaId = ($current && $current['media_id'] !== null) ? (int)$current['media_id'] : null;
+    [$mediaId, $imagePath, $stored] = administrationResolvePhoto(
+        $photoFile, $removePhoto, $oldMediaId, $current['image_path'] ?? null
+    );
+
+    try {
+        if ($current) {
+            $stmt = $db->prepare("
+                UPDATE admin_people
+                SET name = ?, role = ?, media_id = ?, image_path = ?
+                WHERE person_id = ?
+            ");
+            $stmt->execute([$name, $role, $mediaId, $imagePath, $personId]);
+            $recordId = $personId;
+        } else {
+            $stmt = $db->prepare("SELECT COALESCE(MAX(display_order), 0) + 1 FROM admin_people WHERE section_key = ?");
+            $stmt->execute([$sectionKey]);
+            $nextOrder = (int)$stmt->fetchColumn();
+
+            $stmt = $db->prepare("
+                INSERT INTO admin_people (section_key, name, role, media_id, image_path, display_order)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([$sectionKey, $name, $role, $mediaId, $imagePath, $nextOrder]);
+            $recordId = (int)$db->lastInsertId();
+        }
+    } catch (PDOException $e) {
+        discardStoredDepartmentUpload($stored);
+        error_log('Save administration person error: ' . $e->getMessage());
+        throw new Exception('Could not save this card. Please try again.');
+    }
+
+    if ($oldMediaId !== null && $oldMediaId !== $mediaId) {
+        deleteMediaIfUnreferenced($oldMediaId);
+    }
+
+    logActivity(
+        (int)($_SESSION['user_id'] ?? 0), $current ? 'UPDATE' : 'CREATE', 'admin_people', $recordId,
+        'Administration: ' . ($current ? 'updated ' : 'added ') . $name
+    );
+}
+
+/**
+ * Add an office card (Heads of Student Services), or edit one ($officeId > 0).
+ * New cards go to the end of their section.
+ */
+function saveAdministrationOffice(
+    int $officeId,
+    string $sectionKey,
+    string $officeName,
+    string $headName,
+    string $headRole,
+    string $phone,
+    string $email,
+    string $location,
+    string $hours,
+    string $services,
+    ?array $photoFile,
+    bool $removePhoto
+): void {
+    // Validate everything BEFORE storing the photo, so a bad form leaves nothing behind.
+    $officeName = administrationCleanLine($officeName, 255, 'the office name', true);
+    $headName   = administrationCleanLine($headName, 255, 'the name of the head of office', true);
+    $headRole   = administrationCleanLine($headRole, 500, 'the position');
+    $phone      = administrationCleanLine($phone, 100, 'the contact number');
+    $email      = administrationCleanLine($email, 255, 'the email address');
+    $location   = administrationCleanLine($location, 255, 'the location');
+    $hours      = administrationCleanLines($hours, 500, 'the operating hours');
+    $services   = administrationCleanLines($services, 5000, 'the list of services');
+
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        throw new Exception('Please enter a valid email address, or leave it empty.');
+    }
+
+    $db = getDB();
+    $current = null;
+
+    if ($officeId > 0) {
+        try {
+            $stmt = $db->prepare("SELECT office_id, section_key, media_id, image_path FROM admin_offices WHERE office_id = ?");
+            $stmt->execute([$officeId]);
+            $current = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('Load administration office error: ' . $e->getMessage());
+            throw new Exception('Could not load this office. Please try again.');
+        }
+        if (!$current) {
+            throw new Exception('That office no longer exists. Please refresh the page.');
+        }
+        $sectionKey = $current['section_key'];
+    } else {
+        $section = getAdministrationSectionRow($sectionKey);
+        if (!$section || $section['layout'] !== 'offices') {
+            throw new Exception('Please choose a valid section.');
+        }
+    }
+
+    $oldMediaId = ($current && $current['media_id'] !== null) ? (int)$current['media_id'] : null;
+    [$mediaId, $imagePath, $stored] = administrationResolvePhoto(
+        $photoFile, $removePhoto, $oldMediaId, $current['image_path'] ?? null
+    );
+
+    // Empty optional fields are stored as NULL.
+    $orNull = function (string $v): ?string { return $v === '' ? null : $v; };
+
+    try {
+        if ($current) {
+            $stmt = $db->prepare("
+                UPDATE admin_offices
+                SET office_name = ?, head_name = ?, head_role = ?, media_id = ?, image_path = ?,
+                    phone = ?, email = ?, location = ?, hours = ?, services = ?
+                WHERE office_id = ?
+            ");
+            $stmt->execute([
+                $officeName, $headName, $headRole, $mediaId, $imagePath,
+                $orNull($phone), $orNull($email), $orNull($location), $orNull($hours), $orNull($services),
+                $officeId,
+            ]);
+            $recordId = $officeId;
+        } else {
+            $stmt = $db->prepare("SELECT COALESCE(MAX(display_order), 0) + 1 FROM admin_offices WHERE section_key = ?");
+            $stmt->execute([$sectionKey]);
+            $nextOrder = (int)$stmt->fetchColumn();
+
+            $stmt = $db->prepare("
+                INSERT INTO admin_offices
+                    (section_key, office_name, head_name, head_role, media_id, image_path,
+                     phone, email, location, hours, services, display_order)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $sectionKey, $officeName, $headName, $headRole, $mediaId, $imagePath,
+                $orNull($phone), $orNull($email), $orNull($location), $orNull($hours), $orNull($services),
+                $nextOrder,
+            ]);
+            $recordId = (int)$db->lastInsertId();
+        }
+    } catch (PDOException $e) {
+        discardStoredDepartmentUpload($stored);
+        error_log('Save administration office error: ' . $e->getMessage());
+        throw new Exception('Could not save this office. Please try again.');
+    }
+
+    if ($oldMediaId !== null && $oldMediaId !== $mediaId) {
+        deleteMediaIfUnreferenced($oldMediaId);
+    }
+
+    logActivity(
+        (int)($_SESSION['user_id'] ?? 0), $current ? 'UPDATE' : 'CREATE', 'admin_offices', $recordId,
+        'Administration: ' . ($current ? 'updated ' : 'added ') . $officeName
+    );
+}
+
+/**
+ * Delete a person card (and its uploaded photo, if nothing else uses it).
+ */
+function deleteAdministrationPerson(int $personId): void {
+    $db = getDB();
+    try {
+        $stmt = $db->prepare("SELECT name, media_id FROM admin_people WHERE person_id = ?");
+        $stmt->execute([$personId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('Load administration person error: ' . $e->getMessage());
+        throw new Exception('Could not delete this card. Please try again.');
+    }
+    if (!$row) {
+        throw new Exception('That card was already removed. Please refresh the page.');
+    }
+
+    try {
+        $stmt = $db->prepare("DELETE FROM admin_people WHERE person_id = ?");
+        $stmt->execute([$personId]);
+    } catch (PDOException $e) {
+        error_log('Delete administration person error: ' . $e->getMessage());
+        throw new Exception('Could not delete this card. Please try again.');
+    }
+
+    if ($row['media_id'] !== null) {
+        deleteMediaIfUnreferenced((int)$row['media_id']);
+    }
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'DELETE', 'admin_people', $personId, 'Administration: removed ' . $row['name']);
+}
+
+/**
+ * Delete an office card (and its uploaded photo, if nothing else uses it).
+ */
+function deleteAdministrationOffice(int $officeId): void {
+    $db = getDB();
+    try {
+        $stmt = $db->prepare("SELECT office_name, media_id FROM admin_offices WHERE office_id = ?");
+        $stmt->execute([$officeId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('Load administration office error: ' . $e->getMessage());
+        throw new Exception('Could not delete this office. Please try again.');
+    }
+    if (!$row) {
+        throw new Exception('That office was already removed. Please refresh the page.');
+    }
+
+    try {
+        $stmt = $db->prepare("DELETE FROM admin_offices WHERE office_id = ?");
+        $stmt->execute([$officeId]);
+    } catch (PDOException $e) {
+        error_log('Delete administration office error: ' . $e->getMessage());
+        throw new Exception('Could not delete this office. Please try again.');
+    }
+
+    if ($row['media_id'] !== null) {
+        deleteMediaIfUnreferenced((int)$row['media_id']);
+    }
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'DELETE', 'admin_offices', $officeId, 'Administration: removed ' . $row['office_name']);
+}
+
+/**
+ * Archive or restore one card (a person or an office).
+ *   archive → hidden from the public page, kept in the database
+ *   restore → shown again, at the end of its section
+ * Doing something that's already done (archiving an archived card) is not
+ * an error. $kind is 'person' or 'office'.
+ */
+function setAdministrationArchived(string $kind, int $id, bool $archive): void {
+    if (!administrationArchiveSupported()) {
+        throw new Exception('Archiving isn\'t set up yet. Ask your developer to run sql/administration-archive-migration.sql once, then reload this page.');
+    }
+
+    // Table and column names come from this fixed list, never from the request.
+    $map = [
+        'person' => ['admin_people',  'person_id', 'name'],
+        'office' => ['admin_offices', 'office_id', 'office_name'],
+    ];
+    if (!isset($map[$kind])) {
+        throw new Exception('Unknown card type.');
+    }
+    [$table, $idCol, $nameCol] = $map[$kind];
+    $db = getDB();
+
+    try {
+        $stmt = $db->prepare("SELECT section_key, `{$nameCol}` AS label, archived_at FROM `{$table}` WHERE `{$idCol}` = ?");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('Load administration card error: ' . $e->getMessage());
+        throw new Exception('Could not update this card. Please try again.');
+    }
+    if (!$row) {
+        throw new Exception('That card no longer exists. Please refresh the page.');
+    }
+
+    $isArchived = $row['archived_at'] !== null;
+    if ($isArchived === $archive) {
+        return; // already in the requested state
+    }
+
+    try {
+        if ($archive) {
+            $stmt = $db->prepare("UPDATE `{$table}` SET archived_at = NOW() WHERE `{$idCol}` = ?");
+            $stmt->execute([$id]);
+        } else {
+            $stmt = $db->prepare("SELECT COALESCE(MAX(display_order), 0) + 1 FROM `{$table}` WHERE section_key = ?");
+            $stmt->execute([$row['section_key']]);
+            $nextOrder = (int)$stmt->fetchColumn();
+
+            $stmt = $db->prepare("UPDATE `{$table}` SET archived_at = NULL, display_order = ? WHERE `{$idCol}` = ?");
+            $stmt->execute([$nextOrder, $id]);
+        }
+    } catch (PDOException $e) {
+        error_log('Archive administration card error: ' . $e->getMessage());
+        throw new Exception('Could not update this card. Please try again.');
+    }
+
+    logActivity(
+        (int)($_SESSION['user_id'] ?? 0), 'UPDATE', $table, $id,
+        'Administration: ' . ($archive ? 'archived ' : 'restored ') . $row['label']
+    );
+}
+
+function archiveAdministrationPerson(int $personId, bool $archive): void {
+    setAdministrationArchived('person', $personId, $archive);
+}
+
+function archiveAdministrationOffice(int $officeId, bool $archive): void {
+    setAdministrationArchived('office', $officeId, $archive);
+}
+
+/**
+ * Save a new card order for one section. $orderedIds are person_ids (or
+ * office_ids for the offices layout), first card first. Any cards the list
+ * doesn't mention keep their relative order after the listed ones.
+ */
+function reorderAdministration(string $sectionKey, array $orderedIds): void {
+    $section = getAdministrationSectionRow($sectionKey);
+    if (!$section) {
+        throw new Exception('That section no longer exists. Please refresh the page.');
+    }
+
+    // Table and column names come from this fixed list, never from the request.
+    [$table, $idCol] = $section['layout'] === 'offices'
+        ? ['admin_offices', 'office_id']
+        : ['admin_people', 'person_id'];
+
+    $db = getDB();
+    try {
+        $stmt = $db->prepare("SELECT `{$idCol}` FROM `{$table}` WHERE section_key = ? ORDER BY display_order ASC, `{$idCol}` ASC");
+        $stmt->execute([$sectionKey]);
+        $existing = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    } catch (PDOException $e) {
+        error_log('Load administration order error: ' . $e->getMessage());
+        throw new Exception('Could not save the new order. Please try again.');
+    }
+
+    $wanted = [];
+    foreach ($orderedIds as $id) {
+        $id = (int)$id;
+        if (!in_array($id, $existing, true)) {
+            throw new Exception('The new order includes a card that isn\'t in this section. Please refresh the page.');
+        }
+        if (!in_array($id, $wanted, true)) {
+            $wanted[] = $id;
+        }
+    }
+    $final = array_merge($wanted, array_values(array_diff($existing, $wanted)));
+
+    try {
+        $db->beginTransaction();
+        $upd = $db->prepare("UPDATE `{$table}` SET display_order = ? WHERE `{$idCol}` = ? AND section_key = ?");
+        foreach ($final as $position => $id) {
+            $upd->execute([$position + 1, $id, $sectionKey]);
+        }
+        $db->commit();
+    } catch (PDOException $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        error_log('Reorder administration error: ' . $e->getMessage());
+        throw new Exception('Could not save the new order. Please try again.');
+    }
+
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'UPDATE', $table, null, "Administration: reordered \"{$section['title']}\"");
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * College Departments — dynamic detail page: full program CRUD
+ * ───────────────────────────────────────────────────────────────────────── */
+
+const PROGRAM_IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+
+/**
+ * Validate + store a program card image, insert it into media_library.
+ * Mirrors storeDepartmentUpload() but standalone (that function's config
+ * list is local to it). Returns ['media_id','path','abs']; throws with a
+ * user-safe message on failure, leaving nothing behind.
+ */
+function storeProgramImageUpload(array $file): array {
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        throw new Exception(departmentUploadErrorMessage((int)($file['error'] ?? UPLOAD_ERR_NO_FILE), 'program image'));
+    }
+    if (!is_uploaded_file($file['tmp_name'])) {
+        throw new Exception('The program image upload failed. Please try again.');
+    }
+    if ($file['size'] > PROGRAM_IMAGE_MAX_BYTES) {
+        throw new Exception('The program image is too large. Maximum size is 5MB.');
+    }
+
+    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime  = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+    if (!isset($allowed[$mime]) || @getimagesize($file['tmp_name']) === false) {
+        throw new Exception('Invalid image type. Allowed: JPG, PNG, WEBP.');
+    }
+
+    $filename  = bin2hex(random_bytes(16)) . '.' . $allowed[$mime];
+    $uploadDir = __DIR__ . '/../uploads/programs/';
+    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
+        throw new Exception('The server could not create the upload folder for the program image.');
+    }
+    $destination = $uploadDir . $filename;
+    if (!move_uploaded_file($file['tmp_name'], $destination)) {
+        throw new Exception('Failed to save the uploaded program image.');
+    }
+    $filePath = '/uploads/programs/' . $filename;
+
+    $display = trim(preg_replace('/[^\p{L}\p{N}\s._()\-]+/u', '', basename((string)($file['name'] ?? ''))));
+    $display = mb_substr($display === '' ? $filename : $display, 0, 200);
+
+    try {
+        $db   = getDB();
+        $stmt = $db->prepare("
+            INSERT INTO media_library (file_name, file_type, file_size, file_path, created_by, created_at)
+            VALUES (?, ?, ?, ?, ?, NOW())
+        ");
+        $stmt->execute([$display, $allowed[$mime], (int)$file['size'], $filePath, $_SESSION['user_id'] ?? null]);
+        return ['media_id' => (int)$db->lastInsertId(), 'path' => $filePath, 'abs' => $destination];
+    } catch (Exception $e) {
+        @unlink($destination);
+        error_log('Program image media_library insert error: ' . $e->getMessage());
+        throw new Exception('Failed to record the program image in the media library.');
+    }
+}
+
+const PROGRAM_FULL_SELECT_SQL = "
+    SELECT p.*,
+           d.dept_name,
+           d.slug AS dept_slug,
+           pm.file_path AS pdf_path, pm.file_name AS pdf_name, pm.file_size AS pdf_size,
+           im.file_path AS image_path, im.file_name AS image_name
+    FROM programs p
+    LEFT JOIN departments d ON d.dept_id = p.dept_id
+    LEFT JOIN media_library pm ON pm.media_id = p.pdf_media_id
+    LEFT JOIN media_library im ON im.media_id = p.image_media_id
+";
+
+/**
+ * hydrateProgram() + the card image fields.
+ */
+function hydrateProgramFull(array $row): array {
+    $row = hydrateProgram($row);
+    $row['image_url'] = departmentFileExists($row['image_path'] ?? null) ? $row['image_path'] : null;
+    if ($row['image_url'] === null) {
+        $row['image_name'] = null;
+    }
+    return $row;
+}
+
+function getProgramFullById(int $programId): ?array {
+    try {
+        $stmt = getDB()->prepare(PROGRAM_FULL_SELECT_SQL . " WHERE p.program_id = ?");
+        $stmt->execute([$programId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? hydrateProgramFull($row) : null;
+    } catch (Exception $e) {
+        error_log('Get program full error: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Create ($data['program_id'] = 0) or update a program: code, department
+ * assignment, card description, and card image (upload / replace / remove).
+ *
+ *  - program_code must be one of getProgramCategories() and unique.
+ *  - The slug is generated from the code at creation and never changes
+ *    (same rule as departments — renames can't break URLs).
+ *  - dept_id of 0 / unknown means "unassigned" (NULL).
+ *
+ * Returns the refreshed program row. Throws Exception with a user-safe
+ * message on validation/storage failure.
+ */
+function saveProgramFull(array $data, ?array $imageFile, bool $removeImage): array {
+    assertProgramDepartmentAllowed((int)($data['dept_id'] ?? 0));
+    $db        = getDB();
+    $programId = (int)($data['program_id'] ?? 0);
+
+    // ── validate text first, so a bad form leaves nothing behind ──
+    $code = strtoupper(preg_replace('/\s+/', '', (string)($data['program_code'] ?? '')));
+    $valid = getProgramCategories();
+    if (!isset($valid[$code])) {
+        throw new Exception('Please choose a valid program.');
+    }
+
+    $deptId = (int)($data['dept_id'] ?? 0);
+    if ($deptId > 0) {
+        $stmt = $db->prepare("SELECT 1 FROM departments WHERE dept_id = ?");
+        $stmt->execute([$deptId]);
+        if ($stmt->fetchColumn() === false) {
+            $deptId = 0; // unknown department = unassigned, not an error
+        }
+    }
+
+    $description = trim((string)($data['description'] ?? ''));
+    if (mb_strlen($description) > 5000) {
+        throw new Exception('The program description is too long (maximum 5000 characters).');
+    }
+    $description = $description === '' ? null : $description;
+
+    // ── image ──
+    $hasImage = !empty($imageFile) && ($imageFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+    $newImage = $hasImage ? storeProgramImageUpload($imageFile) : null; // throws if invalid
+
+    $current    = null;
+    $oldImageId = null;
+    if ($programId > 0) {
+        $current = getProgramFullById($programId);
+        if (!$current) {
+            discardStoredDepartmentUpload($newImage);
+            throw new Exception('Program not found.');
+        }
+        $oldImageId = ($current['image_media_id'] ?? null) !== null ? (int)$current['image_media_id'] : null;
+    }
+    $imageId = $newImage ? $newImage['media_id'] : ($removeImage ? null : $oldImageId);
+
+    // ── unique code check (excluding self) ──
+    try {
+        if ($programId > 0) {
+            $stmt = $db->prepare("SELECT 1 FROM programs WHERE program_code = ? AND program_id <> ? LIMIT 1");
+            $stmt->execute([$code, $programId]);
+        } else {
+            $stmt = $db->prepare("SELECT 1 FROM programs WHERE program_code = ? LIMIT 1");
+            $stmt->execute([$code]);
+        }
+        if ($stmt->fetchColumn() !== false) {
+            discardStoredDepartmentUpload($newImage);
+            throw new Exception('That program already exists. Each program can only be added once.');
+        }
+    } catch (PDOException $e) {
+        discardStoredDepartmentUpload($newImage);
+        throw new Exception('Could not save the program. Please try again.');
+    }
+
+    try {
+        if ($programId > 0) {
+            $stmt = $db->prepare("
+                UPDATE programs
+                SET program_code = ?, dept_id = ?, description = ?, image_media_id = ?
+                WHERE program_id = ?
+            ");
+            $stmt->execute([$code, $deptId > 0 ? $deptId : null, $description, $imageId, $programId]);
+        } else {
+            $slug = generateSlug($valid[$code]); // e.g. "bachelor-of-elementary-education"
+            $stmt = $db->prepare("
+                INSERT INTO programs (program_code, slug, description, dept_id, image_media_id)
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([$code, $slug, $description, $deptId > 0 ? $deptId : null, $imageId]);
+            $programId = (int)$db->lastInsertId();
+        }
+    } catch (PDOException $e) {
+        discardStoredDepartmentUpload($newImage);
+        error_log('Save program full error: ' . $e->getMessage());
+        throw new Exception('Could not save the program. Please try again.');
+    }
+
+    if ($oldImageId !== null && $oldImageId !== $imageId) {
+        deleteMediaIfUnreferenced($oldImageId);
+    }
+
+    logActivity(
+        (int)($_SESSION['user_id'] ?? 0),
+        $current ? 'UPDATE' : 'CREATE',
+        'programs', $programId,
+        ($current ? 'Updated program: ' : 'Added program: ') . $valid[$code]
+    );
+
+    $program = getProgramFullById($programId);
+    if (!$program) {
+        throw new Exception('Program not found.');
+    }
+    return $program;
+}
+
+/**
+ * Permanently delete a program. Its card image and curriculum PDF are
+ * removed from disk/media_library only when nothing else references them.
+ */
+function deleteProgramFull(int $programId): void {
+    $program = getProgramFullById($programId);
+    if (!$program) {
+        throw new Exception('That program was already removed. Please refresh the page.');
+    }
+
+    try {
+        $stmt = getDB()->prepare("DELETE FROM programs WHERE program_id = ?");
+        $stmt->execute([$programId]);
+    } catch (PDOException $e) {
+        error_log('Delete program full error: ' . $e->getMessage());
+        throw new Exception('Could not delete the program. Please try again.');
+    }
+
+    if (!empty($program['image_media_id'])) {
+        deleteMediaIfUnreferenced((int)$program['image_media_id']);
+    }
+    if (!empty($program['pdf_media_id'])) {
+        deleteMediaIfUnreferenced((int)$program['pdf_media_id']);
+    }
+
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'DELETE', 'programs', $programId,
+        'Deleted program: ' . $program['program_name']);
+}
+
+/**
+ * The slice of a program the Admin Panel needs (JSON-safe).
+ */
+function programFullAdminPayload(array $p): array {
+    $payload = programAdminPayload($p);
+    $payload['dept_id']      = ($p['dept_id'] ?? null) !== null ? (int)$p['dept_id'] : null;
+    $payload['dept_name']    = $p['dept_name'] ?? null;
+    $payload['description']  = $p['description'] ?? null;
+    $payload['image_url']    = $p['image_url'] ?? null;
+    $payload['image_name']   = !empty($p['image_url']) ? ($p['image_name'] ?? null) : null;
+    return $payload;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * PROGRAM PAGES — the dynamic program page (program.php?slug=...)
+ * Needs sql/program-page-migration.sql.
+ * Public side: components/program-page-public.php.
+ * Admin side:  components/program-page-manager.php + admin/action/program-page-handler.php.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/** Max rows per repeating list on a program page. */
+function programPageItemLimits(): array {
+    return ['badge' => 6, 'core_value' => 12, 'why' => 12, 'career' => 12, 'uniform' => 8, 'facility' => 24, 'hero_slide' => 8];
+}
+
+/**
+ * Create a new program (the "Add a program" button). It starts hidden-proof:
+ * published, in the chosen colour, with its page ready to fill in.
+ * Returns the new program_id. Throws Exception with a user-safe message.
+ */
+function createProgramPage(array $data): int {
+    assertProgramDepartmentAllowed((int)($data['dept_id'] ?? 0));
+    $db = getDB();
+
+    $code = trim((string)($data['program_code'] ?? ''));
+    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9-]{1,9}$/', $code)) {
+        throw new Exception('The short code must be 2–10 letters or numbers (a dash is allowed), for example BSBA-MM.');
+    }
+    $name = trim(preg_replace('/\s+/', ' ', (string)($data['program_name'] ?? '')));
+    if ($name === '') {
+        throw new Exception('Please enter the full program name.');
+    }
+    if (mb_strlen($name) > 255) {
+        throw new Exception('The program name is too long (maximum 255 characters).');
+    }
+
+    $deptId = (int)($data['dept_id'] ?? 0);
+    if ($deptId > 0) {
+        $stmt = $db->prepare("SELECT 1 FROM departments WHERE dept_id = ?");
+        $stmt->execute([$deptId]);
+        if ($stmt->fetchColumn() === false) $deptId = 0;
+    }
+
+    $accent = programPageResolveTheme($data['theme'] ?? '', $data['theme_custom'] ?? '');
+
+    try {
+        $stmt = $db->prepare("SELECT 1 FROM programs WHERE program_code = ? LIMIT 1");
+        $stmt->execute([$code]);
+        if ($stmt->fetchColumn() !== false) {
+            throw new Exception('A program with that short code already exists.');
+        }
+
+        // Slug: from the code; numbered if somebody already has it. Never changes later.
+        $base = generateSlug($code) ?: 'program';
+        $slug = $base;
+        for ($n = 2; $n < 50; $n++) {
+            $stmt = $db->prepare("SELECT 1 FROM programs WHERE slug = ? UNION SELECT 1 FROM slug_history WHERE old_slug = ? AND `type` = 'program' LIMIT 1");
+            $stmt->execute([$slug, $slug]);
+            if ($stmt->fetchColumn() === false) break;
+            $slug = $base . '-' . $n;
+        }
+
+        $stmt = $db->prepare("
+            INSERT INTO programs (program_code, slug, program_name, dept_id, theme_color, theme_color_light, is_published, core_values_enabled)
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+        ");
+        $stmt->execute([
+            $code, $slug, $name, $deptId > 0 ? $deptId : null,
+            $accent['accent'], $accent['light'],
+            !empty($data['core_values_enabled']) ? 1 : 0,
+        ]);
+        $programId = (int)$db->lastInsertId();
+    } catch (PDOException $e) {
+        error_log('Create program page error: ' . $e->getMessage());
+        throw new Exception('Could not add the program. Please try again.');
+    }
+
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'CREATE', 'programs', $programId, 'Added program: ' . $name);
+    return $programId;
+}
+
+/**
+ * Pick the accent/light pair from a preset key, or from a custom #hex.
+ * Falls back to green.
+ */
+function programPageResolveTheme($presetKey, $custom): array {
+    require_once __DIR__ . '/../components/program-page-public.php';
+    $presets = programPageThemePresets();
+    $key = (string)$presetKey;
+    if ($key === 'custom') {
+        $hex = programPageNormalizeHex($custom);
+        if ($hex === null) {
+            throw new Exception('Please enter the custom colour as a hex code like #1A7F5A.');
+        }
+        $rgb   = programPageHexToRgb($hex);
+        $light = programPageRgbToHex([255 - (255 - $rgb[0]) * 0.12, 255 - (255 - $rgb[1]) * 0.12, 255 - (255 - $rgb[2]) * 0.12]);
+        return ['accent' => $hex, 'light' => $light];
+    }
+    $p = $presets[$key] ?? $presets['green'];
+    return ['accent' => $p['accent'], 'light' => $p['light']];
+}
+
+/**
+ * Save everything in the "Details" tab of one program: name, department,
+ * card text, colour, core-values switch, visibility, every text field of the
+ * page, and the hero / seal pictures.
+ *
+ * $files: ['hero' => $_FILES[..]|null, 'seal' => ...]; $remove: ['hero' => bool, 'seal' => bool]
+ * Returns the refreshed program (getProgramPageById). Throws Exception.
+ */
+function saveProgramPageDetails(int $programId, array $data, array $files = [], array $remove = []): array {
+    assertProgramDepartmentAllowed((int)($data['dept_id'] ?? 0));
+    require_once __DIR__ . '/../components/program-page-public.php';
+    $db = getDB();
+
+    $current = getProgramPageById($programId);
+    if (!$current) {
+        throw new Exception('Program not found.');
+    }
+
+    // ── text ──
+    $name = trim(preg_replace('/\s+/', ' ', (string)($data['program_name'] ?? '')));
+    if ($name === '') throw new Exception('The program name can\'t be empty.');
+    if (mb_strlen($name) > 255) throw new Exception('The program name is too long (maximum 255 characters).');
+
+    $card = trim((string)($data['description'] ?? ''));
+    if (mb_strlen($card) > 5000) throw new Exception('The short description is too long (maximum 5000 characters).');
+
+    $deptId = (int)($data['dept_id'] ?? 0);
+    if ($deptId > 0) {
+        $stmt = $db->prepare("SELECT 1 FROM departments WHERE dept_id = ?");
+        $stmt->execute([$deptId]);
+        if ($stmt->fetchColumn() === false) $deptId = 0;
+    }
+
+    $accent = programPageResolveTheme($data['theme'] ?? '', $data['theme_custom'] ?? '');
+
+    $content = [];
+    foreach (programPageContentFields() as $key => $spec) {
+        $val = trim(str_replace("\r\n", "\n", (string)($data['c_' . $key] ?? '')));
+        if ($spec['type'] === 'icon') {
+            $val = programPageCleanIcon($val, '');
+        } elseif ($spec['type'] === 'path') {
+            // Static pictures can't be typed in by hand: keep what is stored.
+            $val = $current['content'][$key];
+        } elseif ($spec['type'] === 'text') {
+            $val = preg_replace('/\s+/', ' ', $val);
+        }
+        if (mb_strlen($val) > $spec['max']) {
+            throw new Exception('One of the texts is too long (' . str_replace('_', ' ', $key) . ': maximum ' . $spec['max'] . ' characters).');
+        }
+        if ($key === 'cta_link' && $val !== '' && !preg_match('#^(/|https?://)#i', $val)) {
+            throw new Exception('The button link must start with / or https://');
+        }
+        $content[$key] = $val;
+    }
+
+    // ── pictures (validate + store first, so a bad file changes nothing) ──
+    $new = ['hero' => null, 'seal' => null];
+    try {
+        foreach (['hero', 'seal'] as $slot) {
+            $f = $files[$slot] ?? null;
+            if (!empty($f) && ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                $new[$slot] = storeDepartmentUpload($f, 'program_image');
+            }
+        }
+    } catch (Exception $e) {
+        discardStoredDepartmentUpload($new['hero']);
+        discardStoredDepartmentUpload($new['seal']);
+        throw $e;
+    }
+
+    $oldHero = !empty($current['hero_media_id']) ? (int)$current['hero_media_id'] : null;
+    $oldSeal = !empty($current['seal_media_id']) ? (int)$current['seal_media_id'] : null;
+    $heroId  = $new['hero'] ? $new['hero']['media_id'] : (!empty($remove['hero']) ? null : $oldHero);
+    $sealId  = $new['seal'] ? $new['seal']['media_id'] : (!empty($remove['seal']) ? null : $oldSeal);
+    // Removing a picture also drops the built-in one it was falling back to.
+    if (!$new['hero'] && !empty($remove['hero'])) $content['hero_image_path'] = '';
+    if (!$new['seal'] && !empty($remove['seal'])) $content['seal_path'] = '';
+
+    try {
+        $stmt = $db->prepare("
+            UPDATE programs
+            SET program_name = ?, description = ?, dept_id = ?, theme_color = ?, theme_color_light = ?,
+                core_values_enabled = ?, is_published = ?, hero_media_id = ?, seal_media_id = ?, page_content = ?
+            WHERE program_id = ?
+        ");
+        $stmt->execute([
+            $name, $card === '' ? null : $card, $deptId > 0 ? $deptId : null,
+            $accent['accent'], $accent['light'],
+            !empty($data['core_values_enabled']) ? 1 : 0,
+            !empty($data['is_published']) ? 1 : 0,
+            $heroId, $sealId,
+            json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            $programId,
+        ]);
+    } catch (PDOException $e) {
+        discardStoredDepartmentUpload($new['hero']);
+        discardStoredDepartmentUpload($new['seal']);
+        error_log('Save program page error: ' . $e->getMessage());
+        throw new Exception('Could not save the program. Please try again.');
+    }
+
+    if ($oldHero !== null && $oldHero !== $heroId) deleteMediaIfUnreferenced($oldHero);
+    if ($oldSeal !== null && $oldSeal !== $sealId) deleteMediaIfUnreferenced($oldSeal);
+
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'UPDATE', 'programs', $programId, 'Updated program page: ' . $name);
+    return getProgramPageById($programId) ?? $current;
+}
+
+/** Largest single facility picture. Keep in step with the "MB" limit in the Program details form (components/program-page-manager.php). */
+const PROGRAM_FACILITY_IMAGE_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+
+/**
+ * Facility pictures only: JPG / PNG / WEBP, up to 10 MB, and it must really be
+ * an image (not just a renamed file). Throws Exception with a user-safe message.
+ * $f is one $_FILES entry.
+ */
+function programPageCheckFacilityImage(array $f): void {
+    $max = PROGRAM_FACILITY_IMAGE_MAX_BYTES;
+    $err = $f['error'] ?? UPLOAD_ERR_OK;
+    if ($err !== UPLOAD_ERR_OK) {
+        if (in_array($err, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+            throw new Exception('A facility picture is too large. The maximum size is 10 MB.');
+        }
+        throw new Exception('A facility picture could not be uploaded. Please try again.');
+    }
+    if ((int)($f['size'] ?? 0) > $max) {
+        throw new Exception('A facility picture is too large. The maximum size is 10 MB.');
+    }
+    $ext = strtolower(pathinfo((string)($f['name'] ?? ''), PATHINFO_EXTENSION));
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+        throw new Exception('Facility pictures must be JPG, PNG or WEBP.');
+    }
+    $tmp  = (string)($f['tmp_name'] ?? '');
+    $info = ($tmp !== '' && is_readable($tmp)) ? @getimagesize($tmp) : false;
+    $okTypes = [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP];
+    if (!$info || !in_array($info[2], $okTypes, true)) {
+        throw new Exception('One of the facility files is not a valid JPG, PNG or WEBP picture.');
+    }
+    if ($info[0] * $info[1] > 40000000) {
+        throw new Exception('A facility picture has too many pixels. Please use a smaller photo.');
+    }
+}
+
+/**
+ * Top-banner slideshow of a program page ("hero_slide" items): one PICTURE or VIDEO per slide.
+ * Stored in /uploads/program-banners/ (not in the media library, like the homepage slideshow).
+ * Pictures: JPG, PNG, WEBP, GIF up to 10 MB. Videos: MP4 or WEBM up to 50 MB.
+ * $f is one $_FILES entry. Returns ['type' => 'image'|'video', 'path' => '/uploads/program-banners/x.ext', 'abs' => absolute path].
+ * Throws Exception with a user-safe message.
+ */
+function programPageStoreBannerMedia(array $f): array {
+    $err = $f['error'] ?? UPLOAD_ERR_NO_FILE;
+    if ($err !== UPLOAD_ERR_OK) {
+        if (in_array($err, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+            throw new Exception('A banner file is too large for this server (see upload_max_filesize and post_max_size in php.ini). Pictures can be up to 10 MB and videos up to 50 MB.');
+        }
+        throw new Exception('A banner file could not be uploaded. Please try again.');
+    }
+    $tmp = (string)($f['tmp_name'] ?? '');
+    if ($tmp === '' || !is_uploaded_file($tmp)) {
+        throw new Exception('A banner file could not be uploaded. Please try again.');
+    }
+
+    $images = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+    $videos = ['video/mp4' => 'mp4', 'video/webm' => 'webm'];
+
+    // Trust the file's real content, never the browser-supplied type or extension.
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime  = finfo_file($finfo, $tmp);
+    finfo_close($finfo);
+
+    if (isset($images[$mime])) {
+        $type = 'image'; $ext = $images[$mime]; $max = 10 * 1024 * 1024;
+        if (@getimagesize($tmp) === false) {
+            throw new Exception('One of the banner pictures is not a valid picture.');
+        }
+    } elseif (isset($videos[$mime])) {
+        $type = 'video'; $ext = $videos[$mime]; $max = 50 * 1024 * 1024;
+    } else {
+        throw new Exception('Banner slides must be a picture (JPG, PNG, WEBP, GIF) or a video (MP4, WEBM).');
+    }
+    if ((int)($f['size'] ?? 0) > $max) {
+        throw new Exception('A banner file is too large. The maximum is ' . ($type === 'video' ? '50 MB for a video' : '10 MB for a picture') . '.');
+    }
+
+    $dir = __DIR__ . '/../uploads/program-banners/';
+    if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
+        throw new Exception('The server could not create the upload folder for banner slides.');
+    }
+    $name = bin2hex(random_bytes(16)) . '.' . $ext;
+    if (!move_uploaded_file($tmp, $dir . $name)) {
+        throw new Exception('Failed to save a banner file.');
+    }
+    return ['type' => $type, 'path' => '/uploads/program-banners/' . $name, 'abs' => $dir . $name];
+}
+
+/** Delete a banner file we stored (only inside /uploads/program-banners/; anything else is left alone). */
+function programPageDeleteBannerFile(?string $webPath): void {
+    $webPath = (string)$webPath;
+    if (strpos($webPath, '/uploads/program-banners/') !== 0 || strpos($webPath, '..') !== false) return;
+    $abs = __DIR__ . '/..' . $webPath;
+    if (is_file($abs)) @unlink($abs);
+}
+
+/**
+ * program_items.item_type may be an ENUM that does not list 'hero_slide' yet. Add the value once
+ * (needs ALTER permission); otherwise tell the admin the one line to run. Nothing happens when
+ * the column is already a VARCHAR or already lists the value.
+ */
+function programPageEnsureItemType(string $type): void {
+    static $done = [];
+    if (isset($done[$type])) return;
+    try {
+        $db  = getDB();
+        $col = $db->query("SHOW COLUMNS FROM program_items LIKE 'item_type'")->fetch(PDO::FETCH_ASSOC);
+        $def = (string)($col['Type'] ?? '');
+        if (stripos($def, 'enum(') === 0 && stripos($def, "'" . $type . "'") === false) {
+            preg_match_all("/'((?:[^']|'')*)'/", $def, $m);
+            $vals = array_map(function ($v) { return "'" . $v . "'"; }, $m[1]);
+            $vals[] = "'" . $type . "'";
+            $sql = 'ALTER TABLE program_items MODIFY item_type ENUM(' . implode(',', $vals) . ')'
+                 . ((($col['Null'] ?? 'NO') === 'NO') ? ' NOT NULL' : ' NULL');
+            if (($col['Default'] ?? null) !== null) $sql .= ' DEFAULT ' . $db->quote((string)$col['Default']);
+            $db->exec($sql);
+        }
+        $done[$type] = true;
+    } catch (Throwable $t) {
+        error_log('program_items item_type update error: ' . $t->getMessage());
+        throw new Exception('One-time database update needed. In phpMyAdmin run: ALTER TABLE program_items MODIFY item_type VARCHAR(30) NOT NULL;  then try again.');
+    }
+}
+
+/** PHP's memory_limit in bytes (0 = unlimited). */
+function programPageMemoryLimitBytes(): int {
+    $v = trim((string)ini_get('memory_limit'));
+    if ($v === '' || $v === '-1') return 0;
+    $n = (int)$v;
+    switch (strtolower(substr($v, -1))) {
+        case 'g': $n *= 1024;
+        case 'm': $n *= 1024;
+        case 'k': $n *= 1024;
+    }
+    return $n;
+}
+
+/**
+ * Shrink a stored picture so it loads fast: the LONG side is scaled down to at
+ * most $maxSide px (1920 = "1080p": a 4K 3840x2160 photo becomes 1920x1080;
+ * portrait photos are limited the same way), and phone photos are turned the
+ * right way up (EXIF) before the metadata is dropped. Never enlarges. Best
+ * effort: on any problem the original file is left exactly as uploaded.
+ */
+function programPageOptimizeImage(int $mediaId, int $maxSide = 1920): void {
+    try {
+        if (!function_exists('imagecreatetruecolor')) return;
+        $stmt = getDB()->prepare("SELECT file_path FROM media_library WHERE media_id = ?");
+        $stmt->execute([$mediaId]);
+        $web = (string)$stmt->fetchColumn();
+        if ($web === '' || strpos($web, '..') !== false || strpos($web, '/uploads/') !== 0) return;
+        $file = __DIR__ . '/..' . $web;
+        if (!is_file($file)) return;
+
+        $info = @getimagesize($file);
+        if (!$info) return;
+        [$w, $h, $type] = $info;
+
+        // A big camera photo (e.g. 24 megapixels) needs roughly 5 bytes per pixel to open and resize. Ask for more
+        // memory, and if there still isn't enough, keep the original file as uploaded instead of crashing the request.
+        $needBytes = (int)($w * $h * 5) + 32 * 1024 * 1024;
+        $limit = programPageMemoryLimitBytes();
+        if ($limit > 0 && $limit < $needBytes) {
+            @ini_set('memory_limit', (string)max((int)ceil($needBytes / 1048576), 256) . 'M');
+            $limit = programPageMemoryLimitBytes();
+        }
+        if ($limit > 0 && $limit - memory_get_usage(true) < $needBytes) {
+            error_log('Optimize image skipped (not enough memory for ' . $w . 'x' . $h . '): raise memory_limit in php.ini');
+            return;
+        }
+
+        $orient = 1;
+        if ($type === IMAGETYPE_JPEG && function_exists('exif_read_data')) {
+            $exif = @exif_read_data($file);
+            $orient = (int)($exif['Orientation'] ?? 1);
+        }
+        if (max($w, $h) <= $maxSide && $orient === 1) return;
+
+        if ($type === IMAGETYPE_JPEG)      $img = @imagecreatefromjpeg($file);
+        elseif ($type === IMAGETYPE_PNG)   $img = @imagecreatefrompng($file);
+        elseif ($type === IMAGETYPE_WEBP)  $img = function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($file) : false;
+        else return;
+        if (!$img) return;
+
+        $angle = [3 => 180, 6 => -90, 8 => 90][$orient] ?? 0;
+        if ($angle !== 0) {
+            $rot = imagerotate($img, $angle, 0);
+            if ($rot) { imagedestroy($img); $img = $rot; }
+        }
+        $sw = imagesx($img); $sh = imagesy($img);
+        if (max($sw, $sh) > $maxSide) {
+            $k  = $maxSide / max($sw, $sh);
+            $scaled = imagescale($img, max(1, (int)round($sw * $k)), max(1, (int)round($sh * $k)), IMG_BICUBIC);
+            if ($scaled) { imagedestroy($img); $img = $scaled; }
+        }
+        if ($type !== IMAGETYPE_JPEG) {
+            imagealphablending($img, false);
+            imagesavealpha($img, true);
+        }
+
+        $tmp = $file . '.opt';
+        if ($type === IMAGETYPE_JPEG)     $ok = imagejpeg($img, $tmp, 82);
+        elseif ($type === IMAGETYPE_PNG)  $ok = imagepng($img, $tmp, 6);
+        else                              $ok = function_exists('imagewebp') && imagewebp($img, $tmp, 82);
+        imagedestroy($img);
+
+        if ($ok && is_file($tmp) && filesize($tmp) > 0) {
+            rename($tmp, $file);
+            clearstatcache(true, $file);
+            $up = getDB()->prepare("UPDATE media_library SET file_size = ? WHERE media_id = ?");
+            $up->execute([filesize($file), $mediaId]);
+        } elseif (is_file($tmp)) {
+            @unlink($tmp);
+        }
+    } catch (Throwable $e) {
+        error_log('Optimize image error: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Replace one repeating list of a program page (badges, core values,
+ * why-choose cards, careers or uniform pictures) with the submitted one.
+ *
+ * $rows: list of ['item_id' => int (0 = new), 'title', 'subtitle', 'body',
+ *        'icon', 'letter', 'remove_image' => bool, 'file' => $_FILES entry|null]
+ * in the order they should appear. Rows missing from the list are deleted.
+ * Returns the refreshed items of that type. Throws Exception.
+ */
+function saveProgramPageItems(int $programId, string $type, array $rows): array {
+    require_once __DIR__ . '/../components/program-page-public.php';
+    $limits = programPageItemLimits();
+    if (!isset($limits[$type])) throw new Exception('Unknown list.');
+    $program = getProgramPageById($programId);
+    if (!$program) throw new Exception('Program not found.');
+    if (count($rows) > $limits[$type]) {
+        throw new Exception('You can add at most ' . $limits[$type] . ' items here.');
+    }
+
+    $hasImage = in_array($type, ['career', 'uniform', 'facility', 'hero_slide'], true);   // 'why' cards are text only
+    if ($type === 'hero_slide') programPageEnsureItemType('hero_slide');
+    $db = getDB();
+
+    $stmt = $db->prepare("SELECT * FROM program_items WHERE program_id = ? AND item_type = ?");
+    $stmt->execute([$programId, $type]);
+    $existing = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) $existing[(int)$r['item_id']] = $r;
+
+    // ── validate + store pictures first ──
+    $clean  = [];
+    $stored = [];
+    $storedBanner = [];   // banner files written during this save (removed again if the save fails)
+    try {
+        foreach ($rows as $i => $row) {
+            $id    = (int)($row['item_id'] ?? 0);
+            $old   = ($id > 0 && isset($existing[$id])) ? $existing[$id] : null;
+            if ($id > 0 && !$old) $id = 0;
+
+            $title = trim(preg_replace('/\s+/', ' ', (string)($row['title'] ?? '')));
+            $sub   = trim(preg_replace('/\s+/', ' ', (string)($row['subtitle'] ?? '')));
+            $body  = trim(str_replace("\r\n", "\n", (string)($row['body'] ?? '')));
+            $icon  = programPageCleanIcon($row['icon'] ?? '', '');
+            $letter = mb_substr(trim((string)($row['letter'] ?? '')), 0, 2);
+
+            if (mb_strlen($title) > 255 || mb_strlen($sub) > 255 || mb_strlen($body) > 2000) {
+                throw new Exception('Item ' . ($i + 1) . ' has text that is too long.');
+            }
+            if ($type !== 'uniform' && $type !== 'hero_slide' && $title === '') {
+                throw new Exception(($type === 'facility' ? 'Facility ' : 'Item ') . ($i + 1) . ' needs a name.');
+            }
+            if ($type === 'facility' && mb_strlen($body) > 500) {
+                throw new Exception('Facility ' . ($i + 1) . ': the description is too long (maximum 500 characters).');
+            }
+            if ($type === 'core_value' && $letter === '') $letter = mb_strtoupper(mb_substr($title, 0, 1));
+            if (in_array($type, ['badge', 'core_value'], true) && $icon === '') {
+                $icon = $type === 'badge' ? 'material:school' : 'material:star';
+            }
+
+            $mediaId = $old && $old['image_media_id'] !== null ? (int)$old['image_media_id'] : null;
+            $path    = $old['image_path'] ?? null;
+            $upload  = null;
+            if ($type === 'hero_slide') {
+                // Banner slide: a picture or a video, kept as a file path (no media-library row).
+                $f = $row['file'] ?? null;
+                if (!empty($f) && ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                    $banner = programPageStoreBannerMedia($f);
+                    $storedBanner[] = $banner['abs'];
+                    $mediaId = null;
+                    $path    = $banner['path'];
+                } elseif (!empty($row['remove_image'])) {
+                    $mediaId = null;
+                    $path    = null;
+                }
+                if ($mediaId === null && $path === null) {
+                    throw new Exception('Banner slide ' . ($i + 1) . ' needs a picture or a video.');
+                }
+            } elseif ($hasImage) {
+                $f = $row['file'] ?? null;
+                if (!empty($f) && ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                    if ($type === 'facility') programPageCheckFacilityImage($f);
+                    $upload = storeDepartmentUpload($f, $type === 'facility' ? 'facility_image' : 'program_image');
+                    $stored[] = $upload;
+                    $mediaId = $upload['media_id'];
+                    $path    = null;
+                    if ($type === 'facility') programPageOptimizeImage((int)$mediaId);
+                } elseif (!empty($row['remove_image'])) {
+                    $mediaId = null;
+                    $path    = null;
+                }
+                if (in_array($type, ['uniform', 'facility'], true) && $mediaId === null && $path === null) {
+                    throw new Exception(($type === 'facility' ? 'Facility ' : 'Uniform ') . ($i + 1) . ' needs a picture.');
+                }
+            }
+
+            $clean[] = [
+                'id' => $id, 'title' => $title, 'subtitle' => $sub !== '' ? $sub : null,
+                'body' => $body !== '' ? $body : null, 'icon' => $icon !== '' ? $icon : null,
+                'letter' => $letter !== '' ? $letter : null, 'media' => $mediaId, 'path' => $path,
+            ];
+        }
+    } catch (Exception $e) {
+        foreach ($stored as $s) discardStoredDepartmentUpload($s);
+        foreach ($storedBanner as $abs) { if (is_file($abs)) @unlink($abs); }
+        throw $e;
+    }
+
+    // ── write in one transaction ──
+    $keep = [];
+    try {
+        $db->beginTransaction();
+        foreach ($clean as $order => $it) {
+            if ($it['id'] > 0) {
+                $stmt = $db->prepare("
+                    UPDATE program_items SET title = ?, subtitle = ?, body = ?, icon = ?, letter = ?,
+                           image_media_id = ?, image_path = ?, display_order = ?
+                    WHERE item_id = ? AND program_id = ?
+                ");
+                $stmt->execute([$it['title'], $it['subtitle'], $it['body'], $it['icon'], $it['letter'],
+                    $it['media'], $it['path'], $order + 1, $it['id'], $programId]);
+                $keep[] = $it['id'];
+            } else {
+                $stmt = $db->prepare("
+                    INSERT INTO program_items (program_id, item_type, title, subtitle, body, icon, letter, image_media_id, image_path, display_order)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([$programId, $type, $it['title'], $it['subtitle'], $it['body'], $it['icon'], $it['letter'],
+                    $it['media'], $it['path'], $order + 1]);
+                $keep[] = (int)$db->lastInsertId();
+            }
+        }
+        foreach ($existing as $id => $old) {
+            if (!in_array($id, $keep, true)) {
+                $stmt = $db->prepare("DELETE FROM program_items WHERE item_id = ? AND program_id = ?");
+                $stmt->execute([$id, $programId]);
+            }
+        }
+        $db->commit();
+    } catch (PDOException $e) {
+        if ($db->inTransaction()) $db->rollBack();
+        foreach ($stored as $s) discardStoredDepartmentUpload($s);
+        foreach ($storedBanner as $abs) { if (is_file($abs)) @unlink($abs); }
+        error_log('Save program items error: ' . $e->getMessage());
+        throw new Exception('Could not save. Please try again.');
+    }
+
+    // Pictures that were replaced, removed, or belonged to deleted rows.
+    $stillUsed = array_filter(array_column($clean, 'media'));
+    foreach ($existing as $id => $old) {
+        $oldMedia = $old['image_media_id'] !== null ? (int)$old['image_media_id'] : null;
+        if ($oldMedia !== null && !in_array($oldMedia, $stillUsed, true)) {
+            deleteMediaIfUnreferenced($oldMedia);
+        }
+    }
+
+    // Banner files that were replaced, or belonged to slides that were deleted.
+    if ($type === 'hero_slide') {
+        $stillUsedPaths = array_filter(array_column($clean, 'path'));
+        foreach ($existing as $old) {
+            $oldPath = (string)($old['image_path'] ?? '');
+            if ($oldPath !== '' && !in_array($oldPath, $stillUsedPaths, true)) {
+                programPageDeleteBannerFile($oldPath);
+            }
+        }
+    }
+
+    logActivity((int)($_SESSION['user_id'] ?? 0), 'UPDATE', 'programs', $programId,
+        $program['program_name'] . ': updated ' . str_replace('_', ' ', $type) . ' list');
+
+    return programPageItems($programId)[$type];
+}
+
+/**
+ * Permanently delete a program together with its page content and pictures.
+ * (deleteProgramFull() removes the row + card image + PDF; the rest is here.)
+ */
+function deleteProgramPage(int $programId): void {
+    require_once __DIR__ . '/../components/program-page-public.php';
+    $program = getProgramPageById($programId);
+    if (!$program) {
+        throw new Exception('That program was already removed. Please refresh the page.');
+    }
+
+    $media = [];
+    foreach (['hero_media_id', 'seal_media_id'] as $col) {
+        if (!empty($program[$col])) $media[] = (int)$program[$col];
+    }
+    try {
+        $stmt = getDB()->prepare("SELECT image_media_id FROM program_items WHERE program_id = ? AND image_media_id IS NOT NULL");
+        $stmt->execute([$programId]);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $m) $media[] = (int)$m;
+    } catch (Exception $e) {
+        error_log('Delete program page: item lookup error: ' . $e->getMessage());
+    }
+    $bannerFiles = [];   // banner-slide pictures/videos live as plain files
+    try {
+        $stmt = getDB()->prepare("SELECT image_path FROM program_items WHERE program_id = ? AND item_type = 'hero_slide' AND image_path IS NOT NULL");
+        $stmt->execute([$programId]);
+        $bannerFiles = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Exception $e) {
+        error_log('Delete program page: banner lookup error: ' . $e->getMessage());
+    }
+
+    deleteProgramFull($programId);          // row (items cascade), card image, PDF
+    foreach ($bannerFiles as $bf) programPageDeleteBannerFile((string)$bf);
+
+    foreach (array_unique($media) as $m) {
+        deleteMediaIfUnreferenced($m);
+    }
+}
+
+// ============================================================
+// VISUAL EDITOR PREVIEW MODE
+// ============================================================
+// The Content Editor (admin/content-edit.php) shows the REAL public pages
+// in a frame and edits them in place. To do that, a public page is opened
+// with ?ce_preview=1. This only works for a signed-in person who may edit
+// page content; anyone else gets the normal public page, unchanged.
+//
+// In preview mode a public page:
+//   - shows unpublished DRAFT text (so what you saved as a draft is what you see)
+//   - prints small data-ve-* markers that tell the editor what is editable
+//   - is never cached or indexed
+// Visitors never get the markers or the drafts.
+
+/** True when this request is the Content Editor's live preview. */
+function cePreviewActive(): bool {
+    static $active = null;
+    if ($active !== null) return $active;
+    $active = false;
+    if (($_GET['ce_preview'] ?? '') !== '1') return false;   // normal visitors: no session, no cost
+    initSession();
+    if (isLoggedIn() && (hasPermission('manage_page_content') || hasPermission('edit_page_content'))) {
+        $active = true;
+        if (!headers_sent()) {
+            header('Cache-Control: no-store, no-cache, must-revalidate');
+            header('X-Robots-Tag: noindex, nofollow');
+        }
+    }
+    return $active;
+}
+
+/**
+ * Editor markers for a public template, e.g.
+ *   <div class="vm-text"<?= ceMark('data-ve-section="vision"') ?>>
+ * Prints nothing unless the page is being previewed inside the Content Editor.
+ */
+function ceMark(string $attributes): string {
+    return cePreviewActive() ? ' ' . $attributes : '';
+}
+
+/** HTML-escape an attribute value for ceMark(). */
+function ceAttr($value): string {
+    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * True only inside the Content Editor preview AND only for someone who may MANAGE page content.
+ * Departments, programs and the homepage posts are saved through handlers that need that permission,
+ * so only those people get their editing markers and data blocks (text editors never see them).
+ */
+function cePreviewCanManage(): bool {
+    static $can = null;
+    if ($can === null) $can = cePreviewActive() && hasPermission('manage_page_content');
+    return $can;
+}
+
+/** Like ceMark(), but for the pages that only managers can edit (departments, programs, posts). */
+function ceManageMark(string $attributes): string {
+    return cePreviewCanManage() ? ' ' . $attributes : '';
+}
+
+/**
+ * Marker that turns an existing element into an editable text field in the Content Editor, e.g.
+ *   <h1<?= ceField('dept-name', ['max' => 255, 'label' => 'Department name']) ?>>...</h1>
+ * Options: key (which stored value), max (characters), label, ph (placeholder), multiline.
+ * Prints nothing for visitors.
+ */
+function ceField(string $name, array $o = []): string {
+    if (!cePreviewCanManage()) return '';
+    $a = 'data-ve-field="' . ceAttr($name) . '"';
+    if (!empty($o['key']))       $a .= ' data-ve-key="'   . ceAttr($o['key'])   . '"';
+    if (!empty($o['max']))       $a .= ' data-ve-max="'   . (int)$o['max']      . '"';
+    if (!empty($o['label']))     $a .= ' data-ve-label="' . ceAttr($o['label']) . '"';
+    if (!empty($o['ph']))        $a .= ' data-ve-ph="'    . ceAttr($o['ph'])    . '"';
+    if (!empty($o['multiline'])) $a .= ' data-ve-multiline="1"';
+    return ' ' . $a;
+}
+
+/**
+ * A block of JSON the editor reads from the page (the current values it needs to save a whole record safely).
+ * Printed only for managers in the preview. Every character that could end the <script> is escaped.
+ */
+function ceData(string $id, array $data): string {
+    if (!cePreviewCanManage()) return '';
+    return '<script type="application/json" id="' . ceAttr($id) . '">'
+        . json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_PARTIAL_OUTPUT_ON_ERROR)
+        . '</script>';
+}
+
+
+// ============================================================
+// HOMEPAGE — editable section headings, heading icons, intro lines and the three Academic Programs cards
+// ============================================================
+// index.php used to have these words typed straight into the page. Each one now has a
+// "key" below with its original wording as the default, so:
+//   - nothing changes on the website until someone edits it in the Content Editor, and
+//   - an edit is stored in `homepage_text` (created automatically the first time you save).
+// Pictures are stored as a media_library id, like every other upload.
+//
+// Optional: the table can also be created ahead of time with
+//   CREATE TABLE homepage_text (
+//       text_key   VARCHAR(60) NOT NULL PRIMARY KEY,
+//       value      TEXT NULL,
+//       media_id   INT NULL,
+//       updated_by INT NULL,
+//       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+//   ) DEFAULT CHARSET = utf8mb4;
+
+const HOME_LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.';
+
+/** Every editable homepage block: type (text|link|icon|image), original wording, max length, label shown in the editor. */
+function homeContentSchema(): array {
+    $s = [
+        'news_icon'         => ['icon', 'bi-megaphone-fill', 60, 'News heading icon'],
+        'news_heading'      => ['text', 'News & Announcements', 60, 'News heading'],
+        'news_subheading'   => ['text', "Stay Updated,\nStay Informed", 60, 'News heading, second part'],
+        'news_intro'        => ['text', 'Get the latest news, events, and important updates.', 200, 'News introduction'],
+        'calendar_icon'     => ['icon', 'bi-calendar-event-fill', 60, 'Calendar small heading icon'],
+        'calendar_kicker'   => ['text', 'Calendar of Events', 60, 'Calendar small heading'],
+        'calendar_heading'  => ['text', 'Mark Your', 40, 'Calendar heading'],
+        'calendar_accent'   => ['text', 'Calendar', 40, 'Calendar heading, highlighted word'],
+        'calendar_intro'    => ['text', 'Keep track of school activities, holidays, and important dates.', 200, 'Calendar introduction'],
+        'events_label'      => ['text', 'Upcoming Events', 60, 'Events list heading'],
+        'programs_icon'     => ['icon', 'bi-mortarboard-fill', 60, 'Programs heading icon'],
+        'programs_heading'  => ['text', 'Academic Programs', 60, 'Programs heading'],
+        'programs_subheading' => ['text', "Shaping Minds,\nBuilding Futures", 60, 'Programs heading, second part'],
+        'programs_intro'    => ['text', 'From basic education to graduate school, GNC offers a path for every learner.', 200, 'Programs introduction'],
+        'president_label'   => ['text', 'Message from the President', 60, 'President section label'],
+        'campus_heading'    => ['text', 'Find Your Way Around', 80, 'Campus map heading'],
+        'campus_intro'      => ['text', 'Tap a building to see the route from the main gate', 200, 'Campus map introduction'],
+    ];
+    $cards = [
+        1 => ['Basic Education',  '/pages/academics/basic-edu/basic-edu-dept.php',           'assets/images/basic-edu.png'],
+        2 => ['College Programs', '/pages/academics/college/college-dept.php',               'assets/images/college-programs.png'],
+        3 => ['Graduate School',  '/pages/academics/graduate-school/graduate-school.php',    'assets/images/graduate-school.png'],
+    ];
+    foreach ($cards as $n => [$title, $link, $img]) {
+        $s["programs_{$n}_title"]  = ['text',  $title,        80,  "Program {$n} title"];
+        $s["programs_{$n}_text"]   = ['text',  HOME_LOREM,    400, "Program {$n} description"];
+        $s["programs_{$n}_button"] = ['text',  'Learn More',  30,  "Program {$n} button"];
+        $s["programs_{$n}_link"]   = ['link',  $link,         255, "Program {$n} button link"];
+        $s["programs_{$n}_image"]  = ['image', $img,          0,   "Program {$n} picture"];
+    }
+    $out = [];
+    foreach ($s as $key => [$type, $default, $max, $label]) {
+        $out[$key] = ['type' => $type, 'default' => $default, 'max' => $max, 'label' => $label];
+    }
+    return $out;
+}
+
+/** Stored overrides only: key => ['value' => ?string, 'media_id' => ?int, 'path' => ?string]. Empty if the table doesn't exist yet. */
+function homeContentStored(): array {
+    try {
+        $rows = getDB()->query("
+            SELECT t.text_key, t.value, t.media_id, m.file_path
+            FROM homepage_text t LEFT JOIN media_library m ON m.media_id = t.media_id
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        return [];     // table not created yet: the website simply shows the original wording
+    }
+    $out = [];
+    foreach ($rows as $r) {
+        $out[$r['text_key']] = ['value' => $r['value'], 'media_id' => $r['media_id'] !== null ? (int)$r['media_id'] : null, 'path' => $r['file_path']];
+    }
+    return $out;
+}
+
+/**
+ * Everything on the homepage that can be edited, ready to print: key => ['type','value','default','max','label'].
+ * For a picture, 'value' is the web path to show (an upload, or the original image).
+ */
+function getHomeContent(): array {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $stored = homeContentStored();
+    $cache = [];
+    foreach (homeContentSchema() as $key => $def) {
+        $value = $def['default'];
+        if (isset($stored[$key])) {
+            if ($def['type'] === 'image') {
+                $p = $stored[$key]['path'] ?? null;
+                if ($p && departmentFileExists($p)) $value = ltrim($p, '/');
+            } elseif ($stored[$key]['value'] !== null && trim((string)$stored[$key]['value']) !== '') {
+                $candidate = trim((string)$stored[$key]['value']);
+                // an icon is only ever a Bootstrap Icons class name; anything else falls back to the original
+                if ($def['type'] !== 'icon' || homeIconIsValid($candidate)) $value = $candidate;
+            }
+        }
+        $cache[$key] = $def + ['value' => $value];
+    }
+    return $cache;
+}
+
+/** The current text (or picture path) for one homepage block. */
+function homeText(string $key): string {
+    $all = getHomeContent();
+    return isset($all[$key]) ? (string)$all[$key]['value'] : '';
+}
+
+/**
+ * Print a homepage text block, escaped. Inside the Content Editor's preview it is wrapped in a marker so it can be
+ * edited in place; for visitors the output is exactly the plain text.
+ */
+function homeTextHtml(string $key): string {
+    $all = getHomeContent();
+    if (!isset($all[$key])) return '';
+    $text = htmlspecialchars((string)$all[$key]['value'], ENT_QUOTES, 'UTF-8');
+    if (!cePreviewActive()) return $text;
+    return '<ve-text data-ve-field="home-text" data-ve-key="' . ceAttr($key) . '" data-ve-max="' . (int)$all[$key]['max']
+         . '" data-ve-label="' . ceAttr($all[$key]['label']) . '">' . $text . '</ve-text>';
+}
+
+/** Homepage text blocks where one line break (Enter) is allowed, e.g. the gold second line of a heading. */
+function homeMultilineKeys(): array {
+    return ['news_subheading', 'programs_subheading'];
+}
+
+/** A multi-line block, escaped, with its line break printed as <br> (for visitors and for the editor preview). */
+function homeTextBr(string $key): string {
+    return preg_replace('/\r\n|\r|\n/', '<br>', htmlspecialchars(homeText($key), ENT_QUOTES, 'UTF-8'));
+}
+
+/** Is this a safe Bootstrap Icons class name, e.g. "bi-megaphone-fill"? */
+function homeIconIsValid(string $v): bool {
+    return (bool)preg_match('/^bi-[a-z0-9]+(?:-[a-z0-9]+)*$/', $v) && strlen($v) <= 60;
+}
+
+/** The icon class to print for a heading icon, e.g. "bi-megaphone-fill" (always safe to print inside class="..."). */
+function homeIconClass(string $key): string {
+    $v = homeText($key);
+    if (homeIconIsValid($v)) return $v;
+    $all = getHomeContent();
+    return isset($all[$key]) ? (string)$all[$key]['default'] : 'bi-circle';
+}
+
+/** Attributes that make a heading icon clickable in the editor (to pick another icon). Empty for visitors. */
+function homeIconMark(string $key): string {
+    $all = getHomeContent();
+    if (!isset($all[$key])) return '';
+    return ceMark('data-ve-icon="home-icon" data-ve-key="' . ceAttr($key) . '" data-ve-label="' . ceAttr($all[$key]['label']) . '"');
+}
+
+/** Attributes that make an existing element (heading, paragraph, button) editable in place. Empty for visitors. */
+function homeTextMark(string $key, bool $multiline = false): string {
+    $all = getHomeContent();
+    if (!isset($all[$key])) return '';
+    return ceMark('data-ve-field="home-text" data-ve-key="' . ceAttr($key) . '" data-ve-max="' . (int)$all[$key]['max']
+        . '" data-ve-label="' . ceAttr($all[$key]['label']) . '"' . ($multiline ? ' data-ve-multiline="1"' : ''));
+}
+
+/** The editor's copy of every block (JSON-safe). */
+function homeContentAdminPayload(): array {
+    $out = [];
+    foreach (getHomeContent() as $key => $b) {
+        $out[$key] = ['type' => $b['type'], 'value' => $b['value'], 'max' => $b['max'], 'label' => $b['label'], 'default' => $b['default']];
+    }
+    return $out;
+}
+
+function homeContentEnsureTable(): void {
+    getDB()->exec("
+        CREATE TABLE IF NOT EXISTS homepage_text (
+            text_key   VARCHAR(60) NOT NULL PRIMARY KEY,
+            value      TEXT NULL,
+            media_id   INT NULL,
+            updated_by INT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) DEFAULT CHARSET = utf8mb4
+    ");
+}
+
+/**
+ * Save edits to homepage blocks in one step.
+ *   $texts  key => new text/link (only the keys that changed)
+ *   $images key => uploaded file array, or the string 'reset' to go back to the original picture
+ * Every key is checked against homeContentSchema(); unknown keys are refused. A blank text puts the original wording back.
+ * Returns the refreshed editor payload. Throws Exception with a user-friendly message.
+ */
+function saveHomeContent(array $texts, array $images): array {
+    $schema = homeContentSchema();
+    $clean = [];
+    foreach ($texts as $key => $val) {
+        if (!isset($schema[$key]) || $schema[$key]['type'] === 'image') throw new Exception('That part of the homepage cannot be edited.');
+        if (in_array($key, homeMultilineKeys(), true)) {
+            // keep the line break the editor typed (one at most per gap), tidy the spaces around it
+            $val = trim(preg_replace('/[ \t]*\n[ \t]*/', "\n", preg_replace('/\n{2,}/', "\n", preg_replace('/[ \t]+/', ' ', str_replace("\r", '', (string)$val)))));
+        } else {
+            $val = trim(preg_replace('/\s+/', ' ', str_replace(["\r", "\n"], ' ', (string)$val)));
+        }
+        $max = $schema[$key]['max'];
+        if ($max && mb_strlen($val) > $max) throw new Exception("“{$schema[$key]['label']}” is too long. Please keep it under {$max} characters.");
+        if ($schema[$key]['type'] === 'link' && $val !== '') {
+            if (preg_match('/^\s*(javascript|data|vbscript):/i', $val)) throw new Exception('That kind of link is not allowed.');
+        }
+        if ($schema[$key]['type'] === 'icon' && $val !== '' && !homeIconIsValid($val)) {
+            throw new Exception('That icon name is not valid. Use a Bootstrap Icons name such as bi-megaphone-fill.');
+        }
+        $clean[$key] = $val;
+    }
+    foreach ($images as $key => $file) {
+        if (!isset($schema[$key]) || $schema[$key]['type'] !== 'image') throw new Exception('That picture cannot be changed.');
+    }
+
+    try { homeContentEnsureTable(); }
+    catch (Throwable $e) {
+        error_log('homepage_text create error: ' . $e->getMessage());
+        throw new Exception('The homepage text table does not exist yet and could not be created automatically. Ask your developer to run the CREATE TABLE homepage_text statement shown in admin-functions.php.');
+    }
+
+    $db = getDB();
+    $stored = homeContentStored();
+    $userId = $_SESSION['user_id'] ?? null;
+    $newMedia = []; $oldMedia = [];
+    try {
+        foreach ($images as $key => $file) {
+            $old = $stored[$key]['media_id'] ?? null;
+            if ($file === 'reset') {
+                $db->prepare("DELETE FROM homepage_text WHERE text_key = ?")->execute([$key]);
+            } else {
+                $up = storeDepartmentUpload($file, 'homepage_image');
+                $newMedia[] = $up;
+                $db->prepare("INSERT INTO homepage_text (text_key, value, media_id, updated_by) VALUES (?, NULL, ?, ?)
+                              ON DUPLICATE KEY UPDATE media_id = VALUES(media_id), updated_by = VALUES(updated_by)")
+                   ->execute([$key, $up['media_id'], $userId]);
+            }
+            if ($old) $oldMedia[] = (int)$old;
+        }
+        foreach ($clean as $key => $val) {
+            if ($val === '') {
+                $db->prepare("DELETE FROM homepage_text WHERE text_key = ?")->execute([$key]);      // back to the original wording
+            } else {
+                $db->prepare("INSERT INTO homepage_text (text_key, value, updated_by) VALUES (?, ?, ?)
+                              ON DUPLICATE KEY UPDATE value = VALUES(value), updated_by = VALUES(updated_by)")
+                   ->execute([$key, $val, $userId]);
+            }
+        }
+    } catch (Exception $e) {
+        foreach ($newMedia as $up) discardStoredDepartmentUpload($up);
+        if ($e instanceof PDOException) { error_log('Save homepage content error: ' . $e->getMessage()); throw new Exception('Could not save the homepage changes. Please try again.'); }
+        throw $e;
+    }
+    foreach (array_unique($oldMedia) as $m) deleteMediaIfUnreferenced($m);
+
+    logActivity((int)$userId, 'UPDATE', 'homepage_text', null, 'Edited homepage text: ' . implode(', ', array_merge(array_keys($clean), array_keys($images))));
+    return homeContentAdminPayload();
 }

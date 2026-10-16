@@ -1,0 +1,523 @@
+{
+  "index": {
+    "text_01": {
+      "type": "text",
+      "default": "Basic Education Departments",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_02": {
+      "type": "text",
+      "default": "Explore our programs designed to build strong foundations, develop character, and prepare learners for a bright future.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_03": {
+      "type": "text",
+      "default": "Quality Education",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_04": {
+      "type": "text",
+      "default": "Curriculum designed for real-world impact.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_05": {
+      "type": "text",
+      "default": "Experienced Faculty",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_06": {
+      "type": "text",
+      "default": "Learn from dedicated professionals.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_07": {
+      "type": "text",
+      "default": "Holistic Development",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_08": {
+      "type": "text",
+      "default": "Growing minds, character and leadership.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_09": {
+      "type": "text",
+      "default": "Community Focused",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_10": {
+      "type": "text",
+      "default": "Committed to nation-building and service.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "card_casa-gradeschool_name": {
+      "type": "text",
+      "default": "CASA and Grade School Montessori",
+      "max": 255,
+      "label": "Department name"
+    },
+    "card_casa-gradeschool_desc": {
+      "type": "text",
+      "default": "The College is dedicated to the holistic development of students, preparing highly motivated and competent educators who drive positive transformation in their communities while preserving and promoting Filipino historical and cultural heritage.",
+      "max": 5000,
+      "label": "Department description"
+    },
+    "card_hs-monte_name": {
+      "type": "text",
+      "default": "High School Montessori",
+      "max": 255,
+      "label": "Department name"
+    },
+    "card_hs-monte_desc": {
+      "type": "text",
+      "default": "The College is dedicated to the holistic development of students, preparing highly motivated and competent educators who drive positive transformation in their communities while preserving and promoting Filipino historical and cultural heritage.",
+      "max": 5000,
+      "label": "Department description"
+    },
+    "card_jhs-regular_name": {
+      "type": "text",
+      "default": "Junior High School Regular",
+      "max": 255,
+      "label": "Department name"
+    },
+    "card_jhs-regular_desc": {
+      "type": "text",
+      "default": "The College is dedicated to the holistic development of students, preparing highly motivated and competent educators who drive positive transformation in their communities while preserving and promoting Filipino historical and cultural heritage.",
+      "max": 5000,
+      "label": "Department description"
+    },
+    "card_shs-regular_name": {
+      "type": "text",
+      "default": "Senior High School Regular",
+      "max": 255,
+      "label": "Department name"
+    },
+    "card_shs-regular_desc": {
+      "type": "text",
+      "default": "The College is dedicated to the holistic development of students, preparing highly motivated and competent educators who drive positive transformation in their communities while preserving and promoting Filipino historical and cultural heritage.",
+      "max": 5000,
+      "label": "Department description"
+    }
+  },
+  "casa-gradeschool": {
+    "text_01": {
+      "type": "text",
+      "default": "CASA and Grade School Montessori",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_02": {
+      "type": "text",
+      "default": "Overview",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_03": {
+      "type": "text",
+      "default": "About the CASA and Grade School Montessori",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_04": {
+      "type": "text",
+      "default": "Leadership & Organization",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_05": {
+      "type": "text",
+      "default": "Head of Office",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_06": {
+      "type": "text",
+      "default": "Meet the visionary leader guiding the CASA and Grade School Montessori in advancing academic excellence, innovation, and service.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_07": {
+      "type": "text",
+      "default": "Meet the Officer-in-Charge",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_08": {
+      "type": "text",
+      "default": "Get Connected",
+      "max": 255,
+      "label": "Heading"
+    }
+  },
+  "hs-monte": {
+    "text_01": {
+      "type": "text",
+      "default": "High School Montessori",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_02": {
+      "type": "text",
+      "default": "Overview",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_03": {
+      "type": "text",
+      "default": "About the High School Montessori",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_04": {
+      "type": "text",
+      "default": "Our Programs",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_05": {
+      "type": "text",
+      "default": "Programs Offered",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_06": {
+      "type": "text",
+      "default": "Junior High School (Hybrid Program)",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_07": {
+      "type": "text",
+      "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_08": {
+      "type": "text",
+      "default": "Health & Allied Sciences",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_09": {
+      "type": "text",
+      "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_10": {
+      "type": "text",
+      "default": "Information & Digital Technologies",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_11": {
+      "type": "text",
+      "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_12": {
+      "type": "text",
+      "default": "Education, Humanities, & Social Sciences",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_13": {
+      "type": "text",
+      "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_14": {
+      "type": "text",
+      "default": "Architecture & Engineering",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_15": {
+      "type": "text",
+      "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_16": {
+      "type": "text",
+      "default": "Accountancy, Business, & Entrepreneurship",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_17": {
+      "type": "text",
+      "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_18": {
+      "type": "text",
+      "default": "Leadership & Organization",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_19": {
+      "type": "text",
+      "default": "Head of Office",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_20": {
+      "type": "text",
+      "default": "Meet the visionary leader guiding the Senior High School Regular in advancing academic excellence, innovation, and service.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_21": {
+      "type": "text",
+      "default": "Meet the Principal",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_22": {
+      "type": "text",
+      "default": "Get Connected",
+      "max": 255,
+      "label": "Heading"
+    },
+    "image_01": {
+      "type": "image",
+      "default": "/assets/images/test-image.png",
+      "label": "Program picture"
+    },
+    "image_02": {
+      "type": "image",
+      "default": "/assets/images/test-image.png",
+      "label": "Program picture"
+    },
+    "image_03": {
+      "type": "image",
+      "default": "/assets/images/test-image.png",
+      "label": "Program picture"
+    },
+    "image_04": {
+      "type": "image",
+      "default": "/assets/images/test-image.png",
+      "label": "Program picture"
+    },
+    "image_05": {
+      "type": "image",
+      "default": "/assets/images/test-image.png",
+      "label": "Program picture"
+    },
+    "image_06": {
+      "type": "image",
+      "default": "/assets/images/test-image.png",
+      "label": "Program picture"
+    }
+  },
+  "jhs-regular": {
+    "text_01": {
+      "type": "text",
+      "default": "Junior High School Regular",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_02": {
+      "type": "text",
+      "default": "Overview",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_03": {
+      "type": "text",
+      "default": "About the Junior High School Regular",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_04": {
+      "type": "text",
+      "default": "Leadership & Organization",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_05": {
+      "type": "text",
+      "default": "Head of Office",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_06": {
+      "type": "text",
+      "default": "Meet the visionary leader guiding the Junior High School Regular in advancing academic excellence, innovation, and service.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_07": {
+      "type": "text",
+      "default": "Meet the Principal",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_08": {
+      "type": "text",
+      "default": "Get Connected",
+      "max": 255,
+      "label": "Heading"
+    }
+  },
+  "shs-regular": {
+    "text_01": {
+      "type": "text",
+      "default": "Senior High School Regular",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_02": {
+      "type": "text",
+      "default": "Overview",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_03": {
+      "type": "text",
+      "default": "About the Junior High School Regular",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_04": {
+      "type": "text",
+      "default": "Our Programs",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_05": {
+      "type": "text",
+      "default": "Programs Offered",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_06": {
+      "type": "text",
+      "default": "Health & Allied Sciences",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_07": {
+      "type": "text",
+      "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_08": {
+      "type": "text",
+      "default": "Information & Digital Technologies",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_09": {
+      "type": "text",
+      "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_10": {
+      "type": "text",
+      "default": "Education, Humanities, & Social Sciences",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_11": {
+      "type": "text",
+      "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_12": {
+      "type": "text",
+      "default": "Architecture & Engineering",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_13": {
+      "type": "text",
+      "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_14": {
+      "type": "text",
+      "default": "Accountancy, Business, & Entrepreneurship",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_15": {
+      "type": "text",
+      "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_16": {
+      "type": "text",
+      "default": "Leadership & Organization",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_17": {
+      "type": "text",
+      "default": "Head of Office",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_18": {
+      "type": "text",
+      "default": "Meet the visionary leader guiding the Senior High School Regular in advancing academic excellence, innovation, and service.",
+      "max": 5000,
+      "label": "Description"
+    },
+    "text_19": {
+      "type": "text",
+      "default": "Meet the Officer-in-Charge",
+      "max": 255,
+      "label": "Heading"
+    },
+    "text_20": {
+      "type": "text",
+      "default": "Get Connected",
+      "max": 255,
+      "label": "Heading"
+    },
+    "image_01": {
+      "type": "image",
+      "default": "/assets/images/test-image.png",
+      "label": "Program picture"
+    },
+    "image_02": {
+      "type": "image",
+      "default": "/assets/images/test-image.png",
+      "label": "Program picture"
+    },
+    "image_03": {
+      "type": "image",
+      "default": "/assets/images/test-image.png",
+      "label": "Program picture"
+    },
+    "image_04": {
+      "type": "image",
+      "default": "/assets/images/test-image.png",
+      "label": "Program picture"
+    },
+    "image_05": {
+      "type": "image",
+      "default": "/assets/images/test-image.png",
+      "label": "Program picture"
+    }
+  }
+}

@@ -46,12 +46,13 @@ $ctaIcon     = 'material:volunteer_activism';
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,100..700,0,0&display=block">
     <link href="/assets/css/green-theme.css" rel="stylesheet">
+    <link href="/assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
-    <?php include_once __DIR__ . '/../../../../components/index-nav.php'; ?>
+    <?php include_once __DIR__ . '/../../../../components/navbar.php'; ?>
 
-    <section class="hero-page template-hero" style="background-image: url('/assets/images/gnc-graduate-school-placeholder.png');" loading="lazy">
+    <section class="hero-page template-hero skeleton-hero" data-bg="/assets/images/gnc-graduate-school-placeholder.png">
         <div class="container h-100">
         <div class="row align-items-center g-0">
             <div class="col-lg-6">
@@ -134,7 +135,9 @@ $ctaIcon     = 'material:volunteer_activism';
 
             <div class="whychoose-grid">
                 <div class="whychoose-card">
-                    <img src="/assets/images/svg/follow the leader-amico 1.svg" alt="Public Leadership and Governance" class="whychoose-illustration" loading="lazy">
+                    <div class="skeleton-wrap">
+                        <img src="/assets/images/svg/follow the leader-amico 1.svg" alt="Public Leadership and Governance" class="whychoose-illustration" loading="lazy">
+                    </div>
                     <h5 class="whychoose-title">Public Leadership and Governance</h5>
                     <p class="whychoose-desc">
                         Develop the leadership and administrative skills needed to effectively manage public institutions and public-oriented organizations.
@@ -142,7 +145,9 @@ $ctaIcon     = 'material:volunteer_activism';
                 </div>
 
                 <div class="whychoose-card">
-                    <img src="/assets/images/svg/Law firm-amico 1.svg" alt="Policy Development and Implementation" class="whychoose-illustration" loading="lazy">
+                    <div class="skeleton-wrap">
+                        <img src="/assets/images/svg/Law firm-amico 1.svg" alt="Policy Development and Implementation" class="whychoose-illustration" loading="lazy">
+                    </div>
                     <h5 class="whychoose-title">Policy Development and Implementation</h5>
                     <p class="whychoose-desc">
                         Build the knowledge and skills to formulate, analyze, and implement policies that address community and societal needs.
@@ -150,7 +155,9 @@ $ctaIcon     = 'material:volunteer_activism';
                 </div>
 
                 <div class="whychoose-card">
-                    <img src="/assets/images/svg/Research paper-amico 1.svg" alt="Advanced Research and Analytical Skills" class="whychoose-illustration" loading="lazy">
+                    <div class="skeleton-wrap">
+                        <img src="/assets/images/svg/Research paper-amico 1.svg" alt="Advanced Research and Analytical Skills" class="whychoose-illustration" loading="lazy">
+                    </div>
                     <h5 class="whychoose-title">Advanced Research and Analytical Skills</h5>
                     <p class="whychoose-desc">
                         Strengthen research, critical thinking, and problem-solving abilities for addressing complex issues in public administration.
@@ -158,7 +165,9 @@ $ctaIcon     = 'material:volunteer_activism';
                 </div>
 
                 <div class="whychoose-card">
-                    <img src="/assets/images/svg/Analysis-amico 1.svg" alt="Technology-Driven Public Administration" class="whychoose-illustration" loading="lazy">
+                    <div class="skeleton-wrap">
+                        <img src="/assets/images/svg/Analysis-amico 1.svg" alt="Technology-Driven Public Administration" class="whychoose-illustration" loading="lazy">
+                    </div>
                     <h5 class="whychoose-title">Technology-Driven Public Administration</h5>
                     <p class="whychoose-desc">
                         Learn to effectively use emerging technologies and information systems to support informed decision-making and efficient public service.
@@ -166,14 +175,19 @@ $ctaIcon     = 'material:volunteer_activism';
                 </div>
 
                 <div class="whychoose-card">
-                    <img src="/assets/images/svg/Logic-amico (2) 1.svg" alt="Strategic Management and Decision-Making" class="whychoose-illustration" loading="lazy">
+                    <div class="skeleton-wrap">
+                        <img src="/assets/images/svg/Logic-amico (2) 1.svg" alt="Strategic Management and Decision-Making" class="whychoose-illustration" loading="lazy">
+                    </div>
                     <h5 class="whychoose-title">Strategic Management and Decision-Making</h5>
                     <p class="whychoose-desc">
                         Enhance your ability to analyze challenges, manage resources, and make sound decisions in dynamic public-sector environments.
+                    </p>
                 </div>
 
                 <div class="whychoose-card">
-                    <img src="/assets/images/svg/International cooperation-amico 1.svg" alt="Social, Economic and Political Awareness" class="whychoose-illustration" loading="lazy">
+                    <div class="skeleton-wrap">
+                        <img src="/assets/images/svg/International cooperation-amico 1.svg" alt="Social, Economic and Political Awareness" class="whychoose-illustration" loading="lazy">
+                    </div>
                     <h5 class="whychoose-title">Social, Economic and Political Awareness</h5>
                     <p class="whychoose-desc">
                         Develop a deeper understanding of the social, economic, and political factors that shape governance, public policy, and community development.
@@ -270,9 +284,11 @@ $ctaIcon     = 'material:volunteer_activism';
 
 
 
-    <?php include_once __DIR__ . '/../../../../components/index-footer.php'; ?>
+    <?php include_once __DIR__ . '/../../../../components/footer.php'; ?>
+    <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
+    <script src="/assets/js/skeleton-loader.js"></script>
 </body>
 </html>

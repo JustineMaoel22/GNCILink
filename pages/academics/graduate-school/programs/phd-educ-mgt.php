@@ -46,12 +46,13 @@ $ctaIcon     = 'material:volunteer_activism';
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,100..700,0,0&display=block">
     <link href="/assets/css/green-theme.css" rel="stylesheet">
+    <link href="/assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
-    <?php include_once __DIR__ . '/../../../../components/index-nav.php'; ?>
+    <?php include_once __DIR__ . '/../../../../components/navbar.php'; ?>
 
-    <section class="hero-page template-hero" style="background-image: url('/assets/images/gnc-graduate-school-placeholder.png');" loading="lazy">
+    <section class="hero-page template-hero skeleton-hero" data-bg="/assets/images/gnc-graduate-school-placeholder.png">
         <div class="container h-100">
         <div class="row align-items-center g-0">
             <div class="col-lg-6">
@@ -135,7 +136,9 @@ $ctaIcon     = 'material:volunteer_activism';
 
             <div class="whychoose-grid">
                 <div class="whychoose-card">
-                    <img src="/assets/images/svg/college project-amico (1) 1.svg" alt="Strong Financial Management Skills" class="whychoose-illustration" loading="lazy">
+                    <div class="skeleton-wrap">
+                        <img src="/assets/images/svg/college project-amico (1) 1.svg" alt="Strong Financial Management Skills" class="whychoose-illustration" loading="lazy">
+                    </div>
                     <h5 class="whychoose-title">Expertise in Educational Management</h5>
                     <p class="whychoose-desc">
                         Develop advanced theoretical knowledge and leadership expertise in educational management and administration.
@@ -143,7 +146,9 @@ $ctaIcon     = 'material:volunteer_activism';
                 </div>
 
                 <div class="whychoose-card">
-                    <img src="/assets/images/svg/Learning-amico (1) 1.svg" alt="Diverse Career Opportunities" class="whychoose-illustration" loading="lazy">
+                    <div class="skeleton-wrap">
+                        <img src="/assets/images/svg/Learning-amico (1) 1.svg" alt="Diverse Career Opportunities" class="whychoose-illustration" loading="lazy">
+                    </div>
                     <h5 class="whychoose-title">Advanced Research and Innovation</h5>
                     <p class="whychoose-desc">
                         Build the skills to conduct independent research and develop innovative theories, programs, systems, and practices in education.
@@ -151,7 +156,9 @@ $ctaIcon     = 'material:volunteer_activism';
                 </div>
 
                 <div class="whychoose-card">
-                    <img src="/assets/images/svg/Problem solving-amico (1) 1.svg" alt="Strategic and Analytical Thinking" class="whychoose-illustration" loading="lazy">
+                    <div class="skeleton-wrap">
+                        <img src="/assets/images/svg/Problem solving-amico (1) 1.svg" alt="Strategic and Analytical Thinking" class="whychoose-illustration" loading="lazy">
+                    </div>
                     <h5 class="whychoose-title">Complex Problem-Solving</h5>
                     <p class="whychoose-desc">
                         Strengthen your ability to analyze and address complex challenges across diverse educational settings.
@@ -159,7 +166,9 @@ $ctaIcon     = 'material:volunteer_activism';
                 </div>
 
                 <div class="whychoose-card">
-                    <img src="/assets/images/svg/forming team leadership-amico 1.svg" alt="Practical Business and Financial Application" class="whychoose-illustration" loading="lazy">
+                    <div class="skeleton-wrap">
+                        <img src="/assets/images/svg/forming team leadership-amico 1.svg" alt="Practical Business and Financial Application" class="whychoose-illustration" loading="lazy">
+                    </div>
                     <h5 class="whychoose-title">Educational Leadership and Systems Development</h5>
                     <p class="whychoose-desc">
                         Learn to design, implement, and evaluate complex educational programs and systems for meaningful institutional improvement.
@@ -167,7 +176,9 @@ $ctaIcon     = 'material:volunteer_activism';
                 </div>
 
                 <div class="whychoose-card">
-                    <img src="/assets/images/svg/Formula-amico 1.svg" alt="Professional and Ethical Development" class="whychoose-illustration" loading="lazy">
+                    <div class="skeleton-wrap">
+                        <img src="/assets/images/svg/Formula-amico 1.svg" alt="Professional and Ethical Development" class="whychoose-illustration" loading="lazy">
+                    </div>
                     <h5 class="whychoose-title">Professional and Scholarly Excellence</h5>
                     <p class="whychoose-desc">
                         Develop the intellectual discipline, professionalism, and scholarly competence required for advanced roles in education.
@@ -175,10 +186,13 @@ $ctaIcon     = 'material:volunteer_activism';
                 </div>
 
                 <div class="whychoose-card">
-                    <img src="/assets/images/svg/Thesis-amico (1) 1.svg" alt="Effective Communication Skills" class="whychoose-illustration" loading="lazy">
+                    <div class="skeleton-wrap">
+                        <img src="/assets/images/svg/Thesis-amico (1) 1.svg" alt="Effective Communication Skills" class="whychoose-illustration" loading="lazy">
+                    </div>
                     <h5 class="whychoose-title">Impactful Educational Transformation</h5>
                     <p class="whychoose-desc">
                         Prepare to communicate research-based insights and lead initiatives that contribute to the continuous advancement of education.
+                    </p>
                 </div>
             </div>
         </div>
@@ -269,11 +283,11 @@ $ctaIcon     = 'material:volunteer_activism';
         </div>
     </section>
 
-
-
-    <?php include_once __DIR__ . '/../../../../components/index-footer.php'; ?>
+    <?php include_once __DIR__ . '/../../../../components/footer.php'; ?>
+    <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
+    <script src="/assets/js/skeleton-loader.js"></script>
 </body>
 </html>

@@ -9,6 +9,12 @@ requireLogin();
 $currentUser = getCurrentUser();
 $currentPage = basename($_SERVER['PHP_SELF'], '.php');
 $csrfToken   = generateCSRFToken();
+
+// Embedded mode: the Visual Editor opens the News / Announcements / Events editors in its side panel. There the page
+// must show only the editor itself (no sidebar or top bar). The browser tells us it is a frame (Sec-Fetch-Dest), so this
+// also holds after a save redirects; ?embed=1 is the fallback. Everything else about the page is unchanged.
+$gncEmbedded = (($_GET['embed'] ?? '') === '1')
+    || strtolower((string)($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '')) === 'iframe';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -20,9 +26,21 @@ $csrfToken   = generateCSRFToken();
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/header-admin-style.css">
+    <style>
+        /* Sidebar brand: show the GNC logo instead of the yellow "G" box */
+        .sidebar-brand-logo { background: transparent !important; padding: 0 !important; box-shadow: none !important; overflow: visible; }
+        .sidebar-brand-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    </style>
+    <?php if ($gncEmbedded): ?>
+    <style>
+        body.gnc-embedded .gnc-sidebar, body.gnc-embedded .gnc-topbar, body.gnc-embedded .sidebar-overlay { display: none !important; }
+        body.gnc-embedded .gnc-main { margin-left: 0 !important; padding-top: 0 !important; width: 100% !important; max-width: none !important; }
+        body.gnc-embedded { padding-top: 0 !important; }
+    </style>
+    <?php endif; ?>
     <link rel="icon" type="image/x-icon" href="../assets/images/logos/gnc-logo-v1.svg">
 </head>
-<body>
+<body<?= $gncEmbedded ? ' class="gnc-embedded"' : '' ?>>
 
 <!-- ============================================================
      SIDEBAR OVERLAY (mobile)
@@ -34,7 +52,7 @@ $csrfToken   = generateCSRFToken();
 ============================================================ -->
 <aside class="gnc-sidebar" id="gnc-sidebar">
     <a class="sidebar-brand" href="/admin/dashboard/">
-        <div class="sidebar-brand-logo">G</div>
+        <div class="sidebar-brand-logo"><img src="/assets/images/logos/gnc-logo-v1.svg" alt="GNC logo"></div>
         <div class="sidebar-brand-text">
             <span class="sidebar-brand-name">GNC Admin Panel</span>
             <span class="sidebar-brand-sub">Guagua National Colleges</span>
@@ -70,8 +88,16 @@ $csrfToken   = generateCSRFToken();
             </a>
         </li>
         <li>
-            <a href="/admin/content-edit.php" class="sidebar-link <?= $currentPage === 'content-edit' ? 'active' : '' ?>">
+            <?php
+            // Page text that editors sent for approval (needs sql/page-approval-migration.sql)
+            $cePending = 0;
+            if (hasPermission('approve_content') && function_exists('pageReviewReady') && pageReviewReady()) {
+                try { $cePending = (int)getDB()->query("SELECT COUNT(*) FROM page_sections WHERE review_status = 'pending'")->fetchColumn(); } catch (Exception $e) {}
+            }
+            ?>
+            <a href="/admin/content-edit.php<?= $cePending > 0 ? '?page=review' : '' ?>" class="sidebar-link <?= $currentPage === 'content-edit' ? 'active' : '' ?>">
                 <i class="bi bi-grid-1x2"></i> Content Editor
+                <?php if ($cePending > 0): ?><span class="sidebar-badge"><?= $cePending ?></span><?php endif; ?>
             </a>
         </li>
     </ul>

@@ -54,7 +54,7 @@ $ctaIcon     = 'material:volunteer_activism';
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
-    <?php include_once __DIR__ . '/../../../../components/index-nav.php'; ?>
+    <?php include_once __DIR__ . '/../../../../components/navbar.php'; ?>
 
     <section class="hero-page template-hero" style="background-image: url('/assets/images/civil-engr-hero-placeholder.png');" loading="lazy">
         <div class="container h-100">
@@ -65,7 +65,7 @@ $ctaIcon     = 'material:volunteer_activism';
                     <i class="bi bi-chevron-right"></i>
                     <a href="/pages/academics/college/college-departments.php">COLLEGE DEPARTMENTS</a>
                     <i class="bi bi-chevron-right"></i>
-                    <a href="/pages/academics/college/departments/coe.php">COLLEGE OF ENGINEERING</a>
+                    <a href="/pages/academics/college/departments/coe.php"><?= htmlspecialchars(mb_strtoupper((publicDepartment('coe')['dept_name'] ?? '') ?: 'COLLEGE OF ENGINEERING')) ?></a>
                     <i class="bi bi-chevron-right"></i>
                     <span>CIVIL ENGINEERING</span>
                 </nav>
@@ -302,7 +302,8 @@ $ctaIcon     = 'material:volunteer_activism';
         </div>
     </section>
 
-    <?php include_once __DIR__ . '/../../../../components/index-footer.php'; ?>
+    <?php include_once __DIR__ . '/../../../../components/footer.php'; ?>
+    <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>

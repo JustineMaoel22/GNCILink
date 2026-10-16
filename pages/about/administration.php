@@ -1,7 +1,13 @@
 <?php
-$section = $_GET['section'] ?? 'board-of-trustees';
+// Content (names, positions, photos, offices) is edited in the admin panel:
+// Content Editor → Administration. It is read from the database by
+// getAdministrationContent(). The array below is only the built-in fallback,
+// used until sql/administration-migration.sql has been run.
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../admin/admin-functions.php';
+cePreviewActive();   // decide editor-preview mode now, before any output is sent (it needs the session)
 
-$sections = [
+$defaultSections = [
 
     'board-of-trustees' => [
         'title' => 'Board of Trustees',
@@ -348,11 +354,46 @@ $sections = [
 
 ];
 
-if (!isset($sections[$section])) {
-    $section = 'board-of-trustees';
+// ── Choose the content source ─────────────────────────────────
+$sections = function_exists('getAdministrationContent') ? getAdministrationContent() : null;
+
+if (!$sections) {
+    // Fallback: reshape the built-in defaults to match the database format.
+    $sections = [];
+    foreach ($defaultSections as $key => $def) {
+        $row = [
+            'key'     => $key,
+            'title'   => $def['title'],
+            'desc'    => $def['desc'],
+            'layout'  => isset($def['offices']) ? 'offices' : 'people',
+            'people'  => [],
+            'offices' => [],
+        ];
+        foreach ($def['people'] ?? [] as $p) {
+            $row['people'][] = ['name' => $p['name'], 'role' => $p['role'], 'image' => '/assets/images/' . $p['img']];
+        }
+        foreach ($def['offices'] ?? [] as $o) {
+            $o['contact']['hours'] = str_replace(['<br>', '<br/>', '<br />'], "\n", $o['contact']['hours']);
+            $row['offices'][] = [
+                'office'   => $o['office'],
+                'name'     => $o['name'],
+                'role'     => $o['role'],
+                'image'    => '/assets/images/' . $o['img'],
+                'contact'  => $o['contact'],
+                'services' => $o['services'],
+            ];
+        }
+        $sections[$key] = $row;
+    }
 }
 
-$current = $sections[$section];
+$section = $_GET['section'] ?? array_key_first($sections);
+if (!isset($sections[$section])) {
+    $section = array_key_first($sections);
+}
+
+$current        = $sections[$section];
+$photoFallback  = '/assets/images/logos/gnc-logo-v1.svg';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -365,49 +406,48 @@ $current = $sections[$section];
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-    <link href="/assets/css/administration-style.css" rel="stylesheet">
+    <link href="/assets/css/administration-style.css?v=2" rel="stylesheet">
     <link href="/assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
 
     <?php $activeSection = 'about'; ?>
-    <?php include_once __DIR__ . '/../../components/index-nav.php'; ?>
+    <?php include_once __DIR__ . '/../../components/navbar.php'; ?>
+
+    <!-- Opening transition: panels wipe up to reveal the page (pure CSS, never blocks clicks) -->
+    <div class="admin-open" aria-hidden="true">
+        <i style="--n:0"></i><i style="--n:1"></i><i style="--n:2"></i><i style="--n:3"></i><i style="--n:4"></i><i style="--n:5"></i>
+        <div class="admin-open-label">
+            <img src="/assets/images/logos/gnc-logo-v1.svg" alt="">
+            <span>Administration</span>
+        </div>
+    </div>
 
     <section class="admin-intro">
         <div class="admin-hero">
             <div class="admin-hero-inner">
-                <nav class="admin-breadcrumb" aria-label="breadcrumb">
+                <nav class="admin-breadcrumb reveal-up" aria-label="breadcrumb">
                     <span>About</span>
                     <i class="bi bi-chevron-right"></i>
                     <span class="admin-current">Administration</span>
                 </nav>
-                <h1>Administration</h1>
-                <p>Meet the leaders who guide our institution with vision, dedication, and service.</p>
+                <h1 class="reveal-up" style="transition-delay: 0.1s;">Administration</h1>
+                <p class="reveal-up" style="transition-delay: 0.2s;">Meet the leaders who guide our institution with vision, dedication, and service.</p>
             </div>
         </div>
     </section>
 
     <!-- Sub navigation Tabs -->
-    <section class="admin-tabs-wrap">
+    <section class="admin-tabs-wrap reveal-up" style="transition-delay: 0.3s;">
         <div class="admin-tabs-inner">
             <nav class="admin-tabs" aria-label="Administration sections">
-                <a href="?section=board-of-trustees"
-                   class="admin-tab <?= $section === 'board-of-trustees' ? 'active' : ''; ?>">
-                    Board of Trustees
-                </a>
-                <a href="?section=corporate-officers"
-                   class="admin-tab <?= $section === 'corporate-officers' ? 'active' : ''; ?>">
-                    Corporate Officers
-                </a>
-                <a href="?section=board-of-administration"
-                   class="admin-tab <?= $section === 'board-of-administration' ? 'active' : ''; ?>">
-                    Board of Administration
-                </a>
-                <a href="?section=heads-of-student-services"
-                   class="admin-tab <?= $section === 'heads-of-student-services' ? 'active' : ''; ?>">
-                    Heads of Student Services
-                </a>
+                <?php foreach ($sections as $key => $tab): ?>
+                    <a href="?section=<?= urlencode($key); ?>"
+                       class="admin-tab <?= $section === $key ? 'active' : ''; ?>">
+                        <?= htmlspecialchars($tab['title']); ?>
+                    </a>
+                <?php endforeach; ?>
             </nav>
         </div>
     </section>
@@ -416,20 +456,21 @@ $current = $sections[$section];
     <section class="admin-section">
         <div class="admin-section-inner">
 
-            <div class="admin-section-intro">
+            <div class="admin-section-intro reveal-up">
                 <span class="admin-eyebrow">Leadership &amp; Organization</span>
-                <h2><?= htmlspecialchars($current['title']); ?></h2>
-                <p><?= htmlspecialchars($current['desc']); ?></p>
+                <h2<?= ceMark('data-ve-field="admin-section-title" data-ve-key="' . ceAttr($section) . '" data-ve-max="255" data-ve-label="Section heading"') ?>><?= htmlspecialchars($current['title']); ?></h2>
+                <p<?= ceMark('data-ve-field="admin-section-desc" data-ve-key="' . ceAttr($section) . '" data-ve-max="2000" data-ve-multiline="1" data-ve-label="Text under the heading" data-ve-allow-empty="1"') ?>><?= htmlspecialchars($current['desc']); ?></p>
             </div>
 
-            <?php if ($section === 'heads-of-student-services'): ?>
+            <?php if (($current['layout'] ?? '') === 'offices'): ?>
 
                 <!-- Flip cards -->
-                <div class="hss-grid">
+                <div class="hss-grid"<?= ceMark('data-ve-grid="offices" data-ve-key="' . ceAttr($section) . '"') ?>>
                     <?php foreach ($current['offices'] as $i => $office): ?>
                         <button type="button"
-                                class="hss-flip-card"
-                                data-hss-flip
+                                class="hss-flip-card reveal-scale"
+                                style="transition-delay: <?= ($i % 2) * 0.15 ?>s;"
+                                data-hss-flip<?= !empty($office['id']) ? ceMark('data-ve-office="' . (int)$office['id'] . '" data-ve-label="' . ceAttr($office['office']) . '"') : '' ?>
                                 aria-expanded="false"
                                 aria-label="Show services offered by the <?= htmlspecialchars($office['office']); ?>">
                             <div class="hss-flip-card-inner">
@@ -441,10 +482,11 @@ $current = $sections[$section];
 
                                     <div class="hss-front-body">
                                         <div class="hss-photo">
-                                            <img src="/assets/images/<?= htmlspecialchars($office['img']); ?>" alt="<?= htmlspecialchars($office['name']); ?>">
+                                            <img src="<?= htmlspecialchars($office['image'] ?: $photoFallback); ?>" alt="<?= htmlspecialchars($office['name']); ?>"<?= !empty($office['id']) ? ceMark('data-ve-img="office-photo" data-ve-id="' . (int)$office['id'] . '"') : '' ?>>
                                         </div>
 
                                         <ul class="hss-contact-list">
+                                            <?php if (!empty($office['contact']['phone'])): ?>
                                             <li>
                                                 <i class="bi bi-telephone" aria-hidden="true"></i>
                                                 <div>
@@ -452,6 +494,8 @@ $current = $sections[$section];
                                                     <span class="hss-contact-value"><?= htmlspecialchars($office['contact']['phone']); ?></span>
                                                 </div>
                                             </li>
+                                            <?php endif; ?>
+                                            <?php if (!empty($office['contact']['email'])): ?>
                                             <li>
                                                 <i class="bi bi-envelope" aria-hidden="true"></i>
                                                 <div>
@@ -459,6 +503,8 @@ $current = $sections[$section];
                                                     <span class="hss-contact-value"><?= htmlspecialchars($office['contact']['email']); ?></span>
                                                 </div>
                                             </li>
+                                            <?php endif; ?>
+                                            <?php if (!empty($office['contact']['location'])): ?>
                                             <li>
                                                 <i class="bi bi-geo-alt" aria-hidden="true"></i>
                                                 <div>
@@ -466,13 +512,16 @@ $current = $sections[$section];
                                                     <span class="hss-contact-value"><?= htmlspecialchars($office['contact']['location']); ?></span>
                                                 </div>
                                             </li>
+                                            <?php endif; ?>
+                                            <?php if (!empty($office['contact']['hours'])): ?>
                                             <li>
                                                 <i class="bi bi-clock" aria-hidden="true"></i>
                                                 <div>
                                                     <span class="hss-contact-label">Operating Hours</span>
-                                                    <span class="hss-contact-value"><?= $office['contact']['hours']; ?></span>
+                                                    <span class="hss-contact-value"><?= nl2br(htmlspecialchars($office['contact']['hours'])); ?></span>
                                                 </div>
                                             </li>
+                                            <?php endif; ?>
                                         </ul>
                                     </div>
                                     
@@ -521,14 +570,14 @@ $current = $sections[$section];
             <?php else: ?>
 
                 <!-- Grid layout Trustees/Administration -->
-                <div class="admin-grid">
-                    <?php foreach ($current['people'] as $person): ?>
-                        <div class="admin-card-wrap skeleton-group">
+                <div class="admin-grid"<?= ceMark('data-ve-grid="people" data-ve-key="' . ceAttr($section) . '"') ?>>
+                    <?php foreach ($current['people'] as $i => $person): ?>
+                        <div class="admin-card-wrap skeleton-group reveal-scale" style="transition-delay: <?= ($i % 3) * 0.15 ?>s;"<?= !empty($person['id']) ? ceMark('data-ve-person="' . (int)$person['id'] . '"') : '' ?>>
                             <div class="admin-square-top" aria-hidden="true"></div>
 
                             <div class="admin-photo-card">
                                 <div class="skeleton-wrap" style="height: 100%;">
-                                    <img src="/assets/images/<?= htmlspecialchars($person['img']); ?>" alt="<?= htmlspecialchars($person['role']); ?>">
+                                    <img src="<?= htmlspecialchars($person['image'] ?: $photoFallback); ?>" alt="<?= htmlspecialchars($person['name']); ?>"<?= !empty($person['id']) ? ceMark('data-ve-img="person-photo" data-ve-id="' . (int)$person['id'] . '"') : '' ?>>
                                 </div>
 
                                 <div class="admin-wave" aria-hidden="true">
@@ -540,8 +589,8 @@ $current = $sections[$section];
                                 </div>
 
                                 <div class="admin-badge">
-                                    <span class="admin-badge-title"><?= htmlspecialchars($person['name']); ?></span>
-                                    <span class="admin-badge-sub"><?= htmlspecialchars($person['role']); ?></span>
+                                    <span class="admin-badge-title"<?= !empty($person['id']) ? ceMark('data-ve-field="person-name" data-ve-id="' . (int)$person['id'] . '" data-ve-max="255" data-ve-label="Name"') : '' ?>><?= htmlspecialchars($person['name']); ?></span>
+                                    <span class="admin-badge-sub"<?= !empty($person['id']) ? ceMark('data-ve-field="person-role" data-ve-id="' . (int)$person['id'] . '" data-ve-max="500" data-ve-label="Position" data-ve-allow-empty="1"') : '' ?>><?= htmlspecialchars($person['role']); ?></span>
                                 </div>
                             </div>
 
@@ -555,20 +604,12 @@ $current = $sections[$section];
         </div>
     </section>
 
-    <?php include_once __DIR__ . '/../../components/index-footer.php'; ?>
+    <?php include_once __DIR__ . '/../../components/footer.php'; ?>
+    <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
     <script src="/assets/js/skeleton-loader.js"></script>
-
-    <script>
-        document.querySelectorAll('[data-hss-flip]').forEach(function (card) {
-            card.addEventListener('click', function () {
-                const isFlipped = card.classList.toggle('is-flipped');
-                card.setAttribute('aria-expanded', isFlipped ? 'true' : 'false');
-            });
-        });
-    </script>
-
+    <script src="/assets/js/administration.js"></script>
 </body>
 </html>

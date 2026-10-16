@@ -115,3 +115,33 @@ function gncCategoryIdForMessage(string $message, array $categoryMap): ?int {
     $name = gncClassifyFbPost($message);
     return $name !== null ? ($categoryMap[mb_strtolower($name, 'UTF-8')] ?? null) : null;
 }
+
+
+/**
+ * Auto-categorize every unlocked Facebook post.
+ * - Posts with category_locked = 1 (manually set by an admin) are never touched.
+ * - Rows are only written when the result actually changes.
+ * Safe to call often (after each Facebook sync, and when the admin list loads).
+ *
+ * @return int number of posts whose category changed
+ */
+function gncAutoCategorizeFbPosts(PDO $db): int {
+    $map  = gncLoadCategoryMap($db);
+    $rows = $db->query(
+        "SELECT fb_post_id, message, category_id FROM fb_posts_cache WHERE category_locked = 0"
+    )->fetchAll();
+    $upd  = $db->prepare(
+        "UPDATE fb_posts_cache SET category_id = ? WHERE fb_post_id = ? AND category_locked = 0"
+    );
+
+    $changed = 0;
+    foreach ($rows as $r) {
+        $new = gncCategoryIdForMessage((string)$r['message'], $map);
+        $old = $r['category_id'] !== null ? (int)$r['category_id'] : null;
+        if ($new !== $old) {
+            $upd->execute([$new, $r['fb_post_id']]);
+            $changed++;
+        }
+    }
+    return $changed;
+}

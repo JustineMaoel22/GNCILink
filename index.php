@@ -2,6 +2,13 @@
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/fb-categorizer.php';
 
+// Content Editor preview (?ce_preview=1): a signed-in editor sees this same page with
+// unpublished slides and small editing markers. Everyone else gets the normal page.
+// The shared functions are always loaded: the homepage headings and program cards below are
+// editable in the Content Editor and read through homeText() (original wording until edited).
+require_once __DIR__ . '/admin/admin-functions.php';
+cePreviewActive();   // decide preview mode now, before any output (it needs the session)
+
 // ---------------------------------------------------------------
 // Fetch the latest published admin announcements
 // ---------------------------------------------------------------
@@ -28,12 +35,13 @@ foreach ($dbAnnouncements as $ann) {
     $excerpt = strip_tags($ann['content']);
     $excerpt = mb_strlen($excerpt) > 110 ? mb_substr($excerpt, 0, 110) . '…' : $excerpt;
     $publicAnnouncements[] = [
+        'id'         => (int)($ann['announcement_id'] ?? 0),
         'source'     => 'admin',
         'title'      => $ann['title'],
         'excerpt'    => $excerpt,
         'image_path' => $ann['image_path'],
         'date'       => $ann['published_at'] ?? $ann['created_at'],
-        'link'       => 'announcement.php?slug=' . urlencode($ann['slug']),
+        'link'       => '/announcement-article.php?slug=' . urlencode($ann['slug']),
     ];
 }
 
@@ -62,12 +70,13 @@ foreach ($dbNews as $item) {
     $excerpt = strip_tags($item['content']);
     $excerpt = mb_strlen($excerpt) > 110 ? mb_substr($excerpt, 0, 110) . '…' : $excerpt;
     $publicNews[] = [
+        'id'         => (int)($item['news_id'] ?? 0),
         'source'     => 'news',
         'title'      => $item['title'],
         'excerpt'    => $excerpt,
         'image_path' => $item['image_path'],
         'date'       => $item['published_at'] ?? $item['created_at'],
-        'link'       => 'news.php?slug=' . urlencode($item['slug']),
+        'link'       => '/news-article.php?slug=' . urlencode($item['slug']),
         'author'     => $item['author'] ?? null,
     ];
 }
@@ -116,7 +125,8 @@ function getFacebookPosts(): array {
     $accessToken = $_ENV['FB_ACCESS_TOKEN'];
 
     $url = "https://graph.facebook.com/v19.0/{$pageId}/posts"
-         . "?fields=id,message,created_time,permalink_url,full_picture&limit=6"
+         . "?fields=id,message,created_time,permalink_url,full_picture,picture,"
+         . "attachments{media{image{src}},subattachments{media{image{src}}}}&limit=6"
          . "&access_token={$accessToken}";
 
     $ch = curl_init();
@@ -141,7 +151,12 @@ function getFacebookPosts(): array {
     }
 
     if (!empty($response['data'])) {
-        $existingStmt = $db->prepare("SELECT image_media_id FROM fb_posts_cache WHERE fb_post_id = ?");
+        $existingStmt = $db->prepare("
+            SELECT f.image_media_id, m.file_path
+            FROM fb_posts_cache f
+            LEFT JOIN media_library m ON f.image_media_id = m.media_id
+            WHERE f.fb_post_id = ?
+        ");
 
         $categoryMap = gncLoadCategoryMap($db);
 
@@ -153,19 +168,32 @@ function getFacebookPosts(): array {
                 permalink_url   = VALUES(permalink_url),
                 created_time    = VALUES(created_time),
                 fetched_at      = NOW(),
-                image_media_id  = COALESCE(image_media_id, VALUES(image_media_id)),
+                image_media_id  = COALESCE(VALUES(image_media_id), image_media_id),
                 category_id     = IF(category_locked = 1, category_id, VALUES(category_id))
         ");
 
         foreach ($response['data'] as $post) {
             if (empty($post['message']) || empty($post['id'])) continue; // skip photo-only / malformed posts
 
-            // Reuse the existing media_library row for this post if we already downloaded it
+            // Reuse the existing media_library row for this post if we already
+            // downloaded it AND the file is still there. Otherwise (never
+            // downloaded, earlier download failed, or file/row went missing)
+            // try again with every image URL Facebook gave us.
             $existingStmt->execute([$post['id']]);
-            $imageMediaId = $existingStmt->fetchColumn() ?: null;
+            $existing     = $existingStmt->fetch() ?: [];
+            $imageMediaId = null;
 
-            if (empty($imageMediaId) && !empty($post['full_picture'])) {
-                $imageMediaId = downloadAndStoreFbImageAsMedia($db, $post['id'], $post['full_picture']);
+            if (!empty($existing['image_media_id']) && gncFbImageIsUsable($existing['file_path'] ?? null)) {
+                $imageMediaId = (int) $existing['image_media_id'];
+            } else {
+                $candidates = gncPickFbImageUrls($post);
+                foreach ($candidates as $candidateUrl) {
+                    $imageMediaId = downloadAndStoreFbImageAsMedia($db, $post['id'], $candidateUrl);
+                    if ($imageMediaId) break;
+                }
+                if (!$imageMediaId) {
+                    error_log("Facebook post {$post['id']}: no usable image (" . count($candidates) . " candidate URL(s) tried)");
+                }
             }
 
             $upsertStmt->execute([
@@ -212,28 +240,75 @@ function fetchCachedFbPostsFromDb(PDO $db): array {
 }
 
 /**
+ * Collect every image URL Facebook returned for a post, best first.
+ * full_picture is empty for some post types (shared links, albums,
+ * videos), so fall back to the attachment images and finally the
+ * small "picture" thumbnail.
+ */
+function gncPickFbImageUrls(array $post): array {
+    $urls = [];
+    if (!empty($post['full_picture'])) $urls[] = $post['full_picture'];
+
+    foreach (($post['attachments']['data'] ?? []) as $att) {
+        if (!empty($att['media']['image']['src'])) $urls[] = $att['media']['image']['src'];
+        foreach (($att['subattachments']['data'] ?? []) as $sub) {
+            if (!empty($sub['media']['image']['src'])) $urls[] = $sub['media']['image']['src'];
+        }
+    }
+
+    if (!empty($post['picture'])) $urls[] = $post['picture'];
+
+    return array_values(array_unique($urls));
+}
+
+/**
+ * True when a cached image row points at a file that still exists.
+ * Lets us re-download images whose media_library row or file was lost.
+ */
+function gncFbImageIsUsable(?string $publicPath): bool {
+    if (empty($publicPath)) return false;
+    if (strpos($publicPath, '/uploads/facebook/') === 0) {
+        return is_file(UPLOAD_PATH . 'facebook/' . basename($publicPath));
+    }
+    return true; // not one of ours: assume it's fine
+}
+
+/**
  * Download a Facebook post image once and register it in media_library,
  * exactly like every other uploaded file in this project. Returns the
  * new media_id, or null if the download/insert failed.
  */
 function downloadAndStoreFbImageAsMedia(PDO $db, string $postId, string $remoteUrl): ?int {
-    $urlPath = parse_url($remoteUrl, PHP_URL_PATH) ?? '';
-    $ext = strtolower(pathinfo($urlPath, PATHINFO_EXTENSION));
-    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
-        $ext = 'jpg';
-    }
-
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $remoteUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);          // CDN links can redirect
+    curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (compatible; GNCWebsite/1.0)');
+    curl_setopt($ch, CURLOPT_ENCODING, '');                   // accept gzip etc.
     $imageData = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr   = curl_error($ch);
     curl_close($ch);
 
-    if ($imageData === false || $httpCode !== 200) {
-        error_log("Failed to download FB image for post $postId (HTTP $httpCode)");
+    if ($imageData === false || $httpCode < 200 || $httpCode >= 300 || $imageData === '') {
+        error_log("Failed to download FB image for post $postId (HTTP $httpCode) $curlErr");
+        return null;
+    }
+
+    // Make sure what we got is really an image (not an HTML error page)
+    $info = @getimagesizefromstring($imageData);
+    if ($info === false) {
+        error_log("FB image for post $postId is not a valid image");
+        return null;
+    }
+    $mimeToExt = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'];
+    $ext = $mimeToExt[$info['mime']] ?? null;
+    if ($ext === null) {
+        error_log("FB image for post $postId has unsupported type {$info['mime']}");
         return null;
     }
 
@@ -268,10 +343,11 @@ $facebookPosts = getFacebookPosts();
 
 // ---------------------------------------------------------------
 // Pinned announcements/news (managed from Admin > Announcements /
-// Admin > News, via the pin toggle — up to 3 items combined). These
-// power the small featured slideshow above the News & Announcements
+// Admin > News, via the pin toggle — up to GNC_PIN_LIMIT items combined).
+// These power the small featured slideshow above the News & Announcements
 // grid below.
 // ---------------------------------------------------------------
+const GNC_PIN_LIMIT = 5;   // most pinned items shown on the homepage (was 3)
 $pinnedFeedItems = [];
 
 /**
@@ -296,9 +372,27 @@ function gncPinnedParse(string $html): array {
     $cut = fn($s, $n) => mb_strlen($s) > $n ? mb_substr($s, 0, $n) . '…' : $s;
     return [$cut($intro, 160), array_map(fn($s) => $cut($s, 110), array_slice($points, 0, 4))];
 }
+/**
+ * Return the admin's content exactly as typed (paragraphs, line breaks, lists,
+ * bold/italic, links) but safe to print: only simple formatting tags are kept
+ * and every attribute is dropped (except a safe href on links).
+ */
+function gncPinnedHtml(string $html): string {
+    $html = strip_tags($html, '<p><br><strong><b><em><i><u><ul><ol><li><a><h1><h2><h3><h4><h5><h6>');
+    $html = preg_replace_callback('/<(\/?)([a-z0-9]+)([^>]*)>/i', function ($m) {
+        $tag = strtolower($m[2]);
+        if ($m[1] === '/') return '</' . $tag . '>';
+        if ($tag === 'a' && preg_match('/href\s*=\s*([\"\'])(.*?)\1/i', $m[3], $h)
+            && preg_match('#^(https?://|/|mailto:)#i', trim($h[2]))) {
+            return '<a href="' . htmlspecialchars(trim($h[2]), ENT_QUOTES) . '" target="_blank" rel="noopener">';
+        }
+        return '<' . $tag . '>';
+    }, $html);
+    return trim($html);
+}
 try {
     $stmt = $db->query("
-        SELECT a.title, a.slug, a.content, a.pinned_at, a.published_at, a.created_at,
+        SELECT a.announcement_id, a.title, a.slug, a.content, a.pinned_at, a.published_at, a.created_at,
             m.file_path AS image_path
         FROM announcements a
         LEFT JOIN media_library m ON a.featured_image = m.media_id
@@ -311,6 +405,8 @@ try {
         $pinnedFeedItems[] = [
             'intro'      => $pinIntro,
             'points'     => $pinPoints,
+            'html'       => gncPinnedHtml((string)$ann['content']),
+            'id'         => (int)($ann['announcement_id'] ?? 0),
             'source'     => 'admin',
             'type_label' => 'Announcement',
             'title'      => $ann['title'],
@@ -318,12 +414,12 @@ try {
             'image_path' => $ann['image_path'],
             'date'       => $ann['published_at'] ?? $ann['created_at'],
             'pinned_at'  => $ann['pinned_at'],
-            'link'       => 'announcement.php?slug=' . urlencode($ann['slug']),
+            'link'       => '/announcement-article.php?slug=' . urlencode($ann['slug']),
         ];
     }
 
     $stmt = $db->query("
-        SELECT n.title, n.slug, n.content, n.pinned_at, n.published_at, n.created_at,
+        SELECT n.news_id, n.title, n.slug, n.content, n.pinned_at, n.published_at, n.created_at,
             m.file_path AS image_path
         FROM news n
         LEFT JOIN media_library m ON n.featured_image = m.media_id
@@ -336,6 +432,8 @@ try {
         $pinnedFeedItems[] = [
             'intro'      => $pinIntro,
             'points'     => $pinPoints,
+            'html'       => gncPinnedHtml((string)$item['content']),
+            'id'         => (int)($item['news_id'] ?? 0),
             'source'     => 'news',
             'type_label' => 'News',
             'title'      => $item['title'],
@@ -343,7 +441,7 @@ try {
             'image_path' => $item['image_path'],
             'date'       => $item['published_at'] ?? $item['created_at'],
             'pinned_at'  => $item['pinned_at'],
-            'link'       => 'news.php?slug=' . urlencode($item['slug']),
+            'link'       => '/news-article.php?slug=' . urlencode($item['slug']),
         ];
     }
 
@@ -358,6 +456,7 @@ try {
         $pinnedFeedItems[] = [
             'intro'      => $excerpt,
             'points'     => [],
+            'html'       => nl2br(htmlspecialchars((string)$row['message'])),
             'source'     => 'facebook',
             'type_label' => 'Announcement',
             'title'      => null,
@@ -370,7 +469,7 @@ try {
     }
 
     usort($pinnedFeedItems, fn($a, $b) => strtotime($b['pinned_at']) <=> strtotime($a['pinned_at']));
-    $pinnedFeedItems = array_slice($pinnedFeedItems, 0, 3);
+    $pinnedFeedItems = array_slice($pinnedFeedItems, 0, GNC_PIN_LIMIT);
 } catch (Exception $e) {
     $pinnedFeedItems = [];
 }
@@ -381,7 +480,7 @@ try {
 try {
     $heroSlides = $db->query("
         SELECT * FROM hero_slides
-        WHERE status = 'published'
+        WHERE status " . (cePreviewActive() ? "IN ('published', 'draft')" : "= 'published'") . "
         ORDER BY display_order ASC, slide_id ASC
     ")->fetchAll();
 } catch (Exception $e) {
@@ -392,18 +491,18 @@ try {
 // simply not rendered on small-screen devices.
 $isMobileUA = isset($_SERVER['HTTP_USER_AGENT'])
     && preg_match('/Mobile|Android|iPhone|iPad|iPod/i', $_SERVER['HTTP_USER_AGENT']);
-if ($isMobileUA) {
+if ($isMobileUA && !cePreviewActive()) {
     $heroSlides = array_values(array_filter($heroSlides, fn($s) => (int)$s['show_on_mobile'] === 1));
 }
 
 // ---------------------------------------------------------------
-// Merge + sort combined feed, newest first, capped at 6
+// Merge + sort combined feed, newest first, capped at 3
 // ---------------------------------------------------------------
 $publicAnnouncements = array_merge($publicAnnouncements, $publicNews, $facebookPosts);
 usort($publicAnnouncements, function ($a, $b) {
     return strtotime($b['date']) <=> strtotime($a['date']);
 });
-$publicAnnouncements = array_slice($publicAnnouncements, 0, 6);
+$publicAnnouncements = array_slice($publicAnnouncements, 0, 3);
 
 // ---------------------------------------------------------------
 // Events calendar (public, published only)
@@ -566,6 +665,45 @@ try {
 } catch (Exception $e) {
     $homePrograms = [];
 }
+
+// ---------------------------------------------------------------
+// "Message from the President" — managed in the admin Content Editor
+// (homepage_president, row id = 1). Any field left empty/missing falls
+// back to the original hardcoded text so the section never renders blank.
+// ---------------------------------------------------------------
+$president = [
+    'name'      => 'Geraldine G. Lim, MBA',
+    'title'     => 'President',
+    'org'       => 'Guagua National Colleges, Inc.',
+    'eyebrow'   => 'A Warm Welcome to',
+    'heading'   => 'Our New Students',
+    'greeting'  => 'Welcome GNCians!',
+    'message'   => "\u{201C}Congratulations for choosing Guagua National Colleges, Inc. to take care of you and your education.\n\nGuagua National Colleges, Inc. boast of 100 plus years of giving quality education.\u{201D}",
+    'photo_url' => 'assets/images/maam-president.png',
+];
+try {
+    $stmt = $db->query("
+        SELECT hp.name, hp.title, hp.org, hp.eyebrow, hp.heading, hp.greeting, hp.message,
+               m.file_path AS photo_path
+        FROM homepage_president hp
+        LEFT JOIN media_library m ON m.media_id = hp.media_id
+        WHERE hp.id = 1
+    ");
+    $hpRow = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : false;
+    if ($hpRow) {
+        foreach (['name', 'title', 'org', 'eyebrow', 'heading', 'greeting', 'message'] as $k) {
+            if (isset($hpRow[$k]) && trim($hpRow[$k]) !== '') {
+                $president[$k] = $hpRow[$k];
+            }
+        }
+        $pp = $hpRow['photo_path'] ?? '';
+        if ($pp !== '' && strpos($pp, '..') === false && is_file(__DIR__ . $pp)) {
+            $president['photo_url'] = ltrim($pp, '/');
+        }
+    }
+} catch (Exception $e) {
+    error_log('Homepage president fetch error: ' . $e->getMessage());
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -577,26 +715,143 @@ try {
     <link href="assets/css/base-style.css" rel="stylesheet">
     <link href="assets/css/navbar-style.css" rel="stylesheet">
     <link href="assets/css/footer-style.css" rel="stylesheet">
-    <link href="assets/css/index-style.css?v=6" rel="stylesheet">
+    <link href="assets/css/index-style.css?v=12" rel="stylesheet">
     <link href="assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="icon" type="image/x-icon" href="assets/images/logos/gnc-logo-v1.svg">
+    <!-- Opening intro: shown once per browser session. Class is set in <head> so the
+         overlay covers the page from the first paint. -->
+    <script>
+        (function () {
+            try {
+                var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                if (<?= cePreviewActive() ? 'false && ' : '' ?>!reduce && !sessionStorage.getItem('gncIntroSeen')) {
+                    document.documentElement.classList.add('gnc-intro-on');
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <style>
+        #gnc-intro { display: none; }
+        html.gnc-intro-on, html.gnc-intro-on body { overflow: hidden; }
+        html.gnc-intro-on #gnc-intro { display: block; position: fixed; inset: 0; z-index: 99999; cursor: pointer; }
+
+        /* ---- background: 6 vertical panels that wipe away on exit ---- */
+        .gnc-intro-panels { position: absolute; inset: 0; display: flex; }
+        .gnc-intro-panels i {
+            flex: 1; background: #094024; margin-right: -1px;
+            transition: transform .9s cubic-bezier(.76, 0, .24, 1);
+        }
+        .gnc-intro-panels i:nth-child(even) { background: #07351d; }
+        .gnc-intro-panels i:nth-child(1) { transition-delay: 0s; }
+        .gnc-intro-panels i:nth-child(2) { transition-delay: .07s; }
+        .gnc-intro-panels i:nth-child(3) { transition-delay: .14s; }
+        .gnc-intro-panels i:nth-child(4) { transition-delay: .21s; }
+        .gnc-intro-panels i:nth-child(5) { transition-delay: .28s; }
+        .gnc-intro-panels i:nth-child(6) { transition-delay: .35s; }
+        #gnc-intro.is-leaving .gnc-intro-panels i { transform: translateY(-101%); }
+
+        /* ---- foreground content ---- */
+        .gnc-intro-ui {
+            position: absolute; inset: 0; color: #fff;
+            padding: clamp(1.2rem, 4vw, 3rem);
+            display: flex; flex-direction: column; justify-content: space-between;
+            transition: opacity .4s ease, transform .5s ease;
+        }
+        #gnc-intro.is-leaving .gnc-intro-ui { opacity: 0; transform: translateY(-30px); }
+
+        .gnc-intro-top { display: flex; align-items: center; gap: .8rem; opacity: 0; animation: gncIFade .8s ease .2s forwards; }
+        .gnc-intro-top img { width: 46px; height: 46px; object-fit: contain; }
+        .gnc-intro-top span {
+            font-family: 'Inter', sans-serif; font-size: .72rem; font-weight: 600;
+            letter-spacing: .28em; text-transform: uppercase; color: rgba(255, 255, 255, .75);
+        }
+
+        .gnc-intro-words { margin: auto 0; padding-left: clamp(0rem, 3vw, 3rem); }
+        .gnc-intro-word {
+            display: block; overflow: hidden; padding: .02em 0;
+            font-family: 'Bebas Neue', 'Anton', Impact, sans-serif;
+            font-size: clamp(3.6rem, 15vw, 11rem); line-height: .9; letter-spacing: .01em;
+        }
+        .gnc-intro-word b {
+            display: block; font-weight: 400; transform: translateY(105%);
+            animation: gncIRise .9s cubic-bezier(.2, .8, .2, 1) forwards;
+        }
+        .gnc-intro-word:nth-child(1) b { animation-delay: .35s; }
+        .gnc-intro-word:nth-child(2) b { animation-delay: .6s; color: transparent; -webkit-text-stroke: 2px rgba(255, 255, 255, .9); }
+        .gnc-intro-word:nth-child(3) b { animation-delay: .85s; color: #EABA3B; }
+
+        .gnc-intro-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
+        .gnc-intro-name {
+            font-family: 'Noto Serif', serif; font-size: clamp(.8rem, 1.6vw, 1.05rem);
+            color: rgba(255, 255, 255, .8); margin: 0 0 .6rem;
+            opacity: 0; animation: gncIFade .8s ease 1.3s forwards;
+        }
+        .gnc-intro-count {
+            font-family: 'Bebas Neue', 'Anton', Impact, sans-serif; line-height: .8;
+            font-size: clamp(3.4rem, 11vw, 8rem); color: #fff; font-variant-numeric: tabular-nums;
+        }
+        .gnc-intro-count small { font-size: .38em; color: #EABA3B; margin-left: .1em; }
+
+        .gnc-intro-line {
+            position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: #EABA3B;
+            transform: scaleX(var(--p, 0)); transform-origin: left;
+        }
+
+        @keyframes gncIRise { to { transform: translateY(0); } }
+        @keyframes gncIFade { to { opacity: 1; } }
+    </style>
 </head>
 <body>
+    <!-- Opening intro overlay (styles/script in <head> and below; click to skip) -->
+    <div id="gnc-intro" aria-hidden="true">
+        <div class="gnc-intro-panels"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="gnc-intro-ui">
+            <div class="gnc-intro-top">
+                <img src="assets/images/logos/gnc-logo-v1.svg" alt="">
+                <span>Guagua National Colleges</span>
+            </div>
+            <div class="gnc-intro-words">
+                <span class="gnc-intro-word"><b>Fides</b></span>
+                <span class="gnc-intro-word"><b>Scientia</b></span>
+                <span class="gnc-intro-word"><b>Patria.</b></span>
+            </div>
+            <div class="gnc-intro-bottom">
+                <p class="gnc-intro-name">Guagua National Colleges, Inc.</p>
+                <div class="gnc-intro-count"><span id="gnc-intro-num">0</span><small>%</small></div>
+            </div>
+        </div>
+        <div class="gnc-intro-line" id="gnc-intro-line"></div>
+    </div>
+
+
+    <!-- Scroll progress bar + back-to-top (decorative, pointer-safe) -->
+    <div class="gnc-scroll-progress" id="gncScrollProgress" aria-hidden="true"></div>
+    <button type="button" class="gnc-backtop" id="gncBackTop" aria-label="Back to top">
+        <i class="bi bi-arrow-up"></i>
+    </button>
 
     <?php $activeSection = 'home'; ?>
-    <?php include __DIR__ . '/components/index-nav.php'; ?>
+    <?php include __DIR__ . '/components/navbar.php'; ?>
 
     <?php if (!empty($heroSlides)): ?>
     <div class="hero-slideshow">
+        <div class="hero-aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+        <canvas id="heroParticles" class="hero-particles" aria-hidden="true"></canvas>
         <?php foreach ($heroSlides as $i => $slide):
+            // Optional database text fields can be NULL, including in editor previews.
+            foreach (['title', 'subtitle', 'btn1_text', 'btn1_link', 'btn2_text', 'btn2_link',
+                      'media_path', 'media_path_mobile', 'poster_path', 'media_type', 'status'] as $field) {
+                $slide[$field] = (string)($slide[$field] ?? '');
+            }
             $titleLines = $slide['title'] ? explode('|', $slide['title'], 2) : [];
-            $hasButtons = !empty($slide['btn1_text']) || !empty($slide['btn2_text']);
+            if (cePreviewActive()) $titleLines = array_pad($titleLines, 2, '');   // editor needs both lines to click into
+            $hasButtons = !empty($slide['btn1_text']) || !empty($slide['btn2_text']) || cePreviewActive();
             $isFirstSlide = $i === 0;
         ?>
-        <div class="hero-slide <?= $isFirstSlide ? 'active' : '' ?>" data-slide="<?= $i ?>">
+        <div class="hero-slide <?= $isFirstSlide ? 'active' : '' ?>" data-slide="<?= $i ?>"<?= ceMark('data-ve-slide="' . (int)$slide['slide_id'] . '" data-ve-status="' . ceAttr($slide['status']) . '"') ?>>
             <?php if ($slide['media_type'] === 'video'): ?>
-                <div class="slide-video-wrap">
+                <div class="slide-video-wrap"<?= ceMark('data-ve-bg="video"') ?>>
                     <?php if ($isFirstSlide): ?>
                     <video
                         class="slide-video hero-slide-video"
@@ -628,42 +883,43 @@ try {
                 <!-- First slide loads eagerly, so it gets a skeleton shimmer while
                      the real image decodes. skeleton-loader.js preloads data-bg,
                      then swaps it into background-image and drops .skeleton-hero. -->
-                <div class="slide-bg skeleton-hero d-none d-md-block" data-bg="<?= htmlspecialchars($slide['media_path']) ?>"></div>
-                <div class="slide-bg skeleton-hero d-md-none" data-bg="<?= htmlspecialchars($mobileMediaPath) ?>"></div>
+                <div class="slide-bg skeleton-hero d-none d-md-block" data-bg="<?= htmlspecialchars($slide['media_path']) ?>"<?= ceMark('data-ve-bg="desktop"') ?>></div>
+                <div class="slide-bg skeleton-hero d-md-none" data-bg="<?= htmlspecialchars($mobileMediaPath) ?>"<?= ceMark('data-ve-bg="mobile"') ?>></div>
                 <?php else: ?>
-                <div class="slide-bg lazy-bg d-none d-md-block" data-bg="<?= htmlspecialchars($slide['media_path']) ?>"></div>
-                <div class="slide-bg lazy-bg d-md-none" data-bg="<?= htmlspecialchars($mobileMediaPath) ?>"></div>
+                <div class="slide-bg lazy-bg d-none d-md-block" data-bg="<?= htmlspecialchars($slide['media_path']) ?>"<?= ceMark('data-ve-bg="desktop"') ?>></div>
+                <div class="slide-bg lazy-bg d-md-none" data-bg="<?= htmlspecialchars($mobileMediaPath) ?>"<?= ceMark('data-ve-bg="mobile"') ?>></div>
                 <?php endif; ?>
             <?php endif; ?>
-            <?php if ($slide['show_gradient'] === null || (int)$slide['show_gradient'] === 1): ?>
-            <div class="slide-overlay"></div>
+            <?php $overlayOn = ($slide['show_gradient'] === null || (int)$slide['show_gradient'] === 1); ?>
+            <?php if ($overlayOn || cePreviewActive()): ?>
+            <div class="slide-overlay"<?= ceMark('data-ve-overlay="1"' . ($overlayOn ? '' : ' style="display:none"')) ?>></div>
             <?php endif; ?>
 
-            <?php if ($titleLines || $slide['subtitle'] || $hasButtons): ?>
+            <?php if ($titleLines || $slide['subtitle'] || $hasButtons || cePreviewActive()): ?>
             <div class="container h-100">
                 <div class="hero-content">
-                    <?php if (!empty($titleLines[0])): ?>
-                        <h1 class="hero-title-line"><?= htmlspecialchars($titleLines[0]) ?></h1>
+                    <?php if (!empty($titleLines[0]) || cePreviewActive()): ?>
+                        <h1 class="hero-title-line"<?= ceMark('data-ve-field="slide-title1" data-ve-max="50" data-ve-ph="Headline" data-ve-label="Headline"') ?>><?= htmlspecialchars($titleLines[0]) ?></h1>
                     <?php endif; ?>
-                    <?php if (!empty($titleLines[1])): ?>
-                        <h1 class="hero-title-line"><?= htmlspecialchars($titleLines[1]) ?></h1>
+                    <?php if (!empty($titleLines[1]) || cePreviewActive()): ?>
+                        <h1 class="hero-title-line"<?= ceMark('data-ve-field="slide-title2" data-ve-max="50" data-ve-ph="Second line (optional)" data-ve-label="Headline, second line"') ?>><?= htmlspecialchars($titleLines[1]) ?></h1>
                     <?php endif; ?>
-                    <?php if (!empty($slide['subtitle'])): ?>
-                        <p class="hero-desc"><?= nl2br(htmlspecialchars($slide['subtitle'])) ?></p>
+                    <?php if (!empty($slide['subtitle']) || cePreviewActive()): ?>
+                        <p class="hero-desc"<?= ceMark('data-ve-field="slide-subtitle" data-ve-max="150" data-ve-multiline="1" data-ve-ph="Add a short description" data-ve-label="Description"') ?>><?= nl2br(htmlspecialchars($slide['subtitle'])) ?></p>
                     <?php endif; ?>
                     <?php if ($hasButtons): ?>
                     <div class="hero-ctas">
-                        <?php if (!empty($slide['btn1_text'])): ?>
-                            <a href="<?= htmlspecialchars($slide['btn1_link'] ?: '#') ?>" class="btn-enroll">
-                                <?= htmlspecialchars($slide['btn1_text']) ?>
+                        <?php if (!empty($slide['btn1_text']) || cePreviewActive()): ?>
+                            <a href="<?= htmlspecialchars($slide['btn1_link'] ?: '#') ?>" class="btn-enroll<?= (cePreviewActive() && empty($slide['btn1_text'])) ? ' ve-ghost' : '' ?>"<?= ceMark('data-ve-btn="1" data-ve-link="' . ceAttr($slide['btn1_link']) . '"') ?>>
+                                <?php if (cePreviewActive()): ?><span data-ve-field="slide-btn1" data-ve-max="30" data-ve-ph="Add a button" data-ve-label="Button text"><?= htmlspecialchars($slide['btn1_text']) ?></span><?php else: ?><?= htmlspecialchars($slide['btn1_text']) ?><?php endif; ?>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
                                     <path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/>
                                 </svg>
                             </a>
                         <?php endif; ?>
-                        <?php if (!empty($slide['btn2_text'])): ?>
-                            <a href="<?= htmlspecialchars($slide['btn2_link'] ?: '#') ?>" class="btn-explore">
-                                <?= htmlspecialchars($slide['btn2_text']) ?>
+                        <?php if (!empty($slide['btn2_text']) || cePreviewActive()): ?>
+                            <a href="<?= htmlspecialchars($slide['btn2_link'] ?: '#') ?>" class="btn-explore<?= (cePreviewActive() && empty($slide['btn2_text'])) ? ' ve-ghost' : '' ?>"<?= ceMark('data-ve-btn="2" data-ve-link="' . ceAttr($slide['btn2_link']) . '"') ?>>
+                                <?php if (cePreviewActive()): ?><span data-ve-field="slide-btn2" data-ve-max="30" data-ve-ph="Add a second button" data-ve-label="Button text"><?= htmlspecialchars($slide['btn2_text']) ?></span><?php else: ?><?= htmlspecialchars($slide['btn2_text']) ?><?php endif; ?>
                             </a>
                         <?php endif; ?>
                     </div>
@@ -695,216 +951,216 @@ try {
     </div>
     <?php endif; ?>
 
-<div class="gnc-pillars">
-        <div class="container">
-            <div class="pillar-card">
-                <div class="pillar-wrap">
-
-                    <div class="pillar-item">
-                        <div class="pillar-icon-wrap fides-bg">
-                            <img src="assets/images/svg/church.svg" alt="Fides" class="pillar-icon-img" loading="lazy" decoding="async">
-                        </div>
-                        <div>
-                            <p class="pillar-title fides-color">FIDES</p>
-                            <p class="pillar-desc">Faith in God and One's Self.</p>
-                        </div>
-                    </div>
-
-                    <div class="pillar-item">
-                        <div class="pillar-icon-wrap scientia-bg">
-                            <img src="assets/images/svg/book.svg" alt="Scientia" class="pillar-icon-img" loading="lazy" decoding="async">
-                        </div>
-                        <div>
-                            <p class="pillar-title scientia-color">SCIENTIA</p>
-                            <p class="pillar-desc">Search for Truth and Knowledge.</p>
-                        </div>
-                    </div>
-
-                    <div class="pillar-item">
-                        <div class="pillar-icon-wrap patria-bg">
-                            <img src="assets/images/svg/swords.svg" alt="Patria" class="pillar-icon-img" loading="lazy" decoding="async">
-                        </div>
-                        <div>
-                            <p class="pillar-title patria-color">PATRIA</p>
-                            <p class="pillar-desc">Love for Country.</p>
-                        </div>
-                    </div>
-
+<?php
+    // The three GNC pillars. Rendered as a looping marquee (2 identical groups,
+    // each holding the set twice, so the -50% loop is seamless on wide screens).
+    $gncPillars = [
+        ['name' => 'FIDES',    'bg' => 'fides-bg',    'icon' => 'assets/images/svg/church.svg', 'desc' => "Faith in God and One's Self."],
+        ['name' => 'SCIENTIA', 'bg' => 'scientia-bg', 'icon' => 'assets/images/svg/book.svg',   'desc' => 'Search for Truth and Knowledge.'],
+        ['name' => 'PATRIA',   'bg' => 'patria-bg',   'icon' => 'assets/images/svg/swords.svg', 'desc' => 'Love for Country.'],
+    ];
+?>
+    <div class="gnc-pillars">
+        <div class="pillar-marquee gnc-reveal" id="pillarMarquee" role="group" aria-label="Our pillars: Fides, Scientia, Patria">
+            <div class="pillar-viewport">
+                <div class="pillar-track">
+                    <?php for ($g = 0; $g < 2; $g++): ?>
+                    <ul class="pillar-group">
+                        <?php for ($rep = 0; $rep < 2; $rep++): foreach ($gncPillars as $p):
+                            $dup = ($g > 0 || $rep > 0); ?>
+                        <li class="pillar-word<?= $dup ? ' is-dup' : '' ?>"<?= $dup ? ' aria-hidden="true"' : '' ?> title="<?= htmlspecialchars($p['desc']) ?>">
+                            <span class="pillar-badge <?= $p['bg'] ?>">
+                                <img src="<?= $p['icon'] ?>" alt="" class="pillar-icon-img" loading="lazy" decoding="async">
+                            </span>
+                            <span class="pillar-label">
+                                <span class="pillar-text"><?= $p['name'] ?></span>
+                                <span class="pillar-desc"><?= htmlspecialchars($p['desc']) ?></span>
+                            </span>
+                        </li>
+                        <?php endforeach; endfor; ?>
+                    </ul>
+                    <?php endfor; ?>
                 </div>
             </div>
         </div>
     </div>
 
-    <section class="gnc-announcements py-5" id="announcements">
-        <div class="container">
-            <div class="gnc-announce-header lazy-bg mb-5">
-                <span class="gnc-announce-eyebrow d-inline-block mb-2">
-                    News &amp; Announcements
-                </span>
-                <h2 class="gnc-announce-title mb-2">Stay Updated, Stay Informed</h2>
-                <p class="text-muted mb-0">Get the latest news, events, and important updates</p>
+    <section class="gnc-news" id="announcements">
+        <div class="container gnc-news-wrap">
+            <div class="gnc-news-head gnc-reveal">
+                <h2 class="gnc-news-heading"><i class="bi <?= homeIconClass('news_icon') ?> gnc-news-icon"<?= homeIconMark('news_icon') ?>></i><?= homeTextHtml('news_heading') ?><span<?= homeTextMark('news_subheading', true) ?>><?= homeTextBr('news_subheading') ?></span></h2>
+                <p class="gnc-news-sub"<?= homeTextMark('news_intro') ?>><?= htmlspecialchars(homeText('news_intro')) ?></p>
             </div>
 
             <?php if (!empty($pinnedFeedItems)): ?>
-            <div class="gnc-pinned-label"><i class="bi bi-pin-angle-fill"></i> Pinned</div>
-            <div id="gncPinnedCarousel" class="carousel slide gnc-pinned-carousel mb-5" data-bs-ride="carousel" data-bs-interval="7000">
-                <div class="carousel-inner">
+            <?php $pinCount = count($pinnedFeedItems); ?>
+            <div class="gnc-pin" id="gncPin" data-count="<?= $pinCount ?>" data-interval="7000" role="region" aria-roledescription="carousel" aria-label="Pinned news and announcements">
+                <div class="gnc-pin-stage">
                     <?php foreach ($pinnedFeedItems as $i => $pin):
                         $isFbPin = $pin['source'] === 'facebook';
-                        $badge   = $isFbPin ? 'From Facebook' : ($pin['type_label'] === 'News' ? 'Featured News' : 'Important Update');
+                        $pinTitle = trim((string)($pin['title'] ?? ''));
+                        if ($pinTitle === '') { $pinTitle = $isFbPin ? 'Facebook Update' : 'Announcement'; }
+                        $isNewsPin = !$isFbPin && $pin['type_label'] === 'News';
+                        $pinKind   = $isFbPin ? 'facebook' : ($isNewsPin ? 'news' : 'announcement');
+                        $pinKindLabel = $isFbPin ? 'Facebook Post' : ($isNewsPin ? 'News' : 'Announcement');
+                        $pinKindIcon  = $isFbPin ? 'bi-facebook' : ($isNewsPin ? 'bi-newspaper' : 'bi-megaphone-fill');
+                        // plain-text description (CSS cuts it off with "..." when it is too long)
+                        $pinDesc = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags(preg_replace('/<\/(p|div|li|h[1-6])>|<br\s*\/?>/i', ' ', (string)($pin['html'] ?? ''))), ENT_QUOTES, 'UTF-8')));
                     ?>
-                    <div class="carousel-item <?= $i === 0 ? 'active' : '' ?>">
-                        <article class="gnc-pinned-card">
-                            <div class="gnc-pinned-media skeleton-wrap">
-                                <?php if (!empty($pin['image_path'])): ?>
-                                <img src="<?= htmlspecialchars($pin['image_path']) ?>" alt="<?= htmlspecialchars($pin['title'] ?? 'Facebook post') ?>" loading="<?= $i === 0 ? 'eager' : 'lazy' ?>" decoding="async">
-                                <?php else: ?>
-                                <div class="gnc-pinned-slide-fallback">
-                                    <i class="bi <?= $isFbPin ? 'bi-facebook' : ($pin['type_label'] === 'News' ? 'bi-newspaper' : 'bi-megaphone') ?>"></i>
-                                </div>
-                                <?php endif; ?>
-                            </div>
-
-                            <div class="gnc-pinned-body">
-                                <div class="gnc-pinned-content">
-                                    <div class="gnc-pinned-tags">
-                                        <span class="gnc-pinned-badge"><?= htmlspecialchars($badge) ?></span>
-                                    </div>
-                                    <?php if (!empty($pin['title'])): ?>
-                                    <h3 class="gnc-pinned-title"><?= htmlspecialchars($pin['title']) ?></h3>
-                                    <?php endif; ?>
-                                    <div class="gnc-pinned-date"><?= date('F d, Y', strtotime($pin['date'])) ?></div>
-
-                                    <?php if (!empty($pin['intro'])): ?>
-                                    <p class="gnc-pinned-intro"><?= htmlspecialchars($pin['intro']) ?></p>
-                                    <?php endif; ?>
-                                    <?php if (!empty($pin['points'])): ?>
-                                    <ul class="gnc-pinned-list">
-                                        <?php foreach ($pin['points'] as $pt): ?>
-                                        <li><i class="bi bi-check-circle-fill"></i><span><?= htmlspecialchars($pt) ?></span></li>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                    <?php endif; ?>
-                                </div>
-
-                                <div class="gnc-pinned-footer">
-                                    <a href="<?= htmlspecialchars($pin['link']) ?>"<?= $isFbPin ? ' target="_blank" rel="noopener"' : '' ?> class="gnc-pinned-btn">
-                                        <?= $isFbPin ? 'View on Facebook' : 'View Full Announcement' ?>
-                                        <i class="bi bi-arrow-right"></i>
-                                    </a>
-                                    <?php if (count($pinnedFeedItems) > 1): ?>
-                                    <div class="gnc-pinned-nav">
-                                        <button type="button" data-bs-target="#gncPinnedCarousel" data-bs-slide="prev" aria-label="Previous"><i class="bi bi-chevron-left"></i></button>
-                                        <button type="button" data-bs-target="#gncPinnedCarousel" data-bs-slide="next" aria-label="Next"><i class="bi bi-chevron-right"></i></button>
-                                    </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </article>
-                    </div>
+                    <article class="gnc-pin-slide<?= $i === 0 ? ' is-active' : '' ?>" data-index="<?= $i ?>" aria-label="<?= ($i + 1) ?> of <?= $pinCount ?>"<?= (!$isFbPin && !empty($pin['id'])) ? ceManageMark('data-ve-post="' . $pinKind . '" data-ve-id="' . (int)$pin['id'] . '" data-ve-label="' . htmlspecialchars($pinTitle, ENT_QUOTES) . '"') : '' ?>>
+                        <?php if (!empty($pin['image_path'])): ?>
+                        <img class="gnc-pin-img" src="<?= htmlspecialchars($pin['image_path']) ?>" alt="" loading="<?= $i === 0 ? 'eager' : 'lazy' ?>" decoding="async">
+                        <?php else: ?>
+                        <div class="gnc-pin-fallback">
+                            <i class="bi <?= $isFbPin ? 'bi-facebook' : ($pin['type_label'] === 'News' ? 'bi-newspaper' : 'bi-megaphone') ?>"></i>
+                        </div>
+                        <?php endif; ?>
+                        <div class="gnc-pin-caption">
+                            <span class="gnc-pin-kind gnc-pin-kind--<?= $pinKind ?>"><i class="bi <?= $pinKindIcon ?>"></i> <?= $pinKindLabel ?></span>
+                            <h3 class="gnc-pin-title"><?= htmlspecialchars($pinTitle) ?></h3>
+                            <?php if ($pinDesc !== ''): ?>
+                            <p class="gnc-pin-desc"><?= htmlspecialchars($pinDesc) ?></p>
+                            <?php endif; ?>
+                            <a href="<?= htmlspecialchars($pin['link']) ?>"<?= $isFbPin ? ' target="_blank" rel="noopener"' : '' ?> class="gnc-pin-more">
+                                Learn more <span aria-hidden="true">&#9655;</span>
+                            </a>
+                        </div>
+                    </article>
                     <?php endforeach; ?>
+
+                    <?php if ($pinCount > 1): ?>
+                    <button type="button" class="gnc-pin-arrow gnc-pin-prev" aria-label="Previous"><i class="bi bi-arrow-left"></i></button>
+                    <button type="button" class="gnc-pin-arrow gnc-pin-next" aria-label="Next"><i class="bi bi-arrow-right"></i></button>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
 
             <?php if (empty($publicAnnouncements)): ?>
-                <p class="text-muted text-center">No announcements have been posted yet. Please check back soon.</p>
+                <p class="gnc-news-empty">No announcements have been posted yet. Please check back soon.</p>
             <?php else: ?>
-                <div class="row g-4">
-                    <?php foreach ($publicAnnouncements as $item):
-                        $isFacebook = $item['source'] === 'facebook';
-                        $isNews     = $item['source'] === 'news';
-                        $linkTarget = $isFacebook ? ' target="_blank" rel="noopener"' : '';
-                        $fallbackIcon = $isFacebook ? 'bi-facebook' : ($isNews ? 'bi-newspaper' : 'bi-megaphone');
-                    ?>
-                    <div class="col-md-6 col-lg-4">
-                        <div class="card h-100 border-0 gnc-announcement-card" style="position:relative;">
+                <?php foreach (array_values($publicAnnouncements) as $idx => $item):
+                    $isFacebook   = $item['source'] === 'facebook';
+                    $isNews       = $item['source'] === 'news';
+                    $linkTarget   = $isFacebook ? ' target="_blank" rel="noopener"' : '';
+                    $fallbackIcon = $isFacebook ? 'bi-facebook' : ($isNews ? 'bi-newspaper' : 'bi-megaphone');
+                    $typeLabel    = $isFacebook ? 'From Facebook' : ($isNews ? 'News' : 'Announcement');
 
-                            <?php if (!empty($item['image_path'])): ?>
-                            <!-- DB / Facebook-sourced image: wrap in .skeleton-wrap so
-                                 skeleton-loader.js shimmers it until it finishes loading. -->
-                            <div class="skeleton-wrap" style="height:280px;">
-                                <img src="<?= htmlspecialchars($item['image_path']) ?>"
-                                     class="card-img-top"
-                                     alt="<?= htmlspecialchars($item['title'] ?? 'Facebook post') ?>"
-                                     style="height:100%;width:100%;object-fit:cover;"
-                                     loading="lazy" decoding="async">
-                            </div>
-                            <?php else: ?>
-                            <div style="height:280px;background:#eef1ee;display:flex;align-items:center;justify-content:center;color:#c3cbc4;">
-                                <i class="bi <?= $fallbackIcon ?>" style="font-size:2rem;"></i>
-                            </div>
-                            <?php endif; ?>
-
-                            <div class="card-body d-flex flex-column">
-                                <small class="text-muted mb-2 d-flex align-items-center gap-2 flex-wrap">
-                                    <i class="bi bi-calendar3"></i> <?= date('F d, Y', strtotime($item['date'])) ?>
-                                    <?php if ($isFacebook): ?>
-                                        <span class="badge" style="background:#e7f0fe;color:#1877F2;font-weight:600;font-size:.68rem;">
-                                            <i class="bi bi-facebook"></i> From Facebook
-                                        </span>
-                                    <?php elseif ($isNews): ?>
-                                        <span class="badge" style="background:rgba(201,162,39,0.16);color:#8a6d1f;font-weight:600;font-size:.68rem;border:1px solid rgba(201,162,39,0.35);">
-                                            <i class="bi bi-newspaper"></i> News
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="badge" style="background:rgba(31,94,44,0.1);color:#1f5e2c;font-weight:600;font-size:.68rem;border:1px solid rgba(31,94,44,0.3);">
-                                            <i class="bi bi-megaphone"></i> Announcement
-                                        </span>
-                                    <?php endif; ?>
-                                </small>
-                                <?php if ($isNews && !empty($item['author'] ?? null)): ?>
-                                <small class="text-muted mb-2 d-block" style="font-size:.75rem;">By <?= htmlspecialchars($item['author']) ?></small>
-                                <?php endif; ?>
-
-                                <?php if (!empty($item['title'])): ?>
-                                <h5 class="card-title" style="font-family: 'Noto Serif', serif; color:#094024;font-weight:800;">
-                                    <?= htmlspecialchars($item['title']) ?>
-                                </h5>
-                                <?php endif; ?>
-
-                                <p class="card-text text-muted flex-grow-1" style="font-family: 'Inter', sans-serif; font-size: .9rem;">
-                                    <?= htmlspecialchars($item['excerpt']) ?>
-                                </p>
-
-                                <a href="<?= htmlspecialchars($item['link']) ?>"<?= $linkTarget ?> class="gnc-read-more text-decoration-none mt-1">
-                                    <?= $isFacebook ? 'View on Facebook' : 'Read More' ?>
-                                    <i class="bi <?= $isFacebook ? 'bi-box-arrow-up-right' : 'bi-arrow-right' ?>"></i>
-                                </a>
-                            </div>
-                        </div>
+                    // Title (shown in a single gold colour)
+                    $rawTitle = trim((string)($item['title'] ?? ''));
+                    if ($rawTitle === '') { $rawTitle = $isFacebook ? 'Facebook Update' : 'Announcement'; }
+                ?>
+                <div class="gnc-news-row<?= $idx % 2 === 1 ? ' gnc-news-row--reverse' : '' ?> gnc-reveal"<?= (!$isFacebook && !empty($item['id'])) ? ceManageMark('data-ve-post="' . ($isNews ? 'news' : 'announcement') . '" data-ve-id="' . (int)$item['id'] . '" data-ve-label="' . htmlspecialchars($rawTitle, ENT_QUOTES) . '"') : '' ?>>
+                    <div class="gnc-news-img skeleton-wrap">
+                        <?php if (!empty($item['image_path'])): ?>
+                        <img src="<?= htmlspecialchars($item['image_path']) ?>"
+                             alt="<?= htmlspecialchars($item['title'] ?? 'Facebook post') ?>"
+                             loading="lazy" decoding="async">
+                        <?php else: ?>
+                        <div class="gnc-news-img-fallback"><i class="bi <?= $fallbackIcon ?>"></i></div>
+                        <?php endif; ?>
+                        <span class="gnc-news-shine" aria-hidden="true"></span>
                     </div>
-                    <?php endforeach; ?>
+                    <div class="gnc-news-text">
+                        <div class="gnc-news-meta">
+                            <span class="gnc-news-type"><i class="bi <?= $fallbackIcon ?>"></i> <?= $typeLabel ?></span>
+                            <span class="gnc-news-date"><?= date('F d, Y', strtotime($item['date'])) ?></span>
+                        </div>
+                        <h3 class="gnc-news-title"><?= htmlspecialchars($rawTitle) ?></h3>
+                        <?php if ($isNews && !empty($item['author'] ?? null)): ?>
+                        <div class="gnc-news-author">By <?= htmlspecialchars($item['author']) ?></div>
+                        <?php endif; ?>
+                        <p class="gnc-news-desc"><?= htmlspecialchars($item['excerpt']) ?></p>
+                        <a href="<?= htmlspecialchars($item['link']) ?>"<?= $linkTarget ?> class="gnc-news-btn">
+                            <?= $isFacebook ? 'View on Facebook' : 'Read More' ?>
+                        </a>
+                    </div>
                 </div>
+                <?php endforeach; ?>
 
-                <div class="text-center mt-5">
-                    <a href="pages/news-and-announcement.php" class="btn gnc-view-all-btn">
-                        View All Announcements &amp; News
-                    </a>
+                <div class="gnc-news-all gnc-reveal">
+                    <a href="pages/news-and-announcement.php" class="gnc-news-btn">View All Announcements &amp; News</a>
                 </div>
             <?php endif; ?>
         </div>
     </section>
 
-    <section class="gnc-events-cal py-5" id="events" style="background:#F9F6F1;">
+    <section class="gnc-cal-sec" id="events">
         <div class="container">
-            <h2 class="mb-4" style="font-family:'Noto Serif', serif; color:#1F5E2C; font-weight:800;">Calendar of Events</h2>
+            <div class="gnc-cal-head gnc-reveal">
+                <span class="gnc-cal-kicker"><i class="bi <?= homeIconClass('calendar_icon') ?>"<?= homeIconMark('calendar_icon') ?>></i> <?= homeTextHtml('calendar_kicker') ?></span>
+                <h2 class="gnc-cal-heading"><?= homeTextHtml('calendar_heading') ?> <span<?= homeTextMark('calendar_accent') ?>><?= htmlspecialchars(homeText('calendar_accent')) ?></span></h2>
+                <p class="gnc-cal-sub"<?= homeTextMark('calendar_intro') ?>><?= htmlspecialchars(homeText('calendar_intro')) ?></p>
+            </div>
+
+            <div class="gnc-evs gnc-reveal">
+                <div class="gnc-evs-head">
+                    <span class="gnc-evs-title"><i class="bi bi-calendar-event-fill"></i> <?= homeTextHtml('events_label') ?></span>
+                    <?php if ($selectedProgram !== null): ?>
+                        <a href="?#events" class="gnc-programs-count text-decoration-none">
+                            <?= htmlspecialchars($selectedProgram) ?> &times;
+                        </a>
+                    <?php endif; ?>
+                </div>
+
+                <?php if (empty($upcomingEvents)): ?>
+                    <p class="gnc-evs-empty">
+                        <?php if ($selectedProgram !== null): ?>
+                            No upcoming events for <?= htmlspecialchars($selectedProgram) ?> at this time.
+                        <?php else: ?>
+                            No upcoming events at this time.
+                        <?php endif; ?>
+                    </p>
+                <?php else: ?>
+                <div class="gnc-evs-grid">
+                    <?php foreach ($upcomingEvents as $ev):
+                        $evStartTs = strtotime($ev['start_date']);
+                        $evEndTs   = !empty($ev['end_date']) ? strtotime($ev['end_date']) : null;
+                        $stLabel   = evt_timeLabel($ev['start_date']);
+                        $enLabel   = evt_timeLabel($ev['end_date'] ?? null);
+                        $multiDay  = $evEndTs !== null && date('Y-m-d', $evEndTs) !== date('Y-m-d', $evStartTs);
+
+                        if ($multiDay) {
+                            $whenLabel = date('M j', $evStartTs) . ' – ' . date('M j', $evEndTs);
+                        } elseif ($stLabel !== '') {
+                            $whenLabel = $stLabel . ($enLabel !== '' ? ' - ' . $enLabel : '');
+                        } else {
+                            $whenLabel = 'All Day';
+                        }
+                    ?>
+                    <div class="gnc-evs-item" style="--evt-color: <?= evt_categoryColor($ev['category_color'] ?? null, $ev['category_name'] ?? null) ?>;"<?= ceManageMark('data-ve-post="event" data-ve-id="' . (int)($ev['event_id'] ?? 0) . '" data-ve-date="' . htmlspecialchars(date('Y-m', $evStartTs), ENT_QUOTES) . '" data-ve-label="' . htmlspecialchars((string)($ev['title'] ?? 'Event'), ENT_QUOTES) . '"') ?>>
+                        <div class="gnc-datebox">
+                            <span class="gnc-datebox-day"><?= date('j', $evStartTs) ?></span>
+                            <span class="gnc-datebox-mon"><?= strtoupper(date('M', $evStartTs)) ?></span>
+                        </div>
+                        <div class="gnc-evs-info">
+                            <div class="gnc-evs-name"><?= htmlspecialchars($ev['title']) ?></div>
+                            <div class="gnc-evs-meta"><i class="bi bi-clock"></i> <?= htmlspecialchars($whenLabel) ?></div>
+                            <?php if (!empty($ev['location'])): ?>
+                            <div class="gnc-evs-meta"><i class="bi bi-geo-alt"></i> <?= htmlspecialchars($ev['location']) ?></div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+            </div>
 
             <div class="row g-4">
-                <div class="col-lg-7">
+                <div class="col-lg-7 gnc-reveal">
                     <div class="gnc-cal-card">
                         <div class="gnc-cal-header">
                             <a href="?evt_month=<?= $evtPrevMonth ?>&evt_year=<?= $evtPrevYear ?>#events" class="gnc-cal-nav">
                                 <i class="bi bi-chevron-left"></i>
                             </a>
-                            <span class="gnc-cal-title"><?= htmlspecialchars($evtMonthLabel) ?></span>
+                            <span class="gnc-cal-title"><?= htmlspecialchars(date('F', $evtFirstOfMonth)) ?> <span><?= htmlspecialchars(date('Y', $evtFirstOfMonth)) ?></span></span>
                             <a href="?evt_month=<?= $evtNextMonth ?>&evt_year=<?= $evtNextYear ?>#events" class="gnc-cal-nav">
                                 <i class="bi bi-chevron-right"></i>
                             </a>
                         </div>
 
                         <div class="gnc-cal-grid">
-                            <?php foreach (['Sun','Mon','Tue','Wed','Thur','Fri','Sat'] as $dow): ?>
+                            <?php foreach (['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as $dow): ?>
                                 <div class="gnc-cal-dow"><?= $dow ?></div>
                             <?php endforeach; ?>
 
@@ -952,53 +1208,8 @@ try {
                     </div>
                 </div>
 
-                <div class="col-lg-5">
+                <div class="col-lg-5 gnc-reveal">
                     <div class="gnc-events-side-stack">
-                        <div class="gnc-upcoming-card">
-                        <div class="gnc-upcoming-header d-flex align-items-center justify-content-between">
-                            <span><i class="bi bi-calendar-event-fill"></i> Upcoming Events</span>
-                            <?php if ($selectedProgram !== null): ?>
-                                <a href="?#events" class="gnc-programs-count text-decoration-none">
-                                    <?= htmlspecialchars($selectedProgram) ?> &times;
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                        <div class="gnc-upcoming-list">
-                            <?php if (empty($upcomingEvents)): ?>
-                                <p class="text-muted px-3 py-4 mb-0">
-                                    <?php if ($selectedProgram !== null): ?>
-                                        No upcoming events for <?= htmlspecialchars($selectedProgram) ?> at this time.
-                                    <?php else: ?>
-                                        No upcoming events at this time.
-                                    <?php endif; ?>
-                                </p>
-                            <?php else: foreach ($upcomingEvents as $ev): ?>
-                                <div class="gnc-upcoming-item" style="border-left: 4px solid <?= evt_categoryColor($ev['category_color'] ?? null, $ev['category_name'] ?? null) ?>;">
-                                    <i class="bi bi-calendar3 gnc-upcoming-icon" style="color: <?= evt_categoryColor($ev['category_color'] ?? null, $ev['category_name'] ?? null) ?>;"></i>
-                                    <div>
-                                        <div class="gnc-upcoming-title"><?= htmlspecialchars($ev['title']) ?></div>
-                                        <div class="gnc-upcoming-date">
-                                            <?php
-                                                $stLabel = evt_timeLabel($ev['start_date']);
-                                                $enLabel = evt_timeLabel($ev['end_date'] ?? null);
-                                                $multiDay = !empty($ev['end_date']) && date('Y-m-d', strtotime($ev['end_date'])) !== date('Y-m-d', strtotime($ev['start_date']));
-                                            ?>
-                                            <?= date('F j, Y', strtotime($ev['start_date'])) ?><?= $stLabel !== '' ? ', ' . htmlspecialchars($stLabel) : '' ?>
-                                            <?php if ($multiDay): ?>
-                                                &ndash; <?= date('F j, Y', strtotime($ev['end_date'])) ?><?= $enLabel !== '' ? ', ' . htmlspecialchars($enLabel) : '' ?>
-                                            <?php elseif ($stLabel !== '' && $enLabel !== ''): ?>
-                                                &ndash; <?= htmlspecialchars($enLabel) ?>
-                                            <?php endif; ?>
-                                            <?php if (!empty($ev['location'])): ?>
-                                                · <?= htmlspecialchars($ev['location']) ?>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endforeach; endif; ?>
-                        </div>
-                    </div>
-
                     <div class="gnc-upcoming-card">
                         <div class="gnc-upcoming-header d-flex align-items-center justify-content-between">
                             <span><i class="bi bi-mortarboard-fill"></i> Programs</span>
@@ -1058,53 +1269,36 @@ try {
     </div>
 
     <section class="gnc-programs py-5" id="programs">
-        <div class="container">
-            <div class="gnc-programs-header lazy-bg">
-                <span class="gnc-eyebrow">Academic Programs</span>
-                <h2 class="gnc-section-title" style="color: #1F5E2C;">Shaping Minds, Building Futures</h2>
-                <p class="text-muted mb-0">
-                    Explore the services, personnel, and contact information of every office within Guagua National Colleges.
-                </p>
+        <div class="container gnc-prog-wrap">
+            <div class="gnc-prog-head gnc-reveal">
+                <h2 class="gnc-prog-heading"><i class="bi <?= homeIconClass('programs_icon') ?> gnc-prog-icon"<?= homeIconMark('programs_icon') ?>></i><?= homeTextHtml('programs_heading') ?><span<?= homeTextMark('programs_subheading', true) ?>><?= homeTextBr('programs_subheading') ?></span></h2>
+                <p class="gnc-prog-sub"<?= homeTextMark('programs_intro') ?>><?= htmlspecialchars(homeText('programs_intro')) ?></p>
             </div>
 
-            <div class="row g-4 mt-2">
-                <div class="col-md-4">
-                    <div class="gnc-program-card">
-                        <div class="gnc-program-img lazy-bg" data-bg="assets/images/basic-edu.png"></div>
-                        <div class="gnc-program-body">
-                            <h5 class="gnc-program-title">Basic Education</h5>
-                            <p class="gnc-program-desc">
-                                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-                            </p>
-                            <a href="/pages/academics/basic-edu/basic-edu-dept.php" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
-                        </div>
-                    </div>
+            <div class="gnc-prog-row gnc-reveal">
+                <div class="gnc-prog-img lazy-bg" data-bg="<?= htmlspecialchars(homeText('programs_1_image')) ?>" role="img" aria-label="<?= htmlspecialchars(homeText('programs_1_title')) ?>"<?= ceMark('data-ve-img="home-image" data-ve-key="programs_1_image" data-ve-label="Program 1 picture"') ?>></div>
+                <div class="gnc-prog-text">
+                    <h3 class="gnc-prog-title"<?= homeTextMark('programs_1_title') ?>><?= htmlspecialchars(homeText('programs_1_title')) ?></h3>
+                    <p class="gnc-prog-desc"<?= homeTextMark('programs_1_text') ?>><?= htmlspecialchars(homeText('programs_1_text')) ?></p>
+                    <a href="<?= htmlspecialchars(homeText('programs_1_link')) ?>" class="gnc-prog-btn"<?= ceMark('data-ve-btn="1" data-ve-linkkey="programs_1_link" data-ve-link="' . ceAttr(homeText('programs_1_link')) . '"') ?>><?= homeTextHtml('programs_1_button') ?></a>
                 </div>
+            </div>
 
-                <div class="col-md-4">
-                    <div class="gnc-program-card">
-                        <div class="gnc-program-img lazy-bg" data-bg="assets/images/college-programs.png"></div>
-                        <div class="gnc-program-body">
-                            <h5 class="gnc-program-title">College Programs</h5>
-                            <p class="gnc-program-desc">
-                                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-                            </p>
-                            <a href="/pages/academics/college/college-departments.php" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
-                        </div>
-                    </div>
+            <div class="gnc-prog-row gnc-prog-row--reverse gnc-reveal">
+                <div class="gnc-prog-img lazy-bg" data-bg="<?= htmlspecialchars(homeText('programs_2_image')) ?>" role="img" aria-label="<?= htmlspecialchars(homeText('programs_2_title')) ?>"<?= ceMark('data-ve-img="home-image" data-ve-key="programs_2_image" data-ve-label="Program 2 picture"') ?>></div>
+                <div class="gnc-prog-text">
+                    <h3 class="gnc-prog-title"<?= homeTextMark('programs_2_title') ?>><?= htmlspecialchars(homeText('programs_2_title')) ?></h3>
+                    <p class="gnc-prog-desc"<?= homeTextMark('programs_2_text') ?>><?= htmlspecialchars(homeText('programs_2_text')) ?></p>
+                    <a href="<?= htmlspecialchars(homeText('programs_2_link')) ?>" class="gnc-prog-btn"<?= ceMark('data-ve-btn="1" data-ve-linkkey="programs_2_link" data-ve-link="' . ceAttr(homeText('programs_2_link')) . '"') ?>><?= homeTextHtml('programs_2_button') ?></a>
                 </div>
+            </div>
 
-                <div class="col-md-4">
-                    <div class="gnc-program-card">
-                        <div class="gnc-program-img lazy-bg" data-bg="assets/images/graduate-school.png"></div>
-                        <div class="gnc-program-body">
-                            <h5 class="gnc-program-title">Graduate School</h5>
-                            <p class="gnc-program-desc">
-                                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-                            </p>
-                            <a href="/pages/academics/graduate-school/graduate-school.php" class="gnc-program-link">Learn More <i class="bi bi-arrow-right"></i></a>
-                        </div>
-                    </div>
+            <div class="gnc-prog-row gnc-reveal">
+                <div class="gnc-prog-img lazy-bg" data-bg="<?= htmlspecialchars(homeText('programs_3_image')) ?>" role="img" aria-label="<?= htmlspecialchars(homeText('programs_3_title')) ?>"<?= ceMark('data-ve-img="home-image" data-ve-key="programs_3_image" data-ve-label="Program 3 picture"') ?>></div>
+                <div class="gnc-prog-text">
+                    <h3 class="gnc-prog-title"<?= homeTextMark('programs_3_title') ?>><?= htmlspecialchars(homeText('programs_3_title')) ?></h3>
+                    <p class="gnc-prog-desc"<?= homeTextMark('programs_3_text') ?>><?= htmlspecialchars(homeText('programs_3_text')) ?></p>
+                    <a href="<?= htmlspecialchars(homeText('programs_3_link')) ?>" class="gnc-prog-btn"<?= ceMark('data-ve-btn="1" data-ve-linkkey="programs_3_link" data-ve-link="' . ceAttr(homeText('programs_3_link')) . '"') ?>><?= homeTextHtml('programs_3_button') ?></a>
                 </div>
             </div>
         </div>
@@ -1113,47 +1307,482 @@ try {
     <section class="gnc-president py-5" id="president">
         <div class="container">
             <div class="row align-items-center g-5">
-                <div class="col-lg-5">
+                <div class="col-lg-5 gnc-reveal">
                     <div class="gnc-president-leaves"></div>
 
                     <div class="gnc-president-label">
                         <span class="gnc-label-bar"></span>
-                        Message from the President
+                        <?= homeTextHtml('president_label') ?>
                     </div>
 
                     <div class="gnc-president-card">
                         <div class="gnc-president-photo-wrap">
                             <div class="gnc-president-seal"></div>
-                            <img src="assets/images/maam-president.png" alt="Geraldine G. Lim, MBA" class="gnc-president-photo" loading="lazy" decoding="async">
+                            <img src="<?= htmlspecialchars($president['photo_url']) ?>" alt="<?= htmlspecialchars($president['name']) ?>" class="gnc-president-photo" loading="lazy" decoding="async"<?= ceMark('data-ve-img="pres-photo" data-ve-label="President photo"') ?>>
                         </div>
                         <div class="gnc-president-nameplate">
-                            <p class="gnc-president-name">Geraldine G. Lim, MBA</p>
-                            <p class="gnc-president-role">President</p>
-                            <p class="gnc-president-org">Guagua National Colleges, Inc.</p>
+                            <p class="gnc-president-name"<?= ceMark('data-ve-field="pres-name" data-ve-max="255" data-ve-ph="Name" data-ve-label="Name"') ?>><?= htmlspecialchars($president['name']) ?></p>
+                            <p class="gnc-president-role"<?= ceMark('data-ve-field="pres-title" data-ve-max="255" data-ve-ph="Title" data-ve-label="Title"') ?>><?= htmlspecialchars($president['title']) ?></p>
+                            <p class="gnc-president-org"<?= ceMark('data-ve-field="pres-org" data-ve-max="255" data-ve-ph="Organization" data-ve-label="Organization"') ?>><?= htmlspecialchars($president['org']) ?></p>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-lg-7">
-                    <p class="gnc-president-eyebrow" style="color: #1F5E2C;">A Warm Welcome to</p>
-                    <h2 class="gnc-president-title" style="color: #1F5E2C;">Our New Students</h2>
+                <div class="col-lg-7 gnc-reveal">
+                    <p class="gnc-president-eyebrow" style="color: #1F5E2C;"<?= ceMark('data-ve-field="pres-eyebrow" data-ve-max="255" data-ve-ph="Small heading" data-ve-label="Small heading"') ?>><?= htmlspecialchars($president['eyebrow']) ?></p>
+                    <h2 class="gnc-president-title" style="color: #1F5E2C;"<?= ceMark('data-ve-field="pres-heading" data-ve-max="255" data-ve-ph="Heading" data-ve-label="Heading"') ?>><?= htmlspecialchars($president['heading']) ?></h2>
 
-                    <p class="gnc-president-greeting">Welcome GNCians!</p>
+                    <p class="gnc-president-greeting"<?= ceMark('data-ve-field="pres-greeting" data-ve-max="255" data-ve-ph="Greeting" data-ve-label="Greeting"') ?>><?= htmlspecialchars($president['greeting']) ?></p>
 
-                    <p class="gnc-president-quote">
-                        &ldquo;Congratulations for choosing Guagua National Colleges, Inc. to take care of you and your education.
-                    </p>
-                    <p class="gnc-president-quote">
-                        Guagua National Colleges, Inc. boast of 100 plus years of giving quality education.&rdquo;
-                    </p>
+                    <?php if (cePreviewActive()): ?><div data-ve-field="pres-message" data-ve-blocks="1" data-ve-multiline="1" data-ve-max="5000" data-ve-ph="Write the message" data-ve-label="Message"><?php endif; ?>
+                    <?php foreach (preg_split('/\R{2,}/', trim($president['message'])) as $para): ?>
+                    <p class="gnc-president-quote"><?= nl2br(htmlspecialchars(trim($para))) ?></p>
+                    <?php endforeach; ?>
+                    <?php if (cePreviewActive()): ?></div><?php endif; ?>
                 </div>
+            </div>
+        </div>
     </section>
 
-    <?php include __DIR__ . '/components/index-footer.php'; ?>
+    <section class="gnc-campus-map py-5" id="campus-map">
+        <div class="container">
+            <div class="gnc-programs-header lazy-bg gnc-reveal">
+                <h2 class="gnc-section-title" style="color: #1F5E2C;"<?= homeTextMark('campus_heading') ?>><?= htmlspecialchars(homeText('campus_heading')) ?></h2>
+                <p class="text-muted mb-0"<?= homeTextMark('campus_intro') ?>><?= htmlspecialchars(homeText('campus_intro')) ?></p>
+            </div>
+
+            <iframe src="campus_navigator.html"
+                    class="gnc-map-frame gnc-reveal"
+                    title="GNC Campus Navigator"
+                    loading="lazy">
+            </iframe>
+        </div>
+    </section>
+    <?php include __DIR__ . '/components/footer.php'; ?>
+    <?php include __DIR__ . '/chatbot/widget.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
-    <script src="assets/js/index.js?v=2"></script>
+    <?php if (cePreviewActive()): ?>
+    <script>
+        /* Content Editor preview: stop the slideshow auto-advancing so the slide being edited stays put. */
+        (function () { var si = window.setInterval; window.setInterval = function (fn, ms) { return (ms >= 5000) ? 0 : si.apply(window, arguments); }; })();
+    </script>
+    <?php endif; ?>
+    <script src="assets/js/index.js"></script>
     <script src="assets/js/skeleton-loader.js"></script>
+    <script>
+        /* Opening intro: counter climbs for ~2.6s, finishes when the page has loaded (5s cap), then the panels wipe up. */
+        (function () {
+            var root = document.documentElement;
+            var el = document.getElementById('gnc-intro');
+            if (!el || !root.classList.contains('gnc-intro-on')) return;
+            try { sessionStorage.setItem('gncIntroSeen', '1'); } catch (e) {}
+            var num = document.getElementById('gnc-intro-num');
+            var line = document.getElementById('gnc-intro-line');
+            var MIN = 2600, CAP = 5000, t0 = performance.now();
+            var loaded = document.readyState === 'complete', shown = 0, done = false;
+            if (!loaded) window.addEventListener('load', function () { loaded = true; });
+            function leave() {
+                if (done) return; done = true;
+                el.classList.add('is-leaving');
+                setTimeout(function () { root.classList.remove('gnc-intro-on'); el.remove(); }, 1500);
+            }
+            function tick(now) {
+                if (done) return;
+                var t = now - t0;
+                var ready = (loaded && t >= MIN) || t >= CAP;
+                var target = ready ? 100 : 92 * (1 - Math.pow(1 - Math.min(t / MIN, 1), 3));
+                shown += (target - shown) * (ready ? 0.3 : 0.2);
+                if (ready && shown > 99.4) shown = 100;
+                num.textContent = Math.round(shown);
+                line.style.setProperty('--p', (shown / 100).toFixed(3));
+                if (shown >= 100) { setTimeout(leave, 250); return; }
+                requestAnimationFrame(tick);
+            }
+            requestAnimationFrame(tick);
+            el.addEventListener('click', leave);   // click to skip
+        })();
+    </script>
+
+    <script>
+    // Make the WHOLE card clickable (not only the "Read More" button).
+    // Real links/buttons keep working, and selecting text does not open the card.
+    (function () {
+        function go(link) {
+            if (link.target === '_blank') { window.open(link.href, '_blank', 'noopener'); }
+            else { window.location.href = link.href; }
+        }
+        function wire(cardSelector, linkSelector) {
+            document.querySelectorAll(cardSelector).forEach(function (card) {
+                var link = card.querySelector(linkSelector);
+                if (!link) return;
+                card.style.cursor = 'pointer';
+                card.addEventListener('click', function (e) {
+                    if (e.target.closest('a, button, input, select, textarea, label')) return;
+                    if (window.getSelection && window.getSelection().toString()) return;
+                    go(link);
+                });
+            });
+        }
+        wire('.gnc-news-row', 'a.gnc-news-btn');
+        wire('.gnc-pinned-card', 'a.gnc-pinned-btn');
+    })();
+    </script>
+
+    <script>
+    // Pinned news: centre-mode slider (active slide in the middle, neighbours peeking).
+    (function () {
+        var root = document.getElementById('gncPin');
+        if (!root) return;
+        var slides = Array.prototype.slice.call(root.querySelectorAll('.gnc-pin-slide'));
+        var n = slides.length, active = 0, timer = null;
+        var interval = parseInt(root.getAttribute('data-interval'), 10) || 7000;
+        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        function render() {
+            slides.forEach(function (el, i) {
+                var o = ((i - active) % n + n) % n;
+                if (o > n / 2) o -= n;
+                el.style.setProperty('--o', o);
+                el.classList.toggle('is-active', o === 0);
+                el.classList.toggle('is-hidden', Math.abs(o) > 1);
+                el.setAttribute('aria-hidden', o === 0 ? 'false' : 'true');
+            });
+        }
+        function go(i) { active = ((i % n) + n) % n; render(); }
+        function start() { if (n > 1 && !reduce) { stop(); timer = setInterval(function () { go(active + 1); }, interval); } }
+        function stop() { if (timer) { clearInterval(timer); timer = null; } }
+
+        render();
+        if (n < 2) return;
+
+        root.querySelector('.gnc-pin-prev').addEventListener('click', function () { go(active - 1); start(); });
+        root.querySelector('.gnc-pin-next').addEventListener('click', function () { go(active + 1); start(); });
+        root.addEventListener('mouseenter', stop);
+        root.addEventListener('mouseleave', start);
+        root.addEventListener('focusin', stop);
+        root.addEventListener('focusout', start);
+        root.setAttribute('tabindex', '0');
+        root.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowLeft') { go(active - 1); start(); }
+            if (e.key === 'ArrowRight') { go(active + 1); start(); }
+        });
+
+        // click: neighbour -> bring to centre; centre -> open the article
+        slides.forEach(function (el, i) {
+            el.addEventListener('click', function (e) {
+                if (i !== active) { go(i); start(); return; }
+                if (e.target.closest('a')) return;
+                var link = el.querySelector('a.gnc-pin-more');
+                if (!link) return;
+                if (link.target === '_blank') window.open(link.href, '_blank', 'noopener');
+                else window.location.href = link.href;
+            });
+        });
+
+        // swipe
+        var x0 = null;
+        root.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; stop(); }, { passive: true });
+        root.addEventListener('touchend', function (e) {
+            if (x0 === null) return;
+            var dx = e.changedTouches[0].clientX - x0; x0 = null;
+            if (Math.abs(dx) > 40) go(active + (dx < 0 ? 1 : -1));
+            start();
+        });
+        start();
+    })();
+    </script>
+
+
+
+
+    <script>
+    /* ============================================================
+       HOMEPAGE POLISH — decorative animation layer only.
+       Everything is feature-detected and wrapped so that a failure
+       here can never affect the page's real functionality.
+       Respects prefers-reduced-motion throughout.
+       ============================================================ */
+    (function () {
+        'use strict';
+        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var canHover = window.matchMedia && window.matchMedia('(hover: hover)').matches;
+        // Lag-fix build: keep the slideshow, but disable the heaviest hero
+        // decorations (canvas particles + scroll parallax). They look nice,
+        // but combined with a full-screen video they cause stutter.
+        var heroDecorEnabled = false;
+
+        /* ---- 1. Gold-dust particle field over the hero ---- */
+        (function () {
+            var canvas = document.getElementById('heroParticles');
+            if (!canvas || reduce || !heroDecorEnabled) return;
+            var ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            var hero = canvas.parentElement;
+            var particles = [], W = 0, H = 0, raf = null;
+
+            function resize() {
+                W = canvas.width = hero.offsetWidth;
+                H = canvas.height = hero.offsetHeight;
+            }
+            function spawn() {
+                var n = Math.min(70, Math.floor(W * H / 22000));
+                particles = [];
+                for (var i = 0; i < n; i++) {
+                    particles.push({
+                        x: Math.random() * W, y: Math.random() * H,
+                        r: Math.random() * 2.2 + 0.6,
+                        s: Math.random() * 0.45 + 0.12,
+                        d: (Math.random() - 0.5) * 0.3,
+                        a: Math.random() * 0.5 + 0.15,
+                        t: Math.random() * Math.PI * 2
+                    });
+                }
+            }
+            function tick() {
+                ctx.clearRect(0, 0, W, H);
+                for (var i = 0; i < particles.length; i++) {
+                    var p = particles[i];
+                    p.y -= p.s; p.x += p.d; p.t += 0.02;
+                    if (p.y < -10) { p.y = H + 10; p.x = Math.random() * W; }
+                    if (p.x < -10) p.x = W + 10; else if (p.x > W + 10) p.x = -10;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(234,186,59,' + (p.a * (0.6 + 0.4 * Math.sin(p.t))).toFixed(3) + ')';
+                    ctx.fill();
+                }
+                raf = requestAnimationFrame(tick);
+            }
+            resize(); spawn(); tick();
+            window.addEventListener('resize', function () { resize(); spawn(); });
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden) { if (raf) cancelAnimationFrame(raf); raf = null; }
+                else if (!raf) { tick(); }
+            });
+        })();
+
+        /* ---- 2. Hero content parallax drift on scroll ---- */
+        (function () {
+            if (reduce || !heroDecorEnabled) return;
+            var hero = document.querySelector('.hero-slideshow');
+            if (!hero) return;
+            var ticking = false;
+            function update() {
+                ticking = false;
+                var y = window.scrollY;
+                if (y >= hero.offsetHeight) return;
+                var content = hero.querySelector('.hero-slide.active .hero-content');
+                if (!content) return;
+                content.style.transform = 'translateY(' + (y * 0.25) + 'px)';
+                content.style.opacity = Math.max(0, 1 - y / (hero.offsetHeight * 0.85));
+            }
+            window.addEventListener('scroll', function () {
+                if (!ticking) { ticking = true; requestAnimationFrame(update); }
+            }, { passive: true });
+        })();
+
+        /* ---- 3. Magnetic hero buttons ---- */
+        (function () {
+            if (reduce || !canHover) return;
+            document.querySelectorAll('.btn-enroll, .btn-explore').forEach(function (btn) {
+                btn.addEventListener('mousemove', function (e) {
+                    var r = btn.getBoundingClientRect();
+                    var x = e.clientX - r.left - r.width / 2;
+                    var y = e.clientY - r.top - r.height / 2;
+                    btn.style.transform = 'translate(' + (x * 0.18) + 'px,' + (y * 0.3) + 'px)';
+                });
+                btn.addEventListener('mouseleave', function () { btn.style.transform = ''; });
+            });
+        })();
+
+        /* ---- 4. Click ripple on CTA-style buttons ---- */
+        document.addEventListener('click', function (e) {
+            if (reduce) return;
+            var btn = e.target.closest('.gnc-news-btn, .gnc-prog-btn, .gnc-pin-more, .btn-enroll, .btn-explore');
+            if (!btn) return;
+            var rect = btn.getBoundingClientRect();
+            var d = Math.max(rect.width, rect.height);
+            var span = document.createElement('span');
+            span.className = 'gnc-ripple';
+            span.style.width = span.style.height = d + 'px';
+            span.style.left = (e.clientX - rect.left - d / 2) + 'px';
+            span.style.top = (e.clientY - rect.top - d / 2) + 'px';
+            btn.appendChild(span);
+            setTimeout(function () { span.remove(); }, 700);
+        });
+
+        /* ---- 5. Subtle 3D tilt on large cards (desktop only) ---- */
+        (function () {
+            if (reduce || !canHover) return;
+            function tilt(el, max) {
+                el.addEventListener('mousemove', function (e) {
+                    var r = el.getBoundingClientRect();
+                    var px = (e.clientX - r.left) / r.width - 0.5;
+                    var py = (e.clientY - r.top) / r.height - 0.5;
+                    el.style.transform = 'perspective(900px) rotateX(' + (-py * max) + 'deg) rotateY(' + (px * max) + 'deg) translateY(-4px)';
+                });
+                el.addEventListener('mouseleave', function () { el.style.transform = ''; });
+            }
+            /* tilt hover effect removed */
+        })();
+
+        /* ---- 6. Count-up animation for the Programs counter ---- */
+        (function () {
+            if (reduce || !('IntersectionObserver' in window)) return;
+            var el = document.querySelector('.gnc-upcoming-header .gnc-programs-count');
+            if (!el) return;
+            var target = parseInt(el.textContent, 10);
+            if (isNaN(target) || target < 2) return;
+            var done = false;
+            var io = new IntersectionObserver(function (entries) {
+                entries.forEach(function (en) {
+                    if (!en.isIntersecting || done) return;
+                    done = true; io.disconnect();
+                    var start = null, dur = 1200;
+                    function step(ts) {
+                        if (!start) start = ts;
+                        var p = Math.min((ts - start) / dur, 1);
+                        var eased = 1 - Math.pow(1 - p, 3);
+                        el.textContent = Math.round(eased * target);
+                        if (p < 1) requestAnimationFrame(step); else el.textContent = target;
+                    }
+                    requestAnimationFrame(step);
+                });
+            }, { threshold: 0.6 });
+            io.observe(el);
+        })();
+
+        /* ---- 7. Scroll progress bar ---- */
+        (function () {
+            var bar = document.getElementById('gncScrollProgress');
+            if (!bar) return;
+            function update() {
+                var h = document.documentElement;
+                var max = h.scrollHeight - h.clientHeight;
+                bar.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
+            }
+            window.addEventListener('scroll', update, { passive: true });
+            window.addEventListener('resize', update);
+            update();
+        })();
+
+        /* ---- 8. Back-to-top button ---- */
+        (function () {
+            var btn = document.getElementById('gncBackTop');
+            if (!btn) return;
+            window.addEventListener('scroll', function () {
+                btn.classList.toggle('is-show', window.scrollY > 600);
+            }, { passive: true });
+            btn.addEventListener('click', function () {
+                window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+            });
+        })();
+    })();
+    </script>
+
+
+    <script>
+    /* ============================================================
+       HERO VIDEO PERFORMANCE PATCH
+       Keeps the Ken Burns effect off video slides (handled in CSS)
+       and keeps hero videos from decoding while the slideshow is
+       offscreen. It plays only the active slide video, hydrates at
+       most one slide away, pauses all other videos, and pauses the
+       whole hero when scrolled out of view. Runs after index.js and
+       only reacts to the existing .hero-slide.active class, so it
+       does not change slideshow timing, dots, arrows, or lazy-bg.
+       ============================================================ */
+    (function () {
+        'use strict';
+        var heroRoot = document.querySelector('.hero-slideshow');
+        var heroInView = true;
+
+        function heroSlides() {
+            return Array.prototype.slice.call(document.querySelectorAll('.hero-slide'));
+        }
+        function activeIndex(slides) {
+            for (var i = 0; i < slides.length; i++) {
+                if (slides[i].classList.contains('active')) return i;
+            }
+            return 0;
+        }
+        function circularDistance(i, active, n) {
+            var d = Math.abs(i - active) % n;
+            return Math.min(d, n - d);
+        }
+        function hydrateVideo(slide) {
+            var v = slide.querySelector('video.hero-slide-video');
+            if (!v) return null;
+            if (!v.getAttribute('src') && v.getAttribute('data-src')) {
+                if (v.getAttribute('data-poster')) v.poster = v.getAttribute('data-poster');
+                v.src = v.getAttribute('data-src');
+            }
+            return v;
+        }
+        function pauseAllHeroVideos() {
+            heroSlides().forEach(function (slide) {
+                var v = slide.querySelector('video.hero-slide-video');
+                if (v) v.pause();
+            });
+        }
+        function syncHeroVideos() {
+            if (!heroInView) return;
+            var slides = heroSlides();
+            if (!slides.length) return;
+            var n = slides.length;
+            var active = activeIndex(slides);
+            slides.forEach(function (slide, i) {
+                // Hydrate at most one slide away so prev/next are ready,
+                // but never load the whole deck at once.
+                if (circularDistance(i, active, n) > 1) {
+                    var off = slide.querySelector('video.hero-slide-video');
+                    if (off) off.pause();
+                    return;
+                }
+                var v = hydrateVideo(slide);
+                if (!v) return;
+                if (i === active) {
+                    v.muted = true;
+                    var pr = v.play();
+                    if (pr && pr.catch) pr.catch(function () {});
+                } else {
+                    v.pause();
+                }
+            });
+        }
+
+        // Pause the whole slideshow when it scrolls offscreen; resume when
+        // it comes back. This is the main fix for "lags after scrolling
+        // down and back up" because the active video was still decoding
+        // while hidden and then stutters on re-entry.
+        if (heroRoot && 'IntersectionObserver' in window) {
+            var heroIo = new IntersectionObserver(function (entries) {
+                entries.forEach(function (entry) {
+                    heroInView = !!entry.isIntersecting;
+                    if (heroInView) syncHeroVideos();
+                    else pauseAllHeroVideos();
+                });
+            }, { threshold: 0 });
+            heroIo.observe(heroRoot);
+        }
+
+        if (heroRoot && 'MutationObserver' in window) {
+            var mo = new MutationObserver(function () { syncHeroVideos(); });
+            heroSlides().forEach(function (slide) {
+                mo.observe(slide, { attributes: true, attributeFilter: ['class'] });
+            });
+        }
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) pauseAllHeroVideos();
+            else syncHeroVideos();
+        });
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', syncHeroVideos);
+        } else {
+            syncHeroVideos();
+        }
+    })();
+    </script>
 </body>
 </html>

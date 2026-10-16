@@ -1,5 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
 
+/* Prevent horizontal overflow causing background cutoffs */
+html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+}
+
 .enrollment-intro,
 .enrollment-about,
 .enrollment-programs,
@@ -234,4 +240,120 @@
 
 .enrollment-step-bar--green {
     background-color: var(--gnc-green);
+}
+
+/* =========================================================
+   ANIMATIONS
+   ========================================================= */
+
+/* ---------- Hero entrance ---------- */
+@keyframes enrollFadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes enrollFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.enrollment-breadcrumb {
+    animation: enrollFadeIn 0.6s ease both;
+}
+
+.enrollment-hero h1 {
+    animation: enrollFadeUp 0.7s ease 0.1s both;
+}
+
+.enrollment-hero p {
+    animation: enrollFadeUp 0.7s ease 0.25s both;
+}
+
+/* ---------- Tabs ---------- */
+.enrollment-tabs .nav-link {
+    transition: background-color 0.25s ease, color 0.25s ease,
+                transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.enrollment-tabs .nav-link:hover:not(.active) {
+    background-color: rgba(11, 66, 40, 0.08);
+    transform: translateY(-2px);
+}
+
+.enrollment-tabs .nav-link.active {
+    box-shadow: 0 4px 12px rgba(11, 66, 40, 0.25);
+}
+
+/* Pane header slides in when a tab opens */
+.tab-pane.active .enrollment-pane-title {
+    animation: enrollFadeUp 0.5s ease both;
+}
+
+.tab-pane.active .enrollment-pane-desc {
+    animation: enrollFadeUp 0.5s ease 0.1s both;
+}
+
+/* ---------- Step cards: base + hover ---------- */
+.enrollment-step-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.enrollment-step-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 14px 28px rgba(11, 66, 40, 0.15);
+    border-color: var(--gnc-gold);
+}
+
+.enrollment-step-icon img {
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.enrollment-step-card:hover .enrollment-step-icon img {
+    transform: scale(1.12) rotate(-3deg);
+}
+
+.enrollment-step-label {
+    transition: color 0.3s ease, letter-spacing 0.3s ease;
+}
+
+.enrollment-step-card:hover .enrollment-step-label {
+    color: var(--gnc-green-light);
+    letter-spacing: 0.08em;
+}
+
+.enrollment-step-bar {
+    transform-origin: left center;
+    transition: height 0.3s ease;
+}
+
+.enrollment-step-card:hover .enrollment-step-bar {
+    height: 12px;
+}
+
+/* ---------- Step cards: scroll reveal (only when JS is active) ---------- */
+.js-reveal .enrollment-step-card:not(.is-visible) {
+    opacity: 0;
+    transform: translateY(28px) scale(0.97);
+}
+
+.js-reveal .enrollment-step-card.reveal-animating {
+    transition: opacity 0.55s ease, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: calc(var(--i, 0) * 70ms);
+}
+
+.js-reveal .enrollment-step-card:not(.is-visible) .enrollment-step-bar {
+    transform: scaleX(0);
+}
+
+.js-reveal .enrollment-step-card.is-visible .enrollment-step-bar {
+    transform: scaleX(1);
+    transition: transform 0.7s ease 0.3s, height 0.3s ease;
+}
+
+/* ---------- Respect reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+    }
 }

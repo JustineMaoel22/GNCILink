@@ -226,3 +226,156 @@ body {
         transform: translateX(-50%);
     }
 }
+
+/* =============================================================
+   SCROLL ANIMATIONS
+   ============================================================= */
+
+.reveal-up {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.7s cubic-bezier(0.25, 1, 0.5, 1), transform 0.7s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.reveal-up.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.reveal-scale {
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1), transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.reveal-scale.is-visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
+
+/* =============================================================
+   OPENING TRANSITION (same wipe as the Contact Us / History pages)
+   6 green panels slide up and reveal the page. Pure CSS; the whole
+   layer is also hidden at the end so it can never block the page.
+   ============================================================= */
+.lm-open {
+    position: fixed; inset: 0; z-index: 2000;
+    display: flex; pointer-events: none;
+    animation: lmOpenGone 0s linear 1.7s forwards;
+}
+.lm-open > i {
+    flex: 1; margin-right: -1px;
+    background: #0b4228;
+    animation: lmOpenWipe .85s cubic-bezier(.76, 0, .24, 1) forwards;
+    animation-delay: calc(.35s + var(--n, 0) * .07s);
+}
+.lm-open > i:nth-child(even) { background: #083320; }
+.lm-open-label {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .9rem;
+    color: #d3a63a; text-align: center; padding: 0 1rem;
+    animation: lmOpenLabel 1.1s ease forwards;
+}
+.lm-open-label img { width: 64px; height: 64px; object-fit: contain; }
+.lm-open-label span {
+    font-family: 'Noto Serif', serif; font-weight: 700;
+    font-size: clamp(1.5rem, 4vw, 2.2rem); letter-spacing: .02em;
+}
+@keyframes lmOpenWipe { to { transform: translateY(-101%); } }
+@keyframes lmOpenGone { to { visibility: hidden; } }
+@keyframes lmOpenLabel {
+    0%   { opacity: 0; transform: translateY(14px); }
+    30%  { opacity: 1; transform: none; }
+    70%  { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateY(-14px); }
+}
+
+/* While the wipe is playing (class set by a tiny script in <head> and removed
+   after ~2.2s), hold every entrance until the wipe is done. These replace the
+   inline transition-delay values. Scrolling later is not affected. */
+.lm-wait .logo-meaning-breadcrumb.reveal-up { transition-delay: .95s !important; }
+.lm-wait .logo-meaning-hero h1.reveal-up    { transition-delay: 1.05s !important; }
+.lm-wait .logo-meaning-hero p.reveal-up     { transition-delay: 1.15s !important; }
+.lm-wait .logo-display-wrapper.reveal-scale { transition-delay: 1.25s !important; }
+.lm-wait .logo-info-wrapper h2.reveal-up    { transition-delay: 1.3s !important; }
+.lm-wait .logo-info-wrapper > p.reveal-up   { transition-delay: 1.4s !important; }
+.lm-wait .meaning-item:nth-of-type(1)       { transition-delay: 1.5s !important; }
+.lm-wait .meaning-item:nth-of-type(2)       { transition-delay: 1.6s !important; }
+.lm-wait .meaning-item:nth-of-type(3)       { transition-delay: 1.7s !important; }
+
+/* =============================================================
+   EXTRA ANIMATIONS
+   ============================================================= */
+
+/* Logo: gentle float + soft shadow */
+.logo-meaning-graphic {
+    filter: drop-shadow(0 18px 26px rgba(9, 64, 36, .22));
+    animation: lmFloat 6s ease-in-out 2s infinite;
+}
+@keyframes lmFloat {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-12px); }
+}
+
+/* Gold square and dot grid drift slowly behind the logo */
+.logo-display-wrapper::before { animation: lmDriftA 9s ease-in-out infinite alternate; }
+.logo-display-wrapper::after  { animation: lmDriftB 7s ease-in-out infinite alternate; }
+@keyframes lmDriftA { from { transform: translate(0, 0) rotate(0); }      to { transform: translate(14px, 10px) rotate(6deg); } }
+@keyframes lmDriftB { from { transform: translate(0, 0); opacity: .6; }   to { transform: translate(-12px, -8px); opacity: 1; } }
+
+/* "About the Logo" gold underline draws itself in */
+.logo-info-wrapper h2::after {
+    width: 0;
+    transition: width .8s cubic-bezier(.22, 1, .36, 1) .5s;
+}
+.logo-info-wrapper h2.is-visible::after { width: 65px; }
+
+/* Icons pop in when their row appears */
+.icon-circle-box {
+    opacity: 0; transform: scale(.55) rotate(-20deg);
+    transition: opacity .5s ease, transform .7s cubic-bezier(.34, 1.56, .64, 1), box-shadow .4s ease;
+    transition-delay: .3s;
+}
+.meaning-item.is-visible .icon-circle-box { opacity: 1; transform: none; }
+
+/* Pulse ring around each icon */
+.icon-circle-box::after {
+    content: ''; position: absolute; inset: -6px; border-radius: 50%;
+    border: 2px solid currentColor; opacity: 0; pointer-events: none;
+}
+.icon-circle-box.crucifix-icon { color: #d3a63a; }
+.icon-circle-box.book-icon     { color: #1F5E2C; }
+.icon-circle-box.sword-icon    { color: #BA2A26; }
+
+/* Row hover: icon spins, text nudges */
+.meaning-item { position: relative; }
+.meaning-text { transition: transform .45s cubic-bezier(.22, 1, .36, 1); }
+.meaning-item:hover .meaning-text { transform: translateX(8px); }
+
+.meaning-item.is-visible:hover .icon-circle-box {
+    transform: scale(1.1) rotate(-8deg);
+    transition-delay: 0s;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, .22);
+}
+.meaning-item:hover .icon-circle-box::after { animation: lmRing 1.2s ease-out infinite; }
+@keyframes lmRing {
+    0%   { opacity: .8; transform: scale(1); }
+    100% { opacity: 0;  transform: scale(1.45); }
+}
+
+@media (max-width: 992px) {
+    .meaning-item:hover .meaning-text { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lm-open { display: none; }
+    .lm-wait .reveal-up, .lm-wait .reveal-scale { transition-delay: 0s !important; }
+    .logo-meaning-graphic,
+    .logo-display-wrapper::before,
+    .logo-display-wrapper::after,
+    .meaning-item:hover .icon-circle-box::after { animation: none !important; }
+    .icon-circle-box { opacity: 1 !important; transform: none !important; transition: none !important; }
+    .logo-info-wrapper h2::after { width: 65px !important; transition: none !important; }
+    .meaning-text { transition: none !important; }
+}

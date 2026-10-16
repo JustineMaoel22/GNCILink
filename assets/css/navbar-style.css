@@ -21,6 +21,12 @@
     min-height: 64px;
     z-index: 1030;
     font-family: var(--gnc-nav-font);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.gnc-navbar.gnc-navbar-transparent {
+    background-color: transparent !important;
+    box-shadow: none !important;
 }
 
 .gnc-navbar .navbar-brand img {
@@ -145,6 +151,14 @@
     min-width: 240px;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
     font-family: var(--gnc-nav-font);
+    
+    /* Animation base properties */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s;
+    display: block !important;
+    pointer-events: none;
 }
 
 .gnc-navbar .gnc-dropdown-menu .dropdown-item {
@@ -160,11 +174,22 @@
     color: var(--gnc-white);
 }
 
-@media (min-width: 992px) {
-    .gnc-navbar .nav-item.dropdown:hover > .dropdown-menu {
-        display: block;
+@media (min-width: 1200px) {
+    .gnc-navbar .nav-item.dropdown:hover > .gnc-dropdown-menu,
+    .gnc-navbar .nav-item.dropdown.show > .gnc-dropdown-menu {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+        pointer-events: auto;
         margin-top: 0;
     }
+}
+
+.gnc-navbar .nav-item.dropdown.show > .gnc-dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 
@@ -232,14 +257,24 @@
 
 .gnc-chevron {
     font-size: 0.75rem;
-    transition: transform 0.2s ease;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.gnc-mobile-link[aria-expanded="true"] .gnc-chevron {
+.gnc-mobile-link[aria-expanded="true"] .gnc-chevron,
+.gnc-mobile-subtoggle[aria-expanded="true"] .gnc-chevron,
+.gnc-submenu-toggle[aria-expanded="true"] .gnc-chevron {
     transform: rotate(180deg);
 }
 
 /* Submenu (accordion) */
+.gnc-offcanvas .collapse {
+    transition: height 0.3s ease;
+}
+
+.gnc-offcanvas .collapsing {
+    transition: height 0.3s ease;
+}
+
 .gnc-submenu ul li a {
     display: block;
     padding: 0.6rem 1.1rem 0.6rem 3.15rem;
@@ -309,7 +344,6 @@
 
 /* =============================================================
    ACADEMICS NESTED DROPDOWN — DESKTOP FLYOUTS
-   (only the Academics menu uses these classes)
    ============================================================= */
 .gnc-navbar .gnc-dropdown-submenu {
     position: relative;
@@ -329,7 +363,6 @@
     white-space: normal;
 }
 
-/* Row itself carries the highlight, so label + chevron light up together */
 .gnc-navbar .gnc-submenu-row > .dropdown-item:hover,
 .gnc-navbar .gnc-submenu-row > .dropdown-item:focus {
     background-color: transparent;
@@ -361,10 +394,8 @@
     outline-offset: -2px;
 }
 
-/* Flyout panel (intentionally NOT a Bootstrap .dropdown-menu, so Bootstrap's
-   dropdown JS leaves it alone; visibility is handled by hover / .show) */
+/* Flyout panel with animations */
 .gnc-navbar .gnc-nested-menu {
-    display: none;
     position: absolute;
     top: 0;
     left: 100%;
@@ -375,11 +406,20 @@
     min-width: 260px;
     max-width: 340px;
     margin: calc(-0.4rem - 1px) 0 0 0;
+    
+    /* Animation base properties */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(10px);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+    display: block !important;
+    pointer-events: none;
 }
 
 .gnc-navbar .gnc-nested-menu.open-left {
     left: auto;
     right: 100%;
+    transform: translateX(-10px);
 }
 
 .gnc-navbar .gnc-nested-menu .dropdown-item {
@@ -387,13 +427,26 @@
 }
 
 .gnc-navbar .gnc-dropdown-submenu.show > .gnc-nested-menu {
-    display: block;
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+    pointer-events: auto;
 }
 
-/* Mouse users: open on hover (touch users use the chevron button) */
-@media (min-width: 992px) and (hover: hover) and (pointer: fine) {
+.gnc-navbar .gnc-nested-menu.open-left.show {
+    transform: translateX(0);
+}
+
+/* Mouse users: open on hover with animations */
+@media (min-width: 1200px) and (hover: hover) and (pointer: fine) {
     .gnc-navbar .gnc-dropdown-submenu:hover > .gnc-nested-menu {
-        display: block;
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(0);
+        pointer-events: auto;
+    }
+    .gnc-navbar .gnc-dropdown-submenu.open-left:hover > .gnc-nested-menu {
+        transform: translateX(0);
     }
     .gnc-navbar .gnc-dropdown-submenu:hover > .gnc-submenu-row {
         background-color: rgba(234, 186, 59, 0.18);
@@ -432,10 +485,6 @@
 .gnc-mobile-subtoggle:focus-visible {
     color: var(--gnc-gold);
     background-color: rgba(255, 255, 255, 0.04);
-}
-
-.gnc-mobile-subtoggle[aria-expanded="true"] .gnc-chevron {
-    transform: rotate(180deg);
 }
 
 /* Deeper levels get a slightly darker panel and extra indent */

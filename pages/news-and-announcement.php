@@ -111,10 +111,12 @@ try {
     $sidebarCategories = [];
 }
 $selectedCategory = null;
+$selectedCategoryName = '';
 if (isset($_GET['category']) && ctype_digit((string)$_GET['category'])) {
     foreach ($sidebarCategories as $cat) {
         if ((int)$cat['category_id'] === (int)$_GET['category']) {
             $selectedCategory = (int)$cat['category_id'];
+            $selectedCategoryName = $cat['category_name'];
             break;
         }
     }
@@ -166,7 +168,7 @@ if ($db) {
                 'search_text'   => gncSearchText([$ann['title'], $ann['content'], $ann['category_name'], $ann['program']]),
                 'image_path'    => $ann['image_path'],
                 'date'          => $ann['published_at'] ?? $ann['created_at'],
-                'link'          => 'announcement.php?slug=' . urlencode($ann['slug']),
+                'link'          => '/announcement-article.php?slug=' . urlencode($ann['slug']),
                 'category_id'   => $ann['category_id'],
                 'category_name' => $ann['category_name'],
                 'program'       => $ann['program'],
@@ -201,7 +203,7 @@ if ($db) {
                 'search_text'   => gncSearchText([$item['title'], $item['content'], $item['category_name'], $item['author'] ?? '']),
                 'image_path'    => $item['image_path'],
                 'date'          => $item['published_at'] ?? $item['created_at'],
-                'link'          => 'news.php?slug=' . urlencode($item['slug']),
+                'link'          => '/news-article.php?slug=' . urlencode($item['slug']),
                 'category_id'   => $item['category_id'],
                 'category_name' => $item['category_name'],
                 'program'       => null, // news isn't tagged to a specific program
@@ -296,7 +298,7 @@ if ($db) {
                 'image_path' => $ann['image_path'],
                 'date'       => $ann['published_at'] ?? $ann['created_at'],
                 'pinned_at'  => $ann['pinned_at'],
-                'link'       => 'announcement.php?slug=' . urlencode($ann['slug']),
+                'link'       => '/announcement-article.php?slug=' . urlencode($ann['slug']),
             ];
         }
 
@@ -321,7 +323,7 @@ if ($db) {
                 'image_path' => $item['image_path'],
                 'date'       => $item['published_at'] ?? $item['created_at'],
                 'pinned_at'  => $item['pinned_at'],
-                'link'       => 'news.php?slug=' . urlencode($item['slug']),
+                'link'       => '/news-article.php?slug=' . urlencode($item['slug']),
             ];
         }
 
@@ -369,11 +371,11 @@ usort($feedItems, function ($a, $b) use ($sortOrder) {
 // Apply filters: type tab, search box, program dropdown
 // ---------------------------------------------------------------
 $searchWords = $searchTerm === '' ? [] : array_values(array_filter(preg_split('/\s+/u', gncNormalizeForSearch($searchTerm)), 'strlen'));
-$filteredItems = array_filter($feedItems, function ($item) use ($activeType, $searchWords, $programFilter, $selectedCategory) {
+$matchesFilters = function ($item, $skipCategory = false) use ($activeType, $searchWords, $programFilter, $selectedCategory) {
     if ($activeType !== 'all' && $item['type_key'] !== $activeType) {
         return false;
     }
-    if ($selectedCategory !== null && (int)($item['category_id'] ?? 0) !== $selectedCategory) {
+    if (!$skipCategory && $selectedCategory !== null && (int)($item['category_id'] ?? 0) !== $selectedCategory) {
         return false;
     }
     if ($programFilter !== '' && $programFilter !== 'ALL') {
@@ -385,18 +387,25 @@ $filteredItems = array_filter($feedItems, function ($item) use ($activeType, $se
             return false;
         }
     }
-    if (!empty($searchWords)) {
+    foreach ($searchWords as $w) {
         // Every word typed must appear somewhere in the item's full text
         // (title, whole content, category, program, author) — not just the excerpt.
-        foreach ($searchWords as $w) {
-            if (mb_strpos($item['search_text'] ?? '', $w) === false) {
-                return false;
-            }
+        if (mb_strpos($item['search_text'] ?? '', $w) === false) {
+            return false;
         }
     }
     return true;
-});
-$filteredItems = array_values($filteredItems);
+};
+$filteredItems = array_values(array_filter($feedItems, fn($it) => $matchesFilters($it)));
+
+// Category counts in the sidebar follow the other active filters (type, search, program),
+// so the numbers match what the visitor will actually see after clicking.
+$catCounts = [];
+foreach ($feedItems as $fi) {
+    if (!$matchesFilters($fi, true)) continue;
+    $cid = (int)($fi['category_id'] ?? 0);
+    if ($cid) $catCounts[$cid] = ($catCounts[$cid] ?? 0) + 1;
+}
 
 // ---------------------------------------------------------------
 // Paginate
@@ -418,7 +427,7 @@ function na_url(array $overrides = []): string {
         'page'     => $_GET['page'] ?? '1',
     ], $overrides);
     $params = array_filter($params, fn($v) => $v !== '' && $v !== null);
-    return 'news-and-announcement.php' . (!empty($params) ? '?' . http_build_query($params) : '');
+    return 'news-and-announcement.php' . (!empty($params) ? '?' . http_build_query($params) : '') . '#na-results';
 }
 ?>
 <!DOCTYPE html>
@@ -426,7 +435,7 @@ function na_url(array $overrides = []): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>News & Announcement</title>
+    <title>News &amp; Announcements</title>
     <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="/assets/css/base-style.css" rel="stylesheet">
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
@@ -436,12 +445,15 @@ function na_url(array $overrides = []): string {
     <link href="/assets/css/skeleton-style.css?v=2" rel="stylesheet">
     <style>
         /* Programs sidebar (same look as the homepage card) */
-        .na-side-stack{position:sticky;top:90px;display:flex;flex-direction:column;gap:1.25rem}
-        .na-sidebar .gnc-upcoming-card{background:#fff;border:1px solid rgba(9,64,36,.12);border-radius:12px;overflow:hidden}
-        .na-events-card{background:#fff;border:1px solid rgba(9,64,36,.12);border-radius:12px;padding:1.4rem 1.4rem 1.1rem}
+        .na-side-stack{display:flex;flex-direction:column;gap:1.25rem}
+        .na-side-stack>*{flex-shrink:0}
+        /* Always sticky on desktop. If the sidebar is taller than the screen, it scrolls inside itself instead of being cut off. */
+        @media (min-width:992px){.na-side-stack{position:sticky;top:90px;max-height:calc(100vh - 110px);overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;padding-right:2px}}
+        .na-sidebar .gnc-upcoming-card{background:#fff;border:1px solid rgba(9,64,36,.12);border-radius:0;overflow:hidden}
+        .na-events-card{background:#fff;border:1px solid rgba(9,64,36,.12);border-radius:0;padding:1.4rem 1.4rem 1.1rem}
         .na-events-title{font-family:'Noto Serif',Georgia,serif;font-weight:700;font-size:1.35rem;color:#0d4a26;margin:0 0 1.1rem}
         .na-event-item{display:flex;align-items:flex-start;gap:1rem;margin-bottom:1.1rem}
-        .na-event-badge{flex:0 0 62px;border:1px solid rgba(0,0,0,.08);border-radius:8px;overflow:hidden;text-align:center;background:#fff}
+        .na-event-badge{flex:0 0 62px;border:1px solid rgba(0,0,0,.08);border-radius:0;overflow:hidden;text-align:center;background:#fff}
         .na-event-month{display:block;background:#094024;color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.04em;padding:.25rem 0}
         .na-event-day{display:block;font-size:1.5rem;font-weight:700;color:#1a1a1a;padding:.2rem 0}
         .na-event-name{font-family:'Noto Serif',Georgia,serif;font-weight:700;color:#0d4a26;line-height:1.3}
@@ -450,8 +462,11 @@ function na_url(array $overrides = []): string {
         .na-events-link:hover{color:#094024;text-decoration:underline}
         .na-sidebar .gnc-upcoming-header{background:#094024;color:#fff;padding:.85rem 1.1rem;font-weight:600}
         .na-sidebar .gnc-upcoming-header i{margin-right:.4rem}
-        .na-sidebar .gnc-programs-count{background:rgba(255,255,255,.18);color:#fff;border-radius:999px;padding:.1rem .6rem;font-size:.78rem}
+        .na-sidebar .gnc-programs-count{background:rgba(255,255,255,.18);color:#fff;border-radius:0;padding:.1rem .6rem;font-size:.78rem}
         .na-sidebar .gnc-programs-list{max-height:340px;overflow-y:auto}
+        .na-sidebar .gnc-programs-list{scrollbar-width:none;-ms-overflow-style:none}
+        /* Hide the scrollbars in the sidebar (it still scrolls with the mouse wheel / touch) */
+        .na-side-stack::-webkit-scrollbar,.na-sidebar .gnc-programs-list::-webkit-scrollbar{display:none;width:0;height:0}
         .na-sidebar .gnc-programs-list-item{display:flex;flex-direction:column;gap:.1rem;padding:.7rem 1.1rem;border-bottom:1px solid rgba(0,0,0,.06);color:#1a1a1a;border-left:4px solid transparent}
         .na-sidebar .gnc-programs-list-item:hover{background:#eaf5ee}
         .na-sidebar .gnc-programs-list-item-active{background:#eaf5ee;border-left-color:#EABA3B}
@@ -461,24 +476,52 @@ function na_url(array $overrides = []): string {
         .na-sidebar .gnc-cat-item:last-child{border-bottom:0}
         .na-sidebar .gnc-cat-item:hover{background:#eaf5ee}
         .na-sidebar .gnc-cat-item-active{background:#eaf5ee;border-left-color:#EABA3B}
-        .na-sidebar .gnc-cat-dot{width:10px;height:10px;border-radius:50%;flex:0 0 10px}
+        .na-sidebar .gnc-cat-dot{width:10px;height:10px;border-radius:0;flex:0 0 10px}
         .na-sidebar .gnc-cat-name{font-weight:600;color:#094024;flex:1}
-        .na-sidebar .gnc-cat-count{font-size:.78rem;color:#666;background:rgba(9,64,36,.08);border-radius:999px;padding:.05rem .55rem}
+        .na-sidebar .gnc-cat-count{font-size:.78rem;color:#666;background:rgba(9,64,36,.08);border-radius:0;padding:.05rem .55rem}
         /* Keep the whole sticky sidebar (Programs + Categories + Events) within the
            viewport so Upcoming Events is always visible, not only at the page end.
            The Programs list takes whatever height is left and scrolls inside itself. */
         .na-sidebar .gnc-programs-list{max-height:clamp(150px, calc(100vh - 690px), 340px)}
         .na-sidebar .gnc-cat-item{padding:.5rem 1.1rem}
         .na-sidebar .gnc-upcoming-header{padding:.7rem 1.1rem}
-        @media (max-height:780px){.na-side-stack{position:static}}
         .na-head .na-toolbar{flex-wrap:wrap;gap:.75rem}
         .na-head .na-filters{flex-wrap:wrap}
+
+        /* --- UX additions --- */
+        #na-results{scroll-margin-top:90px}
+        /* Keep the sort dropdown above the cards (cards are positioned for the click-anywhere link) */
+        .na-head{position:relative;z-index:30}
+        .na-head .gnc-dropdown-menu,.na-head .dropdown-menu{z-index:1050}
+        .na-card{position:relative}
+        /* Whole card is clickable */
+        .na-card,.gnc-pinned-card{cursor:pointer}
+        .na-card:focus-within{box-shadow:0 0 0 3px rgba(234,186,59,.55)}
+        .na-tab:focus-visible,.na-page-link:focus-visible,.na-read-more:focus-visible,.na-filter-btn:focus-visible,
+        .gnc-programs-list-item:focus-visible,.gnc-cat-item:focus-visible,.na-chip:focus-visible{outline:3px solid #EABA3B;outline-offset:2px}
+        .na-badge-new{display:inline-block;background:#EABA3B;color:#094024;font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:0;padding:.1rem .5rem;margin-left:.5rem;vertical-align:middle}
+        .na-summary{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1rem;margin-bottom:1rem;font-size:.9rem;color:#555}
+        .na-chips{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem}
+        .na-chip{display:inline-flex;align-items:center;gap:.4rem;background:#eaf5ee;color:#094024;border:1px solid rgba(9,64,36,.18);border-radius:0;padding:.2rem .7rem;font-size:.8rem;font-weight:600;text-decoration:none}
+        .na-chip:hover{background:#d9eee0;color:#094024}
+        .na-chip i{font-size:.65rem}
+        .na-chip-clear{font-size:.8rem;color:#b3312d;text-decoration:none;font-weight:600;margin-left:.2rem}
+        .na-chip-clear:hover{text-decoration:underline}
+        .na-note{display:flex;gap:.5rem;align-items:flex-start;background:#fff8e1;border:1px solid rgba(234,186,59,.5);border-radius:0;padding:.6rem .85rem;margin-bottom:1rem;font-size:.85rem;color:#5c4a00}
+        .na-note i{margin-top:.15rem}
+        .na-empty{text-align:center;padding:3rem 1rem;color:#666}
+        .na-empty i{font-size:2.6rem;color:#094024;opacity:.55;display:block;margin-bottom:.6rem}
+        .na-empty h3{font-family:'Noto Serif',Georgia,serif;font-size:1.3rem;color:#0d4a26;margin-bottom:.4rem}
+        .na-empty-btn{display:inline-block;margin-top:.5rem;background:#094024;color:#fff;border-radius:0;padding:.5rem 1.2rem;text-decoration:none;font-weight:600}
+        .na-empty-btn:hover{background:#0d4a26;color:#fff}
+        .na-page-gap{align-self:center;padding:0 .3rem;color:#888}
+        @media (prefers-reduced-motion:reduce){.na-card{animation:none!important}}
     </style>
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
     <?php $activeSection = 'news-and-announcement'; ?>
-    <?php include_once __DIR__ . '/../components/index-nav.php'; ?>
+    <?php include_once __DIR__ . '/../components/navbar.php'; ?>
 
     <section class="newsannouncement-intro">
         <div class="newsannouncement-hero">
@@ -537,7 +580,7 @@ function na_url(array $overrides = []): string {
 
                                 <div class="gnc-pinned-footer">
                                     <a href="<?= htmlspecialchars($pin['link']) ?>"<?= $isFbPin ? ' target="_blank" rel="noopener"' : '' ?> class="gnc-pinned-btn">
-                                        <?= $isFbPin ? 'View on Facebook' : 'View Full Announcement' ?>
+                                        <?= $isFbPin ? 'View on Facebook' : ($pin['type_label'] === 'News' ? 'Read Full Story' : 'View Full Announcement') ?>
                                         <i class="bi bi-arrow-right"></i>
                                     </a>
                                     <?php if (count($pinnedFeedItems) > 1): ?>
@@ -557,9 +600,9 @@ function na_url(array $overrides = []): string {
 
             <div class="row na-head">
             <div class="col-lg-8">
-            <h2 class="na-feed-title">Latest Announcements</h2>
+            <h2 class="na-feed-title"><?= ['all' => 'Latest News &amp; Announcements', 'announcement' => 'Latest Announcements', 'news' => 'Latest News'][$activeType] ?></h2>
 
-            <div class="na-toolbar">
+            <div class="na-toolbar" id="na-results">
                 <div class="na-tabs" role="tablist">
                     <a href="<?= htmlspecialchars(na_url(['type' => 'all', 'page' => 1])) ?>"
                        class="na-tab <?= $activeType === 'all' ? 'active' : '' ?>">
@@ -575,12 +618,12 @@ function na_url(array $overrides = []): string {
                     </a>
                 </div>
 
-                <form class="na-filters" method="get" action="news-and-announcement.php">
+                <form class="na-filters" method="get" action="news-and-announcement.php#na-results">
                     <input type="hidden" name="type" value="<?= htmlspecialchars($activeType) ?>">
 
                     <div class="na-search">
                         <i class="bi bi-search"></i>
-                        <input type="text" name="q" placeholder="Search" value="<?= htmlspecialchars($searchTerm) ?>">
+                        <input type="search" name="q" id="na-search" placeholder="Search news &amp; announcements" aria-label="Search news and announcements" autocomplete="off" value="<?= htmlspecialchars($searchTerm) ?>">
                     </div>
                     <button type="submit" class="visually-hidden">Search</button>
 
@@ -597,7 +640,7 @@ function na_url(array $overrides = []): string {
                     <div class="dropdown na-filter-group">
                         <button type="button" class="na-filter-btn dropdown-toggle"
                                 data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-funnel"></i> Filter
+                            <i class="bi bi-funnel"></i> Sort: <?= $sortOrder === 'oldest' ? 'Oldest' : 'Newest' ?>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end gnc-dropdown-menu">
                             <li><h6 class="dropdown-header">Sort By</h6></li>
@@ -623,11 +666,46 @@ function na_url(array $overrides = []): string {
 
             <div class="row g-4 na-layout">
             <div class="col-lg-8">
+            <?php
+                $rangeFrom = $totalItems ? ($currentPage - 1) * ITEMS_PER_PAGE + 1 : 0;
+                $rangeTo   = min($totalItems, $currentPage * ITEMS_PER_PAGE);
+                $activeChips = [];
+                if ($searchTerm !== '')          $activeChips[] = ['Search: “' . $searchTerm . '”', na_url(['q' => '', 'page' => 1])];
+                if ($selectedProgram !== null)   $activeChips[] = ['Program: ' . $selectedProgram, na_url(['program' => '', 'page' => 1])];
+                if ($selectedCategory !== null)  $activeChips[] = ['Category: ' . $selectedCategoryName, na_url(['category' => '', 'page' => 1])];
+                $clearAllUrl = na_url(['type' => 'all', 'q' => '', 'program' => '', 'category' => '', 'page' => 1]);
+            ?>
+            <?php if ($totalItems > 0 || $activeChips): ?>
+            <div class="na-summary" aria-live="polite">
+                <?php if ($totalItems > 0): ?>
+                <div class="na-summary-count">Showing <strong><?= $rangeFrom ?>–<?= $rangeTo ?></strong> of <strong><?= $totalItems ?></strong> <?= $totalItems === 1 ? 'result' : 'results' ?></div>
+                <?php endif; ?>
+                <?php if ($activeChips): ?>
+                <div class="na-chips">
+                    <?php foreach ($activeChips as [$chipLabel, $chipUrl]): ?>
+                    <a href="<?= htmlspecialchars($chipUrl) ?>" class="na-chip" title="Remove this filter"><?= htmlspecialchars($chipLabel) ?> <i class="bi bi-x-lg" aria-hidden="true"></i></a>
+                    <?php endforeach; ?>
+                    <a href="<?= htmlspecialchars($clearAllUrl) ?>" class="na-chip-clear">Clear all</a>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+            <?php if ($selectedProgram !== null): ?>
+            <div class="na-note"><i class="bi bi-info-circle"></i> Showing posts for <?= htmlspecialchars($selectedProgram) ?> and posts for all programs. News articles and Facebook posts are not tied to a program, so they are hidden while a program is selected.</div>
+            <?php endif; ?>
+
             <?php if (empty($pageItems)): ?>
-                <p class="text-muted text-center py-5">No announcements or news match your search.</p>
+                <div class="na-empty">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <h3>Nothing found</h3>
+                    <p><?= ($activeChips || $activeType !== 'all') ? 'Try a different word, or remove some of the filters.' : 'There are no posts yet. Please check back soon.' ?></p>
+                    <?php if ($activeChips || $activeType !== 'all'): ?>
+                    <a href="<?= htmlspecialchars($clearAllUrl) ?>" class="na-empty-btn">Show everything</a>
+                    <?php endif; ?>
+                </div>
             <?php else: ?>
                 <div class="row g-4">
-                    <?php foreach ($pageItems as $item):
+                    <?php foreach ($pageItems as $index => $item):
                         $isFacebook = $item['source'] === 'facebook';
                         $isNews     = $item['source'] === 'news';
                         $linkTarget = $isFacebook ? ' target="_blank" rel="noopener"' : '';
@@ -635,11 +713,9 @@ function na_url(array $overrides = []): string {
                         $ribbonClass = $item['type_key'] === 'news' ? 'na-ribbon-news' : 'na-ribbon-announcement';
                         $hasImage = !empty($item['image_path']);
                     ?>
-                    <div class="col-md-6">
-                        <div class="na-card skeleton-group">
-                            <div class="na-ribbon <?= $ribbonClass ?>">
-                                <span>|</span> <?= strtoupper($item['type_label']) ?>
-                            </div>
+                    <div class="col-md-6 col-xl-4">
+                        <!-- Applied inline style to stagger the entrance animation -->
+                        <div class="na-card skeleton-group" style="animation-delay: <?= 0.1 + ($index * 0.08) ?>s;">
 
                             <?php if ($hasImage): ?>
                             <div class="skeleton-wrap na-card-img-wrap">
@@ -672,8 +748,15 @@ function na_url(array $overrides = []): string {
                                         <h5 class="na-card-title"><?= htmlspecialchars($item['title']) ?></h5>
                                     <?php endif; ?>
 
-                                    <div class="na-card-date">
-                                        <i class="bi bi-calendar3"></i> <?= date('F d, Y', strtotime($item['date'])) ?>
+                                    <div class="na-card-meta">
+                                        <span class="na-card-date"><i class="bi bi-calendar3"></i> <?= date('F d, Y', strtotime($item['date'])) ?></span>
+                                    <?php if ($isFacebook): ?>
+                                        <span class="na-badge na-badge-fb"><i class="bi bi-facebook"></i> From Facebook</span>
+                                    <?php elseif ($isNews): ?>
+                                        <span class="na-badge na-badge-news"><i class="bi bi-newspaper"></i> News</span>
+                                    <?php else: ?>
+                                        <span class="na-badge na-badge-ann"><i class="bi bi-megaphone"></i> Announcement</span>
+                                    <?php endif; ?>
                                     </div>
 
                                     <?php if ($isNews && !empty($item['author'])): ?>
@@ -682,20 +765,7 @@ function na_url(array $overrides = []): string {
 
                                     <p class="na-card-excerpt"><?= htmlspecialchars($item['excerpt']) ?></p>
 
-                                    <hr class="na-card-divider">
-
-                                    <div class="na-card-footer">
-                                        <span class="na-card-footer-date"><?= date('F d, Y', strtotime($item['date'])) ?></span>
-                                        <?php if ($isFacebook): ?>
-                                            <span class="na-badge na-badge-fb"><i class="bi bi-facebook"></i> From Facebook</span>
-                                        <?php elseif ($isNews): ?>
-                                            <span class="na-badge na-badge-news"><i class="bi bi-newspaper"></i> News</span>
-                                        <?php else: ?>
-                                            <span class="na-badge na-badge-ann"><i class="bi bi-megaphone"></i> Announcement</span>
-                                        <?php endif; ?>
-                                    </div>
-
-                                    <a href="<?= htmlspecialchars($item['link']) ?>"<?= $linkTarget ?> class="na-read-more">
+                                    <a href="<?= htmlspecialchars($item['link']) ?>"<?= $linkTarget ?> class="na-read-more stretched-link">
                                         <?= $isFacebook ? 'View on Facebook' : 'Read More' ?>
                                         <i class="bi <?= $isFacebook ? 'bi-box-arrow-up-right' : 'bi-arrow-right' ?>"></i>
                                     </a>
@@ -709,18 +779,34 @@ function na_url(array $overrides = []): string {
                 <?php if ($totalPages > 1): ?>
                 <nav class="na-pagination" aria-label="News and announcements pagination">
                     <?php if ($currentPage > 1): ?>
-                        <a href="<?= htmlspecialchars(na_url(['page' => $currentPage - 1])) ?>" class="na-page-link na-page-prev">
+                        <a href="<?= htmlspecialchars(na_url(['page' => $currentPage - 1])) ?>" class="na-page-link na-page-prev" aria-label="Previous page" rel="prev">
                             <i class="bi bi-chevron-left"></i>
                         </a>
                     <?php endif; ?>
 
-                    <?php for ($p = 1; $p <= $totalPages; $p++): ?>
+                    <?php
+                        // Show first, last and the pages around the current one; fold the rest into "…"
+                        $pageList = [];
+                        for ($p = 1; $p <= $totalPages; $p++) {
+                            if ($p === 1 || $p === $totalPages || abs($p - $currentPage) <= 1) {
+                                $pageList[] = $p;
+                            } elseif (end($pageList) !== '…') {
+                                $pageList[] = '…';
+                            }
+                        }
+                    ?>
+                    <?php foreach ($pageList as $p): ?>
+                        <?php if ($p === '…'): ?>
+                        <span class="na-page-gap" aria-hidden="true">…</span>
+                        <?php else: ?>
                         <a href="<?= htmlspecialchars(na_url(['page' => $p])) ?>"
-                        class="na-page-link <?= $p === $currentPage ? 'active' : '' ?>"><?= $p ?></a>
-                    <?php endfor; ?>
+                           class="na-page-link <?= $p === $currentPage ? 'active' : '' ?>"
+                           aria-label="Page <?= $p ?>"<?= $p === $currentPage ? ' aria-current="page"' : '' ?>><?= $p ?></a>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
 
                     <?php if ($currentPage < $totalPages): ?>
-                        <a href="<?= htmlspecialchars(na_url(['page' => $currentPage + 1])) ?>" class="na-page-link na-page-next">
+                        <a href="<?= htmlspecialchars(na_url(['page' => $currentPage + 1])) ?>" class="na-page-link na-page-next" aria-label="Next page" rel="next">
                             <i class="bi bi-chevron-right"></i>
                         </a>
                     <?php endif; ?>
@@ -762,14 +848,7 @@ function na_url(array $overrides = []): string {
                     </div>
                 </div>
 
-                <?php if (!empty($sidebarCategories)):
-                    // Item counts per category (for the current type/search/program filters)
-                    $catCounts = [];
-                    foreach ($feedItems as $fi) {
-                        $cid = (int)($fi['category_id'] ?? 0);
-                        if ($cid) $catCounts[$cid] = ($catCounts[$cid] ?? 0) + 1;
-                    }
-                ?>
+                <?php if (!empty($sidebarCategories)): ?>
                 <div class="gnc-upcoming-card">
                     <div class="gnc-upcoming-header d-flex align-items-center justify-content-between">
                         <span><i class="bi bi-tags-fill"></i> Categories</span>
@@ -822,10 +901,61 @@ function na_url(array $overrides = []): string {
         </div>
     </section>
 
-    <?php include __DIR__ . '/../components/index-footer.php'; ?>
+    <?php include __DIR__ . '/../components/footer.php'; ?>
+    <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
     <script src="/assets/js/skeleton-loader.js"></script>
+    <script>
+    // Live search: results update a moment after the visitor stops typing (Enter still works too).
+    (function () {
+        var input = document.getElementById('na-search');
+        if (!input) return;
+        var form = input.form, timer = null, last = input.value;
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            timer = setTimeout(function () {
+                if (input.value.trim() === last.trim()) return;
+                last = input.value;
+                try { sessionStorage.setItem('naSearchFocus', '1'); } catch (e) {}
+                form.submit();
+            }, 500);
+        });
+        // After the page reloads with results, put the cursor back at the end of what they typed
+        try {
+            if (sessionStorage.getItem('naSearchFocus') === '1') {
+                sessionStorage.removeItem('naSearchFocus');
+                input.focus();
+                var end = input.value.length;
+                input.setSelectionRange(end, end);
+            }
+        } catch (e) {}
+    })();
+    </script>
+    <script>
+    // Make the WHOLE card clickable (not only the "Read More" button).
+    // Clicks on real links/buttons keep working normally, and selecting text does not trigger it.
+    (function () {
+        function go(link) {
+            if (link.target === '_blank') { window.open(link.href, '_blank', 'noopener'); }
+            else { window.location.href = link.href; }
+        }
+        function wire(cardSelector, linkSelector) {
+            document.querySelectorAll(cardSelector).forEach(function (card) {
+                var link = card.querySelector(linkSelector);
+                if (!link) return;
+                card.addEventListener('click', function (e) {
+                    if (e.target.closest('a, button, input, select, textarea, label')) return;
+                    var sel = window.getSelection && window.getSelection().toString();
+                    if (sel) return;
+                    go(link);
+                });
+            });
+        }
+        wire('.na-card', 'a.na-read-more');
+        wire('.gnc-pinned-card', 'a.gnc-pinned-btn');
+    })();
+    </script>
 </body>
 </html>

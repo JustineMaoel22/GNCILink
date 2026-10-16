@@ -1,0 +1,2894 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+:root {
+    --gnc-green:       #094024;
+    --gnc-green-dark:  #062018;
+    --gnc-green-mid:   #0d5c33;
+    --gnc-green-light: #287838;
+    --gnc-gold:        #EABA3B;
+    --gnc-gold-light:  #E2C06A;
+    --gnc-cream:       #F9F6F1;
+    --gnc-white:       #ffffff; 
+    /* Per-program colours are set inline by program.php; these are fallbacks. */
+    --gnc-template:       #307056;
+    --gnc-template-text:  #307056;   /* accent used for TEXT (darkened automatically for light colours like yellow) */
+    --gnc-template-tint:  rgba(48, 112, 86, 0.10);
+    --gnc-template-dark:  #24543f;   /* hover state */
+}
+
+* { box-sizing: border-box; }
+
+body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: var(--gnc-cream) !important;
+}
+
+/* =============================================
+PROGRAM HERO (shared by every program page)
+============================================= */
+.template-hero {
+    position: relative;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    min-height: 500px;
+}
+
+.template-hero .container {
+    position: relative;
+    z-index: 2;
+}
+
+/* Breadcrumb */
+.template-breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    margin-bottom: 1rem;
+    margin-top: 30px;
+}
+
+.template-breadcrumb a {
+    color: var(--gnc-template-text);
+    text-decoration: none;
+}
+
+.template-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.template-breadcrumb span {
+    color: var(--gnc-template-text);
+}
+
+.template-breadcrumb i {
+    font-size: 0.6rem;
+    color: var(--gnc-template-text);
+    opacity: 0.7;
+}
+
+/* Title & copy */
+.template-hero-content {
+    max-width: 600px;
+    margin-top: 50px;
+    margin-bottom: 2rem;
+}
+
+.template-title {
+    font-family: 'Noto Serif', serif;
+    font-size: 2.75rem;
+    font-weight: 800;
+    color: var(--gnc-template-text);
+    margin-bottom: 0.35rem;
+    line-height: 1.1;
+}
+
+.template-subtitle {
+    font-size: 1rem;
+    font-weight: 700;
+    font-style: italic;
+    color: var(--gnc-template-text);
+    margin-bottom: 0.65rem;
+}
+
+.template-desc {
+    font-size: 0.9rem;
+    color: black;
+    max-width: 800px;
+    margin-bottom: 1.75rem;
+}
+
+/* Badges row */
+.template-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.75rem;
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 1.1rem 1.5rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+    width: fit-content;
+}
+
+.template-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+}
+
+/* Badge icon: works for both Bootstrap Icons (<i class="bi ...">) and
+   Google Material Symbols (<span class="material-symbols-outlined">) */
+.template-badge .template-badge-icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    font-size: 1.9rem;
+    line-height: 1;
+    color: var(--gnc-template-text);
+    overflow: hidden;
+}
+
+.template-badge div {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.template-badge strong {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--gnc-template-text);
+}
+
+.template-badge span {
+    font-size: 0.75rem;
+    color: #6b5c55;
+}
+
+.template-about {
+    background-color: #faf6f1;
+}
+
+/* Section title */
+.template-section-title {
+    color: var(--gnc-template-text);
+    font-weight: 700;
+    position: relative;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.template-section-title::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 40px;
+    height: 3px;
+    background-color: var(--gnc-template);
+}
+
+/* Modifier: gold underline (used on "About the Program") */
+.template-section-title--gold::after {
+    background-color: var(--gnc-gold);
+}
+
+.template-section-text {
+    color: #333;
+    line-height: 1.7;
+}
+
+/* =============================================
+VISION & MISSION
+============================================= */
+/* (Vision & Mission styles live in the "Vision & Mission" block further down) */
+
+.template-seal {
+    width: 100%;
+    max-width: 400px;
+    height: auto;
+    margin-left: 100px;
+}
+
+/* =============================================
+CORE VALUES
+============================================= */
+.corevalue-subtitle {
+    color: #6b6b6b;
+    font-size: 0.85rem;
+    margin-top: -0.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.corevalue-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.corevalue-card {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background-color: var(--gnc-white);
+    border-left: 5px solid var(--gnc-template);
+    border-radius: 12px;
+    padding: 1.35rem 1.85rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.corevalue-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.corevalue-icon {
+    flex: 0 0 auto;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background-color: var(--gnc-template-tint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Core value icon: Bootstrap Icons or Google Material Symbols */
+.corevalue-icon .corevalue-icon-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    font-size: 2rem;
+    line-height: 1;
+    color: var(--gnc-template-text);
+    overflow: hidden;
+}
+
+.corevalue-titlegroup {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    min-width: 280px;
+    padding-right: 1.5rem;
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.corevalue-letter {
+    flex: 0 0 auto;
+    width: 60px;
+    font-family: 'Inter', sans-serif;
+    font-size: 3rem;
+    font-weight: bold;
+    color: var(--gnc-template-text);
+    line-height: 1;
+}
+
+.corevalue-title {
+    color: var(--gnc-template-text);
+    font-weight: bold;
+    font-size: 1.5rem;
+    margin: 0;
+    line-height: 1;
+}
+
+.corevalue-text {
+    flex: 1 1 auto;
+    color: #6b6b6b;
+    font-size: 0.95rem;
+    line-height: 1.65;
+    margin: 0;
+    padding-left: 0.35rem;
+}
+
+/* Core value stacking is handled in the RESPONSIVE section at the end of this file */
+
+/* =============================================
+ABOUT THE PROGRAM (seal left, big heading right)
+============================================= */
+.about-feature {
+    display: flex;
+    align-items: center;
+    gap: 4rem;
+}
+
+.about-feature-seal { flex: 0 0 340px; }
+
+.about-feature-seal-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 340px;
+    margin: 0 auto;
+}
+
+/* gold corner block peeking out behind the seal */
+.about-feature-seal-wrap::before {
+    content: "";
+    position: absolute;
+    top: -16px;
+    left: -16px;
+    width: 40%;
+    height: 40%;
+    background: var(--gnc-gold);
+    border-top-left-radius: 28px;
+    z-index: 0;
+}
+
+.about-feature-seal-wrap img {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.about-feature-text { flex: 1 1 auto; min-width: 0; }
+
+.about-eyebrow {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--gnc-gold);
+    margin-bottom: 0.6rem;
+}
+
+.about-heading {
+    font-family: 'Noto Serif', serif;
+    font-size: 2.6rem;
+    font-weight: 800;
+    line-height: 1.15;
+    color: var(--gnc-green-light, #287838);
+    margin: 0 0 1.1rem;
+}
+
+.about-body {
+    color: #222;
+    font-size: 0.95rem;
+    line-height: 1.75;
+    margin: 0;
+    max-width: 44rem;
+}
+
+@media (max-width: 991px) {
+    .about-feature { flex-direction: column; gap: 2rem; text-align: center; }
+    .about-feature-seal { flex-basis: auto; width: 100%; max-width: 260px; }
+    .about-heading { font-size: 2rem; }
+    .about-body { text-align: justify; margin-inline: auto; }
+}
+
+@media (max-width: 575px) {
+    .about-heading { font-size: 1.65rem; }
+}
+
+/* =============================================
+WHY CHOOSE THIS PROGRAM (dark, sticky heading + numbered list)
+============================================= */
+.template-why {
+    --why-progress: 0;
+    --why-bg: #07201a;
+    --why-gold: var(--gnc-gold, #EABA3B);
+    background-color: var(--why-bg);
+    color: #fff;
+    padding: 5.5rem 0;
+}
+
+.why-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    column-gap: 0;
+    align-items: start;
+}
+
+/* Left: sticky heading, with the vertical rule on its right edge */
+.why-side {
+    position: sticky;
+    top: 110px;
+    align-self: start;
+    padding-right: 3rem;
+    margin-right: 2.5rem;
+}
+
+.why-side::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 2px;
+    height: 100%;
+    background: linear-gradient(
+        to bottom,
+        var(--why-gold) 0,
+        var(--why-gold) calc(var(--why-progress) * 100%),
+        rgba(255, 255, 255, 0.14) calc(var(--why-progress) * 100%),
+        rgba(255, 255, 255, 0.14) 100%
+    );
+}
+
+.why-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--why-gold);
+    margin-bottom: 1.1rem;
+}
+
+.why-eyebrow::after {
+    content: "";
+    width: 44px;
+    height: 1px;
+    background: var(--why-gold);
+}
+
+.why-heading {
+    font-family: 'Noto Serif', serif;
+    font-size: 3.1rem;
+    font-weight: 800;
+    line-height: 1.12;
+    color: #fff;
+    margin: 0 0 1.6rem;
+}
+
+.why-dot { color: var(--why-gold); }
+
+.why-intro {
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.98rem;
+    line-height: 1.85;
+    margin: 0;
+    max-width: 30rem;
+}
+
+/* Right: numbered rows */
+.why-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-bottom: 1px solid rgba(234, 186, 59, 0.75);
+}
+
+.why-item {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 2.25rem;
+    padding: 2.1rem 3rem 2.1rem 0;
+    border-top: 1px solid rgba(234, 186, 59, 0.75);
+    transition: background-color 0.3s ease, padding-left 0.3s ease;
+    isolation: isolate;
+}
+
+/* soft gold glow that fades in from the left on hover */
+.why-item::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(90deg, rgba(234, 186, 59, 0.13), rgba(234, 186, 59, 0) 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.why-item:hover::before,
+.why-item:focus-within::before { opacity: 1; }
+
+.why-num {
+    flex: 0 0 6.2rem;
+    font-family: 'Noto Serif', serif;
+    font-size: 3.7rem;
+    font-weight: 700;
+    line-height: 1;
+    color: transparent;
+    -webkit-text-stroke: 1.5px var(--why-gold);
+    transition: color 0.3s ease;
+    font-variant-numeric: lining-nums;
+}
+
+.why-body { flex: 1 1 auto; min-width: 0; }
+
+.why-title {
+    font-family: 'Noto Serif', serif;
+    font-size: 1.7rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #fff;
+    margin: 0.2rem 0 0.7rem;
+    transition: color 0.3s ease;
+}
+
+.why-desc {
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.95rem;
+    line-height: 1.8;
+    margin: 0;
+    max-width: 34rem;
+}
+
+/* slide + gold accent bar on hover */
+.why-item::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--why-gold);
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform 0.35s ease;
+}
+.why-item:hover,
+.why-item:focus-within { padding-left: 1.25rem; }
+.why-item:hover::after,
+.why-item:focus-within::after { transform: scaleY(1); }
+.why-item:hover .why-desc { color: rgba(255, 255, 255, 0.9); }
+.why-desc { transition: color 0.3s ease; }
+.why-item:hover .why-num { color: var(--why-gold); }
+.why-item:hover .why-title { color: var(--why-gold); }
+
+@media (max-width: 1199px) {
+    .why-heading { font-size: 2.6rem; }
+    .why-num { flex-basis: 5rem; font-size: 3.1rem; }
+    .why-title { font-size: 1.45rem; }
+    .why-item { gap: 1.5rem; }
+}
+
+@media (max-width: 991px) {
+    .template-why { padding: 3.25rem 0; }
+    .why-layout { grid-template-columns: 1fr; }
+    .why-side {
+        position: relative;
+        top: auto;
+        padding: 0 0 2rem;
+        margin: 0;
+    }
+    /* the vertical rule becomes a short gold bar under the intro */
+    .why-side::after {
+        top: auto;
+        bottom: 0;
+        right: auto;
+        left: 0;
+        width: 56px;
+        height: 3px;
+        background: var(--why-gold);
+    }
+    .why-heading { font-size: 2.2rem; }
+    .why-intro { max-width: none; }
+    .why-list { margin-top: 1.5rem; }
+}
+
+@media (max-width: 575px) {
+    .why-heading { font-size: 1.9rem; }
+    .why-item { gap: 1rem; padding: 1.5rem 0.25rem 1.5rem 0; }
+    .why-num { flex-basis: 3.4rem; font-size: 2.3rem; -webkit-text-stroke-width: 1px; }
+    .why-title { font-size: 1.2rem; margin-bottom: 0.45rem; }
+    .why-desc { font-size: 0.88rem; line-height: 1.7; }
+}
+
+@media (hover: none) {
+    .why-item:hover { padding-left: 0; }
+    .why-item:hover::after { transform: scaleY(0); }
+    .why-item:hover .why-desc { color: rgba(255, 255, 255, 0.68); }
+    .why-item:hover::before { opacity: 0; }
+    .why-item:hover .why-num { color: transparent; }
+    .why-item:hover .why-title { color: #fff; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .why-item, .why-item::before, .why-item::after, .why-num, .why-title, .why-desc { transition: none; }
+}
+
+.template-curriculum {
+    background-color: var(--gnc-cream);
+}
+
+/* =============================================
+UNIFORM
+============================================= */
+.template-uniform {
+    background-color: #faf6f1;
+}
+
+.template-uniform-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.75rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+}
+
+.template-uniform-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.template-uniform-card img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* Uniform Lightbox */
+.uniform-lightbox {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.uniform-lightbox.active {
+    display: flex;
+    opacity: 1;
+}
+
+.uniform-lightbox-img {
+    max-width: 90%;
+    max-height: 80vh;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    animation: uniformLightboxZoom 0.25s ease;
+}
+
+@keyframes uniformLightboxZoom {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.uniform-lightbox-caption {
+    color: #fff;
+    margin-top: 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.uniform-lightbox-close {
+    position: absolute;
+    top: 20px;
+    right: 35px;
+    color: #fff;
+    font-size: 2.5rem;
+    font-weight: 300;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.uniform-lightbox-close:hover {
+    color: var(--gnc-template-text);
+}
+
+/* =============================================
+CAREER OPPORTUNITIES
+============================================= */
+.template-career {
+    background-color: var(--gnc-cream);
+}
+
+/* Career rail: hover/focus expands a panel; image-backed, no cards */
+.career-rail {
+    display: flex;
+    gap: 10px;
+    height: 460px;
+    margin-top: 1.5rem;
+}
+
+.career-panel {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    border-radius: 18px;
+    background: var(--gnc-green);
+    color: #fff;
+    cursor: pointer;
+    outline: none;
+    transition: flex-grow 0.55s cubic-bezier(.22, .8, .24, 1);
+}
+
+.career-panel.is-open { flex-grow: 5; cursor: default; }
+
+.career-panel:focus-visible { box-shadow: 0 0 0 3px var(--gnc-gold); }
+
+.career-panel-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    transform: scale(1.08);
+    transition: transform 0.8s ease, filter 0.5s ease;
+    filter: grayscale(0.85) brightness(0.8);
+}
+
+.career-panel--plain .career-panel-bg {
+    background: linear-gradient(160deg, var(--gnc-green-mid), var(--gnc-green-dark));
+    filter: none;
+}
+
+.career-panel.is-open .career-panel-bg { transform: scale(1); filter: none; }
+
+/* green wash, heavier at the bottom where the text sits */
+.career-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(to top, rgba(6, 32, 24, 0.94) 0%, rgba(6, 32, 24, 0.55) 45%, rgba(6, 32, 24, 0.25) 100%);
+}
+
+.career-index {
+    position: absolute;
+    z-index: 2;
+    top: 1.25rem;
+    left: 1.4rem;
+    font-family: 'Noto Serif', serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--gnc-gold);
+}
+
+/* collapsed state: title runs vertically */
+.career-vlabel {
+    position: absolute;
+    z-index: 2;
+    left: 50%;
+    bottom: 1.4rem;
+    transform: translateX(-50%) rotate(180deg);
+    writing-mode: vertical-rl;
+    max-height: calc(100% - 5rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: 'Noto Serif', serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #fff;
+    transition: opacity 0.25s ease;
+}
+
+.career-panel.is-open .career-vlabel { opacity: 0; pointer-events: none; }
+
+/* open state: full title + description */
+.career-content {
+    position: absolute;
+    z-index: 2;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0 2rem 2rem;
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.3s ease, transform 0.45s ease;
+    pointer-events: none;
+}
+
+.career-panel.is-open .career-content {
+    opacity: 1;
+    transform: none;
+    transition-delay: 0.22s;
+    pointer-events: auto;
+}
+
+.career-content::before {
+    content: "";
+    display: block;
+    width: 44px;
+    height: 3px;
+    background: var(--gnc-gold);
+    margin-bottom: 1rem;
+}
+
+.career-title {
+    font-family: 'Noto Serif', serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #fff;
+    margin: 0 0 0.6rem;
+}
+
+.career-desc {
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.95rem;
+    line-height: 1.7;
+    margin: 0;
+    max-width: 30rem;
+}
+
+@media (max-width: 991px) {
+    .career-rail { height: 420px; }
+    .career-title { font-size: 1.4rem; }
+    .career-content { padding: 0 1.4rem 1.5rem; }
+}
+
+/* Phones & small tablets: simple stack, text always visible */
+@media (max-width: 767px) {
+    .career-rail { flex-direction: column; height: auto; gap: 12px; }
+    .career-panel,
+    .career-panel.is-open { flex: none; min-height: 230px; cursor: default; }
+    .career-panel-bg,
+    .career-panel.is-open .career-panel-bg { filter: none; transform: none; }
+    .career-vlabel { display: none; }
+    .career-content,
+    .career-panel.is-open .career-content {
+        position: relative;
+        opacity: 1;
+        transform: none;
+        pointer-events: auto;
+        padding: 4.25rem 1.25rem 1.4rem;
+    }
+    .career-title { font-size: 1.25rem; }
+    .career-desc { font-size: 0.88rem; }
+}
+
+/* =====================================================================
+   BULLETIN BOARD
+   ===================================================================== */
+
+.bulletin-board {
+    background-color: var(--gnc-cream, #F9F6F1);
+}
+
+.bulletin-heading {
+    color: var(--gnc-template-text);
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    position: relative;
+    padding-bottom: 0.5rem;
+}
+
+.bulletin-heading::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 40px;
+    height: 3px;
+    background-color: var(--gnc-gold);
+}
+
+.bulletin-subtext {
+    color: black;
+    margin-bottom: 0;
+}
+
+.bulletin-panel {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.bulletin-panel-header {
+    margin-bottom: 1rem;
+}
+
+.bulletin-panel-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--gnc-green-light);
+}
+
+.bulletin-panel-title--gold {
+    color: var(--gnc-gold);
+}
+
+.bulletin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    flex: 1 1 auto;
+}
+
+.bulletin-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    text-decoration: none;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid #f0eee9;
+}
+
+.bulletin-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.bulletin-item-icon {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    background-color: #f4f8f4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.bulletin-item-icon i {
+    color: var(--gnc-green-light);
+    font-size: 1.1rem;
+}
+
+.bulletin-item-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.bulletin-item-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--gnc-green-light);
+    margin-bottom: 0.1rem;
+}
+
+.bulletin-item-title--gold {
+    color: var(--gnc-gold);
+}
+
+.bulletin-item-excerpt {
+    font-size: 0.82rem;
+    color: #777;
+    margin-bottom: 0.2rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.bulletin-item-date,
+.bulletin-item-meta {
+    font-size: 0.75rem;
+    color: #999;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+/* Event rows */
+.bulletin-event-item {
+    align-items: stretch;
+}
+
+.bulletin-event-badge {
+    flex: 0 0 52px;
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.bulletin-event-month {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.bulletin-event-day {
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.badge-green {
+    background-color: var(--gnc-green-light);
+}
+
+.badge-gold {
+    background-color: var(--gnc-gold);
+    color: #3a2e2a;
+}
+
+.badge-maroon {
+    background-color: #7a1f2b;
+}
+
+/* Empty state */
+.bulletin-empty {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2.5rem 1rem;
+    color: #aaa;
+    text-align: center;
+}
+
+.bulletin-empty i {
+    font-size: 1.8rem;
+}
+
+.bulletin-empty p {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+/* Footer / view all */
+.bulletin-panel-footer {
+    margin-top: 1.1rem;
+    padding-top: 0.9rem;
+    text-align: center;
+    border-top: 1px solid #f0eee9;
+}
+
+.bulletin-view-all {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.bulletin-view-all--green {
+    color: var(--gnc-green-light);
+}
+
+.bulletin-view-all--gold {
+    color: var(--gnc-gold);
+}
+
+.bulletin-view-all:hover {
+    text-decoration: underline;
+}
+
+/* Accent bar under each panel */
+.col-lg-6:first-child .bulletin-panel {
+    border-bottom: 4px solid var(--gnc-green-light);
+}
+
+.col-lg-6:last-child .bulletin-panel {
+    border-bottom: 4px solid var(--gnc-gold);
+}
+
+
+/* =============================================
+CTA BANNER
+============================================= */
+.template-cta {
+    background-color: var(--gnc-cream);
+}
+.template-cta-card {
+    background: #fff;
+    border-radius: 10px;
+    border-left: 5px solid var(--gnc-template);
+    padding: 1.25rem 1.75rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.template-cta-icon {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* CTA icon: Bootstrap Icons or Google Material Symbols */
+.template-cta-icon .template-cta-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-size: 2.25rem;
+    line-height: 1;
+    color: var(--gnc-template-text);
+    overflow: hidden;
+    /* Icon stroke weight: 100 (thinnest) to 700 (boldest), default is 400 */
+    font-variation-settings: 'wght' 300;
+}
+
+.template-cta-text {
+    flex: 1 1 auto;
+}
+
+.template-cta-title {
+    color: var(--gnc-template-text);
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+}
+
+.template-cta-desc {
+    color: #666;
+    font-size: 0.82rem;
+    margin-bottom: 0;
+}
+
+.template-cta-action {
+    flex: 0 0 auto;
+}
+
+.template-cta-btn {
+    display: inline-block;
+    background-color: var(--gnc-template);
+    color: var(--gnc-white);
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 0.6rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.2s ease;
+}
+
+.template-cta-btn:hover {
+    background-color: var(--gnc-template-dark);
+    color: white;
+}
+
+/* =====================================================================
+   RESPONSIVE — large screens down to small phones
+   Breakpoints follow Bootstrap 5: 1400 / 1200 / 992 / 768 / 576
+   ===================================================================== */
+
+/* Never let media push the page wider than the screen */
+img { max-width: 100%; }
+.template-curriculum iframe,
+.template-curriculum embed,
+.template-curriculum object,
+.template-curriculum canvas { max-width: 100%; }
+
+/* Long words/URLs in bulletin items should wrap, not overflow */
+.bulletin-item-body { min-width: 0; }
+.bulletin-item-title,
+.bulletin-item-excerpt { overflow-wrap: anywhere; }
+
+/* Lightbox: use the real visible height on mobile browsers (URL bar) */
+.uniform-lightbox { height: 100dvh; }
+.uniform-lightbox-img { object-fit: contain; }
+
+/* Facilities gallery on the program page (program.php).
+   Uses the program's own colour variables set by program.php (--gnc-template*). */
+
+.template-facilities { background: var(--gnc-cream, #F9F6F1); }
+
+.facility-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.facility-card {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, .08);
+    border-top: 4px solid var(--gnc-template, #307056);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .06);
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.facility-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, .12);
+}
+
+.facility-thumb {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: var(--gnc-template-tint, #eee);
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    cursor: zoom-in;
+}
+
+.facility-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform .35s ease;
+}
+
+.facility-card:hover .facility-thumb img { transform: scale(1.04); }
+
+.facility-thumb:focus-visible {
+    outline: 3px solid var(--gnc-template, #307056);
+    outline-offset: -3px;
+}
+
+.facility-body { padding: 1rem 1.15rem 1.25rem; }
+
+.facility-name {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--gnc-template-text, #307056);
+}
+
+.facility-desc {
+    margin: .45rem 0 0;
+    font-size: .95rem;
+    line-height: 1.6;
+    color: #4a4a46;
+}
+
+/* Lightbox */
+.facility-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    padding: 1rem;
+    background: rgba(0, 0, 0, .88);
+}
+
+.facility-lightbox[hidden] { display: none; }
+
+.facility-lb-figure {
+    margin: 0;
+    max-width: min(1000px, 100%);
+    text-align: center;
+    color: #fff;
+}
+
+.facility-lb-figure img {
+    display: block;
+    max-width: 100%;
+    max-height: 72vh;
+    margin: 0 auto;
+    border-radius: 10px;
+    object-fit: contain;
+}
+
+.facility-lb-figure figcaption { margin-top: .9rem; }
+.facility-lb-figure strong { display: block; font-size: 1.15rem; }
+.facility-lb-figure span { display: block; margin-top: .3rem; font-size: .95rem; line-height: 1.55; color: rgba(255, 255, 255, .85); }
+.facility-lb-figure span[hidden] { display: none; }
+
+.facility-lb-close,
+.facility-lb-nav {
+    border: 0;
+    background: rgba(255, 255, 255, .14);
+    color: #fff;
+    border-radius: 50%;
+    width: 46px;
+    height: 46px;
+    flex: 0 0 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    cursor: pointer;
+}
+
+.facility-lb-close:hover,
+.facility-lb-nav:hover { background: rgba(255, 255, 255, .28); }
+.facility-lb-nav[hidden] { display: none; }
+
+.facility-lb-close { position: absolute; top: 1rem; right: 1rem; font-size: 1.8rem; line-height: 1; }
+
+@media (max-width: 575px) {
+    .facility-grid { grid-template-columns: 1fr; gap: 1.1rem; }
+    .facility-lightbox { flex-wrap: wrap; align-content: center; }
+    .facility-lb-figure { order: 1; width: 100%; }
+    .facility-lb-nav { order: 2; margin-top: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .facility-card, .facility-thumb img { transition: none; }
+    .facility-card:hover { transform: none; }
+    .facility-card:hover .facility-thumb img { transform: none; }
+}
+
+/* ---------- Extra-large desktops (>=1400px) ---------- */
+@media (min-width: 1400px) {
+    .template-hero { min-height: 560px; }
+    .template-title { font-size: 3rem; }
+}
+
+/* ---------- Small desktops / landscape tablets (<1200px) ---------- */
+@media (max-width: 1199px) {
+    .template-seal { margin-left: 40px; }
+}
+
+/* ---------- Tablets and below (<992px) ---------- */
+@media (max-width: 991px) {
+    /* Hero: let content decide the height, and keep text readable over the photo */
+    .hero-page.template-hero {
+        height: auto;
+        min-height: 0;
+        padding: 1.5rem 0 2.5rem;
+        background-position: 65% center;
+    }
+    .template-hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        background: linear-gradient(180deg, rgba(249, 246, 241, 0.90), rgba(249, 246, 241, 0.78));
+        pointer-events: none;
+    }
+    
+    /* --- CENTERING & JUSTIFYING TEXT UPDATES FOR MOBILE/TABLET --- */
+    .template-breadcrumb { 
+        margin-top: 0.5rem; 
+        justify-content: flex-start; /* Keep breadcrumbs aligned to the left */
+    }
+    .template-hero-content {
+        max-width: 100%;
+        margin-top: 1.5rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+    .template-badges {
+        margin-left: auto;
+        margin-right: auto;
+        justify-content: center;
+    }
+    .template-section-title {
+        text-align: center;
+    }
+    .template-section-title::after {
+        left: 50%;
+        transform: translateX(-50%);
+    }
+    /* Center and justify body/description texts */
+    .template-desc,
+    .template-section-text {
+        text-align: justify;
+    }
+    /* -------------------------------------------------------- */
+
+    .template-title { font-size: 2.2rem; }
+    .template-desc { max-width: 100%; margin-left: auto; margin-right: auto; }
+
+    /* Space below "About the Program" before the seal */
+    #about-program {
+        margin-bottom: 2rem;
+    }
+
+    /* Seal sits centered under Vision & Mission instead of being pushed sideways */
+    .template-seal {
+        margin: 0.5rem auto 0;
+        max-width: 240px;
+        display: block;
+    }
+
+    .corevalue-titlegroup { min-width: 220px; }
+}
+
+/* ---------- Large phones / small tablets (<768px) ---------- */
+@media (max-width: 767px) {
+    /* Section spacing (Bootstrap's py-5 is !important, so this must be too) */
+    .template-about,
+    .template-curriculum,
+    .template-uniform,
+    .template-career {
+        padding-top: 2.25rem !important;
+        padding-bottom: 2.25rem !important;
+    }
+
+    h2.template-section-title { font-size: 1.6rem; }
+    h3.template-section-title { font-size: 1.35rem; }
+
+    /* Hero badges become a tidy 2-column grid */
+    .template-badges {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem 1.25rem;
+        width: 100%;
+        padding: 1rem 1.15rem;
+    }
+
+    /* Core values: icon + letter/title on one row, description underneath */
+    .corevalue-card {
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem 1rem;
+    }
+    .corevalue-titlegroup {
+        flex: 1 1 auto;
+        min-width: 0;
+        border-right: none;
+        padding-right: 0;
+    }
+    .corevalue-text {
+        flex: 0 0 100%;
+        padding-left: 0;
+    }
+
+    /* Uniform cards: keep photos a comfortable size when single-column */
+    .template-uniform-card {
+        max-width: 420px;
+        margin-inline: auto;
+    }
+
+    /* CTA banner stacks and the button goes full width */
+    .template-cta-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+        padding: 1.25rem;
+    }
+    .template-cta-action { width: 100%; }
+    .template-cta-btn {
+        display: block;
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* ---------- Phones (<576px) ---------- */
+@media (max-width: 575px) {
+    .hero-page.template-hero { padding: 1rem 0 2rem; }
+    .template-breadcrumb { font-size: 0.68rem; }
+    
+    .template-title { 
+        font-size: 1.85rem; 
+        overflow-wrap: break-word; 
+        word-wrap: break-word; 
+        hyphens: auto; 
+    }
+    
+    .template-subtitle { font-size: 0.92rem; }
+    .template-desc { font-size: 0.85rem; margin-bottom: 1.25rem; }
+
+    .template-badges { padding: 0.9rem 1rem; }
+    .template-badge { gap: 0.5rem; justify-content: center; }
+    .template-badge strong { font-size: 0.8rem; }
+    .template-badge span { font-size: 0.7rem; }
+    .template-badge .template-badge-icon { width: 1.6rem; height: 1.6rem; font-size: 1.6rem; }
+
+
+    .corevalue-card { padding: 1.1rem; border-left-width: 4px; }
+    .corevalue-icon { width: 48px; height: 48px; }
+    .corevalue-icon .corevalue-icon-glyph { width: 1.6rem; height: 1.6rem; font-size: 1.6rem; }
+    .corevalue-letter { width: 40px; font-size: 2.25rem; }
+    .corevalue-title { font-size: 1.2rem; }
+    .corevalue-text { font-size: 0.88rem; }
+
+    .bulletin-panel { padding: 1.1rem; }
+
+    /* Lightbox controls stay reachable and clear of notches */
+    .uniform-lightbox-img { max-width: 94%; max-height: 75vh; }
+    .uniform-lightbox-caption { padding: 0 1rem; font-size: 0.88rem; }
+    .uniform-lightbox-close {
+        top: calc(10px + env(safe-area-inset-top, 0px));
+        right: 16px;
+        font-size: 2.2rem;
+        padding: 0.25rem 0.5rem;
+    }
+}
+
+/* ---------- Very small phones (<360px) ---------- */
+@media (max-width: 359px) {
+    .template-title { font-size: 1.6rem; }
+    .template-badges { grid-template-columns: 1fr; }
+    .corevalue-letter { font-size: 2rem; width: 34px; }
+}
+
+/* ---------- Touch devices: no sticky "hover lift" after tapping ---------- */
+@media (hover: none) {
+    .corevalue-card:hover {
+        transform: none;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+    }
+    .template-uniform-card:hover {
+        transform: none;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+}
+
+/* ---------- Respect "reduce motion" settings ---------- */
+@media (prefers-reduced-motion: reduce) {
+    .corevalue-card,
+    .template-uniform-card,
+    .uniform-lightbox,
+    .template-cta-btn,
+    .career-panel, .career-panel-bg, .career-content, .career-vlabel { transition: none; }
+    .corevalue-card:hover,
+    .template-uniform-card:hover { transform: none; }
+    .uniform-lightbox-img { animation: none; }
+}
+
+
+/* =====================================================================
+   PDF VIEWER (Program Curriculum) — responsive overrides
+   Scoped under .template-curriculum so they outrank pdf-viewer-style.css
+   (which the component loads later, inside the page body).
+   Written from the viewer's markup; see notes about the sidebar.
+   ===================================================================== */
+.template-curriculum .gnc-pdf-viewer {
+    width: 100%;
+    max-width: 100%;
+}
+
+.template-curriculum .gnc-pdf-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.template-curriculum .gnc-pdf-menu {
+    max-width: calc(100vw - 2rem);
+}
+
+/* Tablets and phones: two-row toolbar
+   Row 1: [thumbnails + title ............ download / print / more]
+   Row 2: [page number · zoom · fit / rotate]  (centered)            */
+@media (max-width: 767px) {
+    .template-curriculum .gnc-pdf-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.25rem 0.5rem;
+        height: auto;
+        padding: 0.4rem 0.5rem;
+    }
+    .template-curriculum .gnc-pdf-left {
+        order: 1;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        flex: 1 1 0;
+        min-width: 0;
+    }
+    .template-curriculum .gnc-pdf-right {
+        order: 2;
+        display: flex;
+        align-items: center;
+        flex: 0 0 auto;
+    }
+    .template-curriculum .gnc-pdf-center {
+        order: 3;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        flex: 0 0 100%;
+    }
+
+    /* Keep the reading area usable on short/tall phones */
+    .template-curriculum .gnc-pdf-body {
+        min-height: 360px;
+        max-height: 75vh;
+        max-height: 75dvh;
+    }
+}
+
+/* Small phones: trim what doesn't fit (rotate clockwise stays in the ⋮ menu) */
+@media (max-width: 479px) {
+    .template-curriculum .gnc-pdf-sep { display: none; }
+    .template-curriculum .gnc-pdf-pageinfo input[data-role="page-input"] { width: 2.75rem; }
+    .template-curriculum .gnc-pdf-zoom input[data-role="zoom-input"] { width: 3.5rem; }
+}
+
+/* Touch screens: comfortable tap targets */
+@media (pointer: coarse) {
+    .template-curriculum .gnc-pdf-icon,
+    .template-curriculum .gnc-pdf-step {
+        min-width: 40px;
+        min-height: 40px;
+    }
+}
+
+/* =====================================================================
+   Additions for the dynamic program page
+   ===================================================================== */
+.template-hero { background-color: var(--gnc-template-tint); }
+.template-curriculum-intro { color: #333; margin-bottom: 0; }
+.uniform-lightbox-close:hover { color: #fff; opacity: .8; }
+
+/* =====================================================================
+   DESIGN REFINEMENT LAYER — modern / minimalist
+   Visual-only overrides: colours, type, spacing finish, shadows, motion.
+   No layout properties (grid/flex structure, positions, sizes) are changed.
+   ===================================================================== */
+:root {
+    --ds-ink:        #14201a;
+    --ds-muted:      #5f6b65;
+    --ds-line:       rgba(20, 32, 26, 0.08);
+    --ds-surface:    #ffffff;
+    --ds-bg:         #faf8f4;
+    --ds-radius:     16px;
+    --ds-shadow-sm:  0 1px 2px rgba(20, 32, 26, 0.04), 0 4px 16px rgba(20, 32, 26, 0.04);
+    --ds-shadow-md:  0 2px 4px rgba(20, 32, 26, 0.04), 0 14px 36px rgba(20, 32, 26, 0.09);
+    --ds-ease:       cubic-bezier(.22, .8, .24, 1);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+    background-color: var(--ds-bg) !important;
+    color: var(--ds-ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+::selection { background: var(--gnc-gold); color: var(--ds-ink); }
+
+.template-about,
+.template-uniform,
+.template-curriculum,
+.template-career,
+.bulletin-board,
+.template-cta { background-color: var(--ds-bg); }
+.template-facilities { background: var(--gnc-cream, #F9F6F1); }
+
+/* ---------- Hero ---------- */
+.template-hero::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gnc-template), transparent);
+    opacity: .35;
+    z-index: 2;
+}
+
+.template-breadcrumb {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+}
+.template-breadcrumb a,
+.template-breadcrumb span { transition: opacity .2s ease, color .2s ease; }
+.template-breadcrumb a:hover { text-decoration: none; opacity: .65; }
+.template-breadcrumb span:last-child { opacity: .6; }
+
+.template-title {
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--gnc-template-text) 30%, var(--gnc-template-dark) 100%);
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.template-subtitle {
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    opacity: .9;
+}
+
+.template-desc {
+    color: var(--ds-ink);
+    line-height: 1.75;
+    opacity: .82;
+}
+
+.template-badges {
+    background: rgba(255, 255, 255, 0.85);
+    -webkit-backdrop-filter: blur(14px);
+            backdrop-filter: blur(14px);
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius);
+    box-shadow: var(--ds-shadow-md);
+}
+.template-badge .template-badge-icon {
+    background: var(--gnc-template-tint);
+    border-radius: 10px;
+    padding: .35rem;
+    box-sizing: content-box;
+    width: 1.5rem; height: 1.5rem; font-size: 1.5rem;
+}
+.template-badge strong { letter-spacing: 0.01em; }
+.template-badge span   { color: var(--ds-muted); }
+
+/* ---------- Section titles (kept as-is structurally, refined finish) ---------- */
+.template-section-title {
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--gnc-template-text);
+}
+.template-section-title::after {
+    width: 36px;
+    height: 3px;
+    border-radius: 3px;
+}
+.template-section-text { color: var(--ds-muted); }
+
+/* ---------- About ---------- */
+.about-feature-seal-wrap::before {
+    border-top-left-radius: 32px;
+    opacity: .95;
+}
+.about-feature-seal-wrap img {
+    filter: drop-shadow(0 18px 30px rgba(20, 32, 26, 0.14));
+}
+.about-eyebrow {
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    color: var(--gnc-template-text);
+}
+.about-heading {
+    color: var(--gnc-template-text);
+    letter-spacing: -0.02em;
+}
+.about-body { color: var(--ds-muted); line-height: 1.85; }
+
+/* ---------- Vision & Mission ----------
+   Ribbon-header cards. Every colour comes from the program's accent
+   (--gnc-template, set from what the admin picked), so each program page
+   recolours itself automatically. */
+.template-vm-stack {
+    --vm-dark:  color-mix(in srgb, var(--gnc-template) 55%, #000);   /* ribbon + icon disc */
+    --vm-mid:   color-mix(in srgb, var(--gnc-template) 78%, #000);   /* ribbon gradient end */
+    --vm-panel: color-mix(in srgb, var(--gnc-template) 9%, #fff);    /* soft tinted card */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3.25rem 2rem;
+    padding-top: 2rem;
+    margin-bottom: 0.5rem;
+}
+.template-vm-card {
+    position: relative;
+    flex: 1 1 340px;
+    display: block;
+    padding: 2.6rem 2rem 1.75rem;
+    /* building photo, washed out with the program's own tint so text stays readable */
+    background:
+        linear-gradient(180deg,
+            color-mix(in srgb, var(--gnc-template) 10%, rgba(255, 255, 255, .88)) 0%,
+            color-mix(in srgb, var(--gnc-template) 14%, rgba(255, 255, 255, .76)) 100%),
+        url('/assets/images/gnc-front-II.jpg') center bottom / cover no-repeat,
+        var(--vm-panel);
+    border: 0;
+    border-radius: 4px;            /* nearly sharp corners */
+    min-height: 15rem;
+    align-self: stretch;           /* side-by-side cards share the same height */
+    box-shadow: 0 6px 22px color-mix(in srgb, var(--gnc-template) 14%, transparent);
+    transition: transform .3s var(--ds-ease), box-shadow .3s var(--ds-ease);
+}
+.template-vm-card:only-child { max-width: 640px; margin-inline: auto; }
+.template-vm-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 34px color-mix(in srgb, var(--gnc-template) 22%, transparent);
+}
+
+/* Header: round icon badge overlapping a slanted ribbon */
+.template-vm-head {
+    position: absolute;
+    top: -2rem;
+    left: -0.9rem;
+    right: 1rem;
+    display: flex;
+    align-items: center;
+}
+.template-vm-icon {
+    position: relative;
+    z-index: 2;
+    flex: 0 0 auto;
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: var(--vm-dark);
+    border: 3px solid var(--gnc-gold);
+    box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .9), 0 4px 12px rgba(0, 0, 0, .22);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .3s var(--ds-ease);
+}
+.template-vm-card:hover .template-vm-icon { transform: scale(1.05); }
+.template-vm-icon .template-vm-icon-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    font-size: 1.9rem;
+    line-height: 1;
+    color: #fff;
+    overflow: hidden;
+}
+.template-vm-card-title {
+    position: relative;
+    z-index: 1;
+    margin: 0 0 0 -1.6rem;
+    padding: 0.75rem 3.4rem 0.75rem 2.4rem;
+    min-width: 11rem;
+    color: #fff;
+    font-family: 'Lora', 'Noto Serif', serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, var(--vm-dark), var(--vm-mid));
+    clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 100%, 0 100%);
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .18));
+}
+.template-vm-card-text {
+    margin: 0;
+    color: #2a3340;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    text-align: justify;
+    hyphens: auto;
+}
+
+/* ---------- Core values ---------- */
+.corevalue-subtitle { color: var(--ds-muted); }
+.corevalue-card {
+    border: 1px solid var(--ds-line);
+    border-left: 3px solid var(--gnc-template);
+    border-radius: var(--ds-radius);
+    box-shadow: var(--ds-shadow-sm);
+    transition: transform .3s var(--ds-ease), box-shadow .3s var(--ds-ease);
+}
+.corevalue-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--ds-shadow-md);
+}
+.corevalue-icon {
+    border-radius: 16px;
+    transition: transform .3s var(--ds-ease);
+}
+.corevalue-card:hover .corevalue-icon { transform: scale(1.06); }
+.corevalue-titlegroup { border-right-color: var(--ds-line); }
+.corevalue-letter {
+    font-family: 'Inter', sans-serif;
+    font-weight: bold;
+}
+.corevalue-title { font-weight: 700; letter-spacing: -0.01em; }
+.corevalue-text  { color: var(--ds-muted); }
+
+/* ---------- Why choose (dark section) ---------- */
+.template-why {
+    --why-bg: #07201a;
+    background-image:
+        radial-gradient(60% 50% at 85% 0%, rgba(234, 186, 59, 0.07), transparent 70%),
+        radial-gradient(50% 40% at 0% 100%, rgba(40, 120, 56, 0.16), transparent 70%);
+}
+.why-list,
+.why-item { border-color: rgba(255, 255, 255, 0.10); }
+.why-list { border-bottom-color: rgba(255, 255, 255, 0.10); }
+.why-item::before {
+    background: linear-gradient(90deg, rgba(234, 186, 59, 0.10), rgba(234, 186, 59, 0) 70%);
+}
+.why-num { -webkit-text-stroke: 1px rgba(234, 186, 59, 0.85); }
+.why-heading { letter-spacing: -0.02em; }
+.why-eyebrow { letter-spacing: 0.28em; }
+.why-intro,
+.why-desc { color: rgba(255, 255, 255, 0.62); }
+.why-item { transition: background-color .35s var(--ds-ease), padding-left .35s var(--ds-ease); }
+
+/* ---------- Curriculum / PDF viewer shell ---------- */
+.template-curriculum .gnc-pdf-viewer {
+    border-radius: var(--ds-radius);
+    overflow: hidden;
+    border: 1px solid var(--ds-line);
+    box-shadow: var(--ds-shadow-md);
+}
+
+/* ---------- Facilities ---------- */
+.facility-card {
+    border: 1px solid var(--ds-line);
+    border-top: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius);
+    box-shadow: var(--ds-shadow-sm);
+    transition: transform .35s var(--ds-ease), box-shadow .35s var(--ds-ease);
+    position: relative;
+}
+.facility-card::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 3px;
+    background: var(--gnc-template);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform .45s var(--ds-ease);
+    z-index: 1;
+}
+.facility-card:hover { transform: translateY(-4px); box-shadow: var(--ds-shadow-md); }
+.facility-card:hover::after { transform: scaleX(1); }
+.facility-thumb img { transition: transform .7s var(--ds-ease); }
+.facility-card:hover .facility-thumb img { transform: scale(1.06); }
+.facility-name { letter-spacing: -0.01em; color: var(--gnc-template-text); }
+.facility-desc { color: var(--ds-muted); }
+.facility-lightbox {
+    background: rgba(6, 32, 24, .92);
+    -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+}
+.facility-lb-figure img { border-radius: 14px; box-shadow: 0 24px 60px rgba(0, 0, 0, .5); }
+.facility-lb-close,
+.facility-lb-nav {
+    background: rgba(255, 255, 255, .10);
+    border: 1px solid rgba(255, 255, 255, .14);
+    transition: background-color .2s ease, transform .2s ease;
+}
+.facility-lb-nav:hover,
+.facility-lb-close:hover { transform: scale(1.06); }
+
+/* ---------- Uniform ---------- */
+.template-uniform-card {
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius);
+    box-shadow: var(--ds-shadow-sm);
+    transition: transform .35s var(--ds-ease), box-shadow .35s var(--ds-ease);
+}
+.template-uniform-card:hover { transform: translateY(-4px); box-shadow: var(--ds-shadow-md); }
+.template-uniform-card img { border-radius: 10px; transition: transform .6s var(--ds-ease); }
+.template-uniform-card:hover img { transform: scale(1.02); }
+.uniform-lightbox {
+    background: rgba(6, 32, 24, .93);
+    -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+}
+.uniform-lightbox-img { border-radius: 14px; }
+
+/* ---------- Career rail ---------- */
+.career-panel {
+    border-radius: 20px;
+    box-shadow: var(--ds-shadow-sm);
+    transition: flex-grow .6s var(--ds-ease), box-shadow .4s ease;
+}
+.career-panel.is-open { box-shadow: var(--ds-shadow-md); }
+.career-panel::before {
+    background: linear-gradient(to top, rgba(6, 32, 24, .92) 0%, rgba(6, 32, 24, .45) 45%, rgba(6, 32, 24, .15) 100%);
+}
+.career-index { font-weight: 600; letter-spacing: .16em; }
+.career-vlabel { font-weight: 600; letter-spacing: .06em; }
+.career-title  { letter-spacing: -0.01em; }
+.career-content::before { width: 36px; height: 2px; border-radius: 2px; }
+
+/* ---------- Bulletin board ---------- */
+.bulletin-heading { color: var(--gnc-template-text); letter-spacing: -0.015em; }
+.bulletin-heading::after { border-radius: 3px; }
+.bulletin-subtext { color: var(--ds-muted); }
+
+.bulletin-panel {
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius);
+    box-shadow: var(--ds-shadow-sm);
+}
+.col-lg-6:first-child .bulletin-panel { border-bottom: 1px solid var(--ds-line); box-shadow: var(--ds-shadow-sm), inset 0 -3px 0 var(--gnc-green-light); }
+.col-lg-6:last-child  .bulletin-panel { border-bottom: 1px solid var(--ds-line); box-shadow: var(--ds-shadow-sm), inset 0 -3px 0 var(--gnc-gold); }
+
+.bulletin-panel-title {
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+}
+.bulletin-item {
+    border-bottom-color: var(--ds-line);
+    border-radius: 10px;
+    transition: transform .25s var(--ds-ease);
+}
+.bulletin-item:hover { transform: translateX(4px); }
+.bulletin-item-icon {
+    border-radius: 12px;
+    background: var(--gnc-template-tint);
+    box-shadow: none;
+}
+.bulletin-item-icon i { color: var(--gnc-template-text); }
+.bulletin-item-title { color: var(--gnc-template-text); font-weight: 600; transition: color .2s ease; }
+.bulletin-item:hover .bulletin-item-title { opacity: .8; }
+.bulletin-item-title--gold { color: var(--gnc-gold); }
+.bulletin-item-excerpt { color: var(--ds-muted); }
+.bulletin-item-date,
+.bulletin-item-meta { color: #8b948f; }
+.bulletin-event-badge { border-radius: 12px; }
+.bulletin-panel-footer { border-top-color: var(--ds-line); }
+.bulletin-view-all { letter-spacing: .02em; transition: gap .25s var(--ds-ease), opacity .2s ease; }
+.bulletin-view-all:hover { text-decoration: none; gap: .65rem; opacity: .8; }
+.bulletin-empty { color: #9aa39e; }
+
+/* ---------- CTA ---------- */
+.template-cta-card {
+    border: 1px solid var(--ds-line);
+    border-left: 3px solid var(--gnc-template);
+    border-radius: var(--ds-radius);
+    box-shadow: var(--ds-shadow-sm);
+    transition: box-shadow .3s var(--ds-ease), transform .3s var(--ds-ease);
+}
+.template-cta-card:hover { box-shadow: var(--ds-shadow-md); transform: translateY(-2px); }
+.template-cta-title { font-size: 1rem; color: var(--gnc-template-text); letter-spacing: -0.01em; }
+.template-cta-desc  { color: var(--ds-muted); }
+.template-cta-btn {
+    border-radius: 999px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 0.65rem 1.7rem;
+    box-shadow: 0 6px 18px -6px var(--gnc-template);
+    transition: background-color .25s ease, transform .25s var(--ds-ease), box-shadow .25s ease;
+}
+.template-cta-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px -8px var(--gnc-template);
+}
+.template-cta-btn:active { transform: translateY(0); }
+.template-cta-btn:focus-visible,
+.facility-thumb:focus-visible { outline: 3px solid var(--gnc-gold); outline-offset: 3px; }
+
+/* ---------- Scroll-in reveal (pure CSS, no markup change) ---------- */
+@supports (animation-timeline: view()) {
+    .template-vm-card,
+    .corevalue-card,
+    .facility-card,
+    .template-uniform-card,
+    .bulletin-panel,
+    .template-cta-card,
+    .about-feature {
+        animation: ds-rise both var(--ds-ease);
+        animation-timeline: view();
+        animation-range: entry 0% entry 35%;
+    }
+    @keyframes ds-rise {
+        from { opacity: 0; transform: translateY(22px); }
+        to   { opacity: 1; transform: none; }
+    }
+}
+
+/* ---------- Mobile touch refinements ---------- */
+@media (hover: none) {
+    .template-vm-card:hover,
+    .facility-card:hover,
+    .template-cta-card:hover,
+    .bulletin-item:hover { transform: none; }
+    .facility-card:hover::after { transform: scaleX(0); }
+}
+
+@media (max-width: 767px) {
+    .template-badges { -webkit-backdrop-filter: none; backdrop-filter: none; background: #fff; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .template-vm-card, .template-vm-icon, .corevalue-card, .corevalue-icon,
+    .facility-card, .facility-card::after, .facility-thumb img,
+    .template-uniform-card, .template-uniform-card img,
+    .bulletin-item, .bulletin-view-all, .template-cta-card, .template-cta-btn { transition: none; animation: none; }
+    .template-vm-card:hover, .corevalue-card:hover, .facility-card:hover,
+    .template-uniform-card:hover, .template-cta-card:hover, .template-cta-btn:hover,
+    .bulletin-item:hover { transform: none; }
+}
+
+
+/* =====================================================================
+   WHY CHOOSE THIS PROGRAM — light version that matches the program page
+   (white surface, program-accent headings, hairline dividers).
+   Colours only: layout, fonts and sizes are untouched.
+   ===================================================================== */
+.template-why {
+    --why-bg: #ffffff;
+    --why-gold: var(--gnc-gold, #EABA3B);
+    background-color: #ffffff;
+    background-image:
+        radial-gradient(55% 45% at 92% 0%, var(--gnc-template-tint), transparent 70%),
+        radial-gradient(40% 35% at 0% 100%, rgba(234, 186, 59, 0.08), transparent 70%);
+    color: var(--ds-ink);
+    border-top: 1px solid rgba(20, 32, 26, 0.08);
+    border-bottom: 1px solid rgba(20, 32, 26, 0.08);
+}
+
+/* Eyebrow + heading */
+.why-eyebrow          { color: var(--gnc-template-text); }
+.why-eyebrow::after   { background: var(--gnc-gold); }
+.why-heading          { color: var(--gnc-template-text); }
+.why-dot              { color: var(--gnc-gold); }
+.why-intro            { color: var(--ds-muted); }
+
+/* Vertical progress rule: gold fill over a light track */
+.why-side::after {
+    background: linear-gradient(
+        to bottom,
+        var(--gnc-gold) 0,
+        var(--gnc-gold) calc(var(--why-progress) * 100%),
+        rgba(20, 32, 26, 0.10) calc(var(--why-progress) * 100%),
+        rgba(20, 32, 26, 0.10) 100%
+    );
+}
+
+/* Rows */
+.why-list             { border-bottom: 1px solid rgba(20, 32, 26, 0.10); }
+.why-item             { border-top: 1px solid rgba(20, 32, 26, 0.10); }
+.why-item::before     { background: linear-gradient(90deg, var(--gnc-template-tint), transparent 70%); }
+.why-item::after      { background: var(--gnc-template); }
+
+.why-num {
+    -webkit-text-stroke: 1px var(--gnc-template);
+    color: transparent;
+}
+.why-title            { color: var(--gnc-template-text); }
+.why-desc             { color: var(--ds-muted); }
+
+.why-item:hover .why-num   { color: var(--gnc-template-tint); -webkit-text-stroke-color: var(--gnc-template); }
+.why-item:hover .why-title { color: var(--gnc-template-dark); }
+.why-item:hover .why-desc  { color: var(--ds-ink); }
+
+/* Touch devices: undo hover colours using the light palette */
+@media (hover: none) {
+    .why-item:hover .why-desc  { color: var(--ds-muted); }
+    .why-item:hover .why-num   { color: transparent; }
+    .why-item:hover .why-title { color: var(--gnc-template-text); }
+}
+
+/* Tablet/phone: short gold bar under the intro stays gold */
+@media (max-width: 991px) {
+    .why-side::after { background: var(--gnc-gold); }
+}
+
+
+/* =====================================================================
+   SPINNING TEXT RING around the About-the-Program seal
+   (markup: <span class="about-seal-ring"> inside .about-feature-seal-wrap)
+   ===================================================================== */
+.about-seal-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 124.7%;               /* ring sits just outside the 340px seal */
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.about-seal-ring svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    animation: seal-ring-spin 32s linear infinite;
+}
+
+.about-seal-ring text {
+    font-family: 'Inter', sans-serif;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    fill: var(--gnc-template-text);
+}
+
+@keyframes seal-ring-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* room for the ring so the seal itself keeps its size */
+.about-feature-seal { flex: 0 0 424px; padding: 42px; }
+.about-feature { gap: 1rem; }
+
+@media (max-width: 991px) {
+    .about-feature-seal { flex-basis: auto; width: 100%; max-width: 328px; padding: 34px; }
+    .about-feature { gap: 1.25rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .about-seal-ring svg { animation: none; }
+}
+@media (max-width: 575px) {
+    .template-vm-stack { gap: 3rem; }
+    .template-vm-card { flex-basis: 100%; padding: 2.4rem 1.25rem 1.4rem; }
+    .template-vm-head { left: -0.5rem; right: 0.5rem; }
+    .template-vm-icon { width: 56px; height: 56px; }
+    .template-vm-icon .template-vm-icon-glyph { width: 1.6rem; height: 1.6rem; font-size: 1.6rem; }
+    .template-vm-card-title { font-size: 0.92rem; padding-right: 2.6rem; min-width: 0; }
+}
+
+/* =====================================================================
+   WHY CHOOSE — scrolling background photo (parallax)
+   The photo sits in a layer taller than the section and is nudged by
+   --why-shift (set from the scroll handler in program.php), so it drifts
+   slower than the content as you scroll.
+   ===================================================================== */
+.template-why {
+    position: relative;
+    overflow: clip;            /* clip the oversized layer without breaking the sticky heading */
+    isolation: isolate;
+}
+.template-why::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0;
+    top: -25%; bottom: -25%;
+    z-index: -1;
+    background:
+        linear-gradient(180deg,
+            color-mix(in srgb, color-mix(in srgb, var(--gnc-template) 30%, #000) 90%, transparent) 0%,
+            color-mix(in srgb, color-mix(in srgb, var(--gnc-template) 22%, #000) 94%, transparent) 100%),
+        url('/assets/images/DSC_2965.JPG') center / cover no-repeat;
+    transform: translate3d(0, var(--why-shift, 0px), 0);
+    will-change: transform;
+    pointer-events: none;
+}
+/* ---- Dark-blue theme for the Why Choose section: light text on navy ---- */
+.template-why {
+    --why-bg: color-mix(in srgb, var(--gnc-template) 26%, #000);   /* follows the program's colour */
+    background-color: var(--why-bg);
+    color: #fff;
+    border-top: 0;
+    border-bottom: 0;
+}
+.why-eyebrow          { color: var(--gnc-gold); }
+.why-heading          { color: #fff; }
+.why-intro            { color: rgba(255, 255, 255, 0.78); }
+.why-title            { color: #fff; }
+.why-desc             { color: rgba(255, 255, 255, 0.72); }
+.why-num              { -webkit-text-stroke: 1px var(--gnc-gold); color: transparent; }
+.why-list             { border-bottom-color: rgba(255, 255, 255, 0.18); }
+.why-item             { border-top-color: rgba(255, 255, 255, 0.18); }
+.why-item::before     { background: linear-gradient(90deg, rgba(234, 186, 59, 0.14), transparent 70%); }
+.why-item::after      { background: var(--gnc-gold); }
+.why-side::after {
+    background: linear-gradient(
+        to bottom,
+        var(--gnc-gold) 0,
+        var(--gnc-gold) calc(var(--why-progress) * 100%),
+        rgba(255, 255, 255, 0.18) calc(var(--why-progress) * 100%),
+        rgba(255, 255, 255, 0.18) 100%
+    );
+}
+.why-item:hover .why-num   { color: var(--gnc-gold); -webkit-text-stroke-color: var(--gnc-gold); }
+.why-item:hover .why-title { color: var(--gnc-gold); }
+.why-item:hover .why-desc  { color: #fff; }
+
+@media (hover: none) {
+    .why-item:hover .why-desc  { color: rgba(255, 255, 255, 0.72); }
+    .why-item:hover .why-num   { color: transparent; }
+    .why-item:hover .why-title { color: #fff; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .template-why::before { transform: none; }
+}
+
+/* =====================================================================
+   CAREER OPPORTUNITIES — centered Noto Serif heading
+   Flanked by two gold rules that fade out toward the edges, each ending
+   in a small dot beside the title. Replaces the short left-aligned bar.
+   ===================================================================== */
+.template-career .template-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.1rem;
+    text-align: center;
+    font-family: 'Noto Serif', serif;
+    font-weight: 800;
+    font-size: clamp(1.9rem, 4.2vw, 2.9rem);
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    padding-bottom: 0;
+    margin: 0 0 0.5rem;
+    color: var(--gnc-template-text);
+}
+.template-career .template-section-title::before,
+.template-career .template-section-title::after {
+    content: "";
+    position: static;
+    transform: none;
+    flex: 1 1 0;
+    min-width: 24px;
+    max-width: 170px;
+    width: auto;
+    height: 8px;
+    border-radius: 0;
+}
+.template-career .template-section-title::before {
+    background:
+        radial-gradient(circle at calc(100% - 4px) 50%, var(--gnc-gold) 0 3.5px, transparent 4px),
+        linear-gradient(90deg, transparent, var(--gnc-gold)) center / 100% 1.5px no-repeat;
+}
+.template-career .template-section-title::after {
+    background:
+        radial-gradient(circle at 4px 50%, var(--gnc-gold) 0 3.5px, transparent 4px),
+        linear-gradient(270deg, transparent, var(--gnc-gold)) center / 100% 1.5px no-repeat;
+}
+.template-career .career-rail { margin-top: 2.25rem; }
+
+@media (max-width: 575px) {
+    .template-career .template-section-title { gap: 0.7rem; }
+    .template-career .template-section-title::before,
+    .template-career .template-section-title::after { max-width: 44px; min-width: 16px; }
+}
+/* =====================================================================
+   BULLETIN BOARD - centered serif heading with ornament
+   ===================================================================== */
+.bulletin-heading {
+    display: block;
+    text-align: center;
+    font-family: 'Noto Serif', Georgia, serif;
+    font-weight: 800;
+    font-size: clamp(2.1rem, 4.2vw, 3rem);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 1.6rem;
+    padding-bottom: 1.35rem;
+}
+
+/* gold rule with a gap in the middle (the diamond sits in the gap) */
+.bulletin-heading::after {
+    left: 50%;
+    transform: translateX(-50%);
+    width: 150px;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg,
+        var(--gnc-gold) 0 calc(50% - 14px),
+        transparent calc(50% - 14px) calc(50% + 14px),
+        var(--gnc-gold) calc(50% + 14px) 100%);
+}
+
+/* diamond ornament */
+.bulletin-heading::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -4px;
+    width: 10px;
+    height: 10px;
+    background: var(--gnc-gold);
+    transform: translateX(-50%) rotate(45deg);
+    box-shadow: 0 0 0 4px var(--ds-bg, var(--gnc-cream, #F9F6F1));
+    outline: 2px solid var(--gnc-template-text);
+    outline-offset: -5px;
+}
+
+.bulletin-subtext {
+    text-align: center;
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+    font-style: italic;
+    color: #3d3d3d;
+}
+
+/* =====================================================================
+   BULLETIN BOARD - panels restyled to match the Bulletin page
+   (solid green header card + white events card, square date tiles,
+   serif titles). Scoped with #bulletin-board so it wins over the
+   earlier bulletin rules above.
+   ===================================================================== */
+#bulletin-board .col-lg-6 .bulletin-panel {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(20, 32, 26, 0.04), 0 12px 32px rgba(20, 32, 26, 0.08);
+}
+
+/* ---- Panel headers ---- */
+#bulletin-board .bulletin-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 1.1rem 1.5rem;
+}
+#bulletin-board .bulletin-panel-header--solid {
+    background: var(--gnc-green);
+    border-bottom: 3px solid var(--gnc-gold);
+}
+#bulletin-board .bulletin-panel-header--light {
+    background: #fff;
+    border-bottom: 1px solid var(--ds-line);
+    padding-bottom: calc(1.1rem + 2px); /* keeps both headers the same height */
+}
+#bulletin-board .bulletin-panel-icon {
+    color: var(--gnc-gold);
+    font-size: 1.2rem;
+    line-height: 1;
+}
+#bulletin-board .bulletin-panel-title {
+    font-family: 'Noto Serif', Georgia, serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--gnc-green);
+}
+#bulletin-board .bulletin-panel-header--solid .bulletin-panel-title { color: #fff; }
+#bulletin-board .bulletin-panel-count {
+    margin-left: auto;
+    min-width: 26px;
+    padding: 0.15rem 0.5rem;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--ds-ink);
+    background: var(--gnc-gold);
+    border-radius: 2px;
+}
+
+/* ---- Lists / rows ---- */
+#bulletin-board .bulletin-list {
+    gap: 0;
+    padding: 0.35rem 1.5rem 0;
+}
+#bulletin-board .bulletin-item {
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--ds-line);
+}
+#bulletin-board .bulletin-item:last-child { border-bottom: 0; }
+#bulletin-board .bulletin-item:hover { transform: none; }
+
+/* announcement tile (like the program-code chips) */
+#bulletin-board .bulletin-item-icon {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    border-radius: 2px;
+    background: #e4ede6;
+    box-shadow: none;
+}
+#bulletin-board .bulletin-item-icon i { color: var(--gnc-green); font-size: 1rem; }
+
+#bulletin-board .bulletin-item-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--gnc-green);
+}
+#bulletin-board .bulletin-item:hover .bulletin-item-title { opacity: 1; color: var(--gnc-green-mid); }
+#bulletin-board .bulletin-item-excerpt { font-size: 0.85rem; color: var(--ds-muted); }
+#bulletin-board .bulletin-item-date,
+#bulletin-board .bulletin-item-meta { font-size: 0.8rem; color: #7b857f; gap: 0.4rem; }
+
+/* ---- Event rows: serif title + paper date tile ---- */
+#bulletin-board .bulletin-event-item { align-items: center; }
+#bulletin-board .bulletin-event-badge,
+#bulletin-board .bulletin-event-badge.badge-green,
+#bulletin-board .bulletin-event-badge.badge-gold,
+#bulletin-board .bulletin-event-badge.badge-maroon {
+    flex: 0 0 62px;
+    width: 62px;
+    height: 66px;
+    gap: 0.3rem;
+    flex-direction: column-reverse;   /* big day on top, month underneath */
+    background: #fff;
+    border-radius: 0;
+    border-top: 4px solid var(--gnc-green);
+    box-shadow: 0 1px 8px rgba(20, 32, 26, 0.12);
+}
+#bulletin-board .bulletin-event-day {
+    font-family: 'Noto Serif', Georgia, serif;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--gnc-green);
+}
+#bulletin-board .bulletin-event-month {
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    color: #c8961a;
+}
+#bulletin-board .bulletin-item-title--gold {
+    font-family: 'Noto Serif', Georgia, serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--gnc-green);
+}
+#bulletin-board .bulletin-event-item:hover .bulletin-item-title--gold { color: var(--gnc-green-mid); }
+
+/* ---- Footer ---- */
+#bulletin-board .bulletin-panel-footer {
+    margin-top: auto;
+    padding: 1rem 1.5rem;
+    background: var(--ds-bg);
+    border-top: 1px solid var(--ds-line);
+}
+#bulletin-board .bulletin-view-all,
+#bulletin-board .bulletin-view-all--green,
+#bulletin-board .bulletin-view-all--gold {
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gnc-green);
+}
+
+#bulletin-board .bulletin-empty { padding: 3rem 1.5rem; }
+
+@media (max-width: 575.98px) {
+    #bulletin-board .bulletin-panel-header { padding: 0.95rem 1.1rem; }
+    #bulletin-board .bulletin-list { padding: 0.25rem 1.1rem 0; }
+    #bulletin-board .bulletin-panel-footer { padding: 0.9rem 1.1rem; }
+}
+
+/* =====================================================================
+   ANIMATIONS
+   1) Page-load entrance for the hero (pure CSS)
+   2) Scroll-reveal for every section (class "js-anim" is added to <html>
+      by program.php; the script there tags elements with data-anim and
+      adds .in-view when they scroll into view, then removes the tag so
+      normal hover effects take over again)
+   3) Hover micro-interactions, CTA pulse
+   Everything is switched off under prefers-reduced-motion.
+   ===================================================================== */
+
+@keyframes anim-fade-up   { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes anim-fade-in   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes anim-pop       { from { opacity: 0; transform: scale(.85) translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes anim-float     { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes anim-pulse     {
+    0%   { box-shadow: 0 6px 18px -6px var(--gnc-template), 0 0 0 0 var(--gnc-template-tint); }
+    70%  { box-shadow: 0 6px 18px -6px var(--gnc-template), 0 0 0 14px rgba(0, 0, 0, 0); }
+    100% { box-shadow: 0 6px 18px -6px var(--gnc-template), 0 0 0 0 rgba(0, 0, 0, 0); }
+}
+@keyframes anim-sweep     { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ---------- 1) Hero entrance ---------- */
+.template-breadcrumb         { animation: anim-fade-up .7s var(--ds-ease) .05s both; }
+.template-title             { animation: anim-fade-up .8s var(--ds-ease) .18s both; }
+.template-subtitle          { animation: anim-fade-up .8s var(--ds-ease) .30s both; }
+.template-desc              { animation: anim-fade-up .8s var(--ds-ease) .42s both; }
+.template-badges            { animation: anim-fade-up .8s var(--ds-ease) .55s both; }
+.template-badge             { animation: anim-pop .6s var(--ds-ease) both; }
+.template-badge:nth-child(1) { animation-delay: .70s; }
+.template-badge:nth-child(2) { animation-delay: .80s; }
+.template-badge:nth-child(3) { animation-delay: .90s; }
+.template-badge:nth-child(4) { animation-delay: 1.00s; }
+.template-badge:nth-child(n+5) { animation-delay: 1.10s; }
+
+/* hero bottom hairline draws itself in */
+.template-hero::after { transform-origin: left; animation: anim-sweep 1.2s var(--ds-ease) .6s both; }
+
+/* ---------- 2) Scroll reveal ---------- */
+.js-anim [data-anim] {
+    opacity: 0;
+    transition: opacity .8s var(--ds-ease), transform .8s var(--ds-ease);
+    transition-delay: var(--anim-delay, 0s);
+    will-change: opacity, transform;
+}
+.js-anim [data-anim="up"]    { transform: translateY(28px); }
+.js-anim [data-anim="left"]  { transform: translateX(-36px); }
+.js-anim [data-anim="right"] { transform: translateX(36px); }
+.js-anim [data-anim="zoom"]  { transform: scale(.88); }
+.js-anim [data-anim].in-view { opacity: 1; transform: none; }
+
+/* The older CSS-only scroll-reveal (animation-timeline) is replaced by the
+   system above. Its "fill: both" also pinned transform:none and blocked the
+   hover lift on cards, so switch it off here. */
+@supports (animation-timeline: view()) {
+    .template-vm-card,
+    .corevalue-card,
+    .facility-card,
+    .template-uniform-card,
+    .bulletin-panel,
+    .template-cta-card,
+    .about-feature {
+        animation: none;
+        animation-timeline: auto;
+    }
+}
+
+/* Section underlines grow in when their title is revealed */
+.js-anim .template-section-title[data-anim]:not(.in-view)::after { transform: scaleX(0); }
+.template-section-title::after { transform-origin: left; }
+.template-section-title.in-view::after { animation: anim-sweep .8s var(--ds-ease) .25s both; }
+
+/* ---------- Hover / idle micro-interactions ---------- */
+.template-badge { transition: transform .3s var(--ds-ease); }
+.template-badge:hover { transform: translateY(-3px); }
+.template-badge .template-badge-icon { transition: transform .4s var(--ds-ease), background-color .3s ease; }
+.template-badge:hover .template-badge-icon { transform: rotate(-8deg) scale(1.12); }
+
+.template-cta-icon .template-cta-glyph { animation: anim-float 3.4s ease-in-out infinite; }
+.template-cta-btn { animation: anim-pulse 2.8s ease-out 1.5s infinite; }
+.template-cta-btn:hover { animation-play-state: paused; }
+
+.corevalue-card:hover .corevalue-letter { transform: scale(1.12); }
+.corevalue-letter { transition: transform .35s var(--ds-ease); display: inline-block; transform-origin: left center; }
+
+.about-feature-seal-wrap::before { transition: transform .6s var(--ds-ease); }
+.about-feature-seal-wrap:hover::before { transform: translate(-6px, -6px); }
+
+.bulletin-event-badge { transition: transform .3s var(--ds-ease); }
+.bulletin-item:hover .bulletin-event-badge { transform: rotate(-4deg) scale(1.06); }
+.bulletin-item-icon { transition: transform .3s var(--ds-ease); }
+.bulletin-item:hover .bulletin-item-icon { transform: scale(1.08); }
+
+.why-item:hover .why-num { transform: translateX(6px); }
+.why-num { transition: color .3s ease, transform .4s var(--ds-ease); }
+
+/* ---------- Reduced motion: no entrance, no reveal, no loops ---------- */
+@media (prefers-reduced-motion: reduce) {
+    .template-breadcrumb, .template-title, .template-subtitle, .template-desc,
+    .template-badges, .template-badge, .template-hero::after,
+    .template-cta-icon .template-cta-glyph, .template-cta-btn,
+    .template-section-title.in-view::after { animation: none; }
+    .js-anim [data-anim] { opacity: 1; transform: none; transition: none; }
+    .template-badge:hover, .template-badge:hover .template-badge-icon,
+    .corevalue-card:hover .corevalue-letter, .why-item:hover .why-num,
+    .bulletin-item:hover .bulletin-event-badge, .bulletin-item:hover .bulletin-item-icon,
+    .about-feature-seal-wrap:hover::before { transform: none; }
+}
+
+/* =====================================================================
+   FACILITIES + UNIFORM + CURRICULUM - centered heading (same style as Career Opportunities)
+   ===================================================================== */
+.template-facilities .template-section-title,
+.template-uniform .template-section-title,
+.template-curriculum .template-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.1rem;
+    text-align: center;
+    font-family: 'Noto Serif', serif;
+    font-weight: 800;
+    font-size: clamp(1.9rem, 4.2vw, 2.9rem);
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    padding-bottom: 0;
+    margin: 0 0 0.5rem;
+    color: var(--gnc-template-text);
+}
+.template-facilities .template-section-title::before,
+.template-facilities .template-section-title::after,
+.template-uniform .template-section-title::before,
+.template-uniform .template-section-title::after,
+.template-curriculum .template-section-title::before,
+.template-curriculum .template-section-title::after {
+    content: "";
+    position: static;
+    transform: none;
+    flex: 1 1 0;
+    min-width: 24px;
+    max-width: 170px;
+    width: auto;
+    height: 8px;
+    border-radius: 0;
+}
+.template-facilities .template-section-title::before,
+.template-uniform .template-section-title::before,
+.template-curriculum .template-section-title::before {
+    background:
+        radial-gradient(circle at calc(100% - 4px) 50%, var(--gnc-gold) 0 3.5px, transparent 4px),
+        linear-gradient(90deg, transparent, var(--gnc-gold)) center / 100% 1.5px no-repeat;
+}
+.template-facilities .template-section-title::after,
+.template-uniform .template-section-title::after,
+.template-curriculum .template-section-title::after {
+    background:
+        radial-gradient(circle at 4px 50%, var(--gnc-gold) 0 3.5px, transparent 4px),
+        linear-gradient(270deg, transparent, var(--gnc-gold)) center / 100% 1.5px no-repeat;
+}
+@media (max-width: 575px) {
+    .template-facilities .template-section-title,
+    .template-uniform .template-section-title,
+    .template-curriculum .template-section-title { gap: 0.7rem; }
+    .template-facilities .template-section-title::before,
+    .template-facilities .template-section-title::after,
+    .template-uniform .template-section-title::before,
+    .template-uniform .template-section-title::after,
+    .template-curriculum .template-section-title::before,
+    .template-curriculum .template-section-title::after { max-width: 44px; min-width: 16px; }
+}
+
+/* paragraph under the Uniform heading follows the centred heading */
+.template-uniform .container > p { text-align: center; max-width: 720px; margin-left: auto; margin-right: auto; }
+
+/* =====================================================================
+   FACILITIES - coverflow carousel
+   Centre photo is full size; neighbours shrink and tuck behind it.
+   program.php sets data-pos on each slide: -2, -1, 0, 1, 2 or "hide".
+   ===================================================================== */
+.fcar {
+    position: relative;
+    margin-top: 2rem;
+}
+
+.fcar-stage {
+    position: relative;
+    height: clamp(260px, 36vw, 440px);
+    overflow: hidden;
+    outline: none;
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.fcar-slide {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 46%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate3d(-50%, 0, 0) scale(1);
+    /* Light animation: only transform + opacity (compositor-only, no repaint),
+       short and snappy. No shadow, no overlay, no clipping on the moving layer. */
+    transition: transform .36s cubic-bezier(.22, .61, .36, 1), opacity .36s linear;
+    will-change: transform, opacity;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.fcar-slide img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 14px;
+    pointer-events: none;
+    -webkit-user-drag: none;
+}
+
+/* Three photos on stage: centre + one each side (sides are smaller and slightly faded).
+   program.php sets data-pos: -1, 0, 1, or hide-l / hide-r for everything else. */
+.fcar-slide[data-pos="0"]  { opacity: 1;   pointer-events: auto; z-index: 5; cursor: zoom-in; transform: translate3d(-50%, 0, 0) scale(1); }
+.fcar-slide[data-pos="-1"] { opacity: .6;  pointer-events: auto; z-index: 4; transform: translate3d(calc(-50% - 62%), 0, 0) scale(.8); }
+.fcar-slide[data-pos="1"]  { opacity: .6;  pointer-events: auto; z-index: 4; transform: translate3d(calc(-50% + 62%), 0, 0) scale(.8); }
+.fcar-slide[data-pos="hide-l"] { opacity: 0; pointer-events: none; z-index: 1; transform: translate3d(calc(-50% - 90%), 0, 0) scale(.65); }
+.fcar-slide[data-pos="hide-r"] { opacity: 0; pointer-events: none; z-index: 1; transform: translate3d(calc(-50% + 90%), 0, 0) scale(.65); }
+/* program.php adds this for one frame to move a hidden/wrapping slide with no animation */
+.fcar-slide.is-jump { transition: none !important; }
+
+.fcar-slide:focus-visible { outline: 3px solid var(--gnc-gold); outline-offset: -3px; }
+
+/* facility name sits on the centre photo only */
+.fcar-caption {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 2.2rem 1.1rem 0.9rem;
+    border-radius: 0 0 14px 14px;
+    text-align: left;
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.01em;
+    background: linear-gradient(to top, rgba(6, 32, 24, .82), rgba(6, 32, 24, 0));
+    opacity: 0;
+    transition: opacity .25s ease .1s;
+}
+.fcar-slide[data-pos="0"] .fcar-caption { opacity: 1; }
+
+/* arrows */
+.fcar-arrow {
+    position: absolute;
+    top: calc(clamp(260px, 36vw, 440px) / 2);
+    transform: translateY(-50%);
+    z-index: 10;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    color: var(--gnc-template-text);
+    background: rgba(255, 255, 255, .92);
+    box-shadow: var(--ds-shadow-md, 0 6px 18px rgba(0, 0, 0, .15));
+    cursor: pointer;
+    transition: background-color .2s ease, color .2s ease, transform .2s ease;
+}
+.fcar-arrow:hover { background: var(--gnc-template); color: #fff; transform: translateY(-50%) scale(1.07); }
+.fcar-arrow:focus-visible { outline: 3px solid var(--gnc-gold); outline-offset: 2px; }
+.fcar-prev { left: 0; }
+.fcar-next { right: 0; }
+
+/* dots */
+.fcar-dots {
+    display: flex;
+    justify-content: center;
+    gap: .6rem;
+    margin-top: 1.4rem;
+}
+.fcar-dot {
+    width: 11px;
+    height: 11px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--gnc-template, #307056);
+    background: transparent;
+    cursor: pointer;
+    transition: background-color .25s ease, transform .25s ease, width .3s var(--ds-ease, ease);
+}
+.fcar-dot:hover { transform: scale(1.2); }
+.fcar-dot.is-active { background: var(--gnc-gold); border-color: var(--gnc-gold); width: 26px; border-radius: 999px; }
+.fcar-dot:focus-visible { outline: 3px solid var(--gnc-gold); outline-offset: 3px; }
+
+@media (max-width: 767px) {
+    .fcar-slide { width: 66%; }
+    .fcar-slide[data-pos="-1"] { transform: translate3d(calc(-50% - 56%), 0, 0) scale(.78); }
+    .fcar-slide[data-pos="1"]  { transform: translate3d(calc(-50% + 56%), 0, 0) scale(.78); }
+    .fcar-arrow { width: 38px; height: 38px; }
+}
+
+@media (hover: none) {
+    .fcar-arrow:hover { background: rgba(255, 255, 255, .92); color: var(--gnc-template-text); transform: translateY(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fcar-slide, .fcar-caption, .fcar-dot, .fcar-arrow { transition: none; }
+}
+
+/* =====================================================================
+   WHY CHOOSE: smooth scrolling, hover effects kept
+   - Removed the scroll-driven parallax photo and gold progress fill
+     (they repainted the whole section on every scroll).
+   - The hover effects are unchanged to look at, but now only animate
+     opacity and transform (handled by the GPU) instead of padding, which
+     forced the page to re-layout on every frame.
+   ===================================================================== */
+.template-why::before {            /* background photo: static, normal size */
+    top: 0;
+    bottom: 0;
+    transform: none;
+    will-change: auto;
+}
+.why-side::after { background: rgba(255, 255, 255, 0.18); }   /* static line */
+
+/* the row no longer animates its padding; its contents slide instead */
+.why-item { transition: none; }
+.why-item:hover,
+.why-item:focus-within { padding-left: 0; }
+.why-num  { transition: transform 0.3s ease, color 0.3s ease; }
+.why-body { transition: transform 0.3s ease; }
+.why-item:hover .why-num,
+.why-item:focus-within .why-num,
+.why-item:hover .why-body,
+.why-item:focus-within .why-body { transform: translateX(1.25rem); }
+
+@media (hover: none) {
+    .why-item:hover .why-num,
+    .why-item:hover .why-body { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .why-num, .why-body { transition: none; }
+}

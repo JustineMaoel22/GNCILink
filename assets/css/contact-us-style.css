@@ -1,0 +1,327 @@
+/* Place at /assets/css/contact-us-style.css
+   Every rule is scoped under .gnc-contact and the colour variables live on
+   .gnc-contact (NOT :root), so nothing here can leak into the navbar or footer. */
+
+.gnc-contact {
+    --gnc-green: #0b4228;
+    --gnc-green-light: #1F5E2C;
+    --gnc-gold: #d3a63a;
+    --gnc-tint: #eaf5ee;
+    --gnc-line: rgba(9, 64, 36, .15);
+    --gnc-danger: #b3261e;
+    font-family: 'Inter', sans-serif;
+    background: #fff;
+}
+
+/* ---------- Page banner ---------- */
+.gnc-contact .gnc-contact-hero {
+    background: var(--gnc-green);
+    color: #fff;
+    text-align: center;
+    padding: clamp(3rem, 7vw, 5.5rem) 1rem clamp(4rem, 8vw, 6.5rem);
+    position: relative;
+    overflow: hidden;
+}
+.gnc-contact .gnc-contact-hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+        radial-gradient(circle at 15% 20%, rgba(211, 166, 58, .16), transparent 45%),
+        radial-gradient(circle at 85% 80%, rgba(255, 255, 255, .07), transparent 40%);
+    pointer-events: none;
+}
+.gnc-contact .gnc-contact-kicker {
+    position: relative;
+    display: inline-flex; align-items: center; gap: .5rem;
+    font-size: .75rem; font-weight: 600;
+    letter-spacing: .28em; text-transform: uppercase;
+    color: var(--gnc-gold);
+}
+.gnc-contact .gnc-contact-title {
+    position: relative;
+    font-family: 'Noto Serif', serif;
+    font-weight: 700;
+    font-size: clamp(2.4rem, 6vw, 4rem);
+    line-height: 1.1; letter-spacing: 0;
+    margin: .6rem 0 .8rem;
+    color: #fff;
+}
+.gnc-contact .gnc-contact-title span { color: var(--gnc-gold); }
+.gnc-contact .gnc-contact-lead {
+    position: relative;
+    max-width: 560px; margin: 0 auto;
+    color: rgba(255, 255, 255, .8);
+    font-family: 'Noto Serif', serif; font-size: 1rem;
+}
+
+/* ---------- Main section ---------- */
+.gnc-contact .gnc-contact-sec { padding: 0 0 4rem; background: #fff; }
+.gnc-contact .gnc-contact-grid { margin-top: -3.5rem; position: relative; z-index: 2; }
+
+/* ---------- Info panel ---------- */
+.gnc-contact .gnc-contact-info {
+    background: var(--gnc-green-light);
+    color: #fff;
+    border-radius: 14px;
+    padding: 2.2rem 2rem;
+    height: 100%;
+    box-shadow: 0 18px 40px rgba(9, 64, 36, .22);
+}
+.gnc-contact .gnc-contact-info h2 {
+    font-family: 'Noto Serif', serif;
+    font-weight: 700; font-size: 1.6rem; letter-spacing: 0;
+    margin: 0 0 .4rem; color: #fff;
+}
+.gnc-contact .gnc-contact-info > p { color: rgba(255, 255, 255, .78); font-size: .92rem; margin-bottom: 1.6rem; }
+
+.gnc-contact .gnc-contact-item { display: flex; gap: 1rem; margin-bottom: 1.35rem; }
+.gnc-contact .gnc-contact-icon {
+    flex: none; width: 42px; height: 42px; border-radius: 50%;
+    background: rgba(211, 166, 58, .18);
+    color: var(--gnc-gold);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.05rem;
+}
+.gnc-contact .gnc-contact-item h3 {
+    font-family: 'Inter', sans-serif; font-size: .72rem; font-weight: 600;
+    letter-spacing: .16em; text-transform: uppercase;
+    color: var(--gnc-gold); margin: 0 0 .15rem;
+}
+.gnc-contact .gnc-contact-item p,
+.gnc-contact .gnc-contact-item a {
+    margin: 0; color: #fff; font-size: .95rem; text-decoration: none; word-break: break-word;
+}
+.gnc-contact .gnc-contact-item a:hover { color: var(--gnc-gold); }
+
+.gnc-contact .gnc-contact-links {
+    display: flex; flex-wrap: wrap; gap: .7rem;
+    margin-top: 1.8rem; padding-top: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, .18);
+}
+.gnc-contact .gnc-contact-pill {
+    display: inline-flex; align-items: center; gap: .5rem;
+    padding: .6rem 1.1rem; border-radius: 999px;
+    font-size: .85rem; font-weight: 600; text-decoration: none;
+    transition: transform .15s ease, background .15s ease;
+}
+.gnc-contact .gnc-contact-pill:hover { transform: translateY(-2px); }
+.gnc-contact .gnc-contact-pill--gold { background: var(--gnc-gold); color: var(--gnc-green); }
+.gnc-contact .gnc-contact-pill--gold:hover { background: #e0b94f; color: var(--gnc-green); }
+.gnc-contact .gnc-contact-pill--line { border: 1px solid rgba(255, 255, 255, .45); color: #fff; }
+.gnc-contact .gnc-contact-pill--line:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+
+/* ---------- Form card ---------- */
+.gnc-contact .gnc-contact-card {
+    background: #fff;
+    border: 1px solid var(--gnc-line);
+    border-radius: 14px;
+    padding: 2.4rem;
+    height: 100%;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, .08);
+}
+.gnc-contact .gnc-contact-card h2 {
+    font-family: 'Noto Serif', serif;
+    font-weight: 700; font-size: 1.6rem; letter-spacing: 0;
+    color: var(--gnc-green); margin: 0 0 .3rem;
+}
+.gnc-contact .gnc-contact-card > p { color: #6b7280; font-size: .92rem; margin-bottom: 1.5rem; }
+
+.gnc-contact .gnc-field { margin-bottom: 1.2rem; }
+.gnc-contact .gnc-field label {
+    display: block; margin-bottom: .4rem;
+    font-size: .72rem; font-weight: 600;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--gnc-green);
+}
+.gnc-contact .gnc-field label .req { color: var(--gnc-danger); }
+.gnc-contact .gnc-field input,
+.gnc-contact .gnc-field textarea {
+    display: block; width: 100%;
+    background: #f7faf8;
+    border: 1px solid var(--gnc-line);
+    border-radius: 8px;
+    padding: .8rem 1rem;
+    font-family: 'Inter', sans-serif; font-size: .95rem; color: #1a1a1a;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.gnc-contact .gnc-field textarea { min-height: 150px; resize: vertical; line-height: 1.6; }
+.gnc-contact .gnc-field input::placeholder,
+.gnc-contact .gnc-field textarea::placeholder { color: #8a8a84; }
+.gnc-contact .gnc-field input:focus,
+.gnc-contact .gnc-field textarea:focus {
+    outline: none; background: #fff;
+    border-color: var(--gnc-green-light);
+    box-shadow: 0 0 0 3px rgba(31, 94, 44, .18);
+}
+
+.gnc-contact .gnc-contact-submit {
+    display: inline-flex; align-items: center; justify-content: center; gap: .6rem;
+    width: 100%;
+    background: var(--gnc-green); color: #fff;
+    border: 0; border-radius: 8px; padding: .95rem 1.4rem;
+    font-family: 'Inter', sans-serif; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    cursor: pointer; transition: background .15s, transform .15s;
+}
+.gnc-contact .gnc-contact-submit:hover { background: var(--gnc-green-light); transform: translateY(-2px); }
+.gnc-contact .gnc-contact-submit:focus-visible { outline: 3px solid var(--gnc-gold); outline-offset: 3px; }
+.gnc-contact .gnc-contact-submit i { color: var(--gnc-gold); }
+
+/* Honeypot (hidden from people, visible to bots) */
+.gnc-contact .gnc-hp { position: absolute; left: -9999px; width: 0; height: 0; overflow: hidden; }
+
+/* ---------- Alerts ---------- */
+.gnc-contact .gnc-alert { padding: .8rem 1rem; border-radius: 8px; margin-bottom: 1.2rem; font-size: .92rem; }
+.gnc-contact .gnc-alert--ok { background: var(--gnc-tint); color: var(--gnc-green-light); border: 1px solid var(--gnc-line); }
+.gnc-contact .gnc-alert--error { background: #fdecea; color: var(--gnc-danger); border: 1px solid #f5c2bd; }
+.gnc-contact .gnc-alert ul { margin: 0; padding-left: 1.1rem; }
+
+/* ---------- School directory ---------- */
+.gnc-contact .gnc-dir { margin-top: 3.5rem; }
+.gnc-contact .gnc-dir-head { text-align: center; margin-bottom: 1.8rem; }
+.gnc-contact .gnc-dir-head h2 {
+    font-family: 'Noto Serif', serif;
+    font-weight: 700; font-size: clamp(1.8rem, 4vw, 2.4rem); letter-spacing: 0;
+    color: var(--gnc-green); margin: 0 0 .3rem;
+}
+.gnc-contact .gnc-dir-head h2::after {
+    content: ''; display: block; width: 56px; height: 3px; background: var(--gnc-gold); margin: .5rem auto 0;
+}
+.gnc-contact .gnc-dir-head p { color: #6b7280; font-size: .95rem; margin: .8rem 0 0; }
+
+.gnc-contact .gnc-dir-card {
+    background: #fff;
+    border: 1px solid var(--gnc-line);
+    border-radius: 14px;
+    padding: 1.6rem 1.8rem;
+    height: 100%;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .06);
+}
+.gnc-contact .gnc-dir-card h3 {
+    display: flex; align-items: center; gap: .55rem;
+    font-family: 'Inter', sans-serif; font-size: .78rem; font-weight: 600;
+    letter-spacing: .16em; text-transform: uppercase;
+    color: var(--gnc-green); margin: 0 0 .6rem; padding-bottom: .8rem;
+    border-bottom: 2px solid var(--gnc-gold);
+}
+.gnc-contact .gnc-dir-card h3 i { color: var(--gnc-gold); }
+
+.gnc-contact .gnc-dir-list { list-style: none; margin: 0; padding: 0; }
+.gnc-contact .gnc-dir-list--cols { columns: 2; column-gap: 2.2rem; }
+.gnc-contact .gnc-dir-item {
+    display: flex; align-items: center; gap: .9rem;
+    padding: .65rem 0; border-bottom: 1px solid var(--gnc-line);
+    break-inside: avoid;
+}
+.gnc-contact .gnc-dir-num {
+    flex: none; min-width: 52px; text-align: center;
+    background: var(--gnc-tint); color: var(--gnc-green);
+    font-weight: 700; font-size: .85rem; letter-spacing: .02em;
+    border-radius: 6px; padding: .28rem .5rem;
+}
+.gnc-contact .gnc-dir-card--direct .gnc-dir-num { min-width: 86px; background: var(--gnc-green); color: #fff; }
+.gnc-contact .gnc-dir-name { font-size: .92rem; line-height: 1.35; color: #1a1a1a; }
+
+/* ---------- Opening transition + animations ---------- */
+/* --ct-base = how long to wait for the opening wipe before the content animates in.
+   It is 0 right after a form submit (no wipe is shown then). */
+.gnc-contact { --ct-base: .95s; }
+.gnc-contact.gnc-contact--quick { --ct-base: 0s; }
+
+/* Opening wipe: 6 green panels slide up and reveal the page. Pure CSS; the whole
+   layer is also hidden at the end, so it can never get stuck over the page. */
+.gnc-contact .gnc-contact-open {
+    position: fixed; inset: 0; z-index: 2000;
+    display: flex; pointer-events: none;
+    animation: gncCtGone 0s linear 1.7s forwards;
+}
+.gnc-contact .gnc-contact-open > i {
+    flex: 1; margin-right: -1px;
+    background: var(--gnc-green);
+    animation: gncCtWipe .85s cubic-bezier(.76, 0, .24, 1) forwards;
+    animation-delay: calc(.35s + var(--n, 0) * .07s);
+}
+.gnc-contact .gnc-contact-open > i:nth-child(even) { background: #083320; }
+.gnc-contact .gnc-contact-open-label {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .9rem;
+    color: var(--gnc-gold); text-align: center;
+    animation: gncCtLabel 1.1s ease forwards;
+}
+.gnc-contact .gnc-contact-open-label img { width: 64px; height: 64px; object-fit: contain; }
+.gnc-contact .gnc-contact-open-label span {
+    font-family: 'Noto Serif', serif; font-weight: 700;
+    font-size: clamp(1.5rem, 4vw, 2.2rem); letter-spacing: .02em;
+}
+@keyframes gncCtWipe  { to { transform: translateY(-101%); } }
+@keyframes gncCtGone  { to { visibility: hidden; } }
+@keyframes gncCtLabel {
+    0%   { opacity: 0; transform: translateY(14px); }
+    30%  { opacity: 1; transform: none; }
+    70%  { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateY(-14px); }
+}
+
+/* Content entrance */
+@keyframes gncCtUp    { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
+@keyframes gncCtLeft  { from { opacity: 0; transform: translateX(-36px); } to { opacity: 1; transform: none; } }
+@keyframes gncCtRight { from { opacity: 0; transform: translateX(36px); }  to { opacity: 1; transform: none; } }
+@keyframes gncCtGlow  { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.12) translate(1.5%, -1.5%); } }
+
+.gnc-contact .gnc-contact-hero::before { animation: gncCtGlow 14s ease-in-out infinite alternate; }
+
+.gnc-contact .gnc-contact-kicker,
+.gnc-contact .gnc-contact-title,
+.gnc-contact .gnc-contact-lead { animation: gncCtUp .8s cubic-bezier(.22, .61, .36, 1) both; }
+.gnc-contact .gnc-contact-kicker { animation-delay: var(--ct-base); }
+.gnc-contact .gnc-contact-title  { animation-delay: calc(var(--ct-base) + .1s); }
+.gnc-contact .gnc-contact-lead   { animation-delay: calc(var(--ct-base) + .2s); }
+
+.gnc-contact .gnc-contact-info { animation: gncCtLeft  .8s cubic-bezier(.22, .61, .36, 1) both; animation-delay: calc(var(--ct-base) + .3s); }
+.gnc-contact .gnc-contact-card { animation: gncCtRight .8s cubic-bezier(.22, .61, .36, 1) both; animation-delay: calc(var(--ct-base) + .4s); }
+
+.gnc-contact .gnc-contact-info .gnc-contact-item,
+.gnc-contact .gnc-contact-info .gnc-contact-links { animation: gncCtUp .6s cubic-bezier(.22, .61, .36, 1) both; }
+.gnc-contact .gnc-contact-info > div:nth-of-type(1) { animation-delay: calc(var(--ct-base) + .60s); }
+.gnc-contact .gnc-contact-info > div:nth-of-type(2) { animation-delay: calc(var(--ct-base) + .68s); }
+.gnc-contact .gnc-contact-info > div:nth-of-type(3) { animation-delay: calc(var(--ct-base) + .76s); }
+.gnc-contact .gnc-contact-info > div:nth-of-type(4) { animation-delay: calc(var(--ct-base) + .84s); }
+.gnc-contact .gnc-contact-info > div:nth-of-type(5) { animation-delay: calc(var(--ct-base) + .92s); }
+
+/* Small hover touches */
+.gnc-contact .gnc-contact-icon { transition: transform .2s ease, background .2s ease; }
+.gnc-contact .gnc-contact-item:hover .gnc-contact-icon { transform: scale(1.1); background: rgba(211, 166, 58, .32); }
+.gnc-contact .gnc-dir-num { transition: transform .2s ease; }
+.gnc-contact .gnc-dir-item:hover .gnc-dir-num { transform: scale(1.07); }
+
+/* Scroll reveal for the school directory (class is added by the page script) */
+.gnc-contact [data-ct-reveal] {
+    transition: opacity .7s cubic-bezier(.22, .61, .36, 1), transform .7s cubic-bezier(.22, .61, .36, 1);
+    transition-delay: var(--rd, 0s);
+}
+.gnc-ct-js .gnc-contact [data-ct-reveal]:not(.is-in) { opacity: 0; transform: translateY(28px); }
+.gnc-ct-js .gnc-contact .gnc-dir-card:not(.is-in) .gnc-dir-item { opacity: 0; }
+.gnc-contact .gnc-dir-card.is-in .gnc-dir-item {
+    animation: gncCtUp .5s cubic-bezier(.22, .61, .36, 1) both;
+    animation-delay: calc(var(--i, 0) * 45ms + .25s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gnc-contact .gnc-contact-open { display: none; }
+    .gnc-contact *, .gnc-contact *::before { animation: none !important; transition: none !important; }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 767.98px) {
+    .gnc-contact .gnc-dir-list--cols { columns: 1; }
+    .gnc-contact .gnc-dir-card { padding: 1.3rem 1.2rem; }
+}
+@media (max-width: 575.98px) {
+    .gnc-contact .gnc-contact-card { padding: 1.6rem 1.2rem; }
+    .gnc-contact .gnc-contact-info { padding: 1.8rem 1.4rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gnc-contact .gnc-contact-pill,
+    .gnc-contact .gnc-contact-submit,
+    .gnc-contact .gnc-field input,
+    .gnc-contact .gnc-field textarea { transition: none; }
+}

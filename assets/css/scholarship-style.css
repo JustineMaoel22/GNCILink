@@ -1,0 +1,690 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+/* Prevent horizontal overflow causing background cutoffs */
+html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+}
+
+.scholarship-intro,
+.scholarship-about,
+.scholarship-programs,
+.scholarship-dean,
+.scholarship-requirements {
+    --gnc-green: #0b4228;
+    --gnc-green-light: #1F5E2C;
+    --gnc-green-dark: #08331e;
+    --gnc-gold: #d3a63a;
+    --gnc-gold-light: #e9b93c;
+    --gnc-maroon: #8f1230;
+    --gnc-cream: #f9f6f1;
+    --gnc-text-dark: #202020;
+    --gnc-text-gray: #6b6b66;
+    --gnc-border: #e6e1d8;
+    font-family: 'Noto Serif', serif;
+}
+
+.scholarship-intro,
+.scholarship-about {
+    background-color: var(--gnc-cream);
+}
+
+/* ---------- Hero ---------- */
+.scholarship-hero {
+    position: relative;
+    background-color: var(--gnc-cream);
+    background-image: url('/assets/images/admission-header.png');
+    background-repeat: no-repeat;
+    background-position: right center;
+    background-size: cover;
+    border-bottom: 1px solid var(--gnc-border);
+}
+
+.scholarship-hero-inner {
+    padding: 40px 15px 44px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.scholarship-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: white;
+    margin-bottom: 14px;
+}
+
+.scholarship-breadcrumb a {
+    color: white;
+    text-decoration: none;
+}
+
+.scholarship-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.scholarship-breadcrumb i {
+    font-size: 10px;
+    color: white;
+    opacity: 0.8;
+}
+
+.scholarship-breadcrumb .scholarship-current {
+    color: white;
+}
+
+.scholarship-hero h1 {
+    font-family: 'Noto Serif', serif;
+    font-weight: 700;
+    color: var(--gnc-gold);
+    font-size: clamp(28px, 4vw, 40px);
+    margin: 0 0 8px;
+}
+
+.scholarship-hero p {
+    font-family: 'Inter', sans-serif;
+    color: white;
+    font-size: 14px;
+    max-width: 900px;
+    margin: 0;
+}
+
+/* ================= Scholarship content ================= */
+.scholarship-body {
+    --gnc-green: #1F5E2C;
+    --gnc-navy: #0b3b6b;
+    --gnc-gold: #c99a0a;
+    --gnc-red: #c8102e;
+    --gnc-cream: #f9f6f1;
+    --gnc-border: #e6e1d8;
+    background: var(--gnc-cream);
+    font-family: 'Inter', sans-serif;
+    padding: 28px 0 60px;
+}
+
+.scholarship-container { max-width: 1200px; margin: 0 auto; padding: 0 15px; }
+
+/* Tabs */
+.scholarship-tabs { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 28px; border: 0; }
+.scholarship-tabs .nav-link {
+    min-width: 200px; text-align: center; padding: 10px 18px;
+    font-size: 0.8rem; font-weight: 600; border-radius: 4px;
+    color: var(--gnc-green); background: #fff; border: 1px solid var(--gnc-green);
+}
+.scholarship-tabs .nav-link.active { background: var(--gnc-green); color: #fff; }
+.scholarship-tabs .nav-link:focus-visible { outline: 2px solid var(--gnc-gold); outline-offset: 2px; }
+
+/* Section heading */
+.sch-heading {
+    font-family: 'Noto Serif', serif; font-weight: 700; font-size: 1.5rem;
+    color: var(--gnc-green); margin: 0; display: inline-block;
+}
+.sch-heading::after { content: ""; display: block; width: 40px; height: 2px; background: var(--gnc-gold); margin-top: 6px; }
+.sch-lead { font-size: 0.8rem; color: #333; margin: 14px 0 22px; }
+
+/* Three-column layout */
+.sch-grid { display: grid; grid-template-columns: 1fr 0.95fr 1fr; gap: 18px; align-items: start; }
+.sch-banner {
+    text-align: center; color: #fff; font-size: 0.78rem; font-weight: 600;
+    padding: 7px 10px; border-radius: 3px; margin-bottom: 12px;
+}
+.sch-banner.green { background: var(--gnc-green); }
+.sch-banner.gold { background: var(--gnc-gold); }
+.sch-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+/* Scholarship card */
+.sch-card {
+    background: #fff; border-radius: 10px; overflow: hidden; text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08); display: flex; flex-direction: column;
+    font-family: 'Inter', sans-serif;
+}
+.sch-card-top { padding: 16px 6px 4px; }
+.sch-rank { color: var(--gnc-gold); font-weight: 700; font-size: 1.05rem; line-height: 1.15; }
+.sch-sub { font-size: 0.8rem; font-weight: 500; color: var(--gnc-green); margin-top: 2px; }
+.sch-pct {
+    display: inline-flex; align-items: flex-start; justify-content: center;
+    font-family: 'Inter', sans-serif; font-weight: 800; font-style: italic;
+    color: #b92b27; line-height: 1; margin-top: 16px; letter-spacing: -0.05em;
+}
+.sch-pct .num { font-size: 3.6rem; }
+.sch-pct .tag { display: flex; flex-direction: column; align-items: flex-start; margin-left: 2px; padding-top: 6px; letter-spacing: 0; }
+.sch-pct .sign { font-size: 2rem; }
+.sch-pct .off { font-size: 0.85rem; margin-top: -4px; }
+
+.sch-foot { position: relative; height: 100px; color: #fff; margin-top: 4px; }
+.sch-foot svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.sch-foot-text { position: absolute; right: 14px; bottom: 12px; text-align: right; line-height: 1.25; }
+.sch-foot-text strong { display: block; font-size: 1.1rem; font-weight: 700; }
+.sch-foot-text span { font-size: 0.85rem; font-weight: 400; opacity: .95; }
+.sch-foot.center .sch-foot-text { left: 0; right: 0; bottom: 10px; text-align: center; }
+.sch-foot.center .sch-foot-text strong { font-size: 0.8rem; font-weight: 500; }
+
+.sch-foot.regular    { --w1: #0b3b6b; --w2: #f5d000; --w3: #c0282d; --w4: #1F5E2C; }
+.sch-foot.montessori { --w1: #1F5E2C; --w2: #f5d000; --w3: #c0282d; --w4: #0b3b6b; }
+.sch-foot.college    { --w1: #0b3b6b; --w2: #1F5E2C; --w3: #c0282d; --w4: #c99a0a; }
+
+/* Info panels */
+.sch-panel {
+    background: #fff; border: 1px solid var(--gnc-border); border-radius: 8px;
+    padding: 16px; margin-bottom: 14px;
+}
+.sch-panel h3 { font-size: 0.85rem; font-weight: 700; margin: 0; }
+.sch-panel .sch-panel-sub { font-size: 0.6rem; margin: 2px 0 0; padding-bottom: 5px; display: inline-block; border-bottom: 1.5px solid currentColor; }
+.sch-panel.blue h3, .sch-panel.blue .sch-panel-sub { color: #1b5e9b; }
+.sch-panel.red h3, .sch-panel.red .sch-panel-sub { color: var(--gnc-red); }
+.sch-item {
+    display: flex; align-items: center; gap: 10px; font-size: 0.62rem; color: #222;
+    padding: 9px 10px; border-radius: 4px; margin-top: 10px;
+}
+.sch-item i { font-size: 0.9rem; }
+.sch-panel.blue .sch-item { background: #e8f0f8; }
+.sch-panel.blue .sch-item i { color: #1b5e9b; }
+.sch-panel.red .sch-item { background: #f9e4e4; }
+.sch-panel.red .sch-item i { color: var(--gnc-red); }
+.sch-note {
+    display: flex; align-items: center; gap: 12px; margin-top: 26px;
+    border: 1px solid var(--gnc-border); border-radius: 6px; padding: 10px 12px;
+}
+.sch-note-icon {
+    flex: 0 0 38px; height: 38px; border-radius: 50%; background: #1b5e9b; color: #fff;
+    display: grid; place-items: center; font-family: 'Noto Serif', serif; font-style: italic; font-weight: 700; font-size: 1.3rem;
+}
+.sch-note strong { display: block; font-size: 0.75rem; font-style: italic; color: #1b5e9b; }
+.sch-note span { font-size: 0.58rem; font-style: italic; color: #333; }
+
+@media (max-width: 991px) {
+    .sch-grid { grid-template-columns: 1fr; }
+    .sch-middle { order: 3; }
+}
+@media (max-width: 420px) {
+    .sch-pct .num { font-size: 2.8rem; }
+}
+
+/* ---------- Scholarship photo cards ---------- */
+.sch-photo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.sch-photo-card {
+    --overlay: #1b5e9b;
+    position: relative;
+    display: block;
+    aspect-ratio: 3 / 4;
+    overflow: hidden;
+    color: #fff;
+    text-decoration: none;
+    background: var(--overlay);
+}
+.sch-photo-card.blue  { --overlay: #1b5e9b; }
+.sch-photo-card.gold  { --overlay: #d9a914; }
+.sch-photo-card.green { --overlay: #1F5E2C; }
+
+.sch-photo-card img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* colour wash rising from the bottom */
+.sch-photo-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, var(--overlay) 0%, var(--overlay) 8%, transparent 55%);
+    opacity: .92;
+    pointer-events: none;
+}
+
+.sch-photo-caption {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 18px;
+    z-index: 1;
+    font-family: 'Inter', sans-serif;
+    text-shadow: 0 1px 3px rgba(0,0,0,.35);
+}
+.sch-photo-caption h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #fff;
+}
+.sch-photo-caption span {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 500;
+    margin-top: 2px;
+}
+
+.sch-photo-card:focus-visible {
+    outline: 3px solid var(--gnc-gold);
+    outline-offset: 3px;
+}
+
+@media (max-width: 767px) {
+    .sch-photo-grid { grid-template-columns: 1fr; }
+    .sch-photo-card { aspect-ratio: 4 / 3; }
+}
+
+
+/* ---------- Basic Education scholarship modal ---------- */
+.sch-modal {
+    --m-green: #1F5E2C;
+    --m-green-dark: #0b4228;
+    --m-navy: #0b3b6b;
+    --m-gold: #e9b93c;
+    --m-red: #b92b27;
+    font-family: 'Inter', sans-serif;
+}
+.sch-modal .modal-dialog { max-width: 560px; }
+.sch-modal .modal-content {
+    border: 0;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.sch-modal .modal-header {
+    position: relative;
+    overflow: hidden;
+    border: 0;
+    padding: 20px 56px 20px 28px;
+    background: linear-gradient(100deg, var(--m-green-dark), var(--m-green));
+}
+.sch-modal .modal-header::before,
+.sch-modal .modal-header::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+}
+.sch-modal .modal-header::before {   /* gold dot, left */
+    width: 34px; height: 34px; left: -10px; bottom: -14px;
+    background: var(--m-gold);
+}
+.sch-modal .modal-header::after {    /* glow, right */
+    width: 90px; height: 90px; right: -22px; top: -28px;
+    background: radial-gradient(circle at 40% 60%, #f5d000 0%, #3f8a2b 55%, var(--m-green-dark) 100%);
+}
+.sch-modal .modal-title {
+    position: relative; z-index: 1;
+    margin: 0; color: #fff;
+    font-size: 1.05rem; font-weight: 600; line-height: 1.3;
+}
+.sch-modal .btn-close {
+    position: absolute; z-index: 2; top: 12px; right: 14px;
+    margin: 0; padding: 6px; opacity: .9;
+}
+
+.sch-modal .modal-body { padding: 22px 26px 30px; background: #fff; }
+
+.sch-modal-heading {
+    display: inline-block;
+    margin: 0 0 14px;
+    font-family: 'Noto Serif', serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--m-green);
+    border-bottom: 2px solid var(--m-green);
+    padding-bottom: 3px;
+}
+.sch-voucher-grid + .sch-modal-heading { margin-top: 30px; }
+
+.sch-voucher-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 26px 20px;
+}
+
+/* paper-stack voucher */
+.sch-voucher { position: relative; padding: 4px 0 10px; }
+.sch-voucher::before {
+    content: "";
+    position: absolute; inset: 8px -4px 4px 6px;
+    background: #f1ebe0;
+    transform: rotate(2.5deg);
+    box-shadow: 0 6px 14px rgba(0,0,0,.14);
+}
+.sch-voucher-paper {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 18px 14px 16px;
+    box-shadow: 0 4px 10px rgba(0,0,0,.12);
+    text-align: center;
+
+    /* ==========================================================
+       BACKGROUND IMAGE GOES HERE  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+       Replace the url() below with your image path.
+       The cream gradient on top keeps the photo faded/washed out
+       so the text stays readable. Lower the .88 to show more photo.
+       ========================================================== */
+    background-color: #f9f6f1;
+    background-image:
+        linear-gradient(rgba(249,246,241,.88), rgba(249,246,241,.88)),
+        url('/assets/images/scholarship/voucher-bg.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.sch-voucher-badge {
+    display: inline-block;
+    padding: 3px 16px;
+    border-radius: 20px;
+    background: var(--m-gold);
+    color: #1a1a1a;
+    font-size: 0.6rem; font-weight: 800; letter-spacing: .02em;
+    text-transform: uppercase;
+}
+.sch-voucher-label {
+    margin-top: 8px;
+    font-size: 0.68rem; font-weight: 600;
+    color: var(--m-green);
+}
+.sch-voucher-label::after {
+    content: ""; display: block; width: 22px; height: 2px;
+    margin: 4px auto 0; background: var(--m-gold);
+}
+.sch-voucher.montessori .sch-voucher-label,
+.sch-voucher.navy .sch-voucher-label { color: var(--m-navy); }
+
+.sch-voucher-pct {
+    display: inline-flex; align-items: flex-start; justify-content: center;
+    margin: 8px 0 12px;
+    font-weight: 900; font-style: italic; line-height: 1;
+    letter-spacing: -0.06em;
+    color: var(--m-red);
+    text-shadow:
+        1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff,
+        3px 3px 0 #6e1210, 4px 5px 4px rgba(0,0,0,.3);
+}
+.sch-voucher-pct .num { font-size: 3.1rem; }
+.sch-voucher-pct .tag { display: flex; flex-direction: column; align-items: flex-start; margin-left: 2px; padding-top: 4px; letter-spacing: 0; }
+.sch-voucher-pct .sign { font-size: 1.7rem; }
+.sch-voucher-pct .off { font-size: 0.8rem; margin-top: -3px; }
+
+.sch-voucher-pill {
+    width: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 6px 10px;
+    border-radius: 20px;
+    color: #fff;
+    border: 2px solid var(--m-gold);
+    background: var(--m-green);
+    line-height: 1.2;
+}
+.sch-voucher.montessori .sch-voucher-pill,
+.sch-voucher.navy .sch-voucher-pill { background: var(--m-navy); }
+.sch-voucher-pill strong { font-size: 0.72rem; font-weight: 700; }
+.sch-voucher-pill span  { font-size: 0.5rem;  font-weight: 400; }
+.sch-voucher-pill:not(:has(strong)) span { font-size: 0.55rem; font-weight: 600; }
+
+@media (max-width: 420px) {
+    .sch-modal .modal-body { padding: 18px 16px 24px; }
+    .sch-voucher-grid { gap: 22px 12px; }
+    .sch-voucher-pct .num { font-size: 2.5rem; }
+}
+
+
+/* ---------- College modal: requirements ---------- */
+.sch-modal .sch-voucher-badge { white-space: nowrap; }
+
+.sch-req {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+}
+.sch-req-main { flex: 1 1 auto; min-width: 0; }
+.sch-req-lead {
+    margin: 0 0 10px;
+    font-size: 0.62rem;
+    color: #333;
+}
+.sch-req-list { list-style: none; margin: 0; padding: 0; }
+.sch-req-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 8px;
+    margin-bottom: 6px;
+    background: #fff;
+    border: 1px solid var(--gnc-border, #e6e1d8);
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+.sch-req-icon {
+    flex: 0 0 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    border-radius: 3px;
+    background: var(--m-green);
+    color: #fff;
+    font-size: 0.7rem;
+}
+.sch-req-text { flex: 1; font-size: 0.6rem; line-height: 1.3; color: #222; }
+.sch-req-check { flex: 0 0 auto; font-size: 0.85rem; color: var(--m-green); }
+
+.sch-req-art {
+    flex: 0 0 38%;
+    max-width: 38%;
+    height: auto;
+    display: block;
+}
+
+@media (max-width: 480px) {
+    .sch-req { flex-direction: column; align-items: stretch; }
+    .sch-req-art { max-width: 200px; align-self: center; }
+}
+
+/* =====================================================================
+   ANIMATIONS
+   ===================================================================== */
+
+/* ---------- Keyframes ---------- */
+@keyframes sch-fade-up {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes sch-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+@keyframes sch-slide-right {
+    from { opacity: 0; transform: translateX(-18px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes sch-line-grow {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+}
+@keyframes sch-pop {
+    0%   { opacity: 0; transform: scale(.6) rotate(-4deg); }
+    60%  { opacity: 1; transform: scale(1.08) rotate(1deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes sch-voucher-in {
+    from { opacity: 0; transform: translateY(26px) rotate(-3deg) scale(.96); }
+    to   { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+}
+@keyframes sch-shimmer {
+    0%   { transform: translateX(-120%) skewX(-20deg); }
+    100% { transform: translateX(260%) skewX(-20deg); }
+}
+@keyframes sch-float {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-6px); }
+}
+@keyframes sch-glow-drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(-8px, 6px) scale(1.12); }
+}
+@keyframes sch-bg-pan {
+    from { background-position: right center; }
+    to   { background-position: 96% center; }
+}
+
+/* ---------- Hero ---------- */
+.scholarship-hero { animation: sch-bg-pan 14s ease-in-out infinite alternate; }
+.scholarship-breadcrumb { animation: sch-slide-right .6s ease-out backwards; }
+.scholarship-hero h1    { animation: sch-fade-up .7s .12s cubic-bezier(.2,.7,.2,1) backwards; }
+.scholarship-hero p     { animation: sch-fade-up .7s .26s cubic-bezier(.2,.7,.2,1) backwards; }
+
+/* ---------- Tabs ---------- */
+.scholarship-tabs .nav-item { animation: sch-fade-up .55s backwards; }
+.scholarship-tabs .nav-item:nth-child(1) { animation-delay: .35s; }
+.scholarship-tabs .nav-item:nth-child(2) { animation-delay: .45s; }
+.scholarship-tabs .nav-link {
+    transition: background-color .25s ease, color .25s ease, transform .2s ease, box-shadow .25s ease;
+}
+.scholarship-tabs .nav-link:hover:not(.active) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(31, 94, 44, .18);
+}
+.scholarship-tabs .nav-link.active { box-shadow: 0 4px 12px rgba(31, 94, 44, .3); }
+
+/* tab pane content animates in each time a tab is shown */
+.tab-pane.active .sch-lead { animation: sch-fade-up .5s .05s backwards; }
+
+/* ---------- Photo cards ---------- */
+.sch-photo-card {
+    transition: transform .35s cubic-bezier(.2,.7,.2,1), box-shadow .35s ease;
+    border-radius: 6px;
+}
+.tab-pane.active .sch-photo-card { animation: sch-fade-up .7s cubic-bezier(.2,.7,.2,1) backwards; }
+.tab-pane.active .sch-photo-card:nth-child(1) { animation-delay: .15s; }
+.tab-pane.active .sch-photo-card:nth-child(2) { animation-delay: .30s; }
+.tab-pane.active .sch-photo-card:nth-child(3) { animation-delay: .45s; }
+
+.sch-photo-card img { transition: transform .7s cubic-bezier(.2,.7,.2,1); }
+.sch-photo-card::after { transition: opacity .35s ease, background-size .35s ease; }
+
+/* light sweep */
+.sch-photo-card::before {
+    content: "";
+    position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
+    z-index: 1; pointer-events: none;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.35), transparent);
+    transform: translateX(-120%) skewX(-20deg);
+}
+
+.sch-photo-caption { transition: transform .35s cubic-bezier(.2,.7,.2,1); }
+.sch-photo-caption h2::after {
+    content: ""; display: block; height: 2px; width: 36px; margin-top: 6px;
+    background: #fff; transform-origin: left; transform: scaleX(0);
+    transition: transform .4s ease;
+}
+
+.sch-photo-card:hover,
+.sch-photo-card:focus-visible {
+    transform: translateY(-6px);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, .22);
+}
+.sch-photo-card:hover img,
+.sch-photo-card:focus-visible img { transform: scale(1.08); }
+.sch-photo-card:hover::before,
+.sch-photo-card:focus-visible::before { animation: sch-shimmer .9s ease; }
+.sch-photo-card:hover .sch-photo-caption,
+.sch-photo-card:focus-visible .sch-photo-caption { transform: translateY(-4px); }
+.sch-photo-card:hover .sch-photo-caption h2::after,
+.sch-photo-card:focus-visible .sch-photo-caption h2::after { transform: scaleX(1); }
+.sch-photo-card:active { transform: translateY(-2px) scale(.99); }
+
+/* ---------- Section headings: gold underline draws in ---------- */
+.sch-heading::after,
+.sch-modal-heading { transform-origin: left; }
+.sch-heading::after { animation: sch-line-grow .6s .3s ease-out backwards; }
+
+/* ---------- Modal ---------- */
+.sch-modal.fade .modal-dialog {
+    transform: translateY(40px) scale(.95);
+    opacity: 0;
+    transition: transform .4s cubic-bezier(.2,.8,.2,1), opacity .3s ease;
+}
+.sch-modal.show .modal-dialog { transform: none; opacity: 1; }
+.modal-backdrop.fade { transition: opacity .3s ease; }
+
+.sch-modal .modal-header::before { animation: sch-float 4s ease-in-out infinite; }
+.sch-modal .modal-header::after  { animation: sch-glow-drift 6s ease-in-out infinite; }
+.sch-modal .btn-close { transition: transform .3s ease, opacity .2s ease; }
+.sch-modal .btn-close:hover { transform: rotate(90deg); opacity: 1; }
+
+/* modal content staggers in when the modal opens */
+.sch-modal.show .modal-title      { animation: sch-slide-right .5s .15s backwards; }
+.sch-modal.show .sch-modal-heading { animation: sch-fade-up .5s backwards; }
+.sch-modal.show .sch-req-lead     { animation: sch-fade-in .5s .6s backwards; }
+.sch-modal.show .modal-body > :nth-child(1) { animation-delay: .20s; }
+.sch-modal.show .modal-body > :nth-child(3) { animation-delay: .55s; }
+.sch-modal.show .modal-body > :nth-child(5) { animation-delay: .85s; }
+
+/* vouchers: staggered drop-in */
+.sch-voucher { transition: transform .3s cubic-bezier(.2,.7,.2,1); }
+.sch-modal.show .sch-voucher { animation: sch-voucher-in .6s cubic-bezier(.2,.8,.2,1) backwards; }
+.sch-modal.show .sch-voucher-grid:nth-of-type(1) .sch-voucher:nth-child(1) { animation-delay: .30s; }
+.sch-modal.show .sch-voucher-grid:nth-of-type(1) .sch-voucher:nth-child(2) { animation-delay: .40s; }
+.sch-modal.show .sch-voucher-grid:nth-of-type(1) .sch-voucher:nth-child(3) { animation-delay: .50s; }
+.sch-modal.show .sch-voucher-grid:nth-of-type(1) .sch-voucher:nth-child(4) { animation-delay: .60s; }
+.sch-modal.show .sch-voucher-grid:nth-of-type(2) .sch-voucher:nth-child(1) { animation-delay: .65s; }
+.sch-modal.show .sch-voucher-grid:nth-of-type(2) .sch-voucher:nth-child(2) { animation-delay: .75s; }
+
+/* percentage number pops */
+.sch-modal.show .sch-voucher-pct { animation: sch-pop .6s cubic-bezier(.2,.8,.2,1) backwards; animation-delay: inherit; }
+.sch-modal.show .sch-voucher:nth-child(1) .sch-voucher-pct { animation-delay: .55s; }
+.sch-modal.show .sch-voucher:nth-child(2) .sch-voucher-pct { animation-delay: .65s; }
+.sch-modal.show .sch-voucher:nth-child(3) .sch-voucher-pct { animation-delay: .75s; }
+.sch-modal.show .sch-voucher:nth-child(4) .sch-voucher-pct { animation-delay: .85s; }
+
+/* voucher hover: lift and straighten the paper stack */
+.sch-voucher::before { transition: transform .35s ease, box-shadow .35s ease; }
+.sch-voucher-paper   { transition: transform .35s cubic-bezier(.2,.7,.2,1), box-shadow .35s ease; overflow: hidden; }
+.sch-voucher-paper::after {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 35%;
+    pointer-events: none;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.7), transparent);
+    transform: translateX(-120%) skewX(-20deg);
+}
+.sch-voucher:hover { transform: translateY(-5px); }
+.sch-voucher:hover::before { transform: rotate(0deg) translateY(2px); box-shadow: 0 10px 20px rgba(0,0,0,.18); }
+.sch-voucher:hover .sch-voucher-paper { box-shadow: 0 10px 20px rgba(0,0,0,.18); }
+.sch-voucher:hover .sch-voucher-paper::after { animation: sch-shimmer .9s ease; }
+.sch-voucher-badge { transition: transform .25s ease; }
+.sch-voucher:hover .sch-voucher-badge { transform: scale(1.06); }
+
+/* requirements list */
+.sch-req-list li { transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+.sch-modal.show .sch-req-list li { animation: sch-slide-right .5s backwards; }
+.sch-modal.show .sch-req-list li:nth-child(1) { animation-delay: .95s; }
+.sch-modal.show .sch-req-list li:nth-child(2) { animation-delay: 1.05s; }
+.sch-modal.show .sch-req-list li:nth-child(3) { animation-delay: 1.15s; }
+.sch-modal.show .sch-req-list li:nth-child(4) { animation-delay: 1.25s; }
+.sch-req-list li:hover {
+    transform: translateX(4px);
+    border-color: var(--m-green);
+    box-shadow: 0 3px 8px rgba(0,0,0,.1);
+}
+.sch-req-check { transition: transform .3s ease; }
+.sch-req-list li:hover .sch-req-check { transform: scale(1.25) rotate(-6deg); }
+.sch-modal.show .sch-req-art { animation: sch-fade-up .7s 1s backwards, sch-float 5s 1.7s ease-in-out infinite; }
+
+/* ---------- Respect reduced-motion preferences ---------- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .001ms !important;
+        animation-delay: 0s !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+    }
+}

@@ -9,7 +9,7 @@ FOOTER
 .gnc-footer-banner {
     position: relative;
     height: 240px;
-    background-image: url('/assets/images/footer-header.png');
+    background-image: url('/assets/images/Footer-Header-V2.png');
     background-size: cover;
     background-position: center;
     overflow: visible;
@@ -198,4 +198,206 @@ FOOTER
 
 .gnc-footer-bottom a:hover {
     color: var(--gnc-gold);
+}
+
+/* =============================================
+FOOTER - VISITOR COUNTER
+============================================= */
+.gnc-visitor-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: .75rem;
+}
+
+.gnc-visitor-stat {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    min-width: 0;
+    padding: .75rem .85rem;
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+}
+
+.gnc-visitor-stat > i {
+    flex-shrink: 0;
+    font-size: 1.15rem;
+    color: var(--gnc-gold);
+}
+
+.gnc-visitor-num {
+    display: block;
+    font-family: 'Noto Serif', serif;
+    font-weight: 700;
+    font-size: 1.15rem;
+    line-height: 1.2;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+.gnc-visitor-label {
+    display: block;
+    font-size: .75rem;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+/* Phones: keep the two stats side by side, tighter spacing */
+@media (max-width: 575.98px) {
+    .gnc-visitor-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: .6rem;
+    }
+
+    .gnc-visitor-stat {
+        padding: .65rem .7rem;
+        gap: .5rem;
+    }
+
+    .gnc-visitor-stat > i {
+        font-size: 1rem;
+    }
+
+    .gnc-visitor-num {
+        font-size: 1.05rem;
+    }
+}
+
+/* Very small phones: stack so numbers and labels never get squeezed */
+@media (max-width: 359.98px) {
+    .gnc-visitor-stats {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =============================================
+FOOTER - POPULAR PAGES (Responsive Grid)
+============================================= */
+.gnc-footer-popular { 
+    margin-bottom: 2.75rem; 
+    padding-bottom: 2.25rem; 
+    border-bottom: 1px solid rgba(255,255,255,.15); 
+}
+.gnc-footer-popular-head { 
+    display: flex; 
+    align-items: center; 
+    gap: .6rem; 
+    margin-bottom: 1.1rem; 
+}
+.gnc-footer-popular-head i { 
+    color: #C9A227; 
+    font-size: 1.15rem; 
+}
+.gnc-footer-popular-head h6 { 
+    margin: 0; 
+    font-weight: 700; 
+    color: #fff; 
+}
+.gnc-footer-popular-grid { 
+    display: grid; 
+    gap: .9rem; 
+    grid-template-columns: repeat(4, minmax(0, 1fr)); 
+}
+.gnc-footer-popular-grid[data-count="3"] { 
+    grid-template-columns: repeat(3, minmax(0, 1fr)); 
+}
+.gnc-footer-popular-grid[data-count="2"] { 
+    grid-template-columns: repeat(2, minmax(0, 1fr)); 
+}
+.gnc-footer-popular-grid[data-count="1"] { 
+    grid-template-columns: minmax(0, 1fr); 
+}
+
+.gnc-popular-link {
+    display: flex; 
+    align-items: center; 
+    gap: .85rem; 
+    min-height: 64px;
+    padding: .85rem 1rem; 
+    border-radius: 10px; 
+    text-decoration: none; 
+    color: #fff;
+    background: rgba(255,255,255,.08); 
+    border: 1px solid rgba(255,255,255,.15);
+    transition: background .2s ease, border-color .2s ease, transform .2s ease;
+}
+
+.gnc-popular-link:hover { 
+    background: rgba(255,255,255,.15); 
+    border-color: #C9A227; 
+    color: #fff; 
+    transform: translateY(-2px); 
+}
+
+.gnc-popular-link:focus-visible { 
+    outline: 3px solid #C9A227; 
+    outline-offset: 2px; 
+}
+
+.gnc-popular-rank {
+    flex: 0 0 auto; 
+    width: 30px; 
+    height: 30px; 
+    border-radius: 50%;
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    font-size: .85rem; 
+    font-weight: 700; 
+    color: #094024; 
+    background: #C9A227;
+}
+
+.gnc-popular-title {
+    flex: 1; 
+    min-width: 0; 
+    font-size: .92rem; 
+    font-weight: 600; 
+    line-height: 1.3;
+    display: -webkit-box; 
+    -webkit-line-clamp: 2; 
+    -webkit-box-orient: vertical; 
+    overflow: hidden;
+}
+
+.gnc-popular-link > i { 
+    flex: 0 0 auto; 
+    color: #C9A227; 
+    transition: transform .2s ease; 
+}
+.gnc-popular-link:hover > i { 
+    transform: translateX(3px); 
+}
+
+/* --- RESPONSIVE MEDIA QUERIES --- */
+@media (max-width: 991.98px) {
+    /* Tablets: Drop to 2 columns */
+    .gnc-footer-popular-grid, 
+    .gnc-footer-popular-grid[data-count="3"] { 
+        grid-template-columns: repeat(2, minmax(0, 1fr)); 
+    }
+}
+
+@media (max-width: 575.98px) {
+    /* Mobile: Drop to 1 column and reduce spacing */
+    .gnc-footer-popular { 
+        margin-bottom: 2rem; 
+        padding-bottom: 1.75rem; 
+    }
+    .gnc-footer-popular-grid, 
+    .gnc-footer-popular-grid[data-count="3"], 
+    .gnc-footer-popular-grid[data-count="2"] { 
+        grid-template-columns: 1fr; 
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gnc-popular-link, .gnc-popular-link > i { 
+        transition: none; 
+    }
+    .gnc-popular-link:hover, .gnc-popular-link:hover > i { 
+        transform: none; 
+    }
 }

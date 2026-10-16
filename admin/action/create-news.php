@@ -20,10 +20,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $postAction = $_POST['action'] ?? '';
 
 if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-    $_SESSION['flash_errors'] = ['Invalid or expired request token. Please try again.'];
+    $_SESSION['flash_errors'] = ['Your session timed out for safety. Please try again.'];
     header('Location: /admin/news.php');
     exit;
 }
+
+// Super admins are the approvers, so they never send items for approval.
+// Keep this check in sync with $isSuperAdmin in /admin/news.php.
+$isSuperAdmin = (($_SESSION['user_role'] ?? '') === 'Super Admin');
 
 // ============================================================
 // DELETE
@@ -36,8 +40,9 @@ if ($postAction === 'delete') {
         $isOwner = $existing['user_id'] == ($_SESSION['user_id'] ?? null);
         if (hasPermission('delete_news') || (hasPermission('delete_own_news') && $isOwner)) {
             deleteNews($delId);
+            $_SESSION['flash_success'] = 'The news article “' . ($existing['title'] ?? '') . '” was deleted.';
         } else {
-            $_SESSION['flash_errors'] = ['You do not have permission to delete this news article.'];
+            $_SESSION['flash_errors'] = ['Your account is not allowed to delete this news article.'];
         }
     }
 
@@ -52,16 +57,58 @@ if ($postAction === 'pin' || $postAction === 'unpin') {
     $pinId = (int)($_POST['news_id'] ?? 0);
 
     if (!hasPermission('publish_news')) {
-        $_SESSION['flash_errors'] = ['You do not have permission to pin news articles.'];
+        $_SESSION['flash_errors'] = ['Your account is not allowed to pin news articles to the homepage.'];
     } elseif ($pinId) {
         try {
             if ($postAction === 'pin') {
                 pinNews($pinId);
+                $_SESSION['flash_success'] = 'Done! The article is now pinned to the homepage slideshow.';
             } else {
                 unpinNews($pinId);
+                $_SESSION['flash_success'] = 'The article was removed from the homepage slideshow.';
             }
         } catch (Exception $e) {
             $_SESSION['flash_errors'] = [$e->getMessage()];
+        }
+    }
+
+    header('Location: /admin/news.php');
+    exit;
+}
+
+// ============================================================
+// ARCHIVE / RESTORE (hides it from the website but keeps it on record)
+// ============================================================
+if ($postAction === 'archive' || $postAction === 'unarchive') {
+    $arcId    = (int)($_POST['news_id'] ?? 0);
+    $existing = $arcId ? getNewsById($arcId) : null;
+
+    if (!$existing) {
+        $_SESSION['flash_errors'] = ['We could not find that news article. It may have been deleted.'];
+    } else {
+        $isOwner = $existing['user_id'] == ($_SESSION['user_id'] ?? null);
+        if (!hasPermission('publish_news') && !hasPermission('edit_news') && !(hasPermission('edit_own_news') && $isOwner)) {
+            $_SESSION['flash_errors'] = ['Your account is not allowed to archive this news article.'];
+        } else {
+            try {
+                if ($postAction === 'archive' && !empty($existing['is_pinned'])) {
+                    unpinNews($arcId); // hidden items should not stay in the homepage slideshow
+                }
+                $ok = updateNews($arcId, [
+                    'title'   => $existing['title'],
+                    'content' => $existing['content'],
+                    'status'  => $postAction === 'archive' ? 'archived' : 'draft',
+                ]);
+                if ($ok) {
+                    $_SESSION['flash_success'] = $postAction === 'archive'
+                        ? 'The article was archived. It is hidden from the website but kept on record.'
+                        : 'The article was restored as a draft. Publish it when you are ready.';
+                } else {
+                    $_SESSION['flash_errors'] = ['We could not update this article. Please try again.'];
+                }
+            } catch (Exception $e) {
+                $_SESSION['flash_errors'] = [$e->getMessage()];
+            }
         }
     }
 
@@ -80,16 +127,16 @@ if ($postAction === 'create' || $postAction === 'update') {
     if ($isUpdate) {
         $existing = $id ? getNewsById($id) : null;
         if (!$existing) {
-            $errors[] = 'News article not found.';
+            $errors[] = 'We could not find that news article. It may have been deleted. Please refresh the page.';
         } else {
             $isOwner = $existing['user_id'] == ($_SESSION['user_id'] ?? null);
             if (!hasPermission('edit_news') && !(hasPermission('edit_own_news') && $isOwner)) {
-                $errors[] = 'You do not have permission to edit this news article.';
+                $errors[] = 'Your account is not allowed to edit this news article.';
             }
         }
     } else {
         if (!hasPermission('create_news')) {
-            $errors[] = 'You do not have permission to create news articles.';
+            $errors[] = 'Your account is not allowed to create news articles.';
         }
     }
 
@@ -98,8 +145,13 @@ if ($postAction === 'create' || $postAction === 'update') {
     $author  = trim($_POST['author'] ?? '');
 
     if (empty($errors)) {
-        if ($title === '') $errors[] = 'Title is required.';
-        if ($content === '' || strip_tags($content) === '') $errors[] = 'Content is required.';
+        if ($title === '') $errors[] = 'Please type a headline for the article.';
+        if ($content === '' || strip_tags($content) === '') $errors[] = 'Please write the story before saving.';
+    }
+
+    // Super admins approve things themselves, so "Send for approval" is not allowed for them.
+    if (empty($errors) && $isSuperAdmin && ($_POST['status'] ?? '') === 'pending') {
+        $errors[] = 'Super admins do not need approval. Please choose “Save as draft” or “Publish now”.';
     }
 
     if (empty($errors)) {
@@ -118,7 +170,7 @@ if ($postAction === 'create' || $postAction === 'update') {
                 }
             }
             if ($galleryCount > 10) {
-                throw new Exception('You can upload up to 10 gallery images at a time.');
+                throw new Exception('You can add up to 10 extra photos at a time. Please choose fewer photos.');
             }
 
             $data = [
@@ -138,7 +190,7 @@ if ($postAction === 'create' || $postAction === 'update') {
                     $data['status'] = $_POST['status'];
                 }
                 if (!updateNews($id, $data)) {
-                    $errors[] = 'Failed to update the news article.';
+                    $errors[] = 'We could not save your changes. Please try again.';
                 } else {
                     // Remove any gallery images the admin checked off
                     if (!empty($_POST['remove_gallery_ids']) && is_array($_POST['remove_gallery_ids'])) {
@@ -157,7 +209,7 @@ if ($postAction === 'create' || $postAction === 'update') {
                 $data['status']         = $_POST['status'] ?? 'draft';
                 $result = createNews($data);
                 if (!$result) {
-                    $errors[] = 'Failed to create the news article.';
+                    $errors[] = 'We could not save the news article. Please try again.';
                 } elseif ($galleryCount > 0) {
                     $newMediaIds = uploadNewsImages($galleryFiles);
                     addNewsImages($result, $newMediaIds);
@@ -169,6 +221,21 @@ if ($postAction === 'create' || $postAction === 'update') {
     }
 
     if (empty($errors)) {
+        // Tell the admin exactly what happened (shown as a green message on the list page).
+        $savedStatus = $data['status'] ?? ($existing['status'] ?? '');
+        if ($isUpdate) {
+            $_SESSION['flash_success'] = $savedStatus === 'published'
+                ? 'Your changes were saved and are live on the website.'
+                : 'Your changes were saved.';
+        } elseif (!hasPermission('publish_news')) {
+            $_SESSION['flash_success'] = 'Your news article was saved. It will appear on the website after it is approved.';
+        } elseif ($savedStatus === 'published') {
+            $_SESSION['flash_success'] = 'Done! Your news article is now live on the website.';
+        } elseif ($savedStatus === 'pending') {
+            $_SESSION['flash_success'] = 'Your news article was sent for approval. It will appear on the website once it is approved.';
+        } else {
+            $_SESSION['flash_success'] = 'Saved as a draft. Visitors cannot see it yet.';
+        }
         header('Location: /admin/news.php');
         exit;
     }

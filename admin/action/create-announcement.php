@@ -25,6 +25,9 @@ if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
     exit;
 }
 
+// Super admins are the approvers, so they never send items for approval.
+$isSuperAdmin = (($_SESSION['user_role'] ?? '') === 'Super Admin');
+
 // ============================================================
 // DELETE
 // ============================================================
@@ -35,7 +38,11 @@ if ($postAction === 'delete') {
     if ($existing) {
         $isOwner = $existing['user_id'] == ($_SESSION['user_id'] ?? null);
         if (hasPermission('delete_announcement') || (hasPermission('delete_own_announcement') && $isOwner)) {
-            deleteAnnouncement($delId);
+            if (deleteAnnouncement($delId)) {
+                $_SESSION['flash_success'] = 'Announcement deleted.';
+            } else {
+                $_SESSION['flash_errors'] = ['Could not delete the announcement. Please try again.'];
+            }
         } else {
             $_SESSION['flash_errors'] = ['You do not have permission to delete this announcement.'];
         }
@@ -58,9 +65,12 @@ if ($postAction === 'pin_facebook' || $postAction === 'unpin_facebook') {
             if ($postAction === 'pin_facebook') {
                 if (!pinFacebookPost($fbPostId)) {
                     $_SESSION['flash_errors'] = ['Facebook post not found.'];
+                } else {
+                    $_SESSION['flash_success'] = 'Pinned to the homepage slideshow.';
                 }
             } else {
                 unpinFacebookPost($fbPostId);
+                $_SESSION['flash_success'] = 'Removed from the homepage slideshow.';
             }
         } catch (Exception $e) {
             $_SESSION['flash_errors'] = [$e->getMessage()];
@@ -84,6 +94,8 @@ if ($postAction === 'set_fb_category') {
         $_SESSION['flash_errors'] = ['Invalid request.'];
     } elseif (!setFacebookPostCategory($fbPostId, $choice)) {
         $_SESSION['flash_errors'] = ['Could not update the Facebook post category.'];
+    } else {
+        $_SESSION['flash_success'] = 'Category updated.';
     }
 
     header('Location: /admin/announcement.php');
@@ -102,11 +114,54 @@ if ($postAction === 'pin' || $postAction === 'unpin') {
         try {
             if ($postAction === 'pin') {
                 pinAnnouncement($pinId);
+                $_SESSION['flash_success'] = 'Pinned to the homepage slideshow.';
             } else {
                 unpinAnnouncement($pinId);
+                $_SESSION['flash_success'] = 'Removed from the homepage slideshow.';
             }
         } catch (Exception $e) {
             $_SESSION['flash_errors'] = [$e->getMessage()];
+        }
+    }
+
+    header('Location: /admin/announcement.php');
+    exit;
+}
+
+// ============================================================
+// ARCHIVE / RESTORE (hides it from the website but keeps it on record)
+// ============================================================
+if ($postAction === 'archive' || $postAction === 'unarchive') {
+    $arcId    = (int)($_POST['announcement_id'] ?? 0);
+    $existing = $arcId ? getAnnouncementById($arcId) : null;
+
+    if (!$existing) {
+        $_SESSION['flash_errors'] = ['We could not find that announcement. It may have been deleted.'];
+    } else {
+        $isOwner = $existing['user_id'] == ($_SESSION['user_id'] ?? null);
+        if (!hasPermission('publish_announcement') && !hasPermission('edit_announcement') && !(hasPermission('edit_own_announcement') && $isOwner)) {
+            $_SESSION['flash_errors'] = ['Your account is not allowed to archive this announcement.'];
+        } else {
+            try {
+                if ($postAction === 'archive' && !empty($existing['is_pinned'])) {
+                    unpinAnnouncement($arcId); // hidden items should not stay in the homepage slideshow
+                }
+                $ok = updateAnnouncement($arcId, [
+                    'title'   => $existing['title'],
+                    'content' => $existing['content'],
+                    'category_id' => $existing['category_id'] ?? null,
+                    'status'  => $postAction === 'archive' ? 'archived' : 'draft',
+                ]);
+                if ($ok) {
+                    $_SESSION['flash_success'] = $postAction === 'archive'
+                        ? 'The announcement was archived. It is hidden from the website but kept on record.'
+                        : 'The announcement was restored as a draft. Publish it when you are ready.';
+                } else {
+                    $_SESSION['flash_errors'] = ['We could not update this announcement. Please try again.'];
+                }
+            } catch (Exception $e) {
+                $_SESSION['flash_errors'] = [$e->getMessage()];
+            }
         }
     }
 
@@ -146,11 +201,28 @@ if ($postAction === 'create' || $postAction === 'update') {
         if ($content === '' || strip_tags($content) === '') $errors[] = 'Content is required.';
     }
 
+    // Super admins approve things themselves, so "Send for approval" is not allowed for them.
+    if (empty($errors) && $isSuperAdmin && ($_POST['status'] ?? '') === 'pending') {
+        $errors[] = 'Super admins do not need approval. Please choose "Save as draft" or "Publish now".';
+    }
+
     if (empty($errors)) {
         try {
             $mediaId = null;
             if (!empty($_FILES['image']['name'] ?? '')) {
                 $mediaId = uploadAnnouncementImage($_FILES['image']);
+            }
+
+            // Gallery: validate the count up front so a bad batch never partially uploads.
+            $galleryFiles = $_FILES['gallery_images'] ?? null;
+            $galleryCount = 0;
+            if (!empty($galleryFiles['name']) && is_array($galleryFiles['error'])) {
+                foreach ($galleryFiles['error'] as $err) {
+                    if ($err !== UPLOAD_ERR_NO_FILE) $galleryCount++;
+                }
+            }
+            if ($galleryCount > 10) {
+                throw new Exception('You can add up to 10 extra photos at a time. Please choose fewer photos.');
             }
 
             $data = [
@@ -172,6 +244,20 @@ if ($postAction === 'create' || $postAction === 'update') {
                 }
                 if (!updateAnnouncement($id, $data)) {
                     $errors[] = 'Failed to update the announcement.';
+                } else {
+                    // Remove any gallery photos the admin marked
+                    if (!empty($_POST['remove_gallery_ids']) && is_array($_POST['remove_gallery_ids'])) {
+                        foreach ($_POST['remove_gallery_ids'] as $imgId) {
+                            removeAnnouncementImage((int)$imgId, $id);
+                        }
+                    }
+                    // Attach any newly uploaded gallery photos
+                    if ($galleryCount > 0) {
+                        $newMediaIds = uploadAnnouncementImages($galleryFiles);
+                        if (!addAnnouncementImages($id, $newMediaIds)) {
+                            $errors[] = 'The announcement was saved, but the extra photos could not be added. Please make sure the announcement_images table exists.';
+                        }
+                    }
                 }
             } else {
                 $data['featured_image'] = $mediaId;
@@ -179,6 +265,11 @@ if ($postAction === 'create' || $postAction === 'update') {
                 $result = createAnnouncement($data);
                 if (!$result) {
                     $errors[] = 'Failed to create the announcement.';
+                } elseif ($galleryCount > 0) {
+                    $newMediaIds = uploadAnnouncementImages($galleryFiles);
+                    if (!addAnnouncementImages($result, $newMediaIds)) {
+                        $errors[] = 'The announcement was saved, but the extra photos could not be added. Please make sure the announcement_images table exists.';
+                    }
                 }
             }
         } catch (Exception $e) {
@@ -187,6 +278,16 @@ if ($postAction === 'create' || $postAction === 'update') {
     }
 
     if (empty($errors)) {
+        $finalStatus = $isUpdate ? ($data['status'] ?? null) : ($data['status'] ?? 'draft');
+        if ($isUpdate) {
+            $_SESSION['flash_success'] = 'Your changes were saved.';
+        } elseif ($finalStatus === 'published') {
+            $_SESSION['flash_success'] = 'Announcement published. It is now live on the website.';
+        } elseif ($finalStatus === 'pending') {
+            $_SESSION['flash_success'] = 'Announcement sent for approval.';
+        } else {
+            $_SESSION['flash_success'] = 'Announcement saved as a draft.';
+        }
         header('Location: /admin/announcement.php');
         exit;
     }

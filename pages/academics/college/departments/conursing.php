@@ -15,7 +15,7 @@
 </head>
 <body>
     <?php $activeSection = 'academics'; ?>
-    <?php include_once __DIR__ . '/../../../../components/index-nav.php'; ?>
+    <?php include_once __DIR__ . '/../../../../components/navbar.php'; ?>
     <?php require_once __DIR__ . '/../../../../components/department-public.php'; ?>
     <?php
         // Logo and PDF come from this department's record, so changing them in
@@ -214,7 +214,31 @@
         </div>
     </section>
 
-    <?php include __DIR__ . '/../../../../components/index-footer.php'; ?>
+    <section class="dept-dean dept-facebook" style="padding-top:0;">
+        <div class="dept-dean-inner">
+
+            <div class="dept-dean-intro">
+                <span class="dept-eyebrow">Stay Updated</span>
+                <h2>Follow Us on Facebook</h2>
+                <p>Get the latest announcements, events, and news from the College of Nursing.</p>
+            </div>
+
+            <div style="max-width:500px;">
+                <iframe
+                    src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fgnc.bsnursing&amp;tabs=&amp;width=500&amp;height=150&amp;small_header=false&amp;adapt_container_width=true&amp;hide_cover=false&amp;show_facepile=false"
+                    title="College of Nursing Facebook Page"
+                    width="500" height="150"
+                    style="border:none; overflow:hidden; width:100%; max-width:500px; border-radius:8px;"
+                    scrolling="no" frameborder="0" allowfullscreen="true"
+                    allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                    loading="lazy"></iframe>
+            </div>
+
+        </div>
+    </section>
+
+    <?php include __DIR__ . '/../../../../components/footer.php'; ?>
+    <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>

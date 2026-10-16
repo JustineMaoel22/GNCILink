@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Anton&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
 
 /* Global reset + body font-family now live in base-style.css (loaded
    on every page). Keep this file focused on homepage-only styling. */
@@ -9,7 +9,7 @@
 .hero-slideshow {
     position: relative;
     width: 100%;
-    min-height: calc(100vh - 64px);
+    min-height: 100vh;
     overflow: hidden;
     background: #094024;
     padding-bottom: 0;
@@ -74,7 +74,7 @@
     position: relative;
     z-index: 2;
     height: 100%;
-    min-height: calc(100vh - 64px);
+    min-height: 100vh;
     display: flex;
     align-items: center;
 }
@@ -196,8 +196,8 @@
     border-color: var(--gnc-gold);
 }
 
-.slide-arrow-prev { left: 1.25rem; }
-.slide-arrow-next { right: 1.25rem; }
+.slide-arrow-prev { left: 3.5rem; }
+.slide-arrow-next { right: 3.5rem; }
 
 /* Dot indicators */
 .hero-dots {
@@ -234,43 +234,67 @@
 .gnc-pillars {
     position: relative;
     z-index: 20;
-    margin-top: -60px;
-    padding: 0 1rem;
+    background: #F9F6F1; /* Toned down from stark white to a warm off-white */
+    padding: 1rem 0; /* Standalone padding */
 }
 
-.gnc-pillars .pillar-card {
-    background: var(--gnc-white);
-    border-radius: 14px;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
-    padding: 1.4rem 1rem;
-}
-
-.gnc-pillars .pillar-wrap {
-    display: flex;
-    align-items: center;
-    gap: 0;
-}
-
-.gnc-pillars .pillar-item {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.4rem 1.5rem;
+/* ---- Marquee: full-width, transparent, huge condensed type scrolling
+   right-to-left with each pillar's icon before its word. ---- */
+.gnc-pillars .pillar-marquee {
     position: relative;
+    width: 100%;
+}
+.gnc-pillars .pillar-viewport {
+    overflow: hidden;
+}
+.gnc-pillars .pillar-track {
+    display: flex;
+    width: max-content;
+    animation: gnc-pillar-scroll 38s linear infinite;
+    will-change: transform;
+}
+.gnc-pillars .pillar-marquee:hover .pillar-track {
+    animation-play-state: paused;
+}
+@keyframes gnc-pillar-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
 }
 
-.gnc-pillars .pillar-item:not(:last-child)::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 10%;
-    height: 80%;
-    width: 1px;
-    background-color: rgba(0,0,0,0.12);
+.gnc-pillars .pillar-group {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.gnc-pillars .pillar-word {
+    display: flex;
+    align-items: center;
+    gap: 3.5rem;
+    padding-right: 3.5rem;
+    flex-shrink: 0;
+    cursor: default;
+}
+.gnc-pillars .pillar-text {
+    font-family: 'Anton', 'Bebas Neue', 'Noto Serif', sans-serif;
+    font-size: clamp(3rem, 7.5vw, 6.25rem);
+    font-weight: 400;
+    line-height: 1.05;
+    letter-spacing: .01em;
+    text-transform: uppercase;
+    white-space: nowrap;
 }
 
-.gnc-pillars .pillar-icon-wrap {
+/* Font colors to match their respective icons */
+.gnc-pillars .pillar-word:nth-child(3n+1) .pillar-text { color: #EABA3B; } /* Gold - Fides */
+.gnc-pillars .pillar-word:nth-child(3n+2) .pillar-text { color: #1F5E2C; } /* Green - Scientia (Updated for white bg) */
+.gnc-pillars .pillar-word:nth-child(3n+3) .pillar-text { color: #B3312D; } /* Red - Patria */
+
+
+/* Plain icon in a soft circle (no ornament) */
+.gnc-pillars .pillar-badge {
     flex-shrink: 0;
     width: 56px;
     height: 56px;
@@ -279,36 +303,12 @@
     align-items: center;
     justify-content: center;
 }
-
-.gnc-pillars .pillar-icon-wrap.fides-bg    { background-color: #fdf3e3; }
-.gnc-pillars .pillar-icon-wrap.scientia-bg { background-color: #eaf5ee; }
-.gnc-pillars .pillar-icon-wrap.patria-bg   { background-color: #fdeaea; }
-
-.gnc-pillars .pillar-icon-wrap svg,
-.gnc-pillars .pillar-icon-wrap img {
-    width: 40px;
-    height: 40px;
-}
-
-.gnc-pillars .pillar-title {
-    font-size: 0.92rem;
-    font-weight: 800;
-    font-family: 'Noto Serif', serif;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    margin-bottom: 2px;
-    line-height: 1.2;
-}
-
-.gnc-pillars .pillar-title.fides-color    { color: #EABA3B; }
-.gnc-pillars .pillar-title.scientia-color { color: #1F5E2C; }
-.gnc-pillars .pillar-title.patria-color   { color: #b03030; }
-
-.gnc-pillars .pillar-desc {
-    font-size: 0.8rem;
-    color: #555;
-    line-height: 1.4;
-    margin: 0;
+.gnc-pillars .pillar-badge.fides-bg    { background-color: #fdf3e3; }
+.gnc-pillars .pillar-badge.scientia-bg { background-color: #eaf5ee; }
+.gnc-pillars .pillar-badge.patria-bg   { background-color: #fdeaea; }
+.gnc-pillars .pillar-badge .pillar-icon-img {
+    width: 30px;
+    height: 30px;
 }
 
 
@@ -319,7 +319,7 @@
     position: relative;
     max-width: none;
     min-height: 0;
-    padding: 1.75rem 3rem;
+    padding: 1.75rem 0.75rem; /* Aligns with column grid padding */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -457,7 +457,10 @@
     border: 0;
 }
 .gnc-pinned-carousel .carousel-inner {
-    border-radius: 20px;
+    /* room for the hover shadow so the carousel's overflow:hidden doesn't cut it off with a hard edge */
+    padding: 8px 10px 26px;
+    margin: -8px -10px -26px;
+    width: calc(100% + 20px); /* offsets the -10px side margins so the card stays centered */
 }
 .gnc-pinned-card {
     box-shadow: none !important;
@@ -619,11 +622,11 @@
 }
 .gnc-cal-empty { background: none; min-height: auto; }
 .gnc-cal-daynum { line-height: 1; }
-.gnc-cal-today { background: #DDEBFD; font-weight: 700; color: #094024; border: 1px solid #1877F2; }
+.gnc-cal-today { background: #F0E4C2; font-weight: 700; color: #094024; border: 1px solid #EABA3B; }
 .gnc-cal-hasevent {
     background: #f3f6f3; font-weight: 700; cursor: default;
 }
-.gnc-cal-hasevent.gnc-cal-today { background: #DDEBFD; border-color: #1877F2; }
+.gnc-cal-hasevent.gnc-cal-today { background: #F0E4C2; border-color: #EABA3B; }
 .gnc-cal-events {
     display: flex; flex-direction: column; gap: 2px; width: 100%;
 }
@@ -825,7 +828,7 @@ a.gnc-programs-count:hover {
     position: relative;
     max-width: none;
     min-height: 0;
-    padding: 1.75rem 3rem;
+    padding: 1.75rem 0.75rem; /* Aligns with column grid padding */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -1118,23 +1121,6 @@ a.gnc-programs-count:hover {
         margin-right: auto;
     }
 
-    /* Pillars - Wrap neatly on tablet instead of squishing */
-    .gnc-pillars {
-        margin-top: -40px;
-    }
-    .gnc-pillars .pillar-wrap {
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-    .gnc-pillars .pillar-item {
-        flex: 1 1 300px; /* Allows pillars to drop to the next row if they run out of space */
-        padding: 1rem;
-        justify-content: center;
-    }
-    .gnc-pillars .pillar-item:not(:last-child)::after { 
-        display: none; 
-    }
-
     /* President Section */
     .gnc-president {
         text-align: center;
@@ -1174,35 +1160,19 @@ a.gnc-programs-count:hover {
         justify-content: center;
     }
 
-    /* Arrows */
+    /* Arrows: hidden on mobile (dots + swipe/auto-advance remain) */
     .slide-arrow {
-        width: 36px;
-        height: 36px;
+        display: none;
     }
-    .slide-arrow-prev { left: 0.6rem; }
-    .slide-arrow-next { right: 0.6rem; }
 
     /* Pillars Mobile Stack */
     .gnc-pillars {
-        padding: 0 0.75rem;
+        padding: 2rem 0.75rem;
     }
-    .gnc-pillars .pillar-wrap {
-        flex-direction: column;
-        align-items: center;
-    }
-    .gnc-pillars .pillar-item {
-        flex: 0 1 auto; /* Override desktop's flex:1 — in a column layout that
-                           was stretching each item to fill 1/3 of the total
-                           height instead of hugging its own content. */
-        width: 100%;
-        flex-direction: column;
-        text-align: center;
-        padding: 1.5rem 1rem;
-        border-bottom: 1px solid rgba(0,0,0,0.08);
-    }
-    .gnc-pillars .pillar-item:last-child {
-        border-bottom: none;
-    }
+    .gnc-pillars .pillar-text { font-size: clamp(2.4rem, 13vw, 3.6rem); }
+    .gnc-pillars .pillar-badge { width: 40px; height: 40px; }
+    .gnc-pillars .pillar-badge .pillar-icon-img { width: 22px; height: 22px; }
+    .gnc-pillars .pillar-word { gap: .75rem; padding-right: 1.75rem; }
 }
 
 @media (max-width: 576px) {
@@ -1343,4 +1313,1689 @@ a.gnc-programs-count:hover {
         font-size: .875rem;
         white-space: normal;
     }
+}
+
+
+/* =============================================================
+   CAMPUS MAP (homepage #campus-map section)
+   ============================================================= */
+.gnc-campus-map {
+    background: #F9F6F1;
+}
+/* center the map section header (this section only) */
+.gnc-campus-map .gnc-programs-header {
+    align-items: center !important;
+    text-align: center !important;
+}
+.gnc-campus-map .gnc-programs-header > * {
+    text-align: center !important;
+    margin-left: auto;
+    margin-right: auto;
+}
+.gnc-map-frame {
+    display: block;
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+    border: 0;
+    border-radius: 18px;
+    background: #F9F6F1;
+    /* phones & tablets: height follows the width (chips + 2:3 portrait map) */
+    height: auto;
+    aspect-ratio: 2 / 3.3;
+}
+@media (max-width: 767px) {
+    .gnc-campus-map { padding-top: 2rem !important; padding-bottom: 2rem !important; }
+    .gnc-campus-map .container { padding-left: 8px; padding-right: 8px; }
+    .gnc-campus-map .text-center { padding: 0 8px; }
+    .gnc-map-frame { border-radius: 14px; }
+}
+/* tablets: keep the portrait map at a comfortable width */
+@media (min-width: 576px) and (max-width: 991.98px) {
+    .gnc-map-frame { max-width: 640px; aspect-ratio: 2 / 3.1; }
+}
+/* desktop: wide frame, side list + map */
+@media (min-width: 992px) {
+    .gnc-map-frame {
+        aspect-ratio: auto;
+        height: min(82vh, 780px);
+        min-height: 520px;
+    }
+}
+/* landscape phones: use the screen height */
+@media (max-height: 480px) and (orientation: landscape) {
+    .gnc-map-frame {
+        max-width: 100%;
+        aspect-ratio: auto;
+        height: calc(100vh - 24px);
+        min-height: 300px;
+    }
+}
+
+
+/* =============================================================
+   ANIMATIONS
+   ============================================================= */
+
+/* ---- Hero text entrance: each line fades/slides up as a slide
+   becomes active, with a short stagger so title -> desc -> buttons
+   feel sequenced rather than popping in all at once. ---- */
+@keyframes gnc-fade-up {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.hero-slide.active .hero-title-line,
+.hero-slide.active .hero-desc,
+.hero-slide.active .hero-ctas {
+    animation: gnc-fade-up 0.7s ease both;
+}
+.hero-slide.active .hero-title-line:nth-of-type(1) { animation-delay: 0.1s; }
+.hero-slide.active .hero-title-line:nth-of-type(2) { animation-delay: 0.2s; }
+.hero-slide.active .hero-desc { animation-delay: 0.3s; }
+.hero-slide.active .hero-ctas { animation-delay: 0.4s; }
+
+/* A little lift + pulse on the hero buttons themselves */
+.btn-enroll,
+.btn-explore {
+    transition: background-color 0.15s, color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.btn-enroll:hover,
+.btn-explore:hover {
+    transform: translateY(-2px);
+}
+.btn-enroll:hover {
+    box-shadow: 0 8px 18px rgba(234, 186, 59, 0.35);
+}
+
+/* ---- Scroll reveal: sections/cards fade + slide up once into view.
+   Toggled by adding .is-visible via the IntersectionObserver script
+   at the bottom of index.php. Fails open — if JS never runs, the
+   script also adds .is-visible immediately, so nothing stays hidden. ---- */
+.gnc-reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.gnc-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.gnc-reveal-stagger > * {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.gnc-reveal-stagger.is-visible > * {
+    opacity: 1;
+    transform: translateY(0);
+}
+.gnc-reveal-stagger.is-visible > *:nth-child(1) { transition-delay: 0.05s; }
+.gnc-reveal-stagger.is-visible > *:nth-child(2) { transition-delay: 0.12s; }
+.gnc-reveal-stagger.is-visible > *:nth-child(3) { transition-delay: 0.19s; }
+.gnc-reveal-stagger.is-visible > *:nth-child(4) { transition-delay: 0.26s; }
+.gnc-reveal-stagger.is-visible > *:nth-child(5) { transition-delay: 0.33s; }
+.gnc-reveal-stagger.is-visible > *:nth-child(6) { transition-delay: 0.4s; }
+
+/* ---- Card image zoom on hover. Both containers already clip
+   overflow (.gnc-program-card has overflow:hidden; .skeleton-wrap
+   sets it too), so the zoomed image never spills past the card. ---- */
+.gnc-program-img {
+    transition: transform 0.45s ease;
+}
+.gnc-program-card:hover .gnc-program-img {
+    transform: scale(1.06);
+}
+
+.gnc-announcement-card .card-img-top {
+    transition: transform 0.45s ease;
+}
+.gnc-announcement-card:hover .card-img-top {
+    transform: scale(1.06);
+}
+
+.gnc-pinned-media img {
+    transition: transform 0.5s ease;
+}
+.gnc-pinned-card:hover .gnc-pinned-media img {
+    transform: scale(1.04);
+}
+
+/* ---- Calendar "today" cell: gentle pulse so it's easy to spot ---- */
+@keyframes gnc-cal-today-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(24, 119, 242, 0.25); }
+    50%      { box-shadow: 0 0 0 5px rgba(24, 119, 242, 0); }
+}
+.gnc-cal-today {
+    animation: gnc-cal-today-pulse 2.4s ease-in-out infinite;
+}
+
+/* Respect reduced-motion preferences: strip every animation/transition
+   added above and make all scroll-reveal content visible immediately. */
+@media (prefers-reduced-motion: reduce) {
+    .hero-slide.active .hero-title-line,
+    .hero-slide.active .hero-desc,
+    .hero-slide.active .hero-ctas,
+    .gnc-cal-today {
+        animation: none !important;
+    }
+    .gnc-reveal,
+    .gnc-reveal-stagger > *,
+    .gnc-program-img,
+    .gnc-announcement-card .card-img-top,
+    .gnc-pinned-media img,
+    .btn-enroll,
+    .btn-explore {
+        transition: none !important;
+    }
+    .gnc-reveal,
+    .gnc-reveal-stagger > * {
+        opacity: 1 !important;
+        transform: none !important;
+    }
+}
+
+/* =============================================================
+   HOVER EFFECT — copied from the pinned card on the News &
+   Announcements page: 4px lift, soft green shadow, border darkens,
+   slow 1.03 image zoom. Applied to the pinned card and the
+   announcement cards.
+   ============================================================= */
+.gnc-pinned-card,
+.gnc-announcement-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.gnc-pinned-card:hover,
+.gnc-announcement-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 28px rgba(9, 64, 36, 0.05) !important;
+    border-color: rgba(9, 64, 36, 0.15);
+}
+
+/* Bootstrap's .border-0 (!important) hid the border on the feed cards,
+   so give them the same hairline border the pinned card has. */
+.gnc-announcement-card.border-0 {
+    border: 1px solid rgba(9, 64, 36, .08) !important;
+}
+.gnc-announcement-card.border-0:hover {
+    border-color: rgba(9, 64, 36, .15) !important;
+}
+
+.gnc-announcement-card .card-img-top,
+.gnc-pinned-media img {
+    transition: transform 0.6s ease;
+}
+.gnc-announcement-card:hover .card-img-top,
+.gnc-pinned-card:hover .gnc-pinned-media img {
+    transform: scale(1.03);
+}
+
+/* Local colour tokens for the Programs section */
+.gnc-programs {
+    --gx-green-900: #062d19;
+    --gx-green: #094024;
+    --gx-gold: #EABA3B;
+}
+
+/* =============================================================
+   ACADEMIC PROGRAMS: staggered, photo-backed layout
+   ============================================================= */
+.gnc-programs {
+    position: relative;
+    overflow: hidden;
+    background: var(--gx-green-900);
+    padding-top: 5rem !important;
+    padding-bottom: 5rem !important;
+    isolation: isolate;
+}
+/* blurred campus photo under a deep green wash */
+/* Parallax: the photo is pinned to the viewport and the section acts as a
+   window onto it, so the background appears to move as you scroll.
+   (clip-path keeps it visible only inside this section; this also works
+   on iOS, where background-attachment: fixed does not.) */
+.gnc-programs { clip-path: inset(0); }
+.gnc-programs::before {
+    content: '';
+    position: fixed;
+    inset: -12px;
+    z-index: -2;
+    background: url('/assets/images/classroom.jpg') center / cover no-repeat;
+    filter: blur(3px);
+}
+@media (prefers-reduced-motion: reduce) {
+    .gnc-programs::before { position: absolute; }
+}
+.gnc-programs::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(180deg, rgba(6, 45, 25, .93), rgba(9, 64, 36, .88));
+}
+
+.gnc-prog-wrap { max-width: 960px; }
+
+.gnc-prog-head { max-width: 560px; margin: 0 0 3.5rem 7%; }
+.gnc-prog-icon { display: block; font-size: 2.2rem; line-height: 1; color: var(--gx-gold); margin-bottom: .5rem; }
+.gnc-prog-heading {
+    font-family: 'Noto Serif', serif;
+    font-weight: 500;
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    line-height: 1.15;
+    color: #fff;
+    margin: 0 0 .9rem;
+}
+.gnc-prog-heading span {
+    display: block;
+    font-weight: 800;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    line-height: 1.20;
+    color: var(--gx-gold);
+}
+.gnc-prog-heading::after {
+    content: '';
+    display: block;
+    width: 64px;
+    height: 3px;
+    margin-top: .8rem;
+    background: var(--gx-gold);
+}
+.gnc-prog-sub { color: rgba(255, 255, 255, .85); font-size: .98rem; line-height: 1.6; margin: 0; }
+
+.gnc-prog-row {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    align-items: center;
+    gap: 2.5rem;
+}
+.gnc-prog-row + .gnc-prog-row { margin-top: -1.25rem; }
+.gnc-prog-row--reverse { grid-template-columns: 1fr 1.15fr; }
+.gnc-prog-row--reverse .gnc-prog-img  { order: 2; }
+.gnc-prog-row--reverse .gnc-prog-text { order: 1; text-align: left; }
+/* nudge the rows sideways so the whole stack zigzags */
+.gnc-prog-row { padding-right: 4%; }
+.gnc-prog-row--reverse { padding-right: 0; padding-left: 4%; }
+
+.gnc-prog-img {
+    aspect-ratio: 3 / 2;
+    background-color: #1c4a32;
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, .4);
+    transition: transform .4s ease;
+}
+.gnc-prog-row:hover .gnc-prog-img { transform: scale(1.02); }
+
+.gnc-prog-title {
+    font-family: 'Noto Serif', serif;
+    font-weight: 500;
+    font-size: clamp(1.25rem, 2.4vw, 1.6rem);
+    line-height: 1.2;
+    color: var(--gx-gold);
+    margin: 0 0 .75rem;
+}
+.gnc-prog-desc {
+    color: rgba(255, 255, 255, .85);
+    font-size: .9rem;
+    line-height: 1.65;
+    margin: 0 0 1.1rem;
+    max-width: 38ch;
+}
+.gnc-prog-btn {
+    display: inline-block;
+    padding: .55rem 1.2rem;
+    background: #fff;
+    color: var(--gx-green);
+    font-size: .78rem;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-decoration: none;
+    border-bottom: 3px solid var(--gx-gold);
+    transition: background .2s, color .2s, transform .2s;
+}
+.gnc-prog-btn:hover { background: var(--gx-gold); color: var(--gx-green); transform: translateY(-2px); }
+.gnc-prog-btn:focus-visible { outline: 3px solid var(--gx-gold); outline-offset: 3px; }
+
+@media (max-width: 767px) {
+    .gnc-programs { padding-top: 3.5rem !important; padding-bottom: 3.5rem !important; }
+    .gnc-prog-head { margin: 0 0 2.5rem; }
+    .gnc-prog-row,
+    .gnc-prog-row--reverse { grid-template-columns: 1fr; gap: 1.25rem; padding: 0 !important; }
+    .gnc-prog-row + .gnc-prog-row { margin-top: 2.5rem; }
+    .gnc-prog-row--reverse .gnc-prog-img  { order: 0; }
+    .gnc-prog-row--reverse .gnc-prog-text { order: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .gnc-prog-img, .gnc-prog-btn { transition: none !important; }
+}
+
+
+/* =============================================================
+   NEWS & ANNOUNCEMENTS: same staggered, photo-backed layout as
+   Academic Programs
+   ============================================================= */
+.gnc-news {
+    --gx-green-900: #062d19;
+    --gx-green: #094024;
+    --gx-gold: #EABA3B;
+    position: relative;
+    overflow: hidden;
+    background: var(--gx-green-900);
+    padding: 5rem 0;
+    isolation: isolate;
+    clip-path: inset(0);
+}
+.gnc-news::before {
+    content: '';
+    position: fixed;
+    inset: -12px;
+    z-index: -2;
+    background: url('/assets/images/DSC_2965.jpg') center / cover no-repeat;
+    filter: blur(3px);
+}
+@media (prefers-reduced-motion: reduce) {
+    .gnc-news::before { position: absolute; }
+}
+.gnc-news::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(180deg, rgba(6, 45, 25, .93), rgba(9, 64, 36, .88));
+}
+
+.gnc-news-wrap { max-width: 960px; }
+
+.gnc-news-head { max-width: 560px; margin: 0 0 3.5rem 7%; }
+.gnc-news-icon { display: block; font-size: 2.2rem; line-height: 1; color: var(--gx-gold); margin-bottom: .5rem; }
+.gnc-news-heading {
+    font-family: 'Noto Serif', serif;
+    font-weight: 500;
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    line-height: 1.15;
+    color: #fff;
+    margin: 0 0 .9rem;
+}
+.gnc-news-heading span {
+    display: block;
+    font-weight: 800;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    line-height: 1.05;
+    color: var(--gx-gold);
+}
+.gnc-news-heading::after {
+    content: '';
+    display: block;
+    width: 64px;
+    height: 3px;
+    margin-top: .9rem;
+    background: var(--gx-gold);
+}
+.gnc-news-sub { color: rgba(255, 255, 255, .85); font-size: .98rem; line-height: 1.6; margin: 0; }
+.gnc-news-empty { color: rgba(255, 255, 255, .85); text-align: center; }
+
+/* pinned carousel sits on the dark background as a white card */
+.gnc-news .gnc-pinned-label { color: var(--gx-gold); }
+.gnc-news .gnc-pinned-carousel { margin-bottom: 3.5rem !important; }
+.gnc-news .gnc-pinned-card { box-shadow: none !important; border: 0; border-radius: 0; }
+.gnc-news .gnc-pinned-media { border-radius: 0; }
+.gnc-news .gnc-pinned-btn { border-radius: 0; border-bottom: 3px solid var(--gx-gold); }
+
+.gnc-news-row {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    align-items: center;
+    gap: 2.5rem;
+    padding-right: 4%;
+}
+.gnc-news-row + .gnc-news-row { margin-top: -1.25rem; }
+.gnc-news-row--reverse { grid-template-columns: 1fr 1.15fr; padding-right: 0; padding-left: 4%; }
+.gnc-news-row--reverse .gnc-news-img  { order: 2; }
+.gnc-news-row--reverse .gnc-news-text { order: 1; text-align: left; }
+
+.gnc-news-img {
+    aspect-ratio: 3 / 2;
+    background-color: #1c4a32;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, .4);
+    overflow: hidden;
+    transition: transform .4s ease;
+}
+.gnc-news-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gnc-news-img-fallback {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255, 255, 255, .25); font-size: 3rem;
+}
+.gnc-news-row:hover .gnc-news-img { transform: scale(1.02); }
+
+.gnc-news-meta {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .9rem;
+    margin-bottom: .6rem;
+    font-size: .72rem; letter-spacing: .06em; text-transform: uppercase;
+}
+.gnc-news-type { color: var(--gx-gold); font-weight: 800; }
+.gnc-news-date { color: rgba(255, 255, 255, .7); font-weight: 600; }
+
+.gnc-news-title {
+    font-family: 'Noto Serif', serif;
+    font-weight: 500;
+    font-size: clamp(1.25rem, 2.4vw, 1.6rem);
+    line-height: 1.25;
+    color: var(--gx-gold);
+    margin: 0 0 .75rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.gnc-news-author { color: rgba(255, 255, 255, .7); font-size: .78rem; margin: -.3rem 0 .7rem; }
+.gnc-news-desc {
+    color: rgba(255, 255, 255, .85);
+    font-size: .9rem;
+    line-height: 1.65;
+    margin: 0 0 1.1rem;
+    max-width: 38ch;
+}
+.gnc-news-btn {
+    display: inline-block;
+    padding: .55rem 1.2rem;
+    background: #fff;
+    color: var(--gx-green);
+    font-size: .78rem;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-decoration: none;
+    border-bottom: 3px solid var(--gx-gold);
+    transition: background .2s, color .2s, transform .2s;
+}
+.gnc-news-btn:hover { background: var(--gx-gold); color: var(--gx-green); transform: translateY(-2px); }
+.gnc-news-btn:focus-visible { outline: 3px solid var(--gx-gold); outline-offset: 3px; }
+.gnc-news-all { text-align: center; margin-top: 3rem; }
+
+@media (max-width: 767px) {
+    .gnc-news { padding: 3.5rem 0; }
+    .gnc-news-head { margin: 0 0 2.5rem; }
+    .gnc-news-row,
+    .gnc-news-row--reverse { grid-template-columns: 1fr; gap: 1.25rem; padding: 0 !important; }
+    .gnc-news-row + .gnc-news-row { margin-top: 2.5rem; }
+    .gnc-news-row--reverse .gnc-news-img  { order: 0; }
+    .gnc-news-row--reverse .gnc-news-text { order: 1; }
+    .gnc-news-all { margin-top: 2.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .gnc-news-img, .gnc-news-btn { transition: none !important; }
+}
+
+/* =============================================================
+   CALENDAR OF EVENTS: its own light, editorial look that sits
+   between the dark News and Programs sections, sharing their
+   serif titles, gold accents, square corners and green palette.
+   ============================================================= */
+.gnc-cal-sec {
+    background: #F9F6F1;
+    border-top: 4px solid #EABA3B;
+    padding: 4.5rem 0 4rem;
+}
+
+/* heading */
+.gnc-cal-head { max-width: 560px; margin: 0 0 2.5rem; }
+.gnc-cal-kicker {
+    display: inline-flex; align-items: center; gap: .5rem;
+    font-size: .78rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
+    color: #094024;
+    margin-bottom: .6rem;
+}
+.gnc-cal-kicker i { color: #EABA3B; font-size: 1.1rem; }
+.gnc-cal-heading {
+    font-family: 'Noto Serif', serif;
+    font-weight: 500;
+    font-size: clamp(1.8rem, 4.2vw, 2.6rem);
+    line-height: 1.1;
+    color: #094024;
+    margin: 0 0 .8rem;
+}
+.gnc-cal-heading span {
+    font-weight: 500;
+    background: linear-gradient(transparent 64%, rgba(234, 186, 59, .6) 64%);
+    padding: 0 .1em;
+}
+.gnc-cal-sub { color: #5d6b62; font-size: .98rem; line-height: 1.6; margin: 0; }
+
+/* panels: square, white, soft green shadow */
+.gnc-cal-sec .gnc-cal-card,
+.gnc-cal-sec .gnc-upcoming-card {
+    border-radius: 0;
+    background: #fff;
+    box-shadow: 0 14px 34px rgba(9, 64, 36, .14);
+}
+
+/* month bar */
+.gnc-cal-sec .gnc-cal-header {
+    background: #fff;
+    border-bottom: 0;
+    padding: 1.1rem 1.25rem;
+}
+.gnc-cal-sec .gnc-cal-title {
+    font-family: 'Noto Serif', serif;
+    font-weight: 500;
+    font-size: 1.5rem;
+    color: #094024;
+}
+.gnc-cal-sec .gnc-cal-title span {
+    font-weight: 800;
+    border-bottom: 3px solid #EABA3B;
+    padding-bottom: 1px;
+}
+.gnc-cal-sec .gnc-cal-nav {
+    width: 36px; height: 36px;
+    border-radius: 0;
+    background: #094024;
+    color: #fff;
+    border-bottom: 3px solid #EABA3B;
+    transition: background .2s, color .2s, transform .2s;
+}
+.gnc-cal-sec .gnc-cal-nav:hover { background: #EABA3B; color: #094024; transform: translateY(-2px); }
+
+/* edge-to-edge table-style grid */
+.gnc-cal-sec .gnc-cal-grid {
+    gap: 0;
+    padding: 0;
+    border-left: 1px solid #e4e9e5;
+    border-top: 0;
+}
+.gnc-cal-sec .gnc-cal-dow {
+    background: #094024;
+    color: #fff;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: .6rem 0;
+    margin: 0;
+    border-right: 1px solid rgba(255, 255, 255, .08);
+}
+.gnc-cal-sec .gnc-cal-cell {
+    border-radius: 0;
+    background: #fff;
+    border-right: 1px solid #e4e9e5;
+    border-bottom: 1px solid #e4e9e5;
+    padding: 6px 5px;
+}
+.gnc-cal-sec .gnc-cal-empty { background: #fbfaf7; min-height: 88px; }
+.gnc-cal-sec .gnc-cal-daynum {
+    font-family: 'Noto Serif', serif;
+    font-weight: 700;
+    font-size: .9rem;
+    color: #094024;
+}
+.gnc-cal-sec .gnc-cal-hasevent { background: #fff; }
+.gnc-cal-sec .gnc-cal-hasevent .gnc-cal-daynum::after {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    margin-left: 5px;
+    background: #EABA3B;
+    transform: rotate(45deg);
+    vertical-align: middle;
+}
+.gnc-cal-sec .gnc-cal-event-chip { border-radius: 0; border-left: 3px solid currentColor; }
+
+/* today: solid green square with a gold edge */
+.gnc-cal-sec .gnc-cal-today,
+.gnc-cal-sec .gnc-cal-hasevent.gnc-cal-today {
+    background: #D1DBD2;
+    border-color: #e4e9e5;
+    border-bottom: 3px solid #EABA3B;
+    animation: none;
+}
+.gnc-cal-sec .gnc-cal-today .gnc-cal-daynum { color: #094024; }
+
+.gnc-cal-sec .gnc-cal-legend {
+    background: #fbfaf7;
+    padding: .85rem 1.25rem;
+    color: #3b4a40;
+    font-weight: 600;
+    border-top: 0;
+}
+.gnc-cal-sec .gnc-cal-legend .gnc-cal-dot { border-radius: 0; }
+
+/* side cards */
+.gnc-cal-sec .gnc-upcoming-header {
+    background: #094024;
+    font-family: 'Noto Serif', serif;
+    font-weight: 500;
+    font-size: 1.05rem;
+    border-bottom: 3px solid #EABA3B;
+}
+.gnc-cal-sec .gnc-programs-count { border-radius: 0; background: #EABA3B; color: #094024; }
+.gnc-cal-sec a.gnc-programs-count:hover { background: #fff; }
+
+/* upcoming events: date block + details */
+.gnc-cal-sec .gnc-upcoming-item {
+    align-items: center;
+    gap: 1rem;
+    padding: .85rem 1.25rem;
+    border-bottom: 1px solid #eef1ee;
+    border-left: 0;
+    transition: background .2s;
+}
+.gnc-cal-sec .gnc-upcoming-item:hover { background: #faf8f3; }
+.gnc-evt-date {
+    flex: 0 0 auto;
+    width: 54px;
+    padding: .4rem 0 .35rem;
+    text-align: center;
+    background: #fff;
+    border: 1px solid #dfe5e0;
+    border-top: 4px solid var(--evt-color, #1F5E2C);
+    line-height: 1;
+}
+.gnc-evt-day { display: block; font-family: 'Noto Serif', serif; font-weight: 800; font-size: 1.35rem; color: #094024; }
+.gnc-evt-mon { display: block; margin-top: 3px; font-size: .62rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #8a6d1f; }
+.gnc-cal-sec .gnc-upcoming-title { font-family: 'Noto Serif', serif; font-weight: 800; font-size: .92rem; line-height: 1.3; }
+.gnc-cal-sec .gnc-upcoming-date { color: #5d6b62; line-height: 1.45; }
+
+/* programs filter list */
+.gnc-cal-sec .gnc-programs-list-item { border-bottom-color: #eef1ee; }
+.gnc-cal-sec .gnc-programs-list-item:hover { background: #faf8f3; }
+.gnc-cal-sec .gnc-programs-code { border-radius: 0; }
+.gnc-cal-sec .gnc-programs-list-item-active { background: #faf8f3; box-shadow: inset 4px 0 0 #EABA3B; }
+.gnc-cal-sec .gnc-programs-list-item-active .gnc-programs-code { background: #094024; color: #fff; }
+
+@media (max-width: 767px) {
+    .gnc-cal-sec { padding: 3rem 0 2.5rem; }
+    .gnc-cal-head { margin-bottom: 1.75rem; }
+    .gnc-cal-sec .gnc-cal-title { font-size: 1.2rem; }
+    .gnc-cal-sec .gnc-cal-grid { padding: 0; }
+    .gnc-cal-sec .gnc-cal-empty { min-height: 65px; }
+    .gnc-cal-sec .gnc-cal-daynum { font-size: .8rem; }
+}
+
+/* =============================================================
+   RESPONSIVE + MOBILE CENTERING: News (pinned card + rows) and
+   Academic Programs
+   ============================================================= */
+
+
+/* ---- One fixed size for every pinned slide: same width + height no
+   matter how much text it has. Long text is clipped with an ellipsis. ---- */
+.gnc-news .gnc-pinned-carousel .carousel-item { width: 100%; }
+.gnc-news .gnc-pinned-card { width: 100%; box-sizing: border-box; }
+.gnc-news .gnc-pinned-body { min-height: 0; }
+.gnc-news .gnc-pinned-content { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.gnc-news .gnc-pinned-footer { flex-shrink: 0; }
+.gnc-news .gnc-pinned-title,
+.gnc-news .gnc-pinned-intro,
+.gnc-news .gnc-pinned-list li span {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.gnc-news .gnc-pinned-title { -webkit-line-clamp: 2; }
+.gnc-news .gnc-pinned-intro { -webkit-line-clamp: 3; }
+.gnc-news .gnc-pinned-list li span { -webkit-line-clamp: 2; }
+
+/* ---- Large tablets / small laptops (<= 1199px) ---- */
+@media (max-width: 1199px) {
+    .gnc-news-wrap,
+    .gnc-prog-wrap { padding-left: 1rem; padding-right: 1rem; }
+}
+
+/* ---- Tablets (<= 991px): let the pinned card grow with its content ---- */
+@media (max-width: 991px) {
+    .gnc-news .gnc-pinned-card { height: 420px; gap: 20px; }
+    .gnc-news .gnc-pinned-media { flex: 0 0 42%; max-width: 42%; height: 100%; min-height: 0; }
+    .gnc-news .gnc-pinned-title { font-size: 1.45rem; }
+    .gnc-news .gnc-pinned-body { padding-right: 8px; }
+    .gnc-news-row,
+    .gnc-news-row--reverse,
+    .gnc-prog-row,
+    .gnc-prog-row--reverse { gap: 1.5rem; }
+    .gnc-news-title,
+    .gnc-pinned-title { overflow-wrap: anywhere; }
+}
+
+/* ---- Mobile (<= 767px): stack everything and center-align it ---- */
+@media (max-width: 767px) {
+    /* section headings */
+    .gnc-news-head,
+    .gnc-prog-head {
+        max-width: 100%;
+        margin: 0 auto 2.5rem;
+        text-align: center;
+    }
+    .gnc-news-heading::after,
+    .gnc-prog-heading::after { margin-left: auto; margin-right: auto; }
+    .gnc-news-sub,
+    .gnc-prog-sub { margin-left: auto; margin-right: auto; }
+
+    /* pinned card */
+    .gnc-news .gnc-pinned-label {
+        display: flex;
+        justify-content: center;
+        text-align: center;
+    }
+    .gnc-news .gnc-pinned-card {
+        flex-direction: column;
+        height: 600px;
+        min-height: 0;
+        gap: 16px;
+        padding: 10px;
+        text-align: center;
+    }
+    .gnc-news .gnc-pinned-media {
+        flex: none;
+        width: 100%;
+        max-width: 100%;
+        height: 230px;
+        min-height: 0;
+        aspect-ratio: auto;
+    }
+    .gnc-news .gnc-pinned-body { padding: 0 6px 10px; align-items: center; }
+    .gnc-news .gnc-pinned-content { width: 100%; }
+    .gnc-news .gnc-pinned-tags { justify-content: center; }
+    .gnc-news .gnc-pinned-title { font-size: 1.3rem; }
+    .gnc-news .gnc-pinned-intro { margin-left: auto; margin-right: auto; }
+    .gnc-news .gnc-pinned-list { align-items: center; }
+    .gnc-news .gnc-pinned-list li {
+        justify-content: center;
+        text-align: center;
+        max-width: 34rem;
+    }
+    .gnc-news .gnc-pinned-footer {
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        margin-top: 1.25rem;
+        width: 100%;
+    }
+    .gnc-news .gnc-pinned-btn { justify-content: center; width: 100%; max-width: 360px; }
+    .gnc-news .gnc-pinned-nav { justify-content: center; }
+
+    /* news rows */
+    .gnc-news-row,
+    .gnc-news-row--reverse { text-align: center; }
+    .gnc-news-row--reverse .gnc-news-text { text-align: center; }
+    .gnc-news-meta { justify-content: center; }
+    .gnc-news-title { text-align: center; }
+    .gnc-news-desc { margin-left: auto; margin-right: auto; max-width: 46ch; }
+    .gnc-news-author { text-align: center; }
+    .gnc-news-all { text-align: center; }
+
+    /* programs rows */
+    .gnc-prog-row,
+    .gnc-prog-row--reverse { text-align: center; }
+    .gnc-prog-row--reverse .gnc-prog-text { text-align: center; }
+    .gnc-prog-desc { margin-left: auto; margin-right: auto; max-width: 46ch; }
+}
+
+/* ---- Small phones (<= 480px) ---- */
+@media (max-width: 480px) {
+    .gnc-news-wrap,
+    .gnc-prog-wrap { padding-left: .75rem; padding-right: .75rem; }
+    .gnc-news .gnc-pinned-card { height: 620px; }
+    .gnc-news .gnc-pinned-title { font-size: 1.15rem; }
+    .gnc-news .gnc-pinned-btn { font-size: .8rem; padding: 10px 14px; }
+}
+/* ---- Pinned card: show the admin's text exactly as typed ---- */
+.gnc-news .gnc-pinned-content { display: flex; flex-direction: column; }
+/* Keep tags / title / date at their natural height so a long body can
+   never squash them (this was clipping the title). */
+.gnc-news .gnc-pinned-tags,
+.gnc-news .gnc-pinned-title,
+.gnc-news .gnc-pinned-date { flex-shrink: 0; }
+
+/* No scrollbar: long text is cut off with "..." after a fixed number of
+   lines. Change --pinned-lines to show more or fewer lines. */
+.gnc-pinned-text {
+    --pinned-lines: 5;
+    flex: 0 1 auto; min-height: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--pinned-lines);
+    line-clamp: var(--pinned-lines);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: 'Inter', sans-serif;
+    font-size: .88rem; line-height: 1.55; color: #33413a;
+    overflow-wrap: anywhere;
+}
+.gnc-pinned-text > :first-child { margin-top: 0; }
+.gnc-pinned-text > :last-child { margin-bottom: 0; }
+.gnc-pinned-text p { margin: 0 0 .5rem; }
+.gnc-pinned-text ul, .gnc-pinned-text ol { margin: 0 0 .7rem; padding-left: 1.3rem; }
+.gnc-pinned-text a { color: #1F5E2C; text-decoration: underline; }
+.gnc-pinned-text h1, .gnc-pinned-text h2, .gnc-pinned-text h3,
+.gnc-pinned-text h4, .gnc-pinned-text h5, .gnc-pinned-text h6 { font-size: 1rem; font-weight: 700; margin: 0 0 .5rem; }
+@media (max-width: 991px) { .gnc-pinned-text { --pinned-lines: 5; } }
+@media (max-width: 767px) { .gnc-pinned-text { --pinned-lines: 3; } }
+@media (max-width: 480px) { .gnc-pinned-text { --pinned-lines: 4; } }
+
+/* =============================================================
+   UPCOMING EVENTS STRIP: sits above the calendar. Each event is a
+   shield-shaped date badge with the title, time and place beside it.
+   ============================================================= */
+.gnc-evs {
+    background: #fff;
+    box-shadow: 0 14px 34px rgba(9, 64, 36, .14);
+    padding: 1.4rem 1.5rem 1.5rem;
+    margin-bottom: 1.5rem;
+}
+.gnc-evs-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding-bottom: .9rem;
+    margin-bottom: 1.4rem;
+    border-bottom: 1px solid #e4e9e5;
+}
+.gnc-evs-title {
+    font-family: 'Noto Serif', serif;
+    font-weight: 500; font-size: 1.15rem; color: #094024;
+}
+.gnc-evs-title i { color: #EABA3B; margin-right: .45rem; }
+.gnc-evs-empty { margin: 0; padding: .5rem 0; color: #5d6b62; }
+
+.gnc-evs-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.75rem 1.5rem;
+}
+.gnc-evs-item {
+    display: flex; align-items: flex-start; gap: 1rem;
+    min-width: 0;
+}
+
+/* the date box: white tile, green top bar, big day over a gold month */
+.gnc-datebox {
+    flex: 0 0 68px;
+    width: 68px;
+    display: flex; flex-direction: column; align-items: center;
+    padding: .45rem 0 .5rem;
+    text-align: center;
+    background: #fff;
+    border: 1px solid #dfe5e0;
+    border-top: 4px solid #1F5E2C;
+    box-shadow: 0 2px 8px rgba(9, 64, 36, .08);
+}
+.gnc-datebox-day {
+    font-family: 'Noto Serif', serif;
+    font-size: 1.75rem; font-weight: 800;
+    line-height: 1.1;
+    color: #094024;
+}
+.gnc-datebox-mon {
+    font-family: 'Inter', sans-serif;
+    font-size: .72rem; font-weight: 800;
+    letter-spacing: .12em;
+    line-height: 1;
+    margin-top: 2px;
+    color: #C9A227;
+}
+
+/* text beside the date box */
+.gnc-evs-info { min-width: 0; padding-top: 2px; }
+.gnc-evs-name {
+    font-family: 'Noto Serif', serif;
+    font-weight: 800; font-size: 1.05rem; line-height: 1.25;
+    color: #094024;
+    margin-bottom: .55rem;
+    overflow-wrap: anywhere;
+}
+.gnc-evs-meta {
+    display: flex; align-items: flex-start; gap: .5rem;
+    font-size: .8rem; line-height: 1.4;
+    color: #5d6b62;
+    margin-top: .35rem;
+    overflow-wrap: anywhere;
+}
+.gnc-evs-meta i { color: #8a8f8c; font-size: .85rem; margin-top: 1px; flex-shrink: 0; }
+
+@media (max-width: 1199px) {
+    .gnc-evs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 575px) {
+    .gnc-evs { padding: 1.2rem 1rem 1.3rem; }
+    .gnc-evs-grid { grid-template-columns: 1fr; }
+}
+
+/* Programs card now sits alone beside the calendar: on desktop make it
+   exactly as tall as the calendar and scroll its list inside. */
+@media (min-width: 992px) {
+    .gnc-cal-sec .gnc-events-side-stack {
+        position: relative;
+        height: 100%;
+        min-height: 360px;
+    }
+    .gnc-cal-sec .gnc-events-side-stack .gnc-upcoming-card {
+        position: absolute; inset: 0;
+        height: auto; min-height: 0;
+        display: flex; flex-direction: column;
+    }
+    .gnc-cal-sec .gnc-events-side-stack .gnc-programs-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+        overflow-y: auto;
+    }
+}
+
+/* =============================================================
+   PINNED NEWS: centre-mode slider. The active card sits in the
+   middle, the previous/next cards peek in from the sides under a
+   green wash, with round white arrows over the centre card's edges.
+   ============================================================= */
+.gnc-news .gnc-pinned-label { margin-bottom: 1rem; }
+.gnc-pin {
+    --pin-w: min(700px, 84vw);
+    --pin-h: 420px;
+    /* break out of the 960px container so the side cards fill the screen edge to edge */
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    background: transparent;
+    padding: 1rem 0 2.5rem;
+    margin-bottom: 3.5rem;
+    overflow: hidden;
+    outline: none;
+}
+.gnc-pin:focus-visible { outline: 3px solid var(--gx-gold); outline-offset: 3px; }
+.gnc-pin-stage {
+    position: relative;
+    height: var(--pin-h);
+}
+.gnc-pin-slide {
+    --o: 0;
+    position: absolute;
+    top: 0;
+    left: calc((100% - var(--pin-w)) / 2);
+    width: var(--pin-w);
+    height: 100%;
+    overflow: hidden;
+    background: #094024;
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 18px 30px -18px rgba(0, 0, 0, .45);
+    transform: translateX(calc(var(--o) * 104%));
+    transition: transform .55s cubic-bezier(.3, .7, .2, 1), opacity .4s ease;
+}
+.gnc-pin-slide.is-hidden { opacity: 0; pointer-events: none; }
+.gnc-pin-img,
+.gnc-pin-fallback { position: absolute; inset: 0; width: 100%; height: 100%; }
+.gnc-pin-img { object-fit: cover; display: block; transition: transform .6s ease; }
+.gnc-pin-slide.is-active:hover .gnc-pin-img { transform: scale(1.03); }
+.gnc-pin-fallback {
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #0b4228, #1F5E2C);
+    color: rgba(255, 255, 255, .18); font-size: 6rem;
+}
+/* dark gradient under the text on the centre card */
+.gnc-pin-slide::before {
+    content: '';
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(to top, rgba(0, 0, 0, .78) 0%, rgba(0, 0, 0, .25) 45%, rgba(0, 0, 0, 0) 70%);
+}
+/* green wash on the side cards */
+.gnc-pin-slide::after {
+    content: '';
+    position: absolute; inset: 0; z-index: 4;   /* above the caption so side-card text is tinted too */
+    background: rgba(9, 64, 36, .82);
+    opacity: 1;
+    transition: opacity .55s ease;
+    pointer-events: none;
+}
+.gnc-pin-slide.is-active::after { opacity: 0; }
+
+.gnc-pin-caption {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
+    padding: 0 3rem 2.6rem;
+}
+.gnc-pin-title {
+    font-family: 'Inter', sans-serif;
+    font-weight: 300;
+    font-size: clamp(1.5rem, 3.4vw, 2.6rem);
+    line-height: 1.2;
+    color: #fff;
+    margin: 0 0 1.4rem;
+    display: -webkit-box; -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2; line-clamp: 2;
+    overflow: hidden; overflow-wrap: anywhere;
+}
+.gnc-pin-title { margin-bottom: .7rem; }
+.gnc-pin-more {
+    display: inline-flex; align-items: center; gap: .5rem;
+    font-family: 'Inter', sans-serif;
+    font-weight: 700; font-size: .8rem;
+    letter-spacing: .14em; text-transform: uppercase;
+    color: #fff; text-decoration: none;
+}
+.gnc-pin-more span { font-size: .75rem; }
+.gnc-pin-more:hover,
+.gnc-pin-more:focus-visible { color: var(--gx-gold); }
+
+.gnc-pin-arrow {
+    position: absolute; top: 50%; z-index: 5;
+    width: 64px; height: 64px;
+    margin-top: -32px;
+    border: 1px solid rgba(255, 255, 255, .45); border-radius: 50%;
+    /* glass effect */
+    background: rgba(255, 255, 255, .16); color: #fff;
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
+    backdrop-filter: blur(10px) saturate(160%);
+    font-size: 1.5rem;
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .25), inset 0 1px 0 rgba(255, 255, 255, .45);
+    cursor: pointer;
+    transition: background .2s, color .2s, transform .2s;
+}
+.gnc-pin-arrow:hover { background: rgba(255, 255, 255, .3); transform: scale(1.06); }
+.gnc-pin-arrow:focus-visible { outline: 3px solid var(--gx-gold); outline-offset: 3px; }
+.gnc-pin-prev { left: calc((100% - var(--pin-w)) / 2 - 32px); }
+.gnc-pin-next { right: calc((100% - var(--pin-w)) / 2 - 32px); }
+
+@media (max-width: 767px) {
+    .gnc-pin { --pin-w: 84vw; --pin-h: 340px; padding: 1rem 0 2rem; }
+    .gnc-pin-caption { padding: 0 1.25rem 1.5rem; }
+    .gnc-pin-title { font-size: 1.35rem; margin-bottom: 1rem; }
+    .gnc-pin-arrow { width: 44px; height: 44px; margin-top: -22px; font-size: 1.1rem; }
+    .gnc-pin-prev { left: calc((100% - var(--pin-w)) / 2 - 22px); }
+    .gnc-pin-next { right: calc((100% - var(--pin-w)) / 2 - 22px); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .gnc-pin-slide, .gnc-pin-slide::after, .gnc-pin-img { transition: none !important; }
+}
+
+/* type indicator (Announcement / News / Facebook Post) + short description */
+.gnc-pin-kind {
+    display: inline-flex; align-items: center; gap: .4rem;
+    margin-bottom: .8rem;
+    padding: 4px 11px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 700; font-size: .68rem;
+    letter-spacing: .08em; text-transform: uppercase;
+    border-radius: 4px;
+    background: #EABA3B; color: #3d2d00;
+}
+.gnc-pin-kind--news { background: #fff; color: #094024; }
+.gnc-pin-kind--facebook { background: #1877F2; color: #fff; }
+.gnc-pin-desc {
+    font-family: 'Inter', sans-serif;
+    font-size: .92rem; line-height: 1.5;
+    color: rgba(255, 255, 255, .88);
+    margin: 0 0 1.2rem;
+    max-width: 60ch;
+    display: -webkit-box; -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2; line-clamp: 2;   /* more than 2 lines becomes "..." */
+    overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere;
+}
+@media (max-width: 767px) {
+    .gnc-pin-kind { font-size: .62rem; margin-bottom: .6rem; }
+    .gnc-pin-title { font-size: 1.2rem; margin-bottom: .5rem; }
+    .gnc-pin-desc { font-size: .82rem; -webkit-line-clamp: 2; line-clamp: 2; margin-bottom: .9rem; }
+}
+
+/* Pillars marquee: no motion -> static, wrapped, single set */
+@media (prefers-reduced-motion: reduce) {
+    .gnc-pillars .pillar-track { animation: none !important; width: auto; flex-wrap: wrap; justify-content: center; }
+    .gnc-pillars .pillar-group:nth-child(n+2),
+    .gnc-pillars .pillar-word.is-dup { display: none; }
+    .gnc-pillars .pillar-group { flex-wrap: wrap; justify-content: center; }
+}
+
+/* =============================================================
+   PILLARS STRIP (v3): polished gold band. All three words solid deep
+   green with a soft embossed highlight, white medallions (no longer
+   clipped), a double rule top and bottom, and a gentle sheen.
+   ============================================================= */
+.gnc-pillars {
+    padding: 0;
+    background:
+        radial-gradient(ellipse 60% 140% at 50% 50%, rgba(255, 236, 160, .55), transparent 70%),
+        repeating-linear-gradient(135deg, rgba(9, 64, 36, .04) 0 2px, transparent 2px 14px),
+        #EABA3B;
+    border-top: 5px solid #094024;
+    border-bottom: 5px solid #094024;
+    box-shadow: inset 0 3px 0 rgba(255, 255, 255, .28), inset 0 -3px 0 rgba(255, 255, 255, .28);
+}
+/* room above/below so the medallion rings and shadows are never cut off */
+.gnc-pillars .pillar-viewport {
+    padding: 1.6rem 0;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
+            mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
+}
+.gnc-pillars .pillar-word {
+    gap: 1.3rem;
+    padding-right: 0;
+    align-items: center;
+}
+
+/* white medallion, green ring, soft halo */
+.gnc-pillars .pillar-badge,
+.gnc-pillars .pillar-badge.fides-bg,
+.gnc-pillars .pillar-badge.scientia-bg,
+.gnc-pillars .pillar-badge.patria-bg {
+    width: 76px;
+    height: 76px;
+    background: radial-gradient(circle at 35% 30%, #fff, #f6f1e4);
+    box-shadow: 0 0 0 3px #094024, 0 0 0 7px rgba(255, 255, 255, .5), 0 10px 18px rgba(9, 64, 36, .28);
+}
+.gnc-pillars .pillar-badge .pillar-icon-img { width: 38px; height: 38px; }
+
+/* lettering: all solid, embossed */
+.gnc-pillars .pillar-label {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .3rem;
+}
+.gnc-pillars .pillar-word:nth-child(3n+1) .pillar-text,
+.gnc-pillars .pillar-word:nth-child(3n+2) .pillar-text,
+.gnc-pillars .pillar-word:nth-child(3n+3) .pillar-text {
+    color: #094024;
+    -webkit-text-stroke: 0;
+    text-shadow: 2px 3px 0 rgba(255, 255, 255, .38);
+}
+.gnc-pillars .pillar-text {
+    font-size: clamp(2.8rem, 5.6vw, 4.6rem);
+    line-height: 1;
+    letter-spacing: .03em;
+}
+.gnc-pillars .pillar-desc {
+    font-family: 'Inter', sans-serif;
+    font-size: .74rem;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: rgba(9, 64, 36, .82);
+    white-space: nowrap;
+    padding-left: .1rem;
+}
+
+/* divider: green diamond with a light centre */
+.gnc-pillars .pillar-word::after {
+    content: '';
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    margin: 0 2.6rem 0 1.2rem;
+    background: #094024;
+    transform: rotate(45deg);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, .4);
+}
+
+@media (max-width: 768px) {
+    .gnc-pillars { border-top-width: 3px; border-bottom-width: 3px; }
+    .gnc-pillars .pillar-viewport { padding: 1rem 0; }
+    .gnc-pillars .pillar-word { gap: .8rem; }
+    .gnc-pillars .pillar-badge,
+    .gnc-pillars .pillar-badge.fides-bg,
+    .gnc-pillars .pillar-badge.scientia-bg,
+    .gnc-pillars .pillar-badge.patria-bg {
+        width: 48px; height: 48px;
+        box-shadow: 0 0 0 2px #094024, 0 0 0 4px rgba(255, 255, 255, .5), 0 6px 10px rgba(9, 64, 36, .25);
+    }
+    .gnc-pillars .pillar-badge .pillar-icon-img { width: 24px; height: 24px; }
+    .gnc-pillars .pillar-text { font-size: clamp(2.2rem, 11vw, 3rem); text-shadow: 1px 2px 0 rgba(255, 255, 255, .38); }
+    .gnc-pillars .pillar-desc { font-size: .58rem; letter-spacing: .1em; }
+    .gnc-pillars .pillar-word::after { width: 9px; height: 9px; margin: 0 1.4rem 0 .6rem; }
+}
+
+/* =============================================================
+   HOMEPAGE ANIMATION & POLISH LAYER (v11)
+   Appended at the end of the file so it only overrides earlier
+   rules deliberately. Everything here is decorative; all original
+   functionality, states and JS hooks are untouched.
+   ============================================================= */
+
+/* ---- Keyframes ---- */
+@keyframes gnc-kenburns {
+    from { transform: scale(1); }
+    to   { transform: scale(1.12); }
+}
+@keyframes gnc-shimmer {
+    to { background-position: 200% center; }
+}
+@keyframes gnc-ripple {
+    to { transform: scale(4); opacity: 0; }
+}
+@keyframes gnc-chip-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes gnc-today-glow {
+    0%, 100% { box-shadow: inset 0 0 0 0 rgba(234, 186, 59, 0); }
+    50%      { box-shadow: inset 0 0 0 4px rgba(234, 186, 59, .45); }
+}
+@keyframes gnc-title-glow {
+    0%, 100% { text-shadow: 0 0 0 rgba(234, 186, 59, 0); }
+    50%      { text-shadow: 0 0 26px rgba(234, 186, 59, .4); }
+}
+@keyframes gnc-spin-slow {
+    to { transform: rotate(360deg); }
+}
+@keyframes gnc-sway {
+    from { transform: rotate(-1.5deg); }
+    to   { transform: rotate(1.5deg); }
+}
+@keyframes gnc-aurora-a {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(9vw, 6vh) scale(1.25); }
+}
+@keyframes gnc-aurora-b {
+    from { transform: translate(0, 0) scale(1.15); }
+    to   { transform: translate(-8vw, -5vh) scale(0.9); }
+}
+@keyframes gnc-aurora-c {
+    from { transform: translate(0, 0) scale(0.95); }
+    to   { transform: translate(6vw, -7vh) scale(1.2); }
+}
+@keyframes gnc-badge-pop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.14) rotate(-5deg); }
+    100% { transform: scale(1); }
+}
+
+/* =============================================================
+   1. SCROLL PROGRESS BAR + BACK TO TOP
+   ============================================================= */
+.gnc-scroll-progress {
+    position: fixed;
+    top: 0; left: 0;
+    width: 0;
+    height: 3px;
+    z-index: 2000;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(90deg, #EABA3B, #fff2c9, #EABA3B);
+    background-size: 200% auto;
+    animation: gnc-shimmer 2.2s linear infinite;
+}
+.gnc-backtop {
+    position: fixed;
+    left: 22px; bottom: 22px;
+    width: 46px; height: 46px;
+    border: 0; border-radius: 50%;
+    background: #094024;
+    color: #EABA3B;
+    font-size: 1.05rem;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    z-index: 1900;
+    box-shadow: 0 8px 20px rgba(9, 64, 36, .35);
+    opacity: 0; visibility: hidden;
+    transform: translateY(14px);
+    transition: opacity .3s ease, transform .3s ease, background .2s, color .2s, visibility .3s;
+}
+.gnc-backtop.is-show { opacity: 1; visibility: visible; transform: translateY(0); }
+.gnc-backtop:hover { background: #EABA3B; color: #094024; transform: translateY(-3px); }
+.gnc-backtop:focus-visible { outline: 3px solid #EABA3B; outline-offset: 3px; }
+
+/* =============================================================
+   2. HERO: Ken Burns zoom, aurora blobs, particles, glow
+   ============================================================= */
+/* Perf: animated blurred aurora + particle canvas are disabled.
+   Large blurred, blend-mode layers over a full-screen video are a major
+   cause of scroll/playback stutter on tablets and low-power laptops. */
+.hero-aurora,
+.hero-particles {
+    display: none !important;
+}
+
+.hero-aurora {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    overflow: hidden;
+    pointer-events: none;
+}
+.hero-aurora span {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(70px);
+    opacity: .5;
+    mix-blend-mode: screen;
+    will-change: transform;
+}
+.hero-aurora span:nth-child(1) {
+    width: 44vw; height: 44vw;
+    left: -10vw; top: -12vw;
+    background: radial-gradient(circle, rgba(234, 186, 59, .5), transparent 65%);
+    animation: gnc-aurora-a 16s ease-in-out infinite alternate;
+}
+.hero-aurora span:nth-child(2) {
+    width: 38vw; height: 38vw;
+    right: -8vw; top: 20%;
+    background: radial-gradient(circle, rgba(31, 94, 44, .8), transparent 65%);
+    animation: gnc-aurora-b 20s ease-in-out infinite alternate;
+}
+.hero-aurora span:nth-child(3) {
+    width: 30vw; height: 30vw;
+    left: 30%; bottom: -14vw;
+    background: radial-gradient(circle, rgba(255, 236, 160, .35), transparent 65%);
+    animation: gnc-aurora-c 14s ease-in-out infinite alternate;
+}
+.hero-particles {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+}
+
+/* Slow cinematic zoom on the active slide's backdrop */
+/* Slideshow zoom removed: scaling full-bleed hero media every frame was
+   causing playback lag. Static hero media only; entrance animations remain. */
+.hero-slide.active .slide-bg,
+.hero-slide.active .slide-video {
+    animation: none;
+    will-change: auto;
+    transform: none;
+}
+
+/* Gold title glow pulse (rides on top of the entrance animation) */
+.hero-slide.active .hero-title-line {
+    animation: gnc-fade-up 0.7s ease both;
+}
+
+/* CTA arrow nudge */
+.btn-enroll svg { transition: transform .25s ease; }
+.btn-enroll:hover svg { transform: translateX(4px); }
+
+/* Active dot glow */
+.hero-dots span.active {
+    box-shadow: 0 0 10px rgba(234, 186, 59, .9);
+}
+
+/* =============================================================
+   3. PILLARS: hover pop + medallion shine sweep
+   ============================================================= */
+.gnc-pillars .pillar-word {
+    transition: transform .3s ease;
+}
+.gnc-pillars .pillar-word:hover {
+    transform: translateY(-6px);
+}
+.gnc-pillars .pillar-badge {
+    position: relative;
+    overflow: hidden;
+    transition: transform .3s ease;
+}
+.gnc-pillars .pillar-word:hover .pillar-badge {
+    animation: gnc-badge-pop .45s ease;
+}
+.gnc-pillars .pillar-badge::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, .85) 50%, transparent 70%);
+    transform: translateX(-130%) rotate(10deg);
+    transition: transform .7s ease;
+    pointer-events: none;
+}
+.gnc-pillars .pillar-word:hover .pillar-badge::after {
+    transform: translateX(130%) rotate(10deg);
+}
+
+/* =============================================================
+   4. SECTION HEADINGS: animated gold shimmer + drawing underline
+   ============================================================= */
+.gnc-news-heading span,
+.gnc-prog-heading span {
+    background: linear-gradient(100deg, #EABA3B 30%, #fff6d8 50%, #EABA3B 70%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gnc-shimmer 5s linear infinite;
+}
+/* underline draws itself in when the header scrolls into view */
+.gnc-news-head .gnc-news-heading::after,
+.gnc-prog-head .gnc-prog-heading::after {
+    width: 0;
+    transition: width .9s cubic-bezier(.2, .7, .2, 1) .35s;
+}
+.gnc-news-head.is-visible .gnc-news-heading::after,
+.gnc-prog-head.is-visible .gnc-prog-heading::after {
+    width: 64px;
+}
+/* calendar kicker slides in */
+.gnc-cal-head .gnc-cal-kicker {
+    opacity: 0;
+    transform: translateX(-16px);
+    transition: opacity .6s ease .1s, transform .6s ease .1s;
+}
+.gnc-cal-head.is-visible .gnc-cal-kicker {
+    opacity: 1;
+    transform: none;
+}
+
+/* =============================================================
+   5. PINNED SLIDER: staged caption entrance on the active card
+   ============================================================= */
+.gnc-pin-slide.is-active .gnc-pin-kind  { animation: gnc-fade-up .5s ease .1s both; }
+.gnc-pin-slide.is-active .gnc-pin-title { animation: gnc-fade-up .6s ease .2s both; }
+.gnc-pin-slide.is-active .gnc-pin-desc  { animation: gnc-fade-up .6s ease .3s both; }
+.gnc-pin-slide.is-active .gnc-pin-more  { animation: gnc-fade-up .6s ease .4s both; }
+.gnc-pin-arrow:active { transform: scale(.94); }
+
+/* =============================================================
+   6. NEWS ROWS: stronger zoom + light sweep across the image
+   ============================================================= */
+.gnc-news-img { position: relative; }
+.gnc-news-img .gnc-news-shine {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, .35) 50%, transparent 60%);
+    transform: translateX(-130%);
+    transition: transform .8s ease;
+    pointer-events: none;
+    z-index: 2;   /* .skeleton-wrap img is z-index:1, so the shine must sit above it */
+}
+.gnc-news-row:hover .gnc-news-img { transform: scale(1.05); }
+.gnc-news-row:hover .gnc-news-img .gnc-news-shine { transform: translateX(130%); }
+
+/* same sweep for the Academic Programs images */
+.gnc-prog-img { position: relative; overflow: hidden; }
+.gnc-prog-img::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, .28) 50%, transparent 60%);
+    transform: translateX(-130%);
+    transition: transform .8s ease;
+    pointer-events: none;
+}
+.gnc-prog-row:hover .gnc-prog-img { transform: scale(1.05); }
+.gnc-prog-row:hover .gnc-prog-img::after { transform: translateX(130%); }
+
+/* =============================================================
+   7. BUTTONS: shine sweep + click ripple
+   ============================================================= */
+.gnc-news-btn, .gnc-prog-btn {
+    position: relative;
+    overflow: hidden;
+}
+.gnc-news-btn::after, .gnc-prog-btn::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -80%;
+    width: 50%; height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .65), transparent);
+    transform: skewX(-20deg);
+    transition: left .6s ease;
+    pointer-events: none;
+}
+.gnc-news-btn:hover::after, .gnc-prog-btn:hover::after { left: 130%; }
+
+.gnc-news-btn, .gnc-prog-btn, .gnc-pin-more, .btn-enroll, .btn-explore {
+    position: relative;
+    overflow: hidden;
+}
+.gnc-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(9, 64, 36, .28);
+    transform: scale(0);
+    opacity: 1;
+    animation: gnc-ripple .65s ease-out forwards;
+    pointer-events: none;
+}
+.gnc-pin-more .gnc-ripple,
+.btn-explore .gnc-ripple { background: rgba(255, 255, 255, .35); }
+
+/* =============================================================
+   8. CALENDAR: chip stagger-in, today glow, hover lift
+   ============================================================= */
+.gnc-cal-sec .gnc-cal-event-chip { animation: gnc-chip-in .35s ease both; }
+.gnc-cal-sec .gnc-cal-event-chip:nth-child(2) { animation-delay: .07s; }
+.gnc-cal-sec .gnc-cal-event-chip:nth-child(3) { animation-delay: .14s; }
+
+.gnc-cal-sec .gnc-cal-today {
+    animation: gnc-today-glow 2.6s ease-in-out infinite;
+}
+.gnc-cal-sec .gnc-cal-hasevent {
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+.gnc-cal-sec .gnc-cal-hasevent:hover {
+    transform: translateY(-3px) scale(1.03);
+    box-shadow: 0 10px 22px rgba(9, 64, 36, .18);
+    z-index: 3;
+}
+
+/* =============================================================
+   9. UPCOMING EVENTS STRIP: hover lift + date-box wiggle
+   ============================================================= */
+.gnc-evs-item { transition: transform .25s ease; }
+.gnc-evs-item:hover { transform: translateY(-3px); }
+.gnc-datebox {
+    transition: border-color .25s ease, transform .25s ease, box-shadow .25s ease;
+}
+.gnc-evs-item:hover .gnc-datebox {
+    border-top-color: #EABA3B;
+    transform: translateY(-2px) rotate(-2deg);
+    box-shadow: 0 8px 16px rgba(9, 64, 36, .14);
+}
+
+/* Programs filter list: sliding hover indent */
+.gnc-programs-list-item {
+    transition: background .15s ease, padding-left .25s ease;
+}
+.gnc-programs-list-item:hover { padding-left: 1.6rem; }
+
+/* =============================================================
+   10. PRESIDENT: swaying laurel, spinning seal
+   ============================================================= */
+.gnc-president-leaves {
+    animation: gnc-sway 9s ease-in-out infinite alternate;
+    transform-origin: top left;
+}
+/* Logo/seal stays static behind the president photo. */
+.gnc-president-seal {
+    animation: none;
+    will-change: auto;
+}
+
+/* =============================================================
+   11. CAMPUS MAP: hover lift + glow
+   ============================================================= */
+.gnc-map-frame {
+    transition: transform .4s ease, box-shadow .4s ease;
+}
+.gnc-map-frame:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 22px 44px rgba(9, 64, 36, .22);
+}
+
+/* =============================================================
+   REDUCED MOTION — strip everything added in this layer
+   ============================================================= */
+@media (prefers-reduced-motion: reduce) {
+    .hero-slide.active .slide-bg,
+    .hero-slide.active .slide-video,
+    .hero-slide.active .hero-title-line,
+    .hero-aurora span,
+    .hero-particles,
+    .gnc-scroll-progress,
+    .gnc-pillars .pillar-badge,
+    .gnc-pillars .pillar-badge::after,
+    .gnc-news-heading span,
+    .gnc-prog-heading span,
+    .gnc-pin-slide.is-active .gnc-pin-kind,
+    .gnc-pin-slide.is-active .gnc-pin-title,
+    .gnc-pin-slide.is-active .gnc-pin-desc,
+    .gnc-pin-slide.is-active .gnc-pin-more,
+    .gnc-cal-sec .gnc-cal-event-chip,
+    .gnc-cal-sec .gnc-cal-today,
+    .gnc-president-leaves,
+    .gnc-president-seal {
+        animation: none !important;
+    }
+    .gnc-news-head .gnc-news-heading::after,
+    .gnc-prog-head .gnc-prog-heading::after {
+        width: 64px !important;
+        transition: none !important;
+    }
+    .gnc-cal-head .gnc-cal-kicker {
+        opacity: 1 !important;
+        transform: none !important;
+        transition: none !important;
+    }
+    .gnc-news-img .gnc-news-shine, .gnc-prog-img::after,
+    .gnc-pillars .pillar-badge::after {
+        display: none !important;
+    }
+    .gnc-pin-slide.is-active .gnc-pin-kind,
+    .gnc-pin-slide.is-active .gnc-pin-title,
+    .gnc-pin-slide.is-active .gnc-pin-desc,
+    .gnc-pin-slide.is-active .gnc-pin-more {
+        opacity: 1 !important;
+    }
+}
+/* =============================================================
+   CENTERED SECTION HEADINGS (News, Calendar, Academic Programs)
+   Placed last so it overrides the earlier left-aligned rules.
+   ============================================================= */
+.gnc-news-head,
+.gnc-prog-head,
+.gnc-cal-head {
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+}
+.gnc-news-heading::after,
+.gnc-prog-heading::after {
+    margin-left: auto;
+    margin-right: auto;
+}
+.gnc-news-sub,
+.gnc-prog-sub,
+.gnc-cal-sub {
+    margin-left: auto;
+    margin-right: auto;
+}
+.gnc-cal-kicker {
+    justify-content: center;
+}
+/* "Pinned" label above the slider */
+.gnc-news .gnc-pinned-label {
+    display: flex;
+    justify-content: center;
+    text-align: center;
+}
+
+/* =============================================================
+   HEADING ICONS: sit inline, to the left of the title text
+   (News & Announcements, Academic Programs)
+   ============================================================= */
+.gnc-news-heading .gnc-news-icon,
+.gnc-prog-heading .gnc-prog-icon {
+    display: inline-block;
+    font-size: 1.05em;
+    line-height: 1;
+    margin: 0 .85rem 0 0;
+    vertical-align: -.1em;
+    color: #fff;
+}
+/* a little more room between the title line and the gold tagline */
+.gnc-news-heading span,
+.gnc-prog-heading span {
+    margin-top: .45rem;
 }

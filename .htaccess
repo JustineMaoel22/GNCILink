@@ -1,0 +1,2 @@
+RewriteEngine On
+RewriteRule ^college/([a-z0-9-]+)/?$ /pages/academics/college/college-dept.php?slug=$1 [L,QSA]

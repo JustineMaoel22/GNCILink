@@ -253,12 +253,10 @@
 
 .wave-gold {
     fill: #d3a63a;
-    opacity: 0.4;
 }
 
 .wave-maroon {
     fill: #8f1230;
-    opacity: 0.6;
 }
 
 .wave-green {
@@ -577,4 +575,79 @@
         width: 100%;
         max-width: 140px;
     }
+}
+
+/* =============================================================
+   SCROLL ANIMATIONS
+   ============================================================= */
+
+.reveal-up {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.7s cubic-bezier(0.25, 1, 0.5, 1), transform 0.7s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.reveal-up.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.reveal-scale {
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1), transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.reveal-scale.is-visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* =============================================================
+   OPENING TRANSITION (same wipe as the Contact Us / History pages)
+   6 green panels slide up and reveal the page. Pure CSS; the whole
+   layer is also hidden at the end so it can never block the page.
+   ============================================================= */
+.admin-open {
+    position: fixed; inset: 0; z-index: 2000;
+    display: flex; pointer-events: none;
+    animation: adOpenGone 0s linear 1.7s forwards;
+}
+.admin-open > i {
+    flex: 1; margin-right: -1px;
+    background: #0b4228;
+    animation: adOpenWipe .85s cubic-bezier(.76, 0, .24, 1) forwards;
+    animation-delay: calc(.35s + var(--n, 0) * .07s);
+}
+.admin-open > i:nth-child(even) { background: #083320; }
+.admin-open-label {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .9rem;
+    color: #d3a63a; text-align: center;
+    animation: adOpenLabel 1.1s ease forwards;
+}
+.admin-open-label img { width: 64px; height: 64px; object-fit: contain; }
+.admin-open-label span {
+    font-family: 'Noto Serif', serif; font-weight: 700;
+    font-size: clamp(1.5rem, 4vw, 2.2rem); letter-spacing: .02em;
+}
+@keyframes adOpenWipe { to { transform: translateY(-101%); } }
+@keyframes adOpenGone { to { visibility: hidden; } }
+@keyframes adOpenLabel {
+    0%   { opacity: 0; transform: translateY(14px); }
+    30%  { opacity: 1; transform: none; }
+    70%  { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateY(-14px); }
+}
+
+/* Hold the hero's entrance until the wipe has finished. These replace the
+   inline transition-delay values (0 / .1s / .2s / .3s) with the wipe wait added. */
+.admin-hero .admin-breadcrumb.reveal-up { transition-delay: .95s !important; }
+.admin-hero h1.reveal-up                { transition-delay: 1.05s !important; }
+.admin-hero p.reveal-up                 { transition-delay: 1.15s !important; }
+.admin-tabs-wrap.reveal-up              { transition-delay: 1.25s !important; }
+
+@media (prefers-reduced-motion: reduce) {
+    .admin-open { display: none; }
+    .admin-hero .reveal-up, .admin-tabs-wrap.reveal-up { transition-delay: 0s !important; }
 }

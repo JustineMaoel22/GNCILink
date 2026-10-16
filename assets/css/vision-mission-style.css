@@ -1,18 +1,30 @@
-@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Serif:ital,wght@0,400;0,500;0,700;0,800;1,400&family=Bebas+Neue&display=swap');
 
-body {
-    background-color: var(--gnc-cream);
-
+/* Colour tokens come from base-style.css; fallbacks keep the page safe. */
+:root {
+    --vm-green:      var(--gnc-green-light, #1F5E2C);
+    --vm-green-deep: #094024;
+    --vm-gold:       var(--gnc-gold, #EABA3B);
+    --vm-cream:      var(--gnc-cream, #F9F6F1);
+    --vm-border:     var(--gnc-border, #e4e9e5);
+    --vm-gray:       var(--gnc-text-gray, #5d6b62);
+    --vm-dark:       var(--gnc-text-dark, #1a1a1a);
+    --vm-ease:       cubic-bezier(.22, 1, .36, 1);
 }
 
+body { background-color: var(--vm-cream); }
+
+/* =============================================================
+   HERO (original design, unchanged)
+   ============================================================= */
 .vision-mission-hero {
     position: relative;
-    background-color: var(--gnc-cream);
+    background-color: var(--vm-cream);
     background-image: url('/assets/images/Section Header.png');
     background-repeat: no-repeat;
     background-position: right center;
     background-size: cover;
-    border-bottom: 1px solid var(--gnc-border);
+    border-bottom: 1px solid var(--vm-border);
 }
 
 .vision-mission-hero-inner {
@@ -44,138 +56,209 @@ body {
 .vision-mission-hero h1 {
     font-family: 'Noto Serif', serif;
     font-weight: 700;
-    color: var(--gnc-green-light);
+    color: var(--gnc-green-light, #1F5E2C);
     font-size: clamp(28px, 4vw, 40px);
     margin: 0 0 8px;
 }
 
 .vision-mission-hero p {
     font-family: 'Inter', sans-serif;
-    color: var(--gnc-text-gray);
+    color: var(--gnc-text-gray, #5d6b62);
     font-size: 14px;
     margin: 0;
 }
 
-/* --- Vision & Mission Cards Main Styles --- */
+/* =============================================================
+   VISION & MISSION CARDS
+   ============================================================= */
+.vision-mission-content { padding-top: 3.5rem !important; }
+
 .vm-card {
-    display: flex;
-    background-color: #ffffff;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-    min-height: 320px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    display: flex; position: relative; overflow: hidden; min-height: 340px; height: 100%;
+    background-color: #fff; border-radius: 14px;
+    box-shadow: 0 6px 22px rgba(9, 64, 36, .08);
+    border-bottom: 5px solid transparent;
+    transition: transform .45s var(--vm-ease), box-shadow .45s ease, border-color .3s;
+}
+.vm-card--green { --accent: var(--vm-green); }
+.vm-card--gold  { --accent: var(--vm-gold); }
+.vm-card:hover {
+    box-shadow: 0 22px 46px rgba(9, 64, 36, .18);
+    border-bottom-color: var(--accent);
 }
 
-/* Colored Left Panel */
-.vm-sidebar {
-    width: 120px;
-    flex-shrink: 0;
-    position: relative;
-    overflow: hidden;
-    z-index: 2;
+/* keep the reveal animation, then allow hover/tilt once visible */
+.vm-card.is-visible { transform: var(--tilt, none) translateY(0); }
+.vm-card.is-visible:hover { transform: var(--tilt, none) translateY(-8px); }
+
+/* Colored left panel */
+.vm-sidebar { width: 124px; flex-shrink: 0; position: relative; overflow: hidden; z-index: 2; }
+.vm-bg-green { background: linear-gradient(170deg, #2a7a3b 0%, var(--vm-green) 45%, var(--vm-green-deep) 100%); }
+.vm-bg-gold  { background: linear-gradient(170deg, #f6d77b 0%, var(--vm-gold) 50%, #d09a1f 100%); }
+
+/* soft light sweep across the sidebar on hover */
+.vm-sidebar::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, .28) 50%, transparent 62%);
+    transform: translateY(-120%); transition: transform .9s ease;
 }
+.vm-card:hover .vm-sidebar::after { transform: translateY(120%); }
 
-.vm-bg-green {
-    background-color: var(--gnc-green-light);
-}
-
-.vm-bg-gold {
-    background-color: var(--gnc-gold);
-}
-
-/* --- Watermarks / Background Graphics --- */
-
-/* Seal Watermark (Inside the colored sidebar) */
+/* Watermarks */
 .vm-watermark-seal {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 250px;
-    height: 250px;
-    opacity: 0.15;
-    background-image: url('/assets/images/logos/gnc-logo-v1.svg');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
+    position: absolute; top: 50%; left: 50%; width: 250px; height: 250px;
+    transform: translate(-50%, -50%) scale(1); opacity: .15;
+    background: url('/assets/images/logos/gnc-logo-v1.svg') center / cover no-repeat;
+    transition: transform 1.2s var(--vm-ease), opacity .5s;
 }
+.vm-card:hover .vm-watermark-seal { transform: translate(-50%, -50%) scale(1.18) rotate(8deg); opacity: .22; }
 
-/* Building Watermark */
 .vm-watermark-building {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 100%;
-    height: 140px;
-    background-image: url('/assets/images/svg/gnc-illustration.svg');
-    background-size: cover;
-    background-position: bottom center;
-    background-repeat: no-repeat;
-    z-index: 1;
-    pointer-events: none;
-    filter: invert(1);
-    mix-blend-mode: multiply;
-    opacity: 0.2;
+    position: absolute; bottom: 0; right: 0; width: 100%; height: 140px; z-index: 1; pointer-events: none;
+    background: url('/assets/images/svg/gnc-illustration.svg') bottom center / cover no-repeat;
+    filter: invert(1); mix-blend-mode: multiply; opacity: .2;
+    transition: transform .8s var(--vm-ease), opacity .5s;
 }
+.vm-card:hover .vm-watermark-building { transform: translateY(-6px); opacity: .28; }
 
-/* --- Icon Circle Placed Inside Sidebar --- */
+/* Icon circle */
 .vm-icon-circle {
-    position: absolute;
-    top: 35px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 82px;
-    height: 82px;
-    background-color: #ffffff;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 3;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    position: absolute; top: 38px; left: 50%; transform: translateX(-50%);
+    width: 82px; height: 82px; border-radius: 50%; z-index: 3;
+    background: #fff; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, .18);
+    transition: transform .5s cubic-bezier(.34, 1.56, .64, 1);
 }
-
-/* --- Text Content Area --- */
-.vm-content {
-    padding: 45px 35px 35px 40px;
-    flex-grow: 1;
-    position: relative;
-    z-index: 2;
+.vm-icon-circle::before {
+    content: ''; position: absolute; inset: -6px; border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, .7);
+    animation: vmRing 3s ease-out infinite;
 }
+@keyframes vmRing { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(1.5); opacity: 0; } }
+.vm-card:hover .vm-icon-circle { transform: translateX(-50%) scale(1.1) rotate(-6deg); }
 
+/* Text content */
+.vm-content { position: relative; z-index: 2; flex-grow: 1; padding: 44px 36px 36px 42px; }
 .vm-title {
-    font-family: 'Noto Serif', serif;
-    font-weight: 700;
-    font-size: 32px;
-    margin-bottom: 25px;
-    position: relative;
-    display: inline-block;
+    position: relative; display: inline-block; margin-bottom: 28px;
+    font-family: 'Noto Serif', serif; font-weight: 800; font-size: 34px; line-height: 1.1;
 }
-
 .vm-title::after {
-    content: '';
-    position: absolute;
-    bottom: -8px;
-    left: 0;
-    width: 100%;
-    height: 2px;
-    background-color: currentColor;
+    content: ''; position: absolute; bottom: -9px; left: 0; width: 100%; height: 3px;
+    background-color: currentColor; transform: scaleX(.35); transform-origin: left;
+    transition: transform .7s var(--vm-ease) .15s;
 }
+.vm-card.is-visible .vm-title::after,
+.vm-card:hover .vm-title::after { transform: scaleX(1); }
 
-.text-green {
-    color: var(--gnc-green-light);
-}
-
-.text-gold {
-    color: var(--gnc-gold);
-}
+.text-green { color: var(--vm-green); }
+.text-gold  { color: #c9962a; }
 
 .vm-text {
-    font-family: 'Inter', sans-serif;
-    font-weight: 500;
-    color: var(--gnc-text-dark);
-    font-size: 17px;
-    line-height: 1.5;
-    margin: 0;
+    font-family: 'Inter', sans-serif; font-weight: 500; font-size: 18px; line-height: 1.6;
+    color: var(--vm-dark); margin: 0; max-width: 30em;
+}
+
+.vm-quote-mark {
+    position: absolute; right: 1.6rem; top: .4rem;
+    font-family: 'Noto Serif', serif; font-size: 7rem; line-height: 1;
+    color: var(--accent); opacity: .16; pointer-events: none;
+    transition: transform .6s var(--vm-ease), opacity .4s;
+}
+.vm-card:hover .vm-quote-mark { transform: translateY(6px) scale(1.08); opacity: .26; }
+
+/* =============================================================
+   SCROLL ANIMATIONS (same class names as before)
+   ============================================================= */
+.reveal-up {
+    opacity: 0; transform: translateY(30px);
+    transition: opacity .7s cubic-bezier(.25, 1, .5, 1), transform .7s cubic-bezier(.25, 1, .5, 1);
+}
+.reveal-up.is-visible { opacity: 1; transform: translateY(0); }
+
+.reveal-scale {
+    opacity: 0; transform: scale(.95);
+    transition: opacity .6s cubic-bezier(.25, 1, .5, 1), transform .6s cubic-bezier(.25, 1, .5, 1), box-shadow .45s ease, border-color .3s;
+}
+.reveal-scale.is-visible { opacity: 1; transform: scale(1); }
+.vm-card.reveal-scale.is-visible { transform: var(--tilt, none) translateY(0); }
+.vm-card.reveal-scale.is-visible:hover { transform: var(--tilt, none) translateY(-8px); }
+
+/* =============================================================
+   RESPONSIVE
+   ============================================================= */
+@media (max-width: 991px) {
+    .vm-card { min-height: 300px; }
+}
+
+@media (max-width: 575px) {
+    /* card stacks: colored band on top, icon circle overlapping the edge */
+    .vm-card { flex-direction: column; min-height: 0; }
+    .vm-sidebar { width: 100%; height: 110px; }
+    .vm-watermark-seal { width: 220px; height: 220px; }
+    .vm-icon-circle { top: auto; bottom: -34px; width: 72px; height: 72px; }
+    .vm-icon-circle img { width: 36px !important; }
+    .vm-card:hover .vm-icon-circle { transform: translateX(-50%) scale(1.08); }
+    .vm-content { padding: 52px 24px 30px; text-align: center; }
+    .vm-text { margin-left: auto; margin-right: auto; font-size: 17px; }
+    .vm-quote-mark { right: 1rem; top: 2.6rem; font-size: 5rem; }
+}
+
+/* =============================================================
+   REDUCED MOTION
+   ============================================================= */
+@media (prefers-reduced-motion: reduce) {
+    .vm-icon-circle::before { animation: none !important; }
+    .reveal-up, .reveal-scale { opacity: 1 !important; transform: none !important; transition: none !important; }
+    .vm-title::after { transform: scaleX(1) !important; transition: none !important; }
+    .vm-card, .vm-card * { transition: none !important; }
+}
+
+
+/* =============================================================
+   OPENING TRANSITION (same wipe as the Contact Us / History pages)
+   6 green panels slide up and reveal the page. Pure CSS; the whole
+   layer is also hidden at the end so it can never block the page.
+   ============================================================= */
+.vm-open {
+    position: fixed; inset: 0; z-index: 2000;
+    display: flex; pointer-events: none;
+    animation: vmOpenGone 0s linear 1.7s forwards;
+}
+.vm-open > i {
+    flex: 1; margin-right: -1px;
+    background: #0b4228;
+    animation: vmOpenWipe .85s cubic-bezier(.76, 0, .24, 1) forwards;
+    animation-delay: calc(.35s + var(--n, 0) * .07s);
+}
+.vm-open > i:nth-child(even) { background: #083320; }
+.vm-open-label {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .9rem;
+    color: #d3a63a; text-align: center;
+    animation: vmOpenLabel 1.1s ease forwards;
+}
+.vm-open-label img { width: 64px; height: 64px; object-fit: contain; }
+.vm-open-label span {
+    font-family: 'Noto Serif', serif; font-weight: 700;
+    font-size: clamp(1.5rem, 4vw, 2.2rem); letter-spacing: .02em;
+}
+@keyframes vmOpenWipe { to { transform: translateY(-101%); } }
+@keyframes vmOpenGone { to { visibility: hidden; } }
+@keyframes vmOpenLabel {
+    0%   { opacity: 0; transform: translateY(14px); }
+    30%  { opacity: 1; transform: none; }
+    70%  { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateY(-14px); }
+}
+
+/* Hold the hero's entrance until the wipe has finished. These replace the
+   inline transition-delay values (0 / .1s / .2s) with the wipe wait added. */
+.vision-mission-hero .vision-mission-breadcrumb.reveal-up { transition-delay: .95s !important; }
+.vision-mission-hero h1.reveal-up                         { transition-delay: 1.05s !important; }
+.vision-mission-hero p.reveal-up                          { transition-delay: 1.15s !important; }
+
+@media (prefers-reduced-motion: reduce) {
+    .vm-open { display: none; }
+    .vision-mission-hero .reveal-up { transition-delay: 0s !important; }
 }

@@ -253,8 +253,12 @@ function render_bulletin_board(): void
                 <!-- Recent Announcements -->
                 <div class="col-lg-6">
                     <div class="bulletin-panel">
-                        <div class="bulletin-panel-header">
-                            <span class="bulletin-panel-title text-uppercase">Recent Announcements</span>
+                        <div class="bulletin-panel-header bulletin-panel-header--solid">
+                            <i class="bi bi-megaphone-fill bulletin-panel-icon"></i>
+                            <span class="bulletin-panel-title">Recent Announcements</span>
+                            <?php if (!empty($announcements)): ?>
+                                <span class="bulletin-panel-count"><?= count($announcements) ?></span>
+                            <?php endif; ?>
                         </div>
 
                         <?php if (empty($announcements)): ?>
@@ -296,8 +300,12 @@ function render_bulletin_board(): void
                 <!-- Upcoming Events -->
                 <div class="col-lg-6">
                     <div class="bulletin-panel">
-                        <div class="bulletin-panel-header">
-                            <span class="bulletin-panel-title text-uppercase bulletin-panel-title--gold">Upcoming Events</span>
+                        <div class="bulletin-panel-header bulletin-panel-header--solid">
+                            <i class="bi bi-calendar-event-fill bulletin-panel-icon"></i>
+                            <span class="bulletin-panel-title">Upcoming Events</span>
+                            <?php if (!empty($events)): ?>
+                                <span class="bulletin-panel-count"><?= count($events) ?></span>
+                            <?php endif; ?>
                         </div>
 
                         <?php if (empty($events)): ?>

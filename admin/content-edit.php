@@ -1,6 +1,16 @@
 <?php
 /**
- * GNC Admin Panel - Section Editor: Homepage Slideshow
+ * GNC Admin Panel - Content Editor
+ *
+ * One place to manage the website's content:
+ *   - "All content" list: search, filter and sort everything you may edit
+ *   - Review queue: approvers accept or send back what editors submitted
+ *   - Homepage slideshow, section-based pages (rich-text editor + live preview),
+ *     College Departments, Programs and Administration (existing managers)
+ *
+ * Roles:
+ *   Super Admin / Content Admin  edit and publish directly, approve and reject
+ *   Content Editor               edit page text, save drafts, submit for approval
  */
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../admin/admin-functions.php';
@@ -8,1149 +18,1002 @@ require_once __DIR__ . '/../admin/admin-functions.php';
 initSession();
 requireLogin();
 
+// CSRF token used by the forms and the JS config below (safe to call repeatedly).
+$csrfToken = generateCSRFToken();
+
+/**
+ * Include an admin component without letting a crash inside it take the
+ * whole Content Editor down. On failure the partial output is discarded,
+ * the error is logged, and a visible message is shown in its place.
+ */
+function renderAdminComponent(string $file): void {
+    // Included components run inside THIS function's scope, so they can't see
+    // the page-level $csrfToken unless it is pulled in here. Without this the
+    // department manager posted an empty token -> "Your session has expired".
+    global $csrfToken;
+    ob_start();
+    try {
+        include $file;
+        ob_end_flush();
+    } catch (Throwable $e) {
+        ob_end_clean();
+        error_log('Content editor component error (' . basename($file) . '): ' . $e->getMessage()
+            . ' in ' . $e->getFile() . ':' . $e->getLine());
+        echo '<div class="alert alert-danger" style="margin-bottom:1rem"><strong>'
+            . htmlspecialchars(basename($file)) . ' failed to load.</strong><br>'
+            . htmlspecialchars($e->getMessage()) . '<br><small>'
+            . htmlspecialchars(basename($e->getFile()) . ':' . $e->getLine()) . '</small></div>';
+    }
+}
+
+/** Short helpers for the markup below. */
+function ce_e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
+function ce_when(?string $ts): string {
+    if (!$ts) return '';
+    $t = strtotime($ts);
+    return $t ? date('M j, Y g:i A', $t) : '';
+}
+
 $currentUser = getCurrentUser();
 $pageTitle   = 'Content Editor';
 $slides      = getHeroSlides(false); // all slides, including drafts, for the admin list
 
-// ── Page selector (Content Editor → Select Page) ──────────────
-// Home keeps using the dedicated slideshow editor below; every other
-// page is powered by the generic Page → Section → Content structure
-// (see page-content-functions in admin-functions.php). Pages/sections
-// are read from the database so new pages can be added later without
-// touching this file.
-$canManagePages = hasPermission('manage_page_content');
-$editablePages  = getEditablePages();
+// ── What may this person do? ──
+$canManagePages = hasPermission('manage_page_content');                 // edit + publish directly
+$canDraftPages  = $canManagePages || hasPermission('edit_page_content'); // edit + submit for approval
+$canApprove     = hasPermission('approve_content') || hasPermission('reject_content');
+$reviewReady    = pageReviewReady();   // false until sql/page-approval-migration.sql has been run
+
+$roleName = (string)($currentUser['role'] ?? ($_SESSION['role'] ?? ''));
+
+// Departments that belong to Basic Education (they have their own page templates). Every other department is a college
+// department. Kept in ONE place so the pickers and the "All content" list always agree.
+$basicEduSlugs = ['casa-gradeschool', 'jhs-regular', 'hs-monte', 'shs-regular'];
+
+// Pages that are NOT edited with the text editor (they have their own tools)
+$customSlugs = ['home', 'college-departments', 'programs', 'administration', 'graduate-school'];
+
+// Where each page appears on the public website (shown as "View live page")
+$publicUrls = [
+    'home'                       => '/',
+    'vision-mission'             => '/pages/about/vision-mission.php',
+    'history'                    => '/pages/about/gnc-history.php',
+    'administration'             => '/pages/about/administration.php',
+    'college-departments'        => '/pages/academics/college/college-dept.php',
+    'programs'                   => '/pages/academics/college/college-dept.php',
+    'graduate-school'            => '/pages/academics/graduate-school/graduate-school.php',
+    'basic-education-departments'=> '/pages/academics/basic-edu/basic-edu-dept.php',
+];
+
+// ── Pages ──
+// Home keeps using the dedicated slideshow editor; every other page is powered
+// by the generic Page -> Section -> Content structure (page-content functions in
+// admin-functions.php), so new pages can be added without touching this file.
+$editablePages = getEditablePages();
 if (empty($editablePages)) {
-    // Fallback so the dropdown still works even before the
-    // page-content-schema.sql migration has been run.
+    // Fallback so the editor still opens even before the page-content schema has been installed.
     $editablePages = [['slug' => 'home', 'title' => 'Home', 'page_type' => 'slideshow']];
 }
-$sectionPages = array_filter($editablePages, fn($p) => ($p['page_type'] ?? 'sections') === 'sections');
+$sectionPages = array_values(array_filter($editablePages, fn($p) => ($p['page_type'] ?? 'sections') === 'sections'));
 
-$requestedPage = $_GET['page'] ?? 'home';
-$validSlugs    = array_column($editablePages, 'slug');
-$activeSlug    = in_array($requestedPage, $validSlugs, true) ? $requestedPage : 'home';
+// Which pages can this person open?
+$textPages   = $canDraftPages ? array_values(array_filter($sectionPages, fn($p) => !in_array($p['slug'], $customSlugs, true))) : [];
+$customPages = $canManagePages ? array_values(array_filter($sectionPages, fn($p) => in_array($p['slug'], $customSlugs, true))) : [];
+$graduateDept = null;
+if ($canManagePages && in_array((string)($_GET['page'] ?? ''), ['programs', 'graduate-school'], true)) {
+    $graduateDept = ensureGraduateSchoolDepartment();
+}
+if ($canManagePages && !in_array('graduate-school', array_column($customPages, 'slug'), true)) {
+    $customPages[] = ['slug' => 'graduate-school', 'title' => 'Graduate School', 'page_type' => 'sections'];
+}
+$titleOf = [];
+foreach ($editablePages as $p) $titleOf[$p['slug']] = $p['title'];
+// Pages of the Visual Editor that are not rows of the page tables (their content lives in the departments / posts tables)
+$titleOf['basic-education'] = 'Basic Education';
+$titleOf['graduate-school'] = 'Graduate School';
+$titleOf['updates']         = 'News, announcements & events';
+
+// News, announcements and events keep their own editors (and their approval workflow). The Visual Editor opens those very
+// editors inside its side panel, so nothing is re-implemented and every permission check stays where it is.
+$postModules = [];
+foreach ([
+    ['announcement', 'announcement.php', 'Announcements', 'bi-megaphone',      ['manage_announcements', 'create_announcement', 'edit_own_announcement', 'edit_announcement', 'publish_announcement'], 'create_announcement'],
+    ['news',         'news.php',         'News',          'bi-newspaper',      ['manage_news', 'create_news', 'edit_own_news', 'edit_news', 'publish_news'],                                      'create_news'],
+    ['event',        'events.php',       'Events',        'bi-calendar-event', ['manage_events', 'create_event', 'edit_own_event', 'edit_event', 'publish_event'],                                'create_event'],
+] as [$pmKey, $pmFile, $pmLabel, $pmIcon, $pmPerms, $pmCreate]) {
+    if (!is_file(__DIR__ . '/' . $pmFile)) continue;
+    foreach ($pmPerms as $pm) {
+        if (hasPermission($pm)) { $postModules[$pmKey] = ['key' => $pmKey, 'file' => $pmFile, 'label' => $pmLabel, 'icon' => $pmIcon, 'canCreate' => hasPermission($pmCreate)]; break; }
+    }
+}
+/** URL (inside this editor) that opens one of those editors in the side panel. Only the whitelisted modules, only plain numbers. */
+function ce_postUrl(string $key, array $q = []): string {
+    $u = '?page=updates&open=' . rawurlencode($key);
+    foreach (['modal' => '/^(edit|create)$/', 'id' => '/^\d{1,10}$/', 'month' => '/^\d{1,2}$/', 'year' => '/^\d{4}$/'] as $k => $re) {
+        if (isset($q[$k]) && preg_match($re, (string)$q[$k])) $u .= '&' . $k . '=' . rawurlencode((string)$q[$k]);
+    }
+    return $u;
+}
+
+// Load sections (with who edited / submitted them) for the text pages
+$sectionsBySlug = [];
+if ($canDraftPages && (($_GET['page'] ?? '') === 'history')) ensureHistoryPageSections();
+foreach ($textPages as $sp) {
+    try { $sectionsBySlug[$sp['slug']] = getPageSectionsDetailed($sp['slug']); }
+    catch (Throwable $e) { error_log('getPageSectionsDetailed error: ' . $e->getMessage()); $sectionsBySlug[$sp['slug']] = []; }
+}
+
+// Approvals waiting
+$pending = ($canApprove && $reviewReady) ? getPendingSections() : [];
+
+// ── Which panel is open? ──
+$validPanels = ['hub'];
+if ($canApprove) $validPanels[] = 'review';
+if ($canManagePages) { $validPanels[] = 'home'; $validPanels[] = 'basic-education'; }
+if ($postModules && $canManagePages) $validPanels[] = 'updates';
+foreach ($textPages as $p)   $validPanels[] = $p['slug'];
+foreach ($customPages as $p) $validPanels[] = $p['slug'];
+$requestedPage = (string)($_GET['page'] ?? '');
+if ($requestedPage === '') {
+    // Opening the Content Editor lands on the website itself (the homepage, or the first page you may edit).
+    $requestedPage = $canManagePages ? 'home' : (string)($textPages[0]['slug'] ?? 'hub');
+}
+$activeSlug    = in_array($requestedPage, $validPanels, true) ? $requestedPage : 'hub';
+
+// "All content" and the review queue are lists. Every other page opens as the visual editor:
+// the real website page, edited in place.
+$editorMode = !in_array($activeSlug, ['hub', 'review'], true);
+
+$VE = null;
+if ($editorMode) {
+    $veKind = $activeSlug === 'home' ? 'home'
+        : ($activeSlug === 'administration' ? 'admin'
+        : ($activeSlug === 'updates' ? 'feed'
+        : (in_array($activeSlug, ['college-departments', 'programs', 'basic-education', 'graduate-school'], true) ? 'entity' : 'sections')));
+    $withPreview = function (string $url): string { return $url . (strpos($url, '?') !== false ? '&' : '?') . 'ce_preview=1'; };
+
+    // The page list in the top bar
+    $pickerPages = [];
+    if ($canManagePages) $pickerPages[] = ['slug' => 'home', 'title' => 'Homepage', 'group' => 'Homepage', 'icon' => 'window-desktop'];
+    foreach ($textPages as $p)   $pickerPages[] = ['slug' => $p['slug'], 'title' => $p['title'], 'group' => 'Pages', 'icon' => 'file-earmark-text'];
+    foreach ($customPages as $p) $pickerPages[] = ['slug' => $p['slug'], 'title' => $p['title'], 'group' => 'Academics & people',
+        'icon' => $p['slug'] === 'administration' ? 'people' : ($p['slug'] === 'programs' ? 'mortarboard' : 'building')];
+    if ($canManagePages) $pickerPages[] = ['slug' => 'basic-education', 'title' => 'Basic Education', 'group' => 'Academics & people', 'icon' => 'backpack'];
+    if ($postModules && $canManagePages) $pickerPages[] = ['slug' => 'updates', 'title' => 'News, announcements & events', 'group' => 'Posts', 'icon' => 'megaphone'];
+
+    $veTitle   = $activeSlug === 'home' ? 'Homepage' : ($titleOf[$activeSlug] ?? $activeSlug);
+    $publicUrl = $publicUrls[$activeSlug] ?? '';
+    $pageUrl   = $publicUrl !== '' ? $withPreview($publicUrl) : '';
+    $subs = [];
+    $wantSub   = trim((string)($_GET['sub'] ?? ''));   // deep link: ?page=programs&sub=<slug>
+    $wantProg  = (int)($_GET['program_id'] ?? 0);      // deep link to a program that was just created
+    $veSection = trim((string)($_GET['section'] ?? ''));
+
+    if ($veKind === 'admin') {
+        $pageUrl = $withPreview('/pages/about/administration.php') . ($veSection !== '' ? '&section=' . rawurlencode($veSection) : '');
+    } elseif ($activeSlug === 'college-departments') {
+        $subs[] = ['label' => 'All departments', 'url' => $withPreview('/pages/academics/college/college-dept.php')];
+        try {
+            foreach (getDepartments() as $d) {
+                if (!empty($d['archived_at']) || empty($d['slug']) || in_array((string)$d['slug'], $basicEduSlugs, true) || $d['slug'] === 'graduate-school') continue;
+                $subs[] = ['key' => (string)$d['slug'], 'label' => (string)$d['dept_name'], 'url' => $withPreview('/pages/academics/college/college-department.php?slug=' . rawurlencode($d['slug']))];
+            }
+        } catch (Throwable $e) { error_log('visual editor departments: ' . $e->getMessage()); }
+        $pageUrl = $subs[0]['url'];
+    } elseif ($activeSlug === 'programs') {
+        try {
+            foreach (getPrograms() as $pr) {
+                if (empty($pr['slug'])) continue;
+                if ($wantProg > 0 && (int)$pr['program_id'] === $wantProg) $wantSub = (string)$pr['slug'];
+                $subs[] = ['key' => (string)$pr['slug'], 'label' => trim(($pr['program_code'] ? $pr['program_code'] . ' – ' : '') . $pr['program_name']), 'url' => $withPreview('/pages/academics/college/program.php?slug=' . rawurlencode($pr['slug']))];
+            }
+        } catch (Throwable $e) { error_log('visual editor programs: ' . $e->getMessage()); }
+        $pageUrl = $subs ? $subs[0]['url'] : $withPreview('/pages/academics/college/college-dept.php');
+    } elseif ($activeSlug === 'graduate-school') {
+        $subs[] = ['key' => 'graduate-school', 'label' => 'Graduate School', 'url' => $withPreview('/pages/academics/college/college-department.php?slug=graduate-school')];
+        $pageUrl = $subs[0]['url'];
+    } elseif ($activeSlug === 'basic-education') {
+        $publicUrl = '/pages/academics/basic-edu/basic-edu-dept.php';
+        $subs[] = ['key' => '', 'label' => 'All Basic Education departments', 'url' => $withPreview($publicUrl)];
+        try {
+            $beSlugs = $basicEduSlugs;
+            foreach (getDepartments() as $d) {
+                if (!in_array((string)($d['slug'] ?? ''), $beSlugs, true)) continue;
+                $subs[] = ['key' => (string)$d['slug'], 'label' => (string)$d['dept_name'], 'url' => $withPreview('/pages/academics/basic-edu/basic-edu-department/' . rawurlencode($d['slug']) . '.php')];
+            }
+        } catch (Throwable $e) { error_log('visual editor basic education: ' . $e->getMessage()); }
+        $pageUrl = $subs[0]['url'];
+    } elseif ($veKind === 'feed') {
+        $publicUrl = '/';
+        $pageUrl   = $withPreview('/') . '#news';
+    }
+    if ($wantSub !== '') {
+        foreach ($subs as $s) { if (($s['key'] ?? null) === $wantSub) { $pageUrl = $s['url']; break; } }
+    }
+
+    // What the in-page editor needs about the open page
+    $veSections = [];
+    if ($veKind === 'sections') {
+        foreach ($sectionsBySlug[$activeSlug] ?? [] as $sec) {
+            $hasDraft = $sec['draft_content'] !== null;
+            $veSections[] = [
+                'key' => $sec['section_key'], 'title' => $sec['title'],
+                'html' => sectionToEditorHtml($hasDraft ? $sec['draft_content'] : ($sec['content'] ?? '')),
+                'has_draft' => $hasDraft, 'review_status' => (string)($sec['review_status'] ?? 'none'),
+                'review_note' => $sec['review_note'] ?? null, 'submitted_by' => trim((string)($sec['submitted_by_name'] ?? '')),
+            ];
+        }
+    }
+    $veHome = null;
+    if ($veKind === 'home') {
+        $pres = [];
+        try { $pres = homepagePresidentAdminPayload(getHomepagePresident()); } catch (Throwable $e) { error_log('visual editor president: ' . $e->getMessage()); }
+        $veHome = ['slides' => $slides, 'president' => $pres, 'content' => homeContentAdminPayload()];
+    }
+    $veAdmin = null;
+    if ($veKind === 'admin') {
+        try { $veAdmin = ['sections' => administrationAdminPayload()]; } catch (Throwable $e) { $veAdmin = ['sections' => []]; error_log('visual editor administration: ' . $e->getMessage()); }
+    }
+    // News, announcements and events open in the side panel (on the homepage, where they appear, and on their own page here)
+    $veEmbed = null;
+    if (in_array($veKind, ['home', 'feed'], true) && $postModules) {
+        $openUrl = null;
+        $openKey = (string)($_GET['open'] ?? '');
+        if (isset($postModules[$openKey])) {
+            $q = []; foreach (['modal', 'id', 'month', 'year'] as $k) if (isset($_GET[$k])) $q[$k] = (string)$_GET[$k];
+            $isEvent = $openKey === 'event';
+            $ok = ['modal' => preg_match('/^(edit|create)$/', $q['modal'] ?? '') ? $q['modal'] : '', 'id' => preg_match('/^\d{1,10}$/', $q['id'] ?? '') ? $q['id'] : '',
+                   'month' => preg_match('/^\d{1,2}$/', $q['month'] ?? '') ? $q['month'] : '', 'year' => preg_match('/^\d{4}$/', $q['year'] ?? '') ? $q['year'] : ''];
+            $qs = ['embed=1'];
+            if (!$isEvent) { if ($ok['modal'] === 'edit' && $ok['id'] !== '') { $qs[] = 'modal=edit'; $qs[] = 'id=' . $ok['id']; } elseif ($ok['modal'] === 'create' && $postModules[$openKey]['canCreate']) { $qs[] = 'modal=create'; } }
+            else { if ($ok['month'] !== '' && $ok['year'] !== '') { $qs[] = 'month=' . $ok['month']; $qs[] = 'year=' . $ok['year']; } }
+            $openUrl = $postModules[$openKey]['file'] . '?' . implode('&', $qs);
+        }
+        $veEmbed = ['modules' => array_map(function ($m) {
+            return ['key' => $m['key'], 'label' => $m['label'], 'icon' => $m['icon'], 'canCreate' => $m['canCreate'],
+                    'list' => $m['file'] . '?embed=1', 'create' => ($m['canCreate'] && $m['key'] !== 'event') ? $m['file'] . '?embed=1&modal=create' : ($m['canCreate'] ? $m['file'] . '?embed=1' : null)];
+        }, array_values($postModules)), 'open' => $openUrl];
+    }
+    // Program page content and settings are edited in the visual canvas and its
+    // contextual options. Do not mount the legacy multi-section form drawer.
+    $hasDrawer = in_array($veKind, ['home', 'admin', 'entity'], true) && !in_array($activeSlug, ['programs', 'graduate-school'], true);
+    $hasPanel  = $hasDrawer || $veEmbed !== null;
+    $drawerFile = $veKind === 'home' ? 'homepage-president-manager.php'
+        : ($veKind === 'admin' ? 'administration-manager.php' : ($activeSlug === 'programs' ? 'program-page-manager.php' : 'department-media-manager.php'));
+    if ($activeSlug === 'basic-education') $drawerFile = 'basic-edu-media-manager.php';
+    $drawerTitle = $veKind === 'home' ? 'Message from the President (full form)'
+        : ($veKind === 'admin' ? 'More settings: archived people, tabs and offices' : ($activeSlug === 'programs' ? 'Program details' : 'Department details'));
+
+    $VE = [
+        'csrf' => $csrfToken, 'contentHandler' => '/admin/action/page-content-handler.php', 'reviewHandler' => '/admin/action/page-review-handler.php',
+        'canPublish' => $canManagePages, 'canApprove' => $canApprove, 'reviewReady' => $reviewReady, 'hasDrawer' => $hasDrawer,
+        'focusSection' => (string)($_GET['section'] ?? '') !== '' && $veKind !== 'admin' ? (string)$_GET['section'] : null,
+        'page' => ['slug' => $activeSlug, 'title' => $veTitle, 'kind' => $veKind, 'url' => $pageUrl, 'publicUrl' => $publicUrl, 'section' => $veSection],
+        'embed' => $veEmbed,
+        'sections' => $veSections, 'home' => $veHome, 'admin' => $veAdmin,
+        'graduateDeptId' => (int)($graduateDept['dept_id'] ?? 0),
+        'programDepartments' => array_values(array_map(static function ($d) {
+            return ['id' => (int)$d['dept_id'], 'name' => (string)$d['dept_name'], 'slug' => (string)($d['slug'] ?? '')];
+        }, array_filter(getDepartments(), static function ($d) use ($basicEduSlugs) {
+            return empty($d['archived_at']) && !in_array((string)($d['slug'] ?? ''), $basicEduSlugs, true);
+        }))),
+    ];
+}
+
+// ── The "All content" list ──
+$rank = ['pending' => 0, 'rejected' => 1, 'draft' => 2, 'live' => 3, 'hidden' => 4];
+$hub = [];
+if ($canManagePages) {
+    $homeStatus = 'live'; $homeTs = 0;
+    foreach ($slides as $s) {
+        if (($s['status'] ?? '') !== 'published') $homeStatus = 'draft';
+        $homeTs = max($homeTs, (int)strtotime((string)($s['updated_at'] ?? $s['created_at'] ?? '')));
+    }
+    if (!$slides) $homeStatus = 'draft';
+    $hub[] = ['title' => 'Homepage slideshow', 'type' => 'Homepage', 'status' => $homeStatus, 'ts' => $homeTs,
+              'note' => count($slides) . ' slide' . (count($slides) === 1 ? '' : 's'), 'open' => 'home', 'href' => '?page=home', 'where' => '/'];
+}
+foreach (getContentHubPages() as $row) {
+    $slug = $row['slug'];
+    if (in_array($slug, $customSlugs, true)) continue;
+    if (!in_array($slug, array_column($textPages, 'slug'), true)) continue;
+    $st = ((int)$row['pending'] > 0) ? 'pending' : (((int)$row['rejected'] > 0) ? 'rejected' : (((int)$row['drafts'] > 0) ? 'draft' : 'live'));
+    $ts = max((int)strtotime((string)$row['sections_updated']), (int)strtotime((string)$row['page_updated']));
+    $n  = (int)$row['section_count'];
+    $hub[] = ['title' => $row['title'], 'type' => 'Page', 'status' => $st, 'ts' => $ts,
+              'note' => $n . ' section' . ($n === 1 ? '' : 's'), 'open' => $slug, 'href' => '?page=' . rawurlencode($slug),
+              'where' => $publicUrls[$slug] ?? ''];
+}
+if ($canManagePages) {
+    foreach ($customPages as $cp) {
+        if ($cp['slug'] === 'home') continue;
+        $type = $cp['slug'] === 'administration' ? 'Administration' : 'Academics';
+        $hub[] = ['title' => $cp['title'], 'type' => $type, 'status' => 'live', 'ts' => 0,
+                  'note' => $cp['slug'] === 'administration' ? 'People and offices' : 'Departments and programs',
+                  'open' => $cp['slug'], 'href' => '?page=' . rawurlencode($cp['slug']), 'where' => $publicUrls[$cp['slug']] ?? ''];
+    }
+    foreach (getContentHubDepartments() as $d) {
+        $isBasic = !empty($d['slug']) && in_array((string)$d['slug'], $basicEduSlugs, true);
+        $isGraduate = ($d['slug'] ?? '') === 'graduate-school';
+        $pageKey = $isGraduate ? 'graduate-school' : ($isBasic ? 'basic-education' : 'college-departments');
+        $hub[] = ['title' => $d['dept_name'], 'type' => 'Department', 'status' => $d['archived_at'] ? 'hidden' : 'live', 'ts' => 0,
+                  'note' => $isGraduate ? 'Graduate School' : ($isBasic ? 'Basic Education department' : 'College department'), 'open' => $pageKey, 'href' => '?page=' . $pageKey . (!empty($d['slug']) ? '&sub=' . rawurlencode($d['slug']) : ''),
+                  'where' => empty($d['slug']) ? '' : ($isGraduate ? '/pages/academics/graduate-school/graduate-school.php' : ($isBasic ? '/pages/academics/basic-edu/basic-edu-department/' . rawurlencode($d['slug']) . '.php' : '/pages/academics/college/college-department.php?slug=' . rawurlencode($d['slug'])))];
+    }
+    foreach (getContentHubPrograms() as $pr) {
+        $hub[] = ['title' => ($pr['program_code'] ? $pr['program_code'] . ' – ' : '') . $pr['program_name'], 'type' => 'Program',
+                  'status' => ((int)$pr['is_published'] === 1) ? 'live' : 'hidden', 'ts' => 0,
+                  'note' => (string)($pr['dept_name'] ?? ''), 'open' => 'programs',
+                  'href' => '?page=programs' . (!empty($pr['slug']) ? '&sub=' . rawurlencode($pr['slug']) : '') . '#program-' . (int)$pr['program_id'], 'where' => ''];
+    }
+}
+// News, announcements and events: listed here so everything is searchable in one place.
+// Each row links to that module's own editor (which keeps its approval workflow).
+$statusMap = ['published' => 'live', 'pending' => 'pending', 'draft' => 'draft', 'archived' => 'hidden'];
+$uid = (int)($_SESSION['user_id'] ?? 0);
+$mayEdit = function (string $manage, string $kind, $ownerId) use ($uid): bool {
+    return hasPermission($manage) || hasPermission("edit_{$kind}") || hasPermission("publish_{$kind}")
+        || (hasPermission("edit_own_{$kind}") && (int)$ownerId === $uid);
+};
+if (is_file(__DIR__ . '/announcement.php')) {
+    try {
+        foreach (getAnnouncements([], 200, 0) as $a) {
+            if (!$mayEdit('manage_announcements', 'announcement', $a['user_id'] ?? 0)) continue;
+            $by = trim(($a['first_name'] ?? '') . ' ' . ($a['last_name'] ?? ''));
+            $hub[] = ['title' => $a['title'], 'type' => 'Announcement', 'status' => $statusMap[$a['status']] ?? 'draft',
+                      'ts' => (int)strtotime((string)($a['updated_at'] ?? $a['created_at'] ?? '')),
+                      'note' => $by !== '' ? 'By ' . $by : '', 'open' => '', 'href' => $canManagePages ? ce_postUrl('announcement', ['modal' => 'edit', 'id' => (int)$a['announcement_id']]) : 'announcement.php?modal=edit&id=' . (int)$a['announcement_id'], 'where' => ''];
+        }
+    } catch (Throwable $e) { error_log('hub announcements: ' . $e->getMessage()); }
+}
+if (is_file(__DIR__ . '/news.php')) {
+    try {
+        foreach (getNews([], 200, 0) as $n) {
+            if (!$mayEdit('manage_news', 'news', $n['user_id'] ?? 0)) continue;
+            $by = trim((string)($n['author'] ?? '')) ?: trim(($n['first_name'] ?? '') . ' ' . ($n['last_name'] ?? ''));
+            $raw = (string)($n['updated_at'] ?? $n['created_at'] ?? '');
+            $hub[] = ['title' => $n['title'], 'type' => 'News', 'status' => $statusMap[$n['status']] ?? 'draft',
+                      'ts' => (int)strtotime($raw . ' UTC'),   // news dates are stored in UTC
+                      'note' => $by !== '' ? 'By ' . $by : '', 'open' => '', 'href' => $canManagePages ? ce_postUrl('news', ['modal' => 'edit', 'id' => (int)$n['news_id']]) : 'news.php?modal=edit&id=' . (int)$n['news_id'], 'where' => ''];
+        }
+    } catch (Throwable $e) { error_log('hub news: ' . $e->getMessage()); }
+}
+if (is_file(__DIR__ . '/events.php')) {
+    try {
+        foreach (getContentHubEvents() as $ev) {
+            if (!$mayEdit('manage_events', 'event', $ev['user_id'] ?? 0)) continue;
+            $hub[] = ['title' => $ev['title'], 'type' => 'Event', 'status' => $statusMap[$ev['status']] ?? 'draft',
+                      'ts' => (int)strtotime((string)$ev['start_date']),
+                      'note' => 'Starts ' . date('M j, Y', (int)strtotime((string)$ev['start_date'])), 'open' => '', 'href' => ($canManagePages ? ce_postUrl('event', ['month' => (int)date('n', (int)strtotime((string)$ev['start_date'])), 'year' => (int)date('Y', (int)strtotime((string)$ev['start_date']))]) : 'events.php?month=' . (int)date('n', (int)strtotime((string)$ev['start_date'])) . '&year=' . (int)date('Y', (int)strtotime((string)$ev['start_date']))), 'where' => ''];
+        }
+    } catch (Throwable $e) { error_log('hub events: ' . $e->getMessage()); }
+}
+$hubTypes = array_values(array_unique(array_column($hub, 'type')));
+$hubCount = ['all' => count($hub), 'live' => 0, 'draft' => 0, 'pending' => 0, 'rejected' => 0, 'hidden' => 0];
+foreach ($hub as $h) $hubCount[$h['status']]++;
+
+$statusLabel = ['live' => 'Live', 'draft' => 'Draft', 'pending' => 'Waiting for approval', 'rejected' => 'Changes requested', 'hidden' => 'Hidden'];
+
+// Other content modules (real files in /admin). Linked only when the person may use them.
+$otherModules = [];
+foreach ([
+    ['announcement.php', 'Announcements', 'bi-megaphone', ['manage_announcements', 'create_announcement', 'edit_own_announcement']],
+    ['news.php',         'News',          'bi-newspaper', ['manage_news', 'create_news', 'edit_own_news']],
+    ['events.php',       'Events',        'bi-calendar-event', ['manage_events', 'create_event', 'edit_own_event']],
+] as [$file, $label, $icon, $perms]) {
+    if (!is_file(__DIR__ . '/' . $file)) continue;
+    foreach ($perms as $pm) { if (hasPermission($pm)) { $otherModules[] = ['href' => ($canManagePages && isset($postModules[$pmk = ['announcement.php' => 'announcement', 'news.php' => 'news', 'events.php' => 'event'][$file]])) ? ce_postUrl($pmk) : $file, 'label' => $label, 'icon' => $icon]; break; } }
+}
+$createLinks = [];
+if (hasPermission('create_announcement') && is_file(__DIR__ . '/announcement.php')) $createLinks[] = [$canManagePages ? ce_postUrl('announcement', ['modal' => 'create']) : 'announcement.php?modal=create', 'Announcement', 'bi-megaphone'];
+if (hasPermission('create_news') && is_file(__DIR__ . '/news.php'))                 $createLinks[] = [$canManagePages ? ce_postUrl('news', ['modal' => 'create']) : 'news.php?modal=create', 'News article', 'bi-newspaper'];
+if (hasPermission('create_event') && is_file(__DIR__ . '/events.php'))              $createLinks[] = [$canManagePages ? ce_postUrl('event') : 'events.php', 'Event', 'bi-calendar-event'];
+
+// Nothing at all to show or do on this screen?
+$noAccess = !$canDraftPages && !$canApprove && !$hub && !$createLinks;
 
 include __DIR__ . '/../components/header-admin.php';
 ?>
 
-<div class="page-header">
-    <div>
-        <h1>Content Editor</h1>
-        <p>Manage and update the content of your website pages.</p>
-    </div>
-</div>
+<link rel="stylesheet" href="/assets/css/content-editor-style.css?v=<?= (int)@filemtime(__DIR__ . '/../assets/css/content-editor-style.css') ?: 1 ?>">
 
-<div class="data-card mb-3" style="padding:1rem 1.25rem">
-    <label class="form-label mb-1" for="page-select">Select Page</label>
-    <select class="form-select" id="page-select" style="max-width:320px">
-        <?php foreach ($editablePages as $p): ?>
-            <option value="<?= htmlspecialchars($p['slug']) ?>" <?= $p['slug'] === $activeSlug ? 'selected' : '' ?>>
-                <?= htmlspecialchars($p['title']) ?>
-            </option>
-        <?php endforeach; ?>
-    </select>
-</div>
+<div class="ce-toasts" id="ceToasts" aria-live="polite" aria-atomic="false"></div>
 
-<!-- ══════════════════ HOME → Slideshow (existing editor, unchanged) ══════════════════ -->
-<div class="page-panel" id="page-panel-home" style="<?= $activeSlug === 'home' ? '' : 'display:none' ?>">
+<?php if ($editorMode): ?>
+<?php /* ══════════════════ Visual editor: the real website page, edited in place ══════════════════ */ ?>
+<div class="ve-app" id="veApp" data-device="desktop">
 
-<div class="page-header">
-    <div>
-        <h1>Slideshow</h1>
-        <p>Add, remove, and reorder slides that appear in the homepage slideshow.</p>
-    </div>
-    <button type="button" class="btn-gnc-gold" id="btn-add-slide">
-        <i class="bi bi-plus-lg"></i> Add New Slide
-    </button>
-</div>
+    <header class="ve-top">
+        <a class="ve-back" href="?page=hub" data-ve-nav title="Back to the list of all content"><i class="bi bi-grid-1x2"></i><span>All content</span></a>
 
-<div class="row g-3 mb-4">
-    <!-- ══════════════════ Slide Order ══════════════════ -->
-    <div class="col-lg-5">
-        <div class="data-card h-100">
-            <div class="data-card-header">
-                <span class="data-card-title"><i class="bi bi-images me-1"></i> Slide Order</span>
+        <details class="ve-menu" id="vePageMenu">
+            <summary title="Choose which page to edit">
+                <i class="bi bi-file-earmark-richtext"></i>
+                <span class="ve-menu-name"><?= ce_e($VE['page']['title']) ?></span>
+                <i class="bi bi-chevron-down ve-caret"></i>
+            </summary>
+            <div class="ve-menu-list" role="menu">
+                <?php $lastGroup = null; foreach ($pickerPages as $pp):
+                    if ($pp['group'] !== $lastGroup) { echo '<div class="ve-menu-group">' . ce_e($pp['group']) . '</div>'; $lastGroup = $pp['group']; } ?>
+                <a role="menuitem" data-ve-nav class="ve-menu-item<?= $pp['slug'] === $activeSlug ? ' is-current' : '' ?>" href="?page=<?= ce_e(rawurlencode($pp['slug'])) ?>">
+                    <i class="bi bi-<?= ce_e($pp['icon']) ?>"></i><span><?= ce_e($pp['title']) ?></span>
+                </a>
+                <?php endforeach; ?>
+                <div class="ve-menu-group">More</div>
+                <a role="menuitem" data-ve-nav class="ve-menu-item" href="?page=hub"><i class="bi bi-grid-1x2"></i><span>All content (list)</span></a>
+                <?php if ($canApprove): ?>
+                <a role="menuitem" data-ve-nav class="ve-menu-item" href="?page=review"><i class="bi bi-inboxes"></i><span>Review queue</span>
+                    <?php if ($pending): ?><em class="ve-badge"><?= count($pending) ?></em><?php endif; ?></a>
+                <?php endif; ?>
             </div>
-            <div style="padding:.5rem .5rem 0">
-                <p class="text-muted small px-2 mb-2">Drag and drop to reorder slides.</p>
-                <div id="slide-list" class="slide-list">
-                    <?php if (empty($slides)): ?>
-                        <div class="empty-state"><i class="bi bi-images"></i><p>No slides yet. Click "Add New Slide" to create one.</p></div>
-                    <?php else: foreach ($slides as $i => $s): ?>
-                        <div class="slide-item" draggable="true" data-id="<?= (int)$s['slide_id'] ?>">
-                            <span class="slide-drag-handle"><i class="bi bi-grip-vertical"></i></span>
-                            <span class="slide-number"><?= $i + 1 ?></span>
-                            <div class="slide-thumb">
-                                <?php if ($s['media_type'] === 'video'): ?>
-                                    <i class="bi bi-camera-reels-fill"></i>
-                                <?php else: ?>
-                                    <img src="<?= htmlspecialchars($s['media_path']) ?>" alt="">
-                                <?php endif; ?>
-                            </div>
-                            <div class="slide-item-info">
-                                <div class="slide-item-title"><?= htmlspecialchars($s['title'] ? str_replace('|', ' ', $s['title']) : '(No title)') ?></div>
-                                <div class="slide-item-sub"><?= htmlspecialchars($s['subtitle'] ?? '') ?></div>
-                                <span class="badge-status <?= $s['status'] ?>"><?= ucfirst($s['status']) ?></span>
-                            </div>
-                            <button type="button" class="slide-item-menu" title="Options"><i class="bi bi-three-dots-vertical"></i></button>
-                        </div>
-                    <?php endforeach; endif; ?>
-                </div>
-                <div class="alert alert-info d-flex align-items-start gap-2 mt-2 mb-2" style="font-size:.8rem">
-                    <i class="bi bi-info-circle-fill mt-1"></i>
-                    <span>The first slide in the list will be displayed first on the website.</span>
-                </div>
-            </div>
+        </details>
+
+        <?php if ($subs): ?>
+        <select class="ve-sub" id="veSub" aria-label="Choose what to preview">
+            <?php foreach ($subs as $s): ?><option value="<?= ce_e($s['url']) ?>"<?= $s['url'] === $pageUrl ? ' selected' : '' ?>><?= ce_e($s['label']) ?></option><?php endforeach; ?>
+        </select>
+        <?php endif; ?>
+
+        <button type="button" class="ve-tool" id="veOutlineBtn" hidden title="Jump to a section of this page"><i class="bi bi-list-nested"></i><span>Sections</span></button>
+
+        <div class="ve-devices" role="group" aria-label="Preview size">
+            <button type="button" class="active" data-device="desktop" aria-pressed="true" title="Computer"><i class="bi bi-display"></i></button>
+            <button type="button" data-device="tablet" aria-pressed="false" title="Tablet"><i class="bi bi-tablet"></i></button>
+            <button type="button" data-device="mobile" aria-pressed="false" title="Phone"><i class="bi bi-phone"></i></button>
         </div>
-    </div>
 
-    <!-- ══════════════════ Slide Preview / Editor ══════════════════ -->
-    <div class="col-lg-7">
-        <div class="data-card h-100">
-            <div class="data-card-header">
-                <span class="data-card-title"><i class="bi bi-eye me-1"></i> Slide Preview</span>
-            </div>
+        <span class="ve-status ve-status-ok" id="veStatus" role="status" aria-live="polite"></span>
 
-            <div id="editor-empty" class="empty-state">
-                <p>Select a slide from the list, or add a new one, to start editing.</p>
-            </div>
-
-            <form id="slide-form" enctype="multipart/form-data" style="padding:0 1.25rem 1.25rem; display:none">
-                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                <input type="hidden" name="slide_id" id="f-slide-id" value="0">
-
-                <!-- Preview mode switch -->
-                <div class="preview-tabs" role="tablist" aria-label="Preview device">
-                    <button type="button" class="preview-tab active" id="tab-desktop" data-preview="desktop" role="tab" aria-selected="true">
-                        <i class="bi bi-display"></i> Desktop Preview
-                    </button>
-                    <button type="button" class="preview-tab" id="tab-mobile" data-preview="mobile" role="tab" aria-selected="false">
-                        <i class="bi bi-phone"></i> Mobile Preview
-                    </button>
-                </div>
-                <p class="small text-muted mb-2" style="margin-top:-.3rem">
-                    Mobile Preview is an approximation of the live site's layout, not a pixel-exact render.
-                </p>
-
-                <!-- Live preview -->
-                <div class="mini-hero-wrap" id="mini-hero-wrap">
-                    <div class="mini-hero" id="mini-hero">
-                        <div class="mini-hero-bg" id="mini-hero-bg"></div>
-                        <video id="mini-hero-video" muted loop playsinline style="display:none"></video>
-                        <div class="mini-hero-overlay"></div>
-                        <div class="mini-hero-content">
-                            <div class="mini-title" id="mini-title"></div>
-                            <div class="mini-sub" id="mini-sub"></div>
-                            <div class="mini-ctas">
-                                <span class="mini-btn mini-btn-primary" id="mini-btn1"></span>
-                                <span class="mini-btn mini-btn-secondary" id="mini-btn2"></span>
-                            </div>
-                        </div>
-                        <div class="mini-arrow mini-arrow-prev"><i class="bi bi-chevron-left"></i></div>
-                        <div class="mini-arrow mini-arrow-next"><i class="bi bi-chevron-right"></i></div>
-                        <div class="mini-dots"><span class="active"></span><span></span><span></span></div>
-                    </div>
-                </div>
-                <div class="small text-muted mt-1 d-none" id="mobile-fallback-note">
-                    <i class="bi bi-info-circle"></i> No mobile image set for this slide — showing the desktop image as a fallback.
-                </div>
-
-                <div class="row g-3 mt-1">
-                    <div class="col-md-6">
-                        <label class="form-label d-flex justify-content-between">
-                            <span>Title</span><span class="text-muted small counter" data-max="50">0 / 50</span>
-                        </label>
-                        <input type="text" class="form-control" id="f-title" name="title" maxlength="50" placeholder="Leave blank to hide title">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label d-flex justify-content-between">
-                            <span>Subtitle</span><span class="text-muted small counter" data-max="150">0 / 150</span>
-                        </label>
-                        <input type="text" class="form-control" id="f-subtitle" name="subtitle" maxlength="150" placeholder="Leave blank to hide subtitle">
-                    </div>
-
-                    <!-- Button 1 -->
-                    <div class="col-md-6">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label mb-0">Button 1</label>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="f-btn1-toggle">
-                                <label class="form-check-label small text-muted" for="f-btn1-toggle">Show</label>
-                            </div>
-                        </div>
-                        <div id="btn1-fields" style="display:none">
-                            <input type="text" class="form-control mb-2" id="f-btn1-text" name="btn1_text" maxlength="30" placeholder="Button Text (e.g. ENROLL NOW)">
-                            <input type="text" class="form-control" id="f-btn1-link" name="btn1_link" placeholder="Button Link (e.g. /auth/login.php)">
-                        </div>
-                    </div>
-
-                    <!-- Button 2 -->
-                    <div class="col-md-6">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label mb-0">Button 2</label>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="f-btn2-toggle">
-                                <label class="form-check-label small text-muted" for="f-btn2-toggle">Show</label>
-                            </div>
-                        </div>
-                        <div id="btn2-fields" style="display:none">
-                            <input type="text" class="form-control mb-2" id="f-btn2-text" name="btn2_text" maxlength="30" placeholder="Button Text (e.g. EXPLORE GNC)">
-                            <input type="text" class="form-control" id="f-btn2-link" name="btn2_link" placeholder="Button Link (e.g. #about)">
-                        </div>
-                    </div>
-
-                    <!-- Background Media: Desktop + Mobile are independent -->
-                    <div class="col-12">
-                        <label class="form-label mb-2">Background Media</label>
-                        <div class="row g-3">
-                            <!-- Desktop background -->
-                            <div class="col-md-6">
-                                <div class="bg-media-field">
-                                    <div class="bg-media-field-label">
-                                        <i class="bi bi-display"></i> Desktop <span class="text-muted fw-normal">(image or video)</span>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div class="media-swatch" id="media-swatch"><i class="bi bi-image"></i></div>
-                                        <div class="flex-grow-1">
-                                            <div class="small text-truncate" id="media-filename">No file selected</div>
-                                            <div class="small text-muted" id="media-meta">Image or video</div>
-                                        </div>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-upload">Upload</button>
-                                        <input type="file" id="f-media" name="media" accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime" hidden>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Mobile background -->
-                            <div class="col-md-6">
-                                <div class="bg-media-field">
-                                    <div class="bg-media-field-label">
-                                        <i class="bi bi-phone"></i> Mobile <span class="text-muted fw-normal">(image only, optional)</span>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div class="media-swatch" id="media-mobile-swatch"><i class="bi bi-image"></i></div>
-                                        <div class="flex-grow-1">
-                                            <div class="small text-truncate" id="media-mobile-filename">Using desktop image</div>
-                                            <div class="small text-muted" id="media-mobile-meta">No mobile-specific image set</div>
-                                        </div>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-upload-mobile">Upload</button>
-                                        <input type="file" id="f-media-mobile" name="media_mobile" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
-                                    </div>
-                                    <button type="button" class="btn btn-link btn-sm p-0 mt-1 d-none" id="btn-clear-mobile">
-                                        <i class="bi bi-x-circle"></i> Remove mobile image (fall back to desktop)
-                                    </button>
-                                    <input type="hidden" name="remove_mobile_media" id="f-remove-mobile-media" value="0">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Status + Mobile + Gradient -->
-                    <div class="col-md-3">
-                        <label class="form-label">Status</label>
-                        <select class="form-select" id="f-status" name="status">
-                            <option value="published">Published</option>
-                            <option value="draft">Draft</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label d-block">Display on Mobile</label>
-                        <div class="form-check form-switch mt-2">
-                            <input class="form-check-input" type="checkbox" id="f-mobile" checked>
-                            <label class="form-check-label small" id="f-mobile-label">Show</label>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label d-block">Gradient Overlay</label>
-                        <div class="form-check form-switch mt-2">
-                            <input class="form-check-input" type="checkbox" id="f-gradient" checked>
-                            <label class="form-check-label small" id="f-gradient-label">On</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="form-alert" class="alert d-none mt-3 mb-0"></div>
-
-                <div class="d-flex justify-content-between align-items-center mt-4 pt-3" style="border-top:1px solid #f0f0f0">
-                    <button type="button" class="btn btn-outline-danger" id="btn-remove-slide">
-                        <i class="bi bi-trash"></i> Remove Slide
-                    </button>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary" id="btn-cancel">Cancel</button>
-                        <button type="submit" class="btn-gnc-primary" id="btn-save">Save Changes</button>
-                    </div>
-                </div>
-            </form>
+        <div class="ve-actions">
+            <?php if ($activeSlug === 'programs' && $canManagePages): ?>
+            <button type="button" class="ve-tool" id="veAddProgramBtn" title="Create a college or Graduate School program"><i class="bi bi-plus-circle"></i><span>Add Program</span></button>
+            <?php endif; ?>
+            <?php if ($VE['page']['publicUrl'] !== ''): ?>
+            <a class="ve-tool" href="<?= ce_e($VE['page']['publicUrl']) ?>" target="_blank" rel="noopener" title="Open the live page in a new tab"><i class="bi bi-box-arrow-up-right"></i><span>View live</span></a>
+            <?php endif; ?>
+            <?php if ($hasDrawer): ?>
+            <button type="button" class="ve-tool" id="veSettingsBtn" title="<?= ce_e($drawerTitle) ?>"><i class="bi bi-sliders"></i><span>More settings</span></button>
+            <?php endif; ?>
+            <button type="button" class="ve-tool" id="vePageOpts" hidden title="Visibility, colour and other options for this page"><i class="bi bi-gear"></i><span>Page options</span></button>
+            <?php if ($veEmbed): ?>
+            <button type="button" class="ve-tool" id="vePostsBtn" title="Open the list of news, announcements and events here"><i class="bi bi-megaphone"></i><span>Posts</span></button>
+            <?php endif; ?>
+            <button type="button" class="ve-tool" id="vePreviewBtn" title="See the page as visitors see it (no editing outlines)"><i class="bi bi-eye"></i><span>Preview</span></button>
+            <button type="button" class="ve-tool ve-tool-danger" id="veCancel" hidden title="Throw away the changes that are not saved yet"><i class="bi bi-x-circle"></i><span>Cancel</span></button>
+            <button type="button" class="btn btn-outline-secondary ve-btn" id="veSecondary" hidden></button>
+            <button type="button" class="btn-gnc ve-btn" id="vePrimary" hidden></button>
         </div>
-    </div>
-</div>
+    </header>
 
-<?php if (hasPermission('manage_page_content')): ?>
-    <hr style="margin: 2rem 0; border-top: 1px solid #e5e5e5;">
-    <div style="margin-top: 2rem;">
-        <?php include __DIR__ . '/../components/homepage-president-manager.php'; ?>
-    </div>
-<?php endif; ?>
-
-</div><!-- /#page-panel-home -->
-
-<!-- ══════════════════ Generic section-based pages (Vision & Mission, About Us, etc.) ══════════════════ -->
-<?php foreach ($sectionPages as $sp):
-    $sections = getPageSections($sp['slug']);
-    // College Departments / Programs have no free-text sections to edit:
-    // department logos + Head of Office live in `departments`, and each
-    // program's curriculum PDF lives in `programs`.
-    $isDeptPage      = ($sp['slug'] === 'college-departments');
-    $isProgramsPage  = ($sp['slug'] === 'programs');
-    $hasCustomPanel  = $isDeptPage || $isProgramsPage;
-?>
-<div class="page-panel" id="page-panel-<?= htmlspecialchars($sp['slug']) ?>" style="<?= $activeSlug === $sp['slug'] ? '' : 'display:none' ?>">
-    <div class="page-header">
-        <div>
-            <h1><?= htmlspecialchars($sp['title']) ?></h1>
-            <p><?= $isDeptPage
-                ? 'Manage each department\'s logo and Head of Office. Changes go live everywhere the department appears.'
-                : ($isProgramsPage
-                    ? 'Upload the curriculum PDF for each program. It appears in the Program Curriculum section of that program\'s page.'
-                    : 'Edit the content sections for this page, then save, preview, and publish your changes.') ?></p>
+    <main class="ve-canvas" id="veCanvas">
+        <div class="ve-stage" id="veStage" data-device="desktop">
+            <iframe id="veFrame" class="ve-frame" title="Website preview. Click anything to edit it."></iframe>
         </div>
-    </div>
+        <div class="ve-loader" id="veLoader"><div class="ve-spin"></div><span>Opening the page…</span></div>
+        <div class="ve-empty-state" id="veEmpty" hidden>
+            <i class="bi bi-collection-play"></i>
+            <strong>The homepage has no slides yet</strong>
+            <span>Add a picture or video to start the slideshow.</span>
+            <button type="button" class="btn-gnc" id="veAddFirst"><i class="bi bi-plus-lg"></i> Add the first slide</button>
+        </div>
+    </main>
 
-    <?php if ($canManagePages && $isDeptPage): ?>
-        <?php include __DIR__ . '/../components/department-media-manager.php'; ?>
-    <?php elseif ($canManagePages && $isProgramsPage): ?>
-        <?php include __DIR__ . '/../components/program-pdf-manager.php'; ?>
+    <div class="ve-dock" id="veDock" hidden></div>
+    <div class="ve-tb" id="veTb" hidden role="toolbar" aria-label="Edit the selected item"></div>
+    <div class="ve-pop" id="vePop" hidden></div>
+    <input type="file" id="veFile" hidden>
+
+    <?php if ($hasPanel): ?>
+    <div class="ve-backdrop" data-ve-drawer-close></div>
+    <aside class="ve-drawer" id="veDrawer" hidden aria-label="<?= ce_e($hasDrawer ? $drawerTitle : 'News, announcements and events') ?>">
+        <div class="ve-drawer-head">
+            <strong id="veDrawerTitle"><?= ce_e($hasDrawer ? $drawerTitle : 'News, announcements and events') ?></strong>
+            <button type="button" class="ve-x" data-ve-drawer-close aria-label="Close"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <?php if ($hasDrawer): ?>
+        <div class="ve-drawer-body" id="veDrawerBody">
+            <p class="ve-drawer-note"><i class="bi bi-info-circle"></i> Most things are edited by clicking them on the page. This panel holds the extra settings. Changes here are saved with its own buttons and go live when saved.</p>
+            <?php renderAdminComponent(__DIR__ . '/../components/' . $drawerFile); ?>
+        </div>
+        <?php endif; ?>
+        <?php if ($veEmbed): ?>
+        <div class="ve-drawer-embed" id="veEmbedWrap" <?= $hasDrawer ? 'hidden' : '' ?>>
+            <iframe id="veEmbed" title="News, announcements and events editor" data-src="about:blank"></iframe>
+        </div>
+        <?php endif; ?>
+    </aside>
     <?php endif; ?>
+</div>
 
-    <?php if (!$canManagePages): ?>
+<script>
+    // legacy config the existing managers read
+    window.SLIDE_EDITOR_CONFIG = { csrfToken: <?= json_encode($csrfToken) ?>, ajaxUrl: '/admin/action/page-content-handler.php' };
+    window.CE_CONFIG = { csrf: <?= json_encode($csrfToken) ?>, handler: '/admin/action/page-review-handler.php',
+        canPublish: <?= $canManagePages ? 'true' : 'false' ?>, canApprove: <?= $canApprove ? 'true' : 'false' ?>, reviewReady: <?= $reviewReady ? 'true' : 'false' ?> };
+    window.VE_CONFIG = <?= json_encode($VE, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR) ?>;
+    document.body.classList.add('ve-mode');
+<?php if ($activeSlug === 'programs'): ?>
+    // Programs: "Edit details" on the Facilities carousel (in the preview) opens that program's Facilities tab here.
+    // (Adding, renaming, reordering and deleting slides is done from the strip under the page: assets/js/content-edit.js)
+    (function () {
+        var frame = document.getElementById('veFrame');
+        function openFacilities(slug) {
+            var drawer = document.getElementById('veDrawer'), btn = document.getElementById('veSettingsBtn');
+            if (drawer && drawer.hidden && btn) btn.click();
+            var cards = Array.prototype.slice.call(document.querySelectorAll('.pgm-card'));
+            var card = cards.filter(function (c) { return c.getAttribute('data-slug') === slug; })[0];
+            if (!card) return;
+            var head = card.querySelector('.pgm-head');
+            if (head && head.getAttribute('aria-expanded') !== 'true') head.click();
+            var tab = card.querySelector('.pgm-tab[data-tab="facility"]');
+            if (tab) tab.click();
+            try { card.scrollIntoView({ block: 'start' }); } catch (e) {}
+        }
+        window.addEventListener('message', function (ev) {
+            if (ev.origin !== window.location.origin) return;
+            if (!frame || ev.source !== frame.contentWindow) return;
+            var d = ev.data;
+            if (!d || d.source !== 'gnc-program-preview' || d.action !== 'facilities' || d.mode !== 'edit') return;
+            openFacilities(String(d.slug || ''));
+        });
+    })();
+<?php endif; ?>
+    (function () {   // the page list closes when you pick something or click elsewhere
+        var m = document.getElementById('vePageMenu');
+        document.addEventListener('mousedown', function (e) { if (m && m.open && !m.contains(e.target)) m.removeAttribute('open'); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && m) m.removeAttribute('open'); });
+    })();
+</script>
+<script src="/assets/js/content-edit.js?v=<?= (int)@filemtime(__DIR__ . '/../assets/js/content-edit.js') ?: 1 ?>"></script>
+
+<?php else: ?>
+<div class="ce-shell">
+
+    <!-- ══════════════════ Navigation ══════════════════ -->
+    <button type="button" class="ce-nav-toggle" id="ceNavToggle" aria-expanded="false" aria-controls="ceNav">
+        <i class="bi bi-list"></i> <span>Menu: <strong id="ceNavCurrent">Content Editor</strong></span>
+    </button>
+
+    <nav class="ce-nav" id="ceNav" aria-label="Content Editor">
+        <div class="ce-nav-group">
+            <div class="ce-nav-label">Overview</div>
+            <a class="ce-nav-link" href="?page=hub" data-panel="hub"><i class="bi bi-grid-1x2"></i><span>All content</span></a>
+            <?php if ($canApprove): ?>
+            <a class="ce-nav-link" href="?page=review" data-panel="review"><i class="bi bi-inboxes"></i><span>Review queue</span>
+                <span class="ce-nav-badge" id="cePendingBadge" <?= $pending ? '' : 'hidden' ?>><?= count($pending) ?></span></a>
+            <?php endif; ?>
+        </div>
+
+        <?php if ($canManagePages): ?>
+        <div class="ce-nav-group">
+            <div class="ce-nav-label">Homepage</div>
+            <a class="ce-nav-link" href="?page=home" data-panel="home"><i class="bi bi-window-desktop"></i><span>Slideshow &amp; president</span></a>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($textPages): ?>
+        <div class="ce-nav-group">
+            <div class="ce-nav-label">Pages</div>
+            <?php foreach ($textPages as $p): ?>
+            <a class="ce-nav-link" href="?page=<?= ce_e(rawurlencode($p['slug'])) ?>" data-panel="<?= ce_e($p['slug']) ?>">
+                <i class="bi bi-file-earmark-text"></i><span><?= ce_e($p['title']) ?></span>
+                <span class="ce-nav-dot" data-dot-for="<?= ce_e($p['slug']) ?>" hidden title="Unsaved changes"></span>
+            </a>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($customPages): ?>
+        <div class="ce-nav-group">
+            <div class="ce-nav-label">Academics &amp; people</div>
+            <?php foreach ($customPages as $p):
+                $icon = $p['slug'] === 'administration' ? 'bi-people' : ($p['slug'] === 'programs' ? 'bi-mortarboard' : 'bi-building'); ?>
+            <a class="ce-nav-link" href="?page=<?= ce_e(rawurlencode($p['slug'])) ?>" data-panel="<?= ce_e($p['slug']) ?>">
+                <i class="bi <?= $icon ?>"></i><span><?= ce_e($p['title']) ?></span>
+            </a>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($otherModules): ?>
+        <div class="ce-nav-group">
+            <div class="ce-nav-label">Other content</div>
+            <?php foreach ($otherModules as $m): ?>
+            <a class="ce-nav-link ce-nav-ext" href="<?= ce_e($m['href']) ?>"><i class="bi <?= ce_e($m['icon']) ?>"></i><span><?= ce_e($m['label']) ?></span></a>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <div class="ce-nav-role">
+            <strong><?= $canManagePages ? 'You can publish' : ($canDraftPages ? 'You can submit for approval' : 'Your own content') ?></strong>
+            <span><?= $canManagePages
+                ? 'Your changes go live when you press Publish.'
+                : ($canDraftPages ? 'Your changes go live after an administrator approves them.' : 'Page text is edited by editors and administrators. You can manage your own posts.') ?></span>
+        </div>
+    </nav>
+
+    <div class="ce-main" id="ceMain">
+
+<?php if ($noAccess): ?>
         <div class="data-card">
             <div class="empty-state">
                 <i class="bi bi-lock-fill"></i>
-                <p>You don't have permission to edit this page's content.</p>
+                <p>You don't have permission to edit website content. Ask a Super Admin if you need access.</p>
             </div>
         </div>
-    <?php elseif (empty($sections) && $hasCustomPanel): ?>
-        <?php /* nothing else to edit on this page */ ?>
-    <?php elseif (empty($sections)): ?>
-        <div class="data-card">
-            <div class="empty-state">
-                <i class="bi bi-file-earmark-text"></i>
-                <p>No editable sections yet for this page.</p>
-            </div>
+<?php else: ?>
+
+<?php if (!$reviewReady && $canDraftPages): ?>
+        <div class="alert alert-warning ce-setup" role="alert">
+            <strong>Approval is not switched on yet.</strong>
+            Your developer needs to run <code>sql/page-approval-migration.sql</code> once. Until then, editors cannot submit for approval; saving drafts and publishing still work.
         </div>
-    <?php else: foreach ($sections as $sec):
-        $hasDraft   = $sec['draft_content'] !== null;
-        $textValue  = $hasDraft ? $sec['draft_content'] : $sec['content'];
-    ?>
-        <div class="data-card mb-3 page-section-card"
-             data-page="<?= htmlspecialchars($sp['slug']) ?>"
-             data-section="<?= htmlspecialchars($sec['section_key']) ?>">
-            <div class="data-card-header">
-                <span class="data-card-title"><?= htmlspecialchars($sec['title']) ?></span>
-                <span class="badge-status <?= $hasDraft ? 'draft' : 'published' ?> ms-auto section-status-badge">
-                    <?= $hasDraft ? 'Unpublished changes' : 'Published' ?>
-                </span>
+<?php endif; ?>
+
+        <!-- ══════════════════ All content ══════════════════ -->
+        <div class="page-panel" id="page-panel-hub" style="<?= $activeSlug === 'hub' ? '' : 'display:none' ?>">
+            <div class="page-header">
+                <div>
+                    <h1>Content Editor</h1>
+                    <p>Everything you can edit on the website, in one list. Search, filter, then press <strong>Edit</strong>.</p>
+                </div>
+                <?php if ($createLinks): ?>
+                <div class="dropdown">
+                    <button class="btn-gnc-gold dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-plus-lg"></i> Create new</button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <?php foreach ($createLinks as $c): ?><li><a class="dropdown-item" href="<?= ce_e($c[0]) ?>"><i class="bi <?= ce_e($c[2]) ?> me-2"></i><?= ce_e($c[1]) ?></a></li><?php endforeach; ?>
+                    </ul>
+                </div>
+                <?php endif; ?>
             </div>
-            <div style="padding:0 1.25rem 1.25rem">
-                <textarea class="form-control section-textarea" rows="4"
-                          aria-label="<?= htmlspecialchars($sec['title']) ?> text"><?= htmlspecialchars($textValue ?? '') ?></textarea>
-                <div class="section-alert alert d-none mt-2 mb-0"></div>
-                <div class="d-flex justify-content-end gap-2 mt-3">
-                    <button type="button" class="btn btn-outline-secondary btn-sm btn-discard-draft" <?= $hasDraft ? '' : 'disabled' ?>>
-                        Discard Draft
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm btn-preview-section">
-                        Preview
-                    </button>
-                    <button type="button" class="btn-gnc-primary btn-sm btn-save-section">
-                        Save Changes
-                    </button>
-                    <button type="button" class="btn-gnc-gold btn-sm btn-publish-section">
-                        Publish
-                    </button>
+
+            <div class="ce-stats" role="group" aria-label="Filter by status">
+                <button type="button" class="ce-stat" data-status="" aria-pressed="true"><b id="ceStatAll"><?= $hubCount['all'] ?></b><span>All content</span></button>
+                <button type="button" class="ce-stat ce-stat-live" data-status="live" aria-pressed="false"><b><?= $hubCount['live'] ?></b><span>Live</span></button>
+                <button type="button" class="ce-stat ce-stat-draft" data-status="draft" aria-pressed="false"><b><?= $hubCount['draft'] ?></b><span>Drafts</span></button>
+                <button type="button" class="ce-stat ce-stat-pending" data-status="pending" aria-pressed="false"><b><?= $hubCount['pending'] ?></b><span>Waiting for approval</span></button>
+                <button type="button" class="ce-stat ce-stat-rejected" data-status="rejected" aria-pressed="false"><b><?= $hubCount['rejected'] ?></b><span>Changes requested</span></button>
+            </div>
+
+            <div class="data-card ce-list-card">
+                <div class="ce-toolbar">
+                    <div class="ce-search">
+                        <i class="bi bi-search" aria-hidden="true"></i>
+                        <input type="search" id="ceSearch" class="form-control" placeholder="Search by title…" aria-label="Search content">
+                    </div>
+                    <select id="ceType" class="form-select" aria-label="Filter by type">
+                        <option value="">All types</option>
+                        <?php foreach ($hubTypes as $t): ?><option value="<?= ce_e($t) ?>"><?= ce_e($t) ?></option><?php endforeach; ?>
+                    </select>
+                    <select id="ceStatus" class="form-select" aria-label="Filter by status">
+                        <option value="">Any status</option>
+                        <?php foreach ($statusLabel as $k => $v): ?><option value="<?= $k ?>"><?= ce_e($v) ?></option><?php endforeach; ?>
+                    </select>
+                    <select id="ceSort" class="form-select" aria-label="Sort by">
+                        <option value="attention">Needs attention first</option>
+                        <option value="modified">Recently modified</option>
+                        <option value="title">Title A–Z</option>
+                        <option value="type">Type</option>
+                    </select>
+                </div>
+
+                <div class="ce-table-wrap">
+                    <table class="ce-table" id="ceTable">
+                        <thead>
+                            <tr>
+                                <th scope="col"><button type="button" class="ce-th" data-sort="title">Title</button></th>
+                                <th scope="col"><button type="button" class="ce-th" data-sort="type">Type</button></th>
+                                <th scope="col"><button type="button" class="ce-th" data-sort="attention">Status</button></th>
+                                <th scope="col"><button type="button" class="ce-th" data-sort="modified">Last modified</button></th>
+                                <th scope="col" class="ce-th-act"><span class="visually-hidden">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($hub as $h): ?>
+                            <tr class="ce-row" data-title="<?= ce_e(mb_strtolower($h['title'] . ' ' . $h['note'])) ?>"
+                                data-name="<?= ce_e(mb_strtolower($h['title'])) ?>" data-type="<?= ce_e($h['type']) ?>"
+                                data-status="<?= ce_e($h['status']) ?>" data-rank="<?= $rank[$h['status']] ?>" data-ts="<?= (int)$h['ts'] ?>">
+                                <td data-label="Title">
+                                    <a class="ce-row-title" href="<?= ce_e($h['href']) ?>" data-open="<?= ce_e($h['open']) ?>"><?= ce_e($h['title']) ?></a>
+                                    <?php if ($h['note'] !== ''): ?><small><?= ce_e($h['note']) ?></small><?php endif; ?>
+                                </td>
+                                <td data-label="Type"><?= ce_e($h['type']) ?></td>
+                                <td data-label="Status"><span class="ce-badge ce-badge-<?= ce_e($h['status']) ?>"><?= ce_e($statusLabel[$h['status']]) ?></span></td>
+                                <td data-label="Last modified"><?= $h['ts'] ? ce_e(date('M j, Y', $h['ts'])) : '<span class="text-muted">—</span>' ?></td>
+                                <td class="ce-row-act">
+                                    <a class="btn btn-sm btn-outline-secondary" href="<?= ce_e($h['href']) ?>" data-open="<?= ce_e($h['open']) ?>"><i class="bi bi-pencil"></i> Edit</a>
+                                    <?php if ($h['where']): ?><a class="ce-ext" href="<?= ce_e($h['where']) ?>" target="_blank" rel="noopener" title="See it on the website" aria-label="View <?= ce_e($h['title']) ?> on the website"><i class="bi bi-box-arrow-up-right"></i></a><?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <div class="empty-state ce-none" id="ceNone" hidden>
+                        <i class="bi bi-search"></i>
+                        <p>Nothing matches. Try a different word, or <button type="button" class="btn btn-link p-0 align-baseline" id="ceReset">clear the filters</button>.</p>
+                    </div>
+                </div>
+                <div class="ce-count-line" id="ceShowing" aria-live="polite"></div>
+            </div>
+
+            <?php if ($otherModules): ?>
+            <div class="ce-others">
+                <h2>Also manage</h2>
+                <div class="ce-others-grid">
+                    <?php foreach ($otherModules as $m): ?>
+                    <a href="<?= ce_e($m['href']) ?>"><i class="bi <?= ce_e($m['icon']) ?>"></i><?= ce_e($m['label']) ?></a>
+                    <?php endforeach; ?>
                 </div>
             </div>
+            <?php endif; ?>
         </div>
-    <?php endforeach; endif; ?>
-</div>
-<?php endforeach; ?>
 
-<!-- Preview modal for section text. Vision & Mission sections render as a
-     scaled-down copy of their actual public-site card (see .cms-preview-*
-     below); any other page/section falls back to plain text. -->
-<div class="modal fade" id="sectionPreviewModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Preview</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<?php if ($canApprove): ?>
+        <!-- ══════════════════ Review queue ══════════════════ -->
+        <div class="page-panel" id="page-panel-review" style="<?= $activeSlug === 'review' ? '' : 'display:none' ?>">
+            <div class="page-header">
+                <div>
+                    <h1>Review queue</h1>
+                    <p>Changes sent in by editors. Nothing here is on the website yet. <strong>Approve</strong> to publish it, or <strong>Request changes</strong> to send it back with a note.</p>
+                </div>
             </div>
-            <div class="modal-body" id="sectionPreviewBody" style="background:var(--gnc-cream, #f7f3ea); padding:2rem"></div>
+
+            <?php if (!$reviewReady): ?>
+                <div class="alert alert-warning">Approval is not switched on yet. Run <code>sql/page-approval-migration.sql</code> once.</div>
+            <?php endif; ?>
+
+            <?php if (hasPermission('manage_approvals')): ?>
+            <div class="alert alert-light border ce-approvals-note"><i class="bi bi-info-circle"></i> This list is for <strong>page text</strong> only. News, announcements and events waiting for approval are on the <a href="/admin/approvals/">Approvals page</a>.</div>
+            <?php endif; ?>
+
+            <div id="ceQueue">
+            <?php foreach ($pending as $q): ?>
+                <article class="data-card ce-review" data-page="<?= ce_e($q['page_slug']) ?>" data-section="<?= ce_e($q['section_key']) ?>">
+                    <header class="ce-review-head">
+                        <div>
+                            <h2><?= ce_e($q['page_title']) ?> <span>›</span> <?= ce_e($q['section_title']) ?></h2>
+                            <small>Sent by <?= ce_e(trim((string)$q['submitted_by_name']) ?: 'an editor') ?> · <?= ce_e(ce_when($q['submitted_at'])) ?></small>
+                        </div>
+                        <a class="btn btn-sm btn-outline-secondary" href="?page=<?= ce_e(rawurlencode($q['page_slug'])) ?>&amp;section=<?= ce_e(rawurlencode($q['section_key'])) ?>" data-open="<?= ce_e($q['page_slug']) ?>" data-section-open="<?= ce_e($q['section_key']) ?>">Open in editor</a>
+                    </header>
+                    <div class="ce-compare">
+                        <div>
+                            <div class="ce-compare-label">On the website now</div>
+                            <div class="ce-prose ce-prose-old"><?= sectionToEditorHtml($q['content']) ?: '<em class="text-muted">(empty)</em>' ?></div>
+                        </div>
+                        <div>
+                            <div class="ce-compare-label ce-compare-new">Proposed change</div>
+                            <div class="ce-prose"><?= sectionToEditorHtml($q['draft_content']) ?: '<em class="text-muted">(empty)</em>' ?></div>
+                        </div>
+                    </div>
+                    <div class="ce-review-actions">
+                        <label class="visually-hidden" for="note-<?= (int)$q['section_id'] ?>">Note to the editor</label>
+                        <input type="text" id="note-<?= (int)$q['section_id'] ?>" class="form-control ce-review-note" maxlength="500" placeholder="Note to the editor (needed when you request changes)">
+                        <button type="button" class="btn btn-outline-secondary" data-review="reject"><i class="bi bi-arrow-counterclockwise"></i> Request changes</button>
+                        <button type="button" class="btn-gnc-gold" data-review="approve"><i class="bi bi-check2-circle"></i> Approve &amp; publish</button>
+                    </div>
+                </article>
+            <?php endforeach; ?>
+            </div>
+            <div class="data-card" id="ceQueueEmpty" <?= $pending ? 'hidden' : '' ?>>
+                <div class="empty-state"><i class="bi bi-check2-all"></i><p>All caught up. Nothing is waiting for approval.</p></div>
+            </div>
         </div>
-    </div>
-</div>
+<?php endif; ?>
 
-<style>
-/* ── Section preview card — mirrors /assets/css/vision-mission-style.css
-     (.vm-card etc.) at a smaller scale, so "Preview" shows admins roughly
-     what the public page will actually look like. Falls back to the
-     admin panel's own --gnc-* variables where defined, with hardcoded
-     fallbacks matching the public site in case those aren't in scope here. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Serif:wght@700&display=swap');
+<?php endif; /* has any permission */ ?>
 
-.cms-preview-card {
-    display: flex;
-    background-color: #ffffff;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-    min-height: 260px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-}
-
-.cms-preview-sidebar {
-    width: 110px;
-    flex-shrink: 0;
-    position: relative;
-    overflow: hidden;
-    z-index: 2;
-}
-
-.cms-preview-sidebar.cms-green { background-color: var(--gnc-green-light, #145c3a); }
-.cms-preview-sidebar.cms-gold  { background-color: var(--gnc-gold, #d3a63a); }
-
-.cms-preview-watermark-seal {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 220px;
-    height: 220px;
-    opacity: .15;
-    background-image: url('/assets/images/logos/gnc-logo-v1.svg');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-}
-
-.cms-preview-watermark-building {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 100%;
-    height: 120px;
-    background-image: url('/assets/images/svg/gnc-illustration.svg');
-    background-size: cover;
-    background-position: bottom center;
-    background-repeat: no-repeat;
-    z-index: 1;
-    pointer-events: none;
-    filter: invert(1);
-    mix-blend-mode: multiply;
-    opacity: .2;
-}
-
-.cms-preview-icon-circle {
-    position: absolute;
-    top: 28px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 72px;
-    height: 72px;
-    background-color: #ffffff;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 3;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-}
-
-.cms-preview-icon-circle img {
-    width: 34px;
-}
-
-.cms-preview-content {
-    padding: 38px 32px 30px 34px;
-    flex-grow: 1;
-    position: relative;
-    z-index: 2;
-}
-
-.cms-preview-title {
-    font-family: 'Noto Serif', serif;
-    font-weight: 700;
-    font-size: 26px;
-    margin-bottom: 18px;
-    position: relative;
-    display: inline-block;
-}
-
-.cms-preview-title::after {
-    content: '';
-    position: absolute;
-    bottom: -6px;
-    left: 0;
-    width: 100%;
-    height: 2px;
-    background-color: currentColor;
-}
-
-.cms-preview-title.cms-green { color: var(--gnc-green-light, #145c3a); }
-.cms-preview-title.cms-gold  { color: var(--gnc-gold, #d3a63a); }
-
-.cms-preview-text {
-    font-family: 'Inter', sans-serif;
-    font-weight: 500;
-    color: var(--gnc-text-dark, #333333);
-    font-size: 16px;
-    line-height: 1.5;
-    margin: 0;
-    white-space: pre-line;
-}
-
-.slide-list {
-    display: flex;
-    flex-direction: column;
-    gap: .5rem;
-    max-height: 640px;
-    overflow-y: auto;
-    padding-bottom: .5rem;
-}
-
-.slide-item {
-    display: flex;
-    align-items: center;
-    gap: .6rem;
-    border: 1px solid #eee;
-    border-radius: 10px;
-    padding: .6rem .7rem;
-    background: #fff;
-    cursor: pointer;
-    transition: border-color var(--transition), background var(--transition);
-}
-
-.slide-item:hover {
-    border-color: rgba(9, 64, 36, 0.25);
-    background: var(--gnc-cream);
-}
-
-.slide-item.selected {
-    border-color: var(--gnc-green);
-    background: rgba(9, 64, 36, 0.06);
-}
-
-.slide-item.dragging {
-    opacity: .4;
-}
-
-.slide-drag-handle {
-    color: #bbb;
-    cursor: grab;
-    font-size: 1rem;
-}
-
-.slide-number {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: var(--gnc-green);
-    color: #fff;
-    font-size: .72rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.slide-thumb {
-    width: 56px;
-    height: 40px;
-    border-radius: 6px;
-    overflow: hidden;
-    flex-shrink: 0;
-    background: #e9ecef;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #999;
-}
-
-.slide-thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.slide-item-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.slide-item-title {
-    font-weight: 600;
-    font-size: .85rem;
-    color: #222;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.slide-item-sub {
-    font-size: .72rem;
-    color: #888;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Reuses the .status-badge naming convention from header-admin-style.css */
-.badge-status {
-    font-size: .65rem;
-    font-weight: 700;
-    padding: .15rem .5rem;
-    border-radius: 20px;
-    display: inline-block;
-    margin-top: 2px;
-}
-
-.badge-status.published {
-    background: #d1e7dd;
-    color: #0a6932;
-}
-
-.badge-status.draft {
-    background: #f0f0f0;
-    color: #666;
-}
-
-.slide-item-menu {
-    border: none;
-    background: none;
-    color: #aaa;
-    padding: .2rem .4rem;
-}
-
-.preview-tabs {
-    display: flex;
-    gap: .4rem;
-    margin-bottom: .6rem;
-}
-
-.preview-tab {
-    border: 1px solid #ddd;
-    background: #fff;
-    border-radius: 20px;
-    padding: .35rem 1rem;
-    font-size: .78rem;
-    font-weight: 600;
-    color: #666;
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-    cursor: pointer;
-    transition: background var(--transition), border-color var(--transition), color var(--transition);
-}
-
-.preview-tab:hover {
-    border-color: rgba(9, 64, 36, 0.3);
-}
-
-.preview-tab.active {
-    background: var(--gnc-green);
-    border-color: var(--gnc-green);
-    color: #fff;
-}
-
-/* ─────────────────────────────────────────────────────────────────────
-   Slide preview — mirrors the real homepage hero (assets/css/index-style.css:
-   .hero-slide / .hero-content / .hero-title-line / .btn-enroll / .btn-explore /
-   .slide-arrow / .hero-dots). Every size is written in cqw (1% of the preview's
-   width) and is the real site's px value divided by a 1440px desktop viewport
-   (390px for the mobile preview), so the preview is a true scaled-down copy.
-   If the site's hero CSS changes, update the numbers here to match.
-   ───────────────────────────────────────────────────────────────────── */
-.mini-hero-wrap {
-    display: flex;
-    justify-content: center;
-    transition: all var(--transition);
-}
-
-.mini-hero {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 1440 / 720;
-    border-radius: 12px;
-    overflow: hidden;
-    background: var(--gnc-green-dark);
-    color: #fff;
-    display: flex;
-    align-items: center;
-    container-type: inline-size;
-    transition: aspect-ratio var(--transition), max-width var(--transition);
-}
-
-.mini-hero-bg {
-    position: absolute;
-    inset: 0;
-    background-size: cover;
-    background-position: center;
-}
-
-#mini-hero-video {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-}
-
-/* same gradient as .slide-overlay */
-.mini-hero-overlay {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(105deg, rgba(9, 64, 36, .72) 0%, rgba(0, 0, 0, .45) 55%, rgba(0, 0, 0, .15) 100%);
-    z-index: 1;
-}
-
-/* .container (left edge ≈ 72px @1440) + .hero-content (max-width 600px) */
-.mini-hero-content {
-    position: relative;
-    z-index: 2;
-    box-sizing: border-box;
-    padding-left: 5cqw;
-    max-width: 46.67cqw;
-    text-align: left;
-}
-
-.mini-title {
-    font-family: 'Noto Serif', serif;
-    font-weight: 800;
-    font-size: 3.333cqw;      /* 3rem */
-    line-height: 1.1;
-    letter-spacing: .01em;
-    color: var(--gnc-gold);
-    text-transform: uppercase;
-    margin: 0 0 1.111cqw;
-}
-
-.mini-sub {
-    font-family: 'Inter', sans-serif;
-    font-size: 1.056cqw;      /* .95rem */
-    line-height: 1.6;
-    color: rgba(255, 255, 255, .88);
-    margin: 0 0 2cqw;
-    max-width: 29.17cqw;      /* 420px */
-}
-
-.mini-title:empty,
-.mini-sub:empty {
-    display: none;
-}
-
-.mini-ctas {
-    display: flex;
-    gap: 1.111cqw;
-    flex-wrap: wrap;
-}
-
-.mini-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: .417cqw;
-    font-family: 'Inter', sans-serif;
-    font-size: .911cqw;       /* .82rem */
-    font-weight: 700;
-    line-height: 1.5;
-    padding: .722cqw 1.667cqw;
-    border: .14cqw solid transparent;
-    border-radius: .417cqw;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-}
-
-.mini-btn:empty {
-    display: none;
-}
-
-.mini-btn-primary {
-    background: var(--gnc-gold);
-    border-color: var(--gnc-gold);
-    color: var(--gnc-green);
-}
-
-/* the arrow the real "Enroll Now" button has */
-.mini-btn-primary::after {
-    content: '';
-    width: .903cqw;
-    height: .903cqw;
-    background: currentColor;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z'/%3E%3C/svg%3E") center / contain no-repeat;
-            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-
-.mini-btn-secondary {
-    border-color: rgba(255, 255, 255, .6);
-    color: #fff;
-}
-
-.mini-arrow {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 3;
-    width: 3.056cqw;          /* 44px */
-    height: 3.056cqw;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, .12);
-    border: 1px solid rgba(255, 255, 255, .25);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2cqw;
-}
-
-.mini-arrow-prev { left: 1.389cqw; }
-.mini-arrow-next { right: 1.389cqw; }
-
-.mini-dots {
-    position: absolute;
-    bottom: 5.556cqw;         /* 80px */
-    left: 0;
-    right: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: .556cqw;
-    z-index: 3;
-}
-
-.mini-dots span {
-    width: .556cqw;
-    height: .556cqw;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, .4);
-}
-
-.mini-dots span.active {
-    width: 1.944cqw;
-    border-radius: .278cqw;
-    background: var(--gnc-gold);
-}
-
-/* ── Mobile preview: same rules as the site's @media (max-width:768px),
-   measured against a 390px-wide phone. Content is centered, buttons stack
-   full-width, title stays at clamp()'s 2rem floor. */
-.mini-hero-wrap.preview-mobile {
-    background: #f4f4f4;
-    border-radius: 12px;
-    padding: 1.25rem 0;
-}
-
-.mini-hero-wrap.preview-mobile .mini-hero {
-    aspect-ratio: 390 / 736;
-    max-width: 300px;
-    border-radius: 0;
-    box-shadow: 0 0 0 1px #ddd;
-}
-
-.mini-hero-wrap.preview-mobile .mini-hero-content {
-    width: 100%;
-    max-width: 100%;
-    padding: 0 3.08cqw;       /* container gutter 12px */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-}
-
-.mini-hero-wrap.preview-mobile .mini-title {
-    font-size: 8.205cqw;      /* 2rem */
-    margin-bottom: 4.1cqw;
-}
-
-.mini-hero-wrap.preview-mobile .mini-sub {
-    font-size: 3.897cqw;
-    margin-bottom: 7.38cqw;
-    max-width: 100%;
-}
-
-.mini-hero-wrap.preview-mobile .mini-ctas {
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    gap: 4.1cqw;
-}
-
-.mini-hero-wrap.preview-mobile .mini-btn {
-    width: 100%;
-    justify-content: center;
-    box-sizing: border-box;
-    font-size: 3.364cqw;
-    padding: 2.667cqw 6.154cqw;
-    border-width: .513cqw;
-    border-radius: 1.538cqw;
-    gap: 1.538cqw;
-}
-
-.mini-hero-wrap.preview-mobile .mini-btn-primary::after {
-    width: 3.333cqw;
-    height: 3.333cqw;
-}
-
-.mini-hero-wrap.preview-mobile .mini-arrow {
-    width: 9.23cqw;           /* 36px */
-    height: 9.23cqw;
-    font-size: 3.6cqw;
-}
-
-.mini-hero-wrap.preview-mobile .mini-arrow-prev { left: 2.46cqw; }
-.mini-hero-wrap.preview-mobile .mini-arrow-next { right: 2.46cqw; }
-
-.mini-hero-wrap.preview-mobile .mini-dots {
-    bottom: 20.5cqw;
-    gap: 2.05cqw;
-}
-
-.mini-hero-wrap.preview-mobile .mini-dots span {
-    width: 2.05cqw;
-    height: 2.05cqw;
-}
-
-.mini-hero-wrap.preview-mobile .mini-dots span.active {
-    width: 7.18cqw;
-    border-radius: 1.026cqw;
-}
-
-.bg-media-field-label {
-    font-size: .78rem;
-    font-weight: 600;
-    color: #555;
-    margin-bottom: .4rem;
-    display: flex;
-    align-items: center;
-    gap: .35rem;
-}
-
-.media-swatch {
-    width: 52px;
-    height: 40px;
-    border-radius: 8px;
-    background: #f1f1f1;
-    color: #999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    overflow: hidden;
-}
-
-.media-swatch img,
-.media-swatch video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.counter.over-limit {
-    color: #dc3545;
-    font-weight: 700;
-}
-
-/* .btn-gnc-gold / .btn-gnc-primary render as inline-block by default via Bootstrap's
-   button reset; this keeps them lined up with the page-header row and form footer. */
-.page-header .btn-gnc-gold {
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-}
-
-.page-panel {
-    animation: page-panel-fade .15s ease;
-}
-
-@keyframes page-panel-fade {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-.section-status-badge.published {
-    background: #d1e7dd;
-    color: #0a6932;
-}
-
-.section-status-badge.draft {
-    background: #fff3cd;
-    color: #8a6100;
-}
-</style>
+    </div><!-- /#ceMain -->
+</div><!-- /.ce-shell -->
 
 <script>
-    window.SLIDE_EDITOR_CONFIG = {
-        csrfToken: <?= json_encode($csrfToken) ?>,
-        ajaxUrl: '/admin/action/page-content-handler.php'
+    window.CE_CONFIG = {
+        csrf: <?= json_encode($csrfToken) ?>,
+        handler: '/admin/action/page-review-handler.php',
+        canPublish: <?= $canManagePages ? 'true' : 'false' ?>,
+        canApprove: <?= $canApprove ? 'true' : 'false' ?>,
+        reviewReady: <?= $reviewReady ? 'true' : 'false' ?>
     };
 </script>
-<script src="/assets/js/content-edit.js"></script>
 
 <script>
-// ══════════════════ Content Editor: page selector + generic section editor ══════════════════
-// Handles switching between "Select Page" options and the Save / Preview / Publish /
-// Discard Draft actions for section-based pages (Vision & Mission, About Us, etc.).
-// The homepage Slideshow editor above is untouched and keeps using /assets/js/content-edit.js.
+// ══════════════════ Content Editor: navigation, content list, rich-text editor, review ══════════════════
 (function () {
-    var PAGE_CONTENT_AJAX_URL = '/admin/action/page-content-handler.php';
-    var csrfToken = <?= json_encode($csrfToken) ?>;
+    'use strict';
+    var CFG = window.CE_CONFIG || {};
+    var $  = function (s, r) { return (r || document).querySelector(s); };
+    var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 
-    // ── Page selector ──
-    var pageSelect = document.getElementById('page-select');
-    if (pageSelect) {
-        pageSelect.addEventListener('change', function () {
-            var slug = this.value;
-            document.querySelectorAll('.page-panel').forEach(function (panel) {
-                panel.style.display = (panel.id === 'page-panel-' + slug) ? '' : 'none';
-            });
-            // Keep the URL shareable/bookmarkable without a full page reload.
-            if (window.history && window.history.replaceState) {
-                var url = new URL(window.location.href);
-                url.searchParams.set('page', slug);
-                window.history.replaceState({}, '', url);
+    // ══════════════════ Notifications ══════════════════
+    var toastBox = $('#ceToasts');
+    function toast(message, type) {
+        if (!toastBox) return;
+        var t = document.createElement('div');
+        t.className = 'ce-toast ce-toast-' + (type === 'error' ? 'error' : 'ok');
+        t.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        var icon = document.createElement('i');
+        icon.className = 'bi ' + (type === 'error' ? 'bi-exclamation-octagon-fill' : 'bi-check-circle-fill');
+        var span = document.createElement('span');
+        span.textContent = message;
+        var x = document.createElement('button');
+        x.type = 'button'; x.className = 'ce-toast-x'; x.setAttribute('aria-label', 'Dismiss'); x.textContent = '×';
+        t.appendChild(icon); t.appendChild(span); t.appendChild(x);
+        toastBox.appendChild(t);
+        var kill = function () { if (t.parentNode) t.parentNode.removeChild(t); };
+        x.addEventListener('click', kill);
+        setTimeout(kill, type === 'error' ? 9000 : 4500);
+    }
+
+    // ══════════════════ Navigation between panels ══════════════════
+    var main = $('#ceMain');
+    var navLinks = $$('.ce-nav-link[data-panel]');
+    var navEl = $('#ceNav'), navToggle = $('#ceNavToggle');
+    function panelEl(slug) { return document.getElementById('page-panel-' + slug); }
+
+    function showPanel(slug, opts) {
+        opts = opts || {};
+        if (!panelEl(slug)) return false;
+        $$('.page-panel', main).forEach(function (p) {
+            if (p.parentNode !== main) return;
+            p.style.display = (p.id === 'page-panel-' + slug) ? '' : 'none';
+        });
+        var label = '';
+        navLinks.forEach(function (a) {
+            var on = a.getAttribute('data-panel') === slug;
+            a.classList.toggle('active', on);
+            if (on) { a.setAttribute('aria-current', 'page'); label = (a.querySelector('span') || a).textContent; }
+            else a.removeAttribute('aria-current');
+        });
+        var cur = $('#ceNavCurrent'); if (cur && label) cur.textContent = label;
+        if (navEl) navEl.classList.remove('open');
+        if (navToggle) navToggle.setAttribute('aria-expanded', 'false');
+        if (window.history && history.replaceState) {
+            var u = new URL(window.location.href);
+            u.searchParams.set('page', slug);
+            u.hash = '';
+            history.replaceState({}, '', u);
+        }
+        if (opts.scroll !== false) window.scrollTo({ top: 0 });
+        return true;
+    }
+
+    function activateSection(panel, key) {
+        if (!panel) return;
+        $$('.ce-sec-tab', panel).forEach(function (t) {
+            var on = t.getAttribute('data-section-tab') === key;
+            t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        $$('.ce-editor', panel).forEach(function (ed) { ed.hidden = ed.getAttribute('data-section') !== key; });
+    }
+
+    // open something from a link: switches panel without reloading (so unsaved text is never lost)
+    function openFrom(a, ev) {
+        var slug = a.getAttribute('data-panel') || a.getAttribute('data-open');
+        if (!slug || !panelEl(slug)) return;
+        ev.preventDefault();
+        showPanel(slug);
+        var sec = a.getAttribute('data-section-open');
+        if (sec) activateSection(panelEl(slug), sec);
+        var href = a.getAttribute('href') || '';
+        var m = /#(program-\d+)$/.exec(href);
+        if (m) {
+            var card = document.getElementById(m[1]);
+            if (card) {
+                var head = card.querySelector('.pgm-head');
+                if (head && head.getAttribute('aria-expanded') !== 'true') head.click();
+                card.scrollIntoView({ block: 'start' });
             }
-        });
+        }
     }
-
-    function showSectionAlert(card, message, isError) {
-        var alertEl = card.querySelector('.section-alert');
-        if (!alertEl) return;
-        alertEl.className = 'section-alert alert mt-2 mb-0 ' + (isError ? 'alert-danger' : 'alert-success');
-        alertEl.textContent = message;
-        alertEl.classList.remove('d-none');
-        setTimeout(function () { alertEl.classList.add('d-none'); }, 4000);
-    }
-
-    function setStatusBadge(card, hasDraft) {
-        var badge = card.querySelector('.section-status-badge');
-        if (!badge) return;
-        badge.classList.toggle('draft', hasDraft);
-        badge.classList.toggle('published', !hasDraft);
-        badge.textContent = hasDraft ? 'Unpublished changes' : 'Published';
-        var discardBtn = card.querySelector('.btn-discard-draft');
-        if (discardBtn) discardBtn.disabled = !hasDraft;
-    }
-
-    function postAction(action, payload) {
-        var body = new URLSearchParams(Object.assign({ action: action, csrf_token: csrfToken }, payload));
-        return fetch(PAGE_CONTENT_AJAX_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: body.toString()
-        }).then(function (res) { return res.json(); });
-    }
-
-    document.querySelectorAll('.page-section-card').forEach(function (card) {
-        var pageSlug    = card.dataset.page;
-        var sectionKey  = card.dataset.section;
-        var textarea    = card.querySelector('.section-textarea');
-
-        var saveBtn    = card.querySelector('.btn-save-section');
-        var previewBtn = card.querySelector('.btn-preview-section');
-        var publishBtn = card.querySelector('.btn-publish-section');
-        var discardBtn = card.querySelector('.btn-discard-draft');
-
-        if (saveBtn) saveBtn.addEventListener('click', function () {
-            saveBtn.disabled = true;
-            postAction('save_draft', { page: pageSlug, section_key: sectionKey, content: textarea.value })
-                .then(function (data) {
-                    if (data.success) {
-                        setStatusBadge(card, true);
-                        showSectionAlert(card, 'Draft saved. Publish to make it live.', false);
-                    } else {
-                        showSectionAlert(card, data.error || 'Could not save.', true);
-                    }
-                })
-                .catch(function () { showSectionAlert(card, 'Network error. Please try again.', true); })
-                .finally(function () { saveBtn.disabled = false; });
-        });
-
-        // Vision & Mission sections get a mini replica of their actual public
-        // card (see .cms-preview-* CSS above); anything else falls back to
-        // plain text so new pages/sections still get a usable preview.
-        var VM_CARD_CONFIG = {
-            vision:  { colorClass: 'cms-green', icon: '/assets/images/svg/vision icon.svg',  label: 'Our Vision'  },
-            mission: { colorClass: 'cms-gold',  icon: '/assets/images/svg/mission icon.svg', label: 'Our Mission' }
-        };
-
-        if (previewBtn) previewBtn.addEventListener('click', function () {
-            var modalBody = document.getElementById('sectionPreviewBody');
-            var cardCfg = (pageSlug === 'vision-mission') ? VM_CARD_CONFIG[sectionKey] : null;
-
-            if (cardCfg) {
-                modalBody.innerHTML =
-                    '<div class="cms-preview-card">' +
-                        '<div class="cms-preview-sidebar ' + cardCfg.colorClass + '">' +
-                            '<div class="cms-preview-watermark-seal"></div>' +
-                            '<div class="cms-preview-icon-circle"><img src="' + cardCfg.icon + '" alt=""></div>' +
-                        '</div>' +
-                        '<div class="cms-preview-watermark-building"></div>' +
-                        '<div class="cms-preview-content">' +
-                            '<h2 class="cms-preview-title ' + cardCfg.colorClass + '">' + cardCfg.label + '</h2>' +
-                            '<p class="cms-preview-text"></p>' +
-                        '</div>' +
-                    '</div>';
-                // Set via textContent (not innerHTML) so the admin's typed text is
-                // never parsed as markup, even though it's their own content.
-                modalBody.querySelector('.cms-preview-text').textContent = textarea.value;
-            } else {
-                modalBody.innerHTML = '<p style="white-space:pre-line; margin:0"></p>';
-                modalBody.querySelector('p').textContent = textarea.value;
-            }
-
-            var modalEl = document.getElementById('sectionPreviewModal');
-            if (window.bootstrap && modalEl) {
-                new bootstrap.Modal(modalEl).show();
-            }
-        });
-
-        if (publishBtn) publishBtn.addEventListener('click', function () {
-            publishBtn.disabled = true;
-            // Publish always saves the current textarea first, then publishes it,
-            // so clicking Publish directly (without a prior Save) still works.
-            postAction('save_draft', { page: pageSlug, section_key: sectionKey, content: textarea.value })
-                .then(function () {
-                    return postAction('publish', { page: pageSlug, section_key: sectionKey });
-                })
-                .then(function (data) {
-                    if (data.success) {
-                        setStatusBadge(card, false);
-                        showSectionAlert(card, 'Published to the live site.', false);
-                    } else {
-                        showSectionAlert(card, data.error || 'Could not publish.', true);
-                    }
-                })
-                .catch(function () { showSectionAlert(card, 'Network error. Please try again.', true); })
-                .finally(function () { publishBtn.disabled = false; });
-        });
-
-        if (discardBtn) discardBtn.addEventListener('click', function () {
-            discardBtn.disabled = true;
-            postAction('discard_draft', { page: pageSlug, section_key: sectionKey })
-                .then(function (data) {
-                    if (data.success) {
-                        // Revert the textarea to the published value returned by the server
-                        // by simply re-fetching this page's sections is overkill here —
-                        // reload just this panel's content from the page instead.
-                        window.location.reload();
-                    } else {
-                        showSectionAlert(card, 'Could not discard draft.', true);
-                    }
-                })
-                .catch(function () { showSectionAlert(card, 'Network error. Please try again.', true); });
+    document.addEventListener('click', function (ev) {
+        var a = ev.target.closest ? ev.target.closest('a[data-panel], a[data-open]') : null;
+        if (a && main && (main.contains(a) || (navEl && navEl.contains(a)))) openFrom(a, ev);
+    });
+    if (navToggle) navToggle.addEventListener('click', function () {
+        var open = navEl.classList.toggle('open');
+        navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    $$('.ce-sec-tab').forEach(function (t) {
+        t.addEventListener('click', function () {
+            activateSection(t.closest('.page-panel'), t.getAttribute('data-section-tab'));
         });
     });
+    (function () {
+        var cur = (new URL(window.location.href)).searchParams.get('page') || 'hub';
+        if (!panelEl(cur)) cur = 'hub';
+        showPanel(cur, { scroll: false });
+    })();
+
+    // ══════════════════ Content list: search / filter / sort ══════════════════
+    (function () {
+        var table = $('#ceTable'); if (!table) return;
+        var tbody = table.tBodies[0];
+        var rows = $$('.ce-row', tbody);
+        var q = $('#ceSearch'), fType = $('#ceType'), fStatus = $('#ceStatus'), fSort = $('#ceSort');
+        var none = $('#ceNone'), showing = $('#ceShowing');
+        var stats = $$('.ce-stat');
+
+        function cmpName(a, b) { return a.dataset.name < b.dataset.name ? -1 : a.dataset.name > b.dataset.name ? 1 : 0; }
+        var sorters = {
+            attention: function (a, b) { return (a.dataset.rank - b.dataset.rank) || (b.dataset.ts - a.dataset.ts) || cmpName(a, b); },
+            modified:  function (a, b) { return (b.dataset.ts - a.dataset.ts) || cmpName(a, b); },
+            title:     cmpName,
+            type:      function (a, b) { return a.dataset.type < b.dataset.type ? -1 : a.dataset.type > b.dataset.type ? 1 : cmpName(a, b); }
+        };
+        function apply() {
+            var term = (q.value || '').trim().toLowerCase();
+            var shown = 0;
+            rows.sort(sorters[fSort.value] || sorters.attention).forEach(function (r) {
+                var ok = (!term || r.dataset.title.indexOf(term) !== -1) &&
+                         (!fType.value || r.dataset.type === fType.value) &&
+                         (!fStatus.value || r.dataset.status === fStatus.value);
+                r.hidden = !ok;
+                if (ok) shown++;
+                tbody.appendChild(r);
+            });
+            table.hidden = shown === 0;
+            if (none) none.hidden = shown !== 0;
+            if (showing) showing.textContent = 'Showing ' + shown + ' of ' + rows.length;
+            stats.forEach(function (s) { s.setAttribute('aria-pressed', (s.getAttribute('data-status') || '') === fStatus.value ? 'true' : 'false'); });
+            $$('.ce-th', table).forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-sort') === fSort.value); });
+        }
+        [q, fType, fStatus, fSort].forEach(function (el) { el.addEventListener(el === q ? 'input' : 'change', apply); });
+        stats.forEach(function (s) { s.addEventListener('click', function () { fStatus.value = s.getAttribute('data-status') || ''; apply(); }); });
+        $$('.ce-th', table).forEach(function (b) { b.addEventListener('click', function () { fSort.value = b.getAttribute('data-sort'); apply(); }); });
+        var reset = $('#ceReset');
+        if (reset) reset.addEventListener('click', function () { q.value = ''; fType.value = ''; fStatus.value = ''; apply(); q.focus(); });
+        apply();
+    })();
+
+    function post(action, fields) {
+        var body = new URLSearchParams();
+        body.set('action', action);
+        body.set('csrf_token', CFG.csrf || '');
+        Object.keys(fields).forEach(function (k) { body.set(k, fields[k]); });
+        return fetch(CFG.handler, {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString()
+        }).then(function (res) {
+            return res.json().catch(function () {
+                return { success: false, error: 'The server sent an unexpected reply (code ' + res.status + '). Please reload the page and try again.' };
+            });
+        }, function () {
+            return { success: false, error: 'We could not reach the server. Please check your internet connection and try again.' };
+        });
+    }
+    // ══════════════════ Review queue ══════════════════
+    function updatePending(n) {
+        var b = $('#cePendingBadge');
+        if (b) { b.textContent = n; b.hidden = n < 1; }
+        var empty = $('#ceQueueEmpty'); if (empty) empty.hidden = n > 0 || !!$('.ce-review');
+    }
+    $$('.ce-review').forEach(function (card) {
+        card.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-review]'); if (!b || b.disabled) return;
+            var what = b.getAttribute('data-review');
+            var note = $('.ce-review-note', card).value.trim();
+            if (what === 'reject' && !note) { toast('Please write a short note so the editor knows what to change.', 'error'); $('.ce-review-note', card).focus(); return; }
+            if (what === 'approve' && !window.confirm('Approve and publish this change?\n\nIt will go live on the website.')) return;
+            $$('button', card).forEach(function (x) { x.disabled = true; });
+            post(what, { page: card.getAttribute('data-page'), section_key: card.getAttribute('data-section'), note: note }).then(function (res) {
+                if (res && res.success) {
+                    toast(res.message || 'Done.', 'ok');
+                    var ed = $('.ce-editor[data-page="' + card.getAttribute('data-page') + '"][data-section="' + card.getAttribute('data-section') + '"]');
+                    if (ed && ed.__ce) ed.__ce.applyState(res, true);
+                    card.parentNode.removeChild(card);
+                    updatePending(typeof res.pending_count === 'number' ? res.pending_count : $$('.ce-review').length);
+                } else {
+                    $$('button', card).forEach(function (x) { x.disabled = false; });
+                    toast((res && res.error) || 'Something went wrong. Please try again.', 'error');
+                }
+            });
+        });
+    });
+
 })();
 </script>
+<?php endif; /* editor / list */ ?>
 
+<script src="../assets/js/photo-check.js?v=<?= (int)filemtime(__DIR__ . '/../assets/js/photo-check.js') ?>"></script>
 <?php include __DIR__ . '/../components/footer-admin.php'; ?>

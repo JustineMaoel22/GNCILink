@@ -9,7 +9,7 @@
     --gnc-gold-light:  #E2C06A;
     --gnc-cream:       #F9F6F1;
     --gnc-white:       #ffffff; 
-    --gnc-template:      #307056;
+    --gnc-template:    #307056;
 }
 
 * { box-sizing: border-box; }
@@ -247,7 +247,7 @@ VISION & MISSION
     margin: 0;
 }
 
-.template-seal{
+.template-seal {
     width: 100%;
     max-width: 400px;
     height: auto;
@@ -406,7 +406,7 @@ WHY CHOOSE BSMLS
     margin: 0;
 }
 
-@media (max-width: 991px) {
+@media (max-width: 1199px) {
     .whychoose-grid {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -946,19 +946,55 @@ img { max-width: 100%; }
         background: linear-gradient(180deg, rgba(249, 246, 241, 0.90), rgba(249, 246, 241, 0.78));
         pointer-events: none;
     }
-    .template-breadcrumb { margin-top: 0.5rem; }
+    
+    /* --- CENTERING & JUSTIFYING TEXT UPDATES FOR MOBILE/TABLET --- */
+    .template-breadcrumb { 
+        margin-top: 0.5rem; 
+        justify-content: flex-start; /* Keep breadcrumbs aligned to the left */
+    }
     .template-hero-content {
         max-width: 100%;
         margin-top: 1.5rem;
         margin-bottom: 1.5rem;
+        text-align: center;
     }
+    .template-badges {
+        margin-left: auto;
+        margin-right: auto;
+        justify-content: center;
+    }
+    .template-section-title {
+        text-align: center;
+    }
+    .template-section-title::after {
+        left: 50%;
+        transform: translateX(-50%);
+    }
+    .whychoose-subtitle {
+        text-align: center;
+    }
+    
+    /* Center and justify body/description texts */
+    .template-desc,
+    .template-section-text,
+    .whychoose-subtitle {
+        text-align: justify;
+    }
+    /* -------------------------------------------------------- */
+
     .template-title { font-size: 2.2rem; }
-    .template-desc { max-width: 100%; }
+    .template-desc { max-width: 100%; margin-left: auto; margin-right: auto; }
+
+    /* Space below "About the Program" before the seal */
+    #about-program {
+        margin-bottom: 2rem;
+    }
 
     /* Seal sits centered under Vision & Mission instead of being pushed sideways */
     .template-seal {
         margin: 0.5rem auto 0;
         max-width: 240px;
+        display: block;
     }
 
     .corevalue-titlegroup { min-width: 220px; }
@@ -1030,12 +1066,19 @@ img { max-width: 100%; }
 @media (max-width: 575px) {
     .hero-page.template-hero { padding: 1rem 0 2rem; }
     .template-breadcrumb { font-size: 0.68rem; }
-    .template-title { font-size: 1.85rem; }
+    
+    .template-title { 
+        font-size: 1.85rem; 
+        overflow-wrap: break-word; 
+        word-wrap: break-word; 
+        hyphens: auto; 
+    }
+    
     .template-subtitle { font-size: 0.92rem; }
     .template-desc { font-size: 0.85rem; margin-bottom: 1.25rem; }
 
     .template-badges { padding: 0.9rem 1rem; }
-    .template-badge { gap: 0.5rem; }
+    .template-badge { gap: 0.5rem; justify-content: center; }
     .template-badge strong { font-size: 0.8rem; }
     .template-badge span { font-size: 0.7rem; }
     .template-badge .template-badge-icon { width: 1.6rem; height: 1.6rem; font-size: 1.6rem; }
