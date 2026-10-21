@@ -32,10 +32,9 @@ if (isset($_SESSION['flash_success'])) {
 if (isset($_GET['resend']) && $_GET['resend'] === '1') {
     $db  = getDB();
     $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-    $exp = date('Y-m-d H:i:s', time() + OTP_EXPIRY);
 
-    $stmt = $db->prepare("UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE user_id = ?");
-    $stmt->execute([$otp, $exp, $_SESSION['temp_user_id']]);
+    $stmt = $db->prepare("UPDATE users SET otp_code = ?, otp_expires_at = TIMESTAMPADD(SECOND, ?, NOW()) WHERE user_id = ?");
+    $stmt->execute([$otp, OTP_EXPIRY, $_SESSION['temp_user_id']]);
 
     sendOTPEmailPHPMailer($email, $name, $otp);
 
@@ -101,6 +100,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Read the same clock used to issue and verify the code; reloads do not restart it.
+$timerStmt = getDB()->prepare("SELECT GREATEST(0, COALESCE(TIMESTAMPDIFF(SECOND, NOW(), otp_expires_at), 0)) FROM users WHERE user_id = ?");
+$timerStmt->execute([$_SESSION['temp_user_id']]);
+$otpSecondsRemaining = (int) $timerStmt->fetchColumn();
 $csrf = generateCSRFToken();
 ?>
 <!DOCTYPE html>
@@ -270,7 +273,7 @@ $csrf = generateCSRFToken();
 
                     <!-- Timer -->
                     <div class="otp-timer">
-                        Code expires in <span id="countdown">5:00</span>
+                        Code expires in <span id="countdown"><?= $otpSecondsRemaining > 0 ? intdiv($otpSecondsRemaining, 60) . ':' . str_pad((string) ($otpSecondsRemaining % 60), 2, '0', STR_PAD_LEFT) : 'Expired' ?></span>
                     </div>
 
                     <!-- Submit Button -->
@@ -328,11 +331,11 @@ $csrf = generateCSRFToken();
         });
         digits[0]?.focus();
 
-        // OTP expiry countdown (5 min)
-        let seconds = 300;
+        // Count down from the server's remaining lifetime without resetting on reload.
+        const expiresAt = performance.now() + <?= $otpSecondsRemaining ?> * 1000;
         const countdown = document.getElementById('countdown');
         const countTimer = setInterval(() => {
-            seconds--;
+            const seconds = Math.max(0, Math.ceil((expiresAt - performance.now()) / 1000));
             const m = Math.floor(seconds / 60);
             const s = seconds % 60;
             countdown.textContent = m + ':' + String(s).padStart(2, '0');

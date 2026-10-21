@@ -143,15 +143,14 @@ function handleLogin() {
 
         // No valid trusted-device token for this browser — normal OTP policy applies.
         $otp          = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $otpExpiresAt = date('Y-m-d H:i:s', time() + OTP_EXPIRY);
 
         // Store OTP in database
         $stmt = $db->prepare("
             UPDATE users
-            SET otp_code = ?, otp_expires_at = ?
+            SET otp_code = ?, otp_expires_at = TIMESTAMPADD(SECOND, ?, NOW())
             WHERE user_id = ?
         ");
-        $stmt->execute([$otp, $otpExpiresAt, $user['user_id']]);
+        $stmt->execute([$otp, OTP_EXPIRY, $user['user_id']]);
 
         // Send OTP email using PHPMailer
         if (sendOTPEmailPHPMailer($user['email'], $user['first_name'], $otp)) {
@@ -208,7 +207,7 @@ function handleOTPVerification() {
         $userId = $_SESSION['temp_user_id'];
 
         // Get user
-        $stmt = $db->prepare("SELECT * FROM users WHERE user_id = ?");
+        $stmt = $db->prepare("SELECT *, (otp_expires_at > NOW()) AS otp_is_current FROM users WHERE user_id = ?");
         $stmt->execute([$userId]);
         $user = $stmt->fetch();
 
@@ -234,7 +233,7 @@ function handleOTPVerification() {
         }
 
         // Check OTP expiry
-        if (strtotime($user['otp_expires_at']) < time()) {
+        if (empty($user['otp_is_current'])) {
             http_response_code(401);
             echo json_encode(['error' => 'OTP has expired']);
             exit;
@@ -298,10 +297,9 @@ function handleResendOTP() {
 
         // Generate new OTP
         $otp          = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $otpExpiresAt = date('Y-m-d H:i:s', time() + OTP_EXPIRY);
 
-        $stmt = $db->prepare("UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE user_id = ?");
-        $stmt->execute([$otp, $otpExpiresAt, $userId]);
+        $stmt = $db->prepare("UPDATE users SET otp_code = ?, otp_expires_at = TIMESTAMPADD(SECOND, ?, NOW()) WHERE user_id = ?");
+        $stmt->execute([$otp, OTP_EXPIRY, $userId]);
 
         // Send OTP using PHPMailer
         if (sendOTPEmailPHPMailer($user['email'], $user['first_name'], $otp)) {
