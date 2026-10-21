@@ -277,7 +277,8 @@ Guagua National Colleges, Inc.
     margin: 0 0 10px;
 }
 
-.dept-program-body p {
+.dept-program-body p,
+.dept-program-body > .cms-rich {
     font-family: 'Inter', sans-serif;
     font-size: 13.5px;
     line-height: 1.6;
@@ -329,7 +330,8 @@ Guagua National Colleges, Inc.
     margin: 0 0 10px;
 }
 
-.dept-principal-intro p {
+.dept-principal-intro p,
+.dept-principal-intro > .cms-rich {
     font-family: 'Inter', sans-serif;
     font-size: 14px;
     color: var(--gnc-text-gray);
@@ -470,7 +472,8 @@ Guagua National Colleges, Inc.
     margin: 0 0 20px;
 }
 
-.dept-principal-content p {
+.dept-principal-content p,
+.dept-principal-content > .cms-rich {
     font-family: 'Inter', sans-serif;
     font-size: 14.5px;
     line-height: 1.75;

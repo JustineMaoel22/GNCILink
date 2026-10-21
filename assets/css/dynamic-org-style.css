@@ -1,0 +1,173 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+/* Prevent horizontal overflow causing background cutoffs */
+html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+}
+body{background:#f9f6f1;color:#26372c}.org-overview,.org-values,.org-gallery-section,.org-facebook,.org-cover-editor{max-width:1100px;margin:0 auto;padding:48px 24px;font:14px/1.7 Inter,system-ui,sans-serif}.org-overview{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:70px;align-items:center}.org-overview h2,.org-gallery-section h2,.org-facebook h2,.org-cover-editor h2{font:700 clamp(20px,3vw,28px)/1.35 'Noto Serif',serif;color:#1f5e2c;margin:5px 0 18px}.org-eyebrow{font:700 11px/1.5 Inter,system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#bb8b21}.org-logo-frame{position:relative;width:290px;height:290px;padding:10px;border-radius:50%;background:#fff;box-shadow:0 5px 18px #20382722}.org-logo-frame:before{content:"";position:absolute;width:90px;height:90px;left:-15px;top:15px;background:#e9b93c;border-radius:5px;z-index:-1}.org-logo-frame img{width:100%;height:100%;border-radius:50%;object-fit:contain}.org-empty-media{width:100%;height:100%;min-height:180px}.org-logo-frame .org-empty-media{border-radius:50%}.org-about-copy{overflow-wrap:anywhere}.org-about-copy p,.org-values p{white-space:normal;overflow-wrap:anywhere}
+.org-values{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:34px;padding-top:20px}.org-values article{background:#edf2ec;border-radius:8px;overflow:hidden;box-shadow:0 2px 10px #2038270a}.org-values h2{display:flex;align-items:center;gap:14px;font:700 18px/1.4 'Noto Serif',serif;background:#1f5e2c;color:#fff;padding:16px 22px;margin:0}.org-values h2 i{font-size:26px;color:#f0cc67}.org-values p{padding:24px;margin:0;min-height:120px}.org-gallery-section,.org-facebook{text-align:center}.org-gallery{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:160px;gap:12px}.org-gallery a{overflow:hidden;border-radius:4px;background:#e7ebe4}.org-gallery a:first-child{grid-column:span 2;grid-row:span 2}.org-gallery img{width:100%;height:100%;object-fit:cover;transition:transform .2s}.org-gallery a:hover img{transform:scale(1.03)}.org-gallery-add{width:100%;min-height:170px;border:2px dashed #a0b6a4;border-radius:10px;background:#f0f4ef;color:#356641}.org-facebook iframe{max-width:100%;border:0;background:#fff;border-radius:8px}.org-cover-editor img{max-width:100%;max-height:340px;object-fit:cover;border-radius:8px}.org-unpublished{display:inline-block;background:#fff2ce;color:#78590a;border-radius:8px;padding:5px 10px;margin-top:14px}.org-not-found{padding:90px 24px;text-align:center}
+@media(max-width:767px){.org-overview{grid-template-columns:minmax(0,1fr);gap:24px}.org-logo-frame{grid-row:1;justify-self:center;width:230px;height:230px}.org-values{grid-template-columns:minmax(0,1fr);gap:20px}.org-gallery{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:135px}.org-overview,.org-values,.org-gallery-section,.org-facebook,.org-cover-editor{padding:30px 20px}}
+@media(prefers-reduced-motion:reduce){.org-gallery img{transition:none}.org-gallery a:hover img{transform:none}}
+
+.org-overview .org-about-copy { font-family: Inter, system-ui, sans-serif; }
+.org-logo-frame { isolation: isolate; }
+
+/* College program ribbon cards, using the organization pages' green palette. */
+.org-values {
+    gap: 52px 32px;
+    padding-top: 52px;
+}
+.org-values > article {
+    position: relative;
+    padding: 42px 32px 28px;
+    min-height: 240px;
+    overflow: visible;
+    border-radius: 4px;
+    background:
+        linear-gradient(180deg, rgba(233, 243, 234, .9), rgba(215, 232, 217, .82)),
+        url('/assets/images/gnc-front-II.jpg') center bottom / cover no-repeat,
+        #e6efe6;
+    box-shadow: 0 6px 22px rgba(31, 94, 44, .14);
+}
+.org-value-head {
+    position: absolute;
+    top: -32px;
+    left: -14px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+}
+.org-value-icon {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 68px;
+    height: 68px;
+    border: 3px solid #d3a63a;
+    border-radius: 50%;
+    background: #0b4228;
+    color: #fff;
+    box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .9), 0 4px 12px rgba(0, 0, 0, .22);
+}
+.org-value-icon i { font-size: 30px; line-height: 1; }
+.org-value-head h2 {
+    position: relative;
+    z-index: 1;
+    display: block;
+    min-width: 176px;
+    margin: 0 0 0 -26px;
+    padding: 12px 54px 12px 38px;
+    font: 700 17px/1.2 'Lora', 'Noto Serif', serif;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #fff;
+    background: linear-gradient(90deg, #0b4228, #1f5e2c);
+    clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 100%, 0 100%);
+}
+.org-values > article > p {
+    min-height: 32px;
+    margin: 0;
+    padding: 0;
+    color: #2a3830;
+    font-size: 14px;
+    line-height: 1.7;
+    text-align: justify;
+    hyphens: auto;
+}
+@media (max-width: 767px) {
+    .org-values { padding-top: 52px; row-gap: 56px; }
+    .org-values > article { padding: 42px 24px 28px; }
+}
+.org-assign-category{display:inline-flex;align-items:center;margin-top:16px;padding:8px 16px;border:1px solid #c9d7ce;border-radius:20px;background:#fff;color:#245b36;font:600 13px Inter,system-ui,sans-serif;cursor:pointer}.org-assign-category:hover{background:#edf4ef}.org-assign-category:focus-visible{outline:3px solid #e9b93c;outline-offset:3px}
+
+.dynamic-org-intro,
+.dynamic-org-about,
+.dynamic-org-programs,
+.dynamic-org-dean,
+.dynamic-org-requirements {
+    --gnc-green: #0b4228;
+    --gnc-green-light: #1F5E2C;
+    --gnc-green-dark: #08331e;
+    --gnc-gold: #d3a63a;
+    --gnc-gold-light: #e9b93c;
+    --gnc-maroon: #8f1230;
+    --gnc-cream: #f9f6f1;
+    --gnc-text-dark: #202020;
+    --gnc-text-gray: #6b6b66;
+    --gnc-border: #e6e1d8;
+    font-family: 'Noto Serif', serif;
+}
+
+.dynamic-org-intro,
+.dynamic-org-about {
+    background-color: var(--gnc-cream);
+}
+
+/* ---------- Hero ---------- */
+.dynamic-org-hero {
+    position: relative;
+    background-color: var(--gnc-cream);
+    background-image: url('/assets/images/admission-header.png');
+    background-repeat: no-repeat;
+    background-position: right center;
+    background-size: cover;
+    border-bottom: 1px solid var(--gnc-border);
+}
+
+.dynamic-org-hero-inner {
+    padding: 40px 15px 44px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.dynamic-org-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: white;
+    margin-bottom: 14px;
+}
+
+.dynamic-org-breadcrumb a {
+    color: white;
+    text-decoration: none;
+}
+
+.dynamic-org-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.dynamic-org-breadcrumb i {
+    font-size: 10px;
+    color: white;
+    opacity: 0.8;
+}
+
+.dynamic-org-breadcrumb .dynamic-org-current {
+    color: white;
+}
+
+.dynamic-org-hero h1 {
+    font-family: 'Noto Serif', serif;
+    font-weight: 700;
+    color: var(--gnc-gold);
+    font-size: clamp(28px, 4vw, 40px);
+    margin: 0 0 8px;
+}
+
+.dynamic-org-hero p {
+    font-family: 'Inter', sans-serif;
+    color: white;
+    font-size: 14px;
+    max-width: 900px;
+    margin: 0;
+}

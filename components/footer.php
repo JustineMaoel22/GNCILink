@@ -1,3 +1,6 @@
+<?php include_once __DIR__ . '/image-framing-assets.php'; ?>
+<link rel="stylesheet" href="/assets/css/content-rich-text.css?v=<?= filemtime(__DIR__.'/../assets/css/content-rich-text.css') ?>">
+<?php include_once __DIR__ . '/office-map-modal.php'; ?>
 <?php
 // Visitor counter: read current numbers (recording happens via api/track-visit.php)
 $gncVisitorStats = ['today' => 0, 'total' => 0];
@@ -160,8 +163,8 @@ try {
 
                     <h6 class="gnc-footer-heading gnc-footer-heading-spaced">Student Resources</h6>
                     <ul class="gnc-footer-links">
-                        <li><a href="#">Libraries <i class="bi bi-chevron-right"></i></a></li>
-                        <li><a href="#">Calendar <i class="bi bi-chevron-right"></i></a></li>
+                        <li><a href="https://gnci-libraries.thsite.top/?fbclid=IwY2xjawVC_A5leHRuA2FlbQIxMABwZG9mAWJyaWQRMTNlekFRazQzZkY2ZWNyQXVzcnRjBmFwcF9pZBAyMjIwMzkxNzg4MjAwODkyAAEeyOb2EKxW0Q443KZcj0zm2_x6VkKVkfV1gMkucZ5BGPwP3f2AOGBadXzhc1A_aem__oMGqHHwxj1twlM5m37f_g&amp;i=1#home" target="_blank" rel="noopener noreferrer">Libraries <i class="bi bi-chevron-right"></i></a></li>
+                        <li><a href="/index.php#events">Calendar <i class="bi bi-chevron-right"></i></a></li>
                     </ul>
                 </div>
 
@@ -191,7 +194,7 @@ try {
             <div class="d-flex flex-wrap justify-content-between align-items-center">
                 <p class="mb-0">&copy; 2026 Guagua National Colleges, Inc. All rights reserved.</p>
                 <p class="mb-0">
-                    <a href="#">Privacy Policy</a> &nbsp;|&nbsp; <a href="#">Terms of Use</a>
+                    <a href="/coming-soon.php">Privacy Policy</a> &nbsp;|&nbsp; <a href="/coming-soon.php">Terms of Use</a>
                 </p>
             </div>
         </div>

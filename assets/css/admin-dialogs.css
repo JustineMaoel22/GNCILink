@@ -1,0 +1,18 @@
+.gnc-dialog{width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:0;border:1px solid #dce5df;border-radius:20px;background:#fff;color:#1b2a22;box-shadow:0 24px 80px #08331e40;font:14px/1.65 Inter,system-ui,sans-serif}
+.gnc-dialog::backdrop{background:#081e1280;backdrop-filter:blur(3px)}
+.gnc-dialog[open]{animation:gncDialogOpen .18s ease-out}
+.gnc-dialog-content{padding:28px}
+.gnc-dialog-icon{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;margin-bottom:16px;border-radius:14px;background:#e6f2ea;color:#0b3d22;font-size:24px;font-weight:700}
+.gnc-dialog h2{margin:0 0 10px;font:700 23px/1.3 Inter,system-ui,sans-serif;color:#0b3d22}
+.gnc-dialog p{margin:0;color:#52645a;white-space:pre-line;overflow-wrap:anywhere}
+.gnc-dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:26px}
+.gnc-dialog-actions button{border:1px solid #cfd9d3;border-radius:10px;padding:10px 16px;font:600 13px/1.4 Inter,system-ui,sans-serif;cursor:pointer}
+.gnc-dialog-cancel{background:#fff;color:#1b2a22}
+.gnc-dialog-actions .gnc-dialog-accept{background:#0b3d22;border-color:#0b3d22;color:#fff}
+.gnc-dialog-danger .gnc-dialog-icon{background:#fce9e7;color:#a42828}
+.gnc-dialog-danger .gnc-dialog-accept{background:#a42828;border-color:#a42828}
+.gnc-dialog-actions button:hover{filter:brightness(.94)}
+.gnc-dialog-actions button:focus-visible{outline:3px solid #d3a63a;outline-offset:3px}
+@keyframes gncDialogOpen{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:420px){.gnc-dialog-content{padding:22px}.gnc-dialog-actions{flex-direction:column-reverse}.gnc-dialog-actions button{width:100%}}
+@media(prefers-reduced-motion:reduce){.gnc-dialog[open]{animation:none}}

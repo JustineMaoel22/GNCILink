@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync('assets/js/content-edit.js','utf8');
+let rect={top:64,bottom:464,left:0,width:1200,height:400};
+const tb={hidden:false,offsetWidth:360,offsetHeight:44,style:{}};
+const context=vm.createContext({tb,lastPos:'',S:{sel:{anchor:'image',el:{isConnected:true,getBoundingClientRect:()=>rect}},frame:{getBoundingClientRect:()=>({top:100,bottom:900,left:0,right:1200,width:1200,height:800})},doc:{querySelector:()=>({getBoundingClientRect:()=>({bottom:64})})}}});
+vm.runInContext(source.slice(source.indexOf('    function placeTb(force)'),source.indexOf('    (function tick()')),context);
+context.placeTb(true);assert.equal(tb.style.left,'420px');assert.equal(tb.style.top,'504px');assert.equal(tb.style.visibility,'visible','Controls sit at the bottom center of the banner, below navigation');
+rect={top:-100,bottom:44,left:0,width:1200,height:144};context.placeTb(true);assert.equal(tb.style.visibility,'hidden','Hide the toolbar when the banner is behind the sticky navigation');
+rect={top:600,bottom:1100,left:0,width:1200,height:500};context.placeTb(true);assert.equal(tb.style.top,'840px');assert.equal(tb.style.visibility,'visible','Partly visible background retains controls inside the viewport');
+console.log('PASS: sports image controls stay centered near the image bottom, avoid navigation, and remain in the viewport.');

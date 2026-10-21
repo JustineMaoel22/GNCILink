@@ -1,0 +1,819 @@
+@import url("https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap");
+
+/* Prevent horizontal overflow causing background cutoffs */
+html,
+body {
+    overflow-x: hidden;
+    max-width: 100%;
+}
+
+.student-org-intro,
+.student-org-about,
+.student-org-programs,
+.student-org-dean,
+.student-org-requirements {
+    --gnc-green: #0b4228;
+    --gnc-green-light: #1f5e2c;
+    --gnc-green-dark: #08331e;
+    --gnc-gold: #d3a63a;
+    --gnc-gold-light: #e9b93c;
+    --gnc-maroon: #8f1230;
+    --gnc-cream: #f9f6f1;
+    --gnc-text-dark: #202020;
+    --gnc-text-gray: #6b6b66;
+    --gnc-border: #e6e1d8;
+    font-family: "Noto Serif", serif;
+}
+
+.student-org-intro,
+.student-org-about {
+    background-color: var(--gnc-cream);
+}
+
+/* ---------- Hero ---------- */
+.student-org-hero {
+    position: relative;
+    background-color: var(--gnc-cream);
+    background-image: url("/assets/images/admission-header.png");
+    background-repeat: no-repeat;
+    background-position: right center;
+    background-size: cover;
+    border-bottom: 1px solid var(--gnc-border);
+}
+
+.student-org-hero-inner {
+    padding: 40px 15px 44px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.student-org-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-family: "Inter", sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: white;
+    margin-bottom: 14px;
+}
+
+.student-org-breadcrumb a {
+    color: white;
+    text-decoration: none;
+}
+
+.student-org-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.student-org-breadcrumb i {
+    font-size: 10px;
+    color: white;
+    opacity: 0.8;
+}
+
+.student-org-breadcrumb .student-org-current {
+    color: white;
+}
+
+.student-org-hero h1 {
+    font-family: "Noto Serif", serif;
+    font-weight: 700;
+    color: var(--gnc-gold);
+    font-size: clamp(28px, 4vw, 40px);
+    margin: 0 0 8px;
+}
+
+.student-org-hero p {
+    font-family: "Inter", sans-serif;
+    color: white;
+    font-size: 14px;
+    max-width: 900px;
+    margin: 0;
+}
+
+.org-cover-picture {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    color: #46634d;
+}
+
+.org-cover-picture img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.org-add-card {
+    min-height: 290px;
+    border: 2px dashed #83a68c;
+    border-radius: 9px;
+    background: #f0f5f1;
+    color: #215e34;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font:
+        600 14px Inter,
+        system-ui,
+        sans-serif;
+}
+
+.org-add-card i {
+    font-size: 24px;
+}
+
+.org-add-card:hover {
+    background: #e4eee6;
+}
+
+.org-canvas-control {
+    background: #fff;
+    border: 1px solid #b9cec0;
+    color: #245b36;
+    border-radius: 18px;
+    padding: 6px 14px;
+    font:
+        600 12px Inter,
+        system-ui,
+        sans-serif;
+}
+
+.student-org-card .org-canvas-control {
+    margin-top: 16px;
+}
+
+.student-org-card[data-ve-org-card]:hover {
+    transform: none;
+}
+
+.student-org-card [contenteditable] {
+    min-height: 20px;
+}
+
+body {
+    background: #f9f6f1;
+    color: #26372c;
+}
+
+.student-org-directory {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 36px 15px 60px;
+    font:
+        14px/1.6 Inter,
+        system-ui,
+        sans-serif;
+}
+
+.student-org-directory h2 {
+    font:
+        700 clamp(22px, 3vw, 28px)/1.3 "Noto Serif",
+        serif;
+    color: #1f5e2c;
+    margin: 0 0 10px;
+}
+
+.student-org-directory h2:after {
+    content: "";
+    display: block;
+    width: 48px;
+    height: 2px;
+    background: #d3a63a;
+    margin-top: 7px;
+}
+
+.student-org-subtitle {
+    margin-bottom: 18px;
+    color: #58625b;
+}
+
+.student-org-filters {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 20px 0 30px;
+}
+
+.student-org-filters a {
+    border: 1px solid #d3a63a;
+    border-radius: 24px;
+    color: #396744;
+    padding: 6px 24px;
+    text-decoration: none;
+    transition:
+        background 0.18s,
+        color 0.18s;
+}
+
+.student-org-filters a.is-active,
+.student-org-filters a:hover {
+    background: #1f5e2c;
+    border-color: #1f5e2c;
+    color: #fff;
+}
+
+.student-org-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px 18px;
+}
+
+.student-org-card {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    border-radius: 9px;
+    background: #fff;
+    color: inherit;
+    text-decoration: none;
+    box-shadow: 0 3px 12px #17362412;
+    transition:
+        transform 0.2s,
+        box-shadow 0.2s;
+}
+
+.student-org-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 24px #17362420;
+    color: inherit;
+}
+
+.student-org-card:focus-visible,
+.student-org-filters a:focus-visible {
+    outline: 3px solid #d3a63a;
+    outline-offset: 3px;
+}
+
+.student-org-card-cover {
+    height: 155px;
+    position: relative;
+    background: #e9eee8;
+}
+
+.student-org-card-cover>img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.student-org-category {
+    position: absolute;
+    right: 14px;
+    top: 12px;
+    background: #1f5e2c;
+    color: #fff;
+    border-radius: 18px;
+    padding: 3px 18px;
+    font-size: 11px;
+}
+
+.student-org-draft {
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    background: #fff1cc;
+    color: #825c11;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+}
+
+.student-org-card-body {
+    position: relative;
+    border-radius: 26px 26px 0 0;
+    margin-top: -26px;
+    background: #fff;
+    padding: 0 24px 24px;
+    min-height: 168px;
+}
+
+.student-org-card-heading {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    min-height: 90px;
+}
+
+.student-org-card-logo {
+    width: 86px;
+    height: 86px;
+    flex: 0 0 86px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 5px solid #fff;
+    border-radius: 50%;
+    background: #f1f5f1;
+    margin-top: -20px;
+    box-shadow: 0 1px 7px #142f2520;
+    font-size: 32px;
+    color: #376942;
+}
+
+.student-org-card-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 50%;
+}
+
+.student-org-card h3 {
+    font:
+        700 14px/1.3 Inter,
+        system-ui,
+        sans-serif;
+    margin: 8px 0;
+    overflow-wrap: anywhere;
+}
+
+.student-org-card-body>p {
+    font-size: 12px;
+    line-height: 1.55;
+    margin: 10px 0 0;
+    overflow-wrap: anywhere;
+}
+
+.student-org-pagination {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 34px;
+}
+
+.student-org-pagination a {
+    border: 1px solid #e1e8e0;
+    min-width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    color: #367146;
+    background: #fff;
+    text-decoration: none;
+}
+
+.student-org-pagination .is-active {
+    background: #28763d;
+    color: #fff;
+    border-color: #28763d;
+}
+
+.student-org-empty {
+    padding: 65px 24px;
+    text-align: center;
+    border: 1px solid #e4e7df;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.student-org-empty>i {
+    font-size: 38px;
+    color: #407b4b;
+}
+
+.student-org-empty h3 {
+    font-size: 19px;
+    margin: 14px 0 8px;
+}
+
+.student-org-empty p {
+    margin: 0;
+    color: #69746c;
+}
+
+@media (max-width: 991px) {
+    .student-org-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .student-org-hero-inner {
+        padding: 32px 20px;
+    }
+}
+
+@media (max-width: 575px) {
+    .student-org-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .student-org-directory {
+        padding: 28px 18px 42px;
+    }
+
+    .student-org-filters {
+        gap: 8px;
+    }
+
+    .student-org-filters a {
+        padding: 5px 14px;
+    }
+
+    .student-org-card-cover {
+        height: 180px;
+    }
+}
+
+.org-canvas-control {
+    cursor: pointer;
+    transition:
+        background-color 0.18s ease,
+        color 0.18s ease,
+        border-color 0.18s ease,
+        box-shadow 0.18s ease,
+        transform 0.18s ease;
+}
+
+.org-canvas-control:hover {
+    background: #e8f2eb;
+    color: #0b4228;
+    border-color: #6c997a;
+    box-shadow: 0 3px 8px rgba(11, 66, 40, 0.12);
+    transform: translateY(-1px);
+}
+
+.org-canvas-control:focus-visible {
+    outline: 3px solid #d3a63a;
+    outline-offset: 3px;
+    background: #e8f2eb;
+}
+
+.org-canvas-control:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.org-leadership {
+    padding-top: 18px;
+    padding-bottom: clamp(32px, 4vw, 64px);
+    font:
+        14px/1.7 Inter,
+        system-ui,
+        sans-serif;
+    color: #2d3a30;
+}
+
+.org-lead-heading {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px 24px;
+    text-align: center;
+}
+
+.org-lead-heading h2,
+.org-lead-heading h3 {
+    margin: 0 0 8px;
+    font:
+        700 clamp(22px, 2.5vw, 29px)/1.35 "Noto Serif",
+        serif;
+    color: #2c6638;
+}
+
+.org-lead-heading h3 {
+    font-size: clamp(20px, 2.2vw, 25px);
+}
+
+.org-lead-heading p {
+    margin: 0;
+    font-size: 13px;
+}
+
+.org-lead-training {
+    position: relative;
+    isolation: isolate;
+    background: #efc83d;
+    min-height: 225px;
+    padding: 36px 24px 40px;
+}
+
+.org-lead-background {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+
+.org-lead-background img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.org-lead-training>.org-lead-background:before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg,
+            rgba(235, 187, 34, 0.9),
+            rgba(250, 222, 116, 0.86));
+    pointer-events: none;
+}
+
+.org-lead-training-content {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.org-lead-training-content h3 {
+    margin: 0 0 10px;
+    color: #365c24;
+    font:
+        700 22px/1.4 "Noto Serif",
+        serif;
+}
+
+.org-lead-training-content p {
+    margin: 0 0 20px;
+    font-size: 13px;
+}
+
+.org-lead-topics {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    list-style: none;
+    max-width: 660px;
+    margin: 0 auto;
+    padding: 0;
+}
+
+.org-lead-topics li {
+    border: 1px solid #61723b;
+    border-radius: 24px;
+    padding: 6px 18px;
+    font-size: 12px;
+    color: #29472a;
+    background: rgba(255, 245, 189, 0.22);
+}
+
+.org-lead-retreat {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 52px 28px 64px;
+}
+
+.org-lead-retreat .org-lead-heading {
+    padding-inline: 0;
+    padding-bottom: 38px;
+}
+
+.org-lead-retreat-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 70px;
+    align-items: center;
+}
+
+.org-lead-photo-frame {
+    position: relative;
+    isolation: isolate;
+    margin: 8px 18px 12px;
+    max-width: 440px;
+}
+
+.org-lead-photo-frame:before,
+.org-lead-photo-frame:after {
+    content: "";
+    position: absolute;
+    width: 42%;
+    height: 48%;
+    z-index: -1;
+    border-radius: 4px;
+    background-size: 18px 18px;
+    background-image: radial-gradient(#fff 1.7px, transparent 2px);
+}
+
+.org-lead-photo-frame:before {
+    top: -22px;
+    left: -22px;
+    background-color: #e7b82f;
+}
+
+.org-lead-photo-frame:after {
+    bottom: -22px;
+    right: -22px;
+    background-color: #285e33;
+}
+
+.org-lead-photo {
+    aspect-ratio: 4/3;
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: 0 8px 20px #17362426;
+    background: #e4ebe2;
+}
+
+.org-lead-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.org-lead-callouts {
+    display: grid;
+    gap: 28px;
+}
+
+.org-lead-callout {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.org-lead-icon {
+    width: 54px;
+    height: 54px;
+    flex: 0 0 54px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #d3a63a;
+    border-radius: 50%;
+    background: #246032;
+    color: #e6bd47;
+    font-size: 25px;
+}
+
+.org-lead-callout p {
+    margin: 0;
+    font-size: 13px;
+}
+
+.org-lead-closing {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    min-height: 225px;
+    background: #103a22;
+    display: flex;
+    align-items: center;
+}
+
+.org-lead-closing>.org-lead-background:before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(3, 38, 18, 0.8);
+    pointer-events: none;
+}
+
+.org-lead-closing-content {
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 90px;
+    position: relative;
+    z-index: 1;
+}
+
+.org-lead-closing-content h2 {
+    max-width: 620px;
+    margin: 0;
+    color: #fff;
+    font:
+        700 clamp(25px, 3vw, 36px)/1.4 "Noto Serif",
+        serif;
+    white-space: pre-line;
+}
+
+.org-lead-orb {
+    position: absolute;
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: linear-gradient(130deg, #f5d954, #eac130);
+    pointer-events: none;
+}
+
+.org-lead-orb-top {
+    top: -92px;
+    left: 48%;
+}
+
+.org-lead-orb-left {
+    bottom: -85px;
+    left: -45px;
+}
+
+.org-lead-orb-right {
+    right: -25px;
+    bottom: -60px;
+}
+
+[data-ve-org-page-media]:after {
+    content: "Edit " attr(data-ve-label);
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    z-index: 2;
+    padding: 5px 10px;
+    border: 1px solid #c4d3c7;
+    border-radius: 8px;
+    background: #fff;
+    color: #245b36;
+    font:
+        600 12px/1.5 Inter,
+        system-ui,
+        sans-serif;
+    pointer-events: none;
+}
+
+.org-lead-photo[data-ve-org-page-media] {
+    position: relative;
+}
+
+.ve-previewing [data-ve-org-page-media]:after {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .org-lead-retreat-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 40px;
+    }
+
+    .org-lead-photo-frame {
+        width: calc(100% - 36px);
+        justify-self: center;
+    }
+
+    .org-lead-retreat {
+        padding: 40px 24px 48px;
+    }
+
+    .org-lead-callouts {
+        gap: 20px;
+    }
+
+    .org-lead-closing-content {
+        padding: 48px 36px;
+    }
+
+    .org-lead-orb {
+        width: 130px;
+        height: 130px;
+    }
+
+    .org-lead-orb-top {
+        top: -90px;
+    }
+
+    .org-lead-topics {
+        gap: 10px;
+    }
+
+    .org-lead-topics li {
+        padding: 5px 12px;
+    }
+
+    .org-lead-closing-content h2 {
+        max-width: 85%;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .student-org-grid {
+        animation: org-list-enter 0.25s ease-out;
+    }
+
+    @keyframes org-list-enter {
+        from {
+            opacity: 0.4;
+            transform: translateY(6px);
+        }
+
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .student-org-card,
+    .student-org-filters a,
+    .org-canvas-control {
+        transition: none;
+    }
+
+    .student-org-card:hover,
+    .org-canvas-control:hover {
+        transform: none;
+    }
+}

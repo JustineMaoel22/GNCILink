@@ -40,6 +40,14 @@ if ($program === null && $cePreview) {
     if ($slugKey !== '' && preg_match('/^[a-z0-9-]+$/', $slugKey)) $program = getProgramPageBySlug($slugKey);
 }
 
+// Basic Education programs are informational cards, without separate detail pages.
+if ($program !== null) {
+    $programDepartment = getDepartmentById((int)$program['dept_id']);
+    if (($programDepartment['department_type'] ?? '') === 'basic-education') {
+        $program = null;
+    }
+}
+
 if ($program === null) {
     // A renamed program keeps its old link working.
     $moved = publicProgramSlugRedirect(strtolower(trim($slug)));
@@ -142,16 +150,17 @@ if (!function_exists('programSealRingText')) {
 $e = function ($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
 $para = function ($v) use ($e): string { return nl2br($e($v)); };
 // Long text: visitors get line breaks as <br>; the editor gets the raw stored text (it edits exactly what is saved).
-$pt = function ($v) use ($e, $para, $cePreview): string { return $cePreview ? $e($v) : $para($v); };
+$pt = function ($v): string { return renderSectionContent((string)$v); };
 /** Editing marker for one stored text of this program (empty for visitors). */
 $pf = function (string $key, string $label, bool $multi = false, string $ph = '') use ($cePreview): string {
     if (!$cePreview) return '';
     $max = (int)(programPageContentFields()[$key]['max'] ?? 0);
-    return ceField('prog-text', ['key' => $key, 'max' => $max, 'label' => $label, 'multiline' => $multi, 'ph' => $ph !== '' ? $ph : $label]);
+    return ceField('prog-text', ['key' => $key, 'max' => $max, 'label' => $label, 'multiline' => $multi || (programPageContentFields()[$key]['type'] ?? '') === 'long', 'rich'=>(programPageContentFields()[$key]['type'] ?? '') === 'long', 'ph' => $ph !== '' ? $ph : $label,
+        'optional' => empty(programPageContentFields()[$key]['warning_required'])]);
 };
 /** Editing marker for one card of a list (badge, core value, why, career). */
 $pi = function (string $type, int $index, string $prop, string $label, bool $multi = false) use ($cePreview): string {
-    return $cePreview ? ceField('prog-item', ['key' => $type . ':' . $index . ':' . $prop, 'label' => $label, 'multiline' => $multi, 'ph' => $label]) : '';
+    return $cePreview ? ceField('prog-item', ['key' => $type . ':' . $index . ':' . $prop, 'label' => $label, 'multiline' => $multi, 'rich'=>$prop==='body', 'ph' => $label]) : '';
 };
 $pcard = function (string $type, int $index) use ($cePreview): string {
     return $cePreview ? ' data-ve-item="' . $type . ':' . $index . '"' : '';
@@ -186,11 +195,16 @@ if ($program !== null) {
     $heroDesc   = trim($c['hero_desc']) !== '' ? trim($c['hero_desc']) : trim((string)($program['description'] ?? ''));
     $deptName   = (string)($program['dept_name'] ?? '');
     $isGraduateProgram = ($program['dept_slug'] ?? '') === 'graduate-school';
-    $departmentIndexTitle = $isGraduateProgram ? 'Graduate School' : 'College Departments';
-    $departmentIndexUrl = $isGraduateProgram ? '/pages/academics/graduate-school/graduate-school.php' : '/pages/academics/college/college-dept.php';
+    $programDepartment = !empty($program['dept_id']) ? getDepartmentById((int)$program['dept_id']) : null;
+    $isBasicProgram = ($programDepartment['department_type'] ?? '') === 'basic-education';
+    $departmentIndexTitle = $isBasicProgram ? 'Basic Education Departments' : ($isGraduateProgram ? 'Graduate School' : 'College Departments');
+    $departmentIndexUrl = $isBasicProgram ? '/pages/academics/basic-edu/basic-edu-dept.php' : ($isGraduateProgram ? '/pages/academics/graduate-school/graduate-school.php' : '/pages/academics/college/college-dept.php');
     $deptUrl    = !empty($program['dept_slug'])
         ? '/pages/academics/college/college-department.php?slug=' . rawurlencode($program['dept_slug'])
         : '/pages/academics/college/college-dept.php';
+    if ($isBasicProgram && in_array($program['dept_slug'] ?? '', ['casa-gradeschool', 'hs-monte', 'jhs-regular', 'shs-regular'], true)) {
+        $deptUrl = '/pages/academics/basic-edu/basic-edu-department/' . rawurlencode($program['dept_slug']) . '.php';
+    }
 
     // The spinning text around the seal follows the program's department.
     $sealRingText = programSealRingText($deptName);
@@ -222,6 +236,7 @@ if ($program !== null) {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,100..700,0,0&display=block">
     <link href="/assets/css/program-page-style.css" rel="stylesheet">
+    <script src="/assets/js/facility-coverflow.js?v=<?= filemtime(__DIR__.'/../../../assets/js/facility-coverflow.js') ?>"></script>
     <link href="/assets/css/base-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
     <style>:root{<?= $themeStyle ?>}</style>
@@ -329,7 +344,7 @@ if ($program !== null) {
                     <p class="template-subtitle"<?= $pf('subtitle', 'Subtitle') ?>><?= $e($c['subtitle']) ?></p>
                     <?php endif; ?>
                     <?php if ($heroDesc !== '' || $cePreview): ?>
-                    <p class="template-desc"<?= $pf('hero_desc', 'Introduction', true, 'Write a short introduction') ?>><?= $pt($heroDesc) ?></p>
+                    <div class="template-desc cms-rich"<?= $pf('hero_desc', 'Introduction', true, 'Write a short introduction') ?>><?= $pt($heroDesc) ?></div>
                     <?php endif; ?>
                 </div>
 
@@ -375,7 +390,7 @@ if ($program !== null) {
                 <div class="about-feature-text">
                     <span class="about-eyebrow"<?= $pf('about_title', 'Small heading above the name') ?><?= $cePreview ? ' style="text-transform:uppercase"' : '' ?>><?= $e($cePreview ? $text('about_title') : mb_strtoupper($text('about_title'))) ?></span>
                     <h2 class="about-heading"<?= ceManageMark('data-ve-pick="prog-name" data-ve-label="Program name"') ?>><?= $e($fullName) ?></h2>
-                    <p class="about-body"<?= $pf('about_text', 'About this program', true, 'Write about this program') ?>><?= $pt($c['about_text']) ?></p>
+                    <div class="about-body cms-rich"<?= $pf('about_text', 'About this program', true, 'Write about this program') ?>><?= $pt($c['about_text']) ?></div>
                 </div>
             </div>
             <?php endif; ?>
@@ -389,7 +404,7 @@ if ($program !== null) {
                         <div class="template-vm-icon"><?= programPageIcon($text('vision_icon'), 'template-vm-icon-glyph') ?></div>
                         <h5 class="template-vm-card-title"<?= $pf('vision_title', 'Vision heading') ?>><?= $e($text('vision_title')) ?></h5>
                     </div>
-                    <p class="template-vm-card-text"<?= $pf('vision_text', 'Vision', true, 'Write the vision') ?>><?= $pt($c['vision_text']) ?></p>
+                    <div class="template-vm-card-text cms-rich"<?= $pf('vision_text', 'Vision', true, 'Write the vision') ?>><?= $pt($c['vision_text']) ?></div>
                 </div>
                 <?php endif; ?>
                 <?php if ($showMission): ?>
@@ -398,7 +413,7 @@ if ($program !== null) {
                         <div class="template-vm-icon"><?= programPageIcon($text('mission_icon'), 'template-vm-icon-glyph') ?></div>
                         <h5 class="template-vm-card-title"<?= $pf('mission_title', 'Mission heading') ?>><?= $e($text('mission_title')) ?></h5>
                     </div>
-                    <p class="template-vm-card-text"<?= $pf('mission_text', 'Mission', true, 'Write the mission') ?>><?= $pt($c['mission_text']) ?></p>
+                    <div class="template-vm-card-text cms-rich"<?= $pf('mission_text', 'Mission', true, 'Write the mission') ?>><?= $pt($c['mission_text']) ?></div>
                 </div>
                 <?php endif; ?>
             </div>
@@ -410,7 +425,7 @@ if ($program !== null) {
                 <div class="col-12">
                     <h3 class="template-section-title template-section-title--gold mt-4" id="core-values"<?= $pf('core_title', 'Core values heading') ?>><?= $e($text('core_title')) ?></h3>
                     <?php if (trim($c['core_intro']) !== '' || $cePreview): ?>
-                    <p class="corevalue-subtitle"<?= $pf('core_intro', 'Core values introduction') ?>><?= $e($c['core_intro']) ?></p>
+                    <div class="corevalue-subtitle cms-rich"<?= $pf('core_intro', 'Core values introduction') ?>><?= $pt($c['core_intro']) ?></div>
                     <?php endif; ?>
 
                     <div class="corevalue-stack">
@@ -424,7 +439,7 @@ if ($program !== null) {
                                 <span class="corevalue-letter"><?= $e($cvLetter) ?></span>
                                 <h5 class="corevalue-title"<?= $pi('core_value', $cvi, 'title', 'Core value') ?>><?= $e($cvTitle) ?></h5>
                             </div>
-                            <p class="corevalue-text"<?= $pi('core_value', $cvi, 'body', 'Description', true) ?>><?= $e($value['body'] ?? '') ?></p>
+                            <div class="corevalue-text cms-rich"<?= $pi('core_value', $cvi, 'body', 'Description', true) ?>><?= renderSectionContent($value['body'] ?? '') ?></div>
                         </div>
                         <?php endforeach; ?>
                         <?= $padd('core_value', 'Add a core value') ?>
@@ -445,7 +460,7 @@ if ($program !== null) {
                     <div class="why-side-inner">
                         <h2 class="why-heading" id="why-choose"><span<?= $pf('why_title', 'Heading') ?>><?= $e($text('why_title')) ?></span><span class="why-dot">.</span></h2>
                         <?php if (trim($c['why_intro']) !== '' || $cePreview): ?>
-                        <p class="why-intro"<?= $pf('why_intro', 'Introduction', true) ?>><?= $pt($c['why_intro']) ?></p>
+                        <div class="why-intro cms-rich"<?= $pf('why_intro', 'Introduction', true) ?>><?= $pt($c['why_intro']) ?></div>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -456,7 +471,7 @@ if ($program !== null) {
                         <span class="why-num" aria-hidden="true"><?= sprintf('%02d', $i + 1) ?></span>
                         <div class="why-body">
                             <h3 class="why-title"<?= $pi('why', $i, 'title', 'Title') ?>><?= $e($card['title']) ?></h3>
-                            <p class="why-desc"<?= $pi('why', $i, 'body', 'Description', true) ?>><?= $e($card['body'] ?? '') ?></p>
+                            <div class="why-desc cms-rich"<?= $pi('why', $i, 'body', 'Description', true) ?>><?= renderSectionContent($card['body'] ?? '') ?></div>
                         </div>
                     </li>
                     <?php endforeach; ?>
@@ -487,7 +502,6 @@ if ($program !== null) {
             <?php if ($cePreview && !empty($facilities)): ?>
             <div class="ve-fac-bar">
                 <button type="button" class="ve-fac-btn ve-fac-btn--solid" data-ve-fac="add"><i class="bi bi-plus-lg"></i> Add slides</button>
-                <button type="button" class="ve-fac-btn" data-ve-fac="edit"><i class="bi bi-pencil"></i> Edit details</button>
                 <span class="ve-fac-count"><?= count($facilities) ?> slide<?= count($facilities) === 1 ? '' : 's' ?></span>
             </div>
             <?php endif; ?>
@@ -549,7 +563,7 @@ if ($program !== null) {
         <div class="container">
             <h2 class="template-section-title template-section-title--gold"<?= $pf('uniform_title', 'Uniform heading') ?>><?= $e($text('uniform_title')) ?></h2>
             <?php if (trim($c['uniform_text']) !== '' || $cePreview): ?>
-            <p<?= $pf('uniform_text', 'Uniform text', true) ?>><?= $pt($c['uniform_text']) ?></p>
+            <div class="cms-rich"<?= $pf('uniform_text', 'Uniform text', true) ?>><?= $pt($c['uniform_text']) ?></div>
             <?php endif; ?>
 
             <div class="row g-4 justify-content-center mt-2">
@@ -580,7 +594,7 @@ if ($program !== null) {
                     <span class="career-vlabel"><?= $e($career['title']) ?></span>
                     <div class="career-content">
                         <h3 class="career-title"<?= $pi('career', $ci, 'title', 'Career title') ?>><?= $e($career['title']) ?></h3>
-                        <p class="career-desc"<?= $pi('career', $ci, 'body', 'Description', true) ?>><?= $e($career['body'] ?? '') ?></p>
+                        <div class="career-desc cms-rich"<?= $pi('career', $ci, 'body', 'Description', true) ?>><?= renderSectionContent($career['body'] ?? '') ?></div>
                     </div>
                 </article>
                 <?php endforeach; ?>
@@ -617,7 +631,7 @@ if ($program !== null) {
                 <div class="template-cta-icon"><?= programPageIcon($text('cta_icon'), 'template-cta-glyph') ?></div>
                 <div class="template-cta-text">
                     <h5 class="template-cta-title"<?= $pf('cta_title', 'Heading') ?>><?= $e($text('cta_title')) ?></h5>
-                    <p class="template-cta-desc"<?= $pf('cta_text', 'Text') ?>><?= $e($text('cta_text')) ?></p>
+                    <div class="template-cta-desc cms-rich"<?= $pf('cta_text', 'Text') ?>><?= $pt($text('cta_text')) ?></div>
                 </div>
                 <div class="template-cta-action">
                     <a href="<?= $e($ctaLink) ?>" class="template-cta-btn"<?= $pf('cta_button', 'Button text') ?>><?= $e($text('cta_button')) ?></a>
@@ -798,6 +812,7 @@ if ($program !== null) {
         'fields'      => array_map(function ($f) { return ['type' => $f['type'], 'max' => $f['max']]; }, programPageContentFields()),
         'items'       => $veItems,
         'limits'      => programPageItemLimits(),
+        'icons'       => array_filter(academicFeatureIconChoices(), static fn($choice) => !isset($choice['path'])),
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_PARTIAL_OUTPUT_ON_ERROR) ?></script>
     <?php endif; ?>
     <?php if ($cePreview && $program !== null): ?>
@@ -833,7 +848,7 @@ if ($program !== null) {
         }, $items['facility'] ?? []),
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
     <script>
-        /* Content Editor preview: "Edit details" asks the editor (the parent page) to open this program's Facilities tab; "Add slides" starts the picture chooser there */
+        /* Content Editor preview: "Add slides" starts the picture chooser in the parent editor. */
         (function () {
             var slug = <?= json_encode((string)($program['slug'] ?? $slug), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             document.addEventListener('click', function (ev) {
@@ -881,57 +896,7 @@ if ($program !== null) {
             var dots   = Array.prototype.slice.call(document.querySelectorAll('.fcar-dot'));
             var n = slides.length, at = 0, timer = null;
 
-            var prevD = [], settleT = null;
-            function side(d) { return d < 0 ? 'hide-l' : 'hide-r'; }
-            function put(s, pos, instant) {
-                if (instant) {
-                    s.classList.add('is-jump');
-                    s.setAttribute('data-pos', pos);
-                    void s.offsetWidth;                  /* commit with no transition */
-                    s.classList.remove('is-jump');
-                } else {
-                    s.setAttribute('data-pos', pos);
-                }
-            }
-            /* hidden slides wait on the side they will re-enter from; move them there unseen */
-            function settle() {
-                settleT = null;
-                slides.forEach(function (s, i) {
-                    var p = s.getAttribute('data-pos');
-                    if (p && p.indexOf('hide') === 0 && p !== side(prevD[i])) put(s, side(prevD[i]), true);
-                });
-            }
-            function layout() {
-                if (settleT) { clearTimeout(settleT); settle(); }
-                var needSettle = false;
-                slides.forEach(function (s, i) {
-                    var d = ((i - at) % n + n) % n;      /* 0..n-1 */
-                    if (d > n / 2) d -= n;               /* shortest way round */
-                    var vis = Math.abs(d) <= 1;
-                    var old = prevD[i];
-                    if (vis) {
-                        /* wrapped from one end to the other: jump instead of flying across */
-                        put(s, String(d), old !== undefined && Math.abs(d - old) > 1);
-                    } else if (old !== undefined && Math.abs(old) <= 1 && (old < 0) !== (d < 0)) {
-                        put(s, side(old), false);        /* leave the way it was heading, then reposition */
-                        needSettle = true;
-                    } else {
-                        put(s, side(d), old !== undefined && old !== d && Math.abs(old) > 1 && (old < 0) !== (d < 0));
-                    }
-                    prevD[i] = d;
-                    s.tabIndex = d === 0 ? 0 : -1;
-                    s.setAttribute('aria-hidden', vis ? 'false' : 'true');
-                    if (Math.abs(d) <= 3) {              /* start fetching neighbours early */
-                        var im = s.firstElementChild;
-                        if (im && im.tagName === 'IMG' && im.loading === 'lazy') im.loading = 'eager';
-                    }
-                });
-                if (needSettle) settleT = setTimeout(settle, 420);
-                dots.forEach(function (dt, i) {
-                    dt.classList.toggle('is-active', i === at);
-                    dt.setAttribute('aria-selected', i === at ? 'true' : 'false');
-                });
-            }
+            function layout() { window.GNCFacilityCoverflow.layout(slides, dots, at); }
             function go(i) { at = (i + n) % n; layout(); }
             function auto() {
                 if (timer) clearInterval(timer);

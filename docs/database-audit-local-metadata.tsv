@@ -1,0 +1,580 @@
+server_version
+8.0.46
+TABLE_NAME	ENGINE	TABLE_ROWS	DATA_LENGTH	INDEX_LENGTH
+activity_logs	InnoDB	719	98304	16384
+admin_offices	InnoDB	15	16384	16384
+admin_people	InnoDB	26	16384	16384
+admin_sections	InnoDB	4	16384	0
+announcement_images	InnoDB	0	16384	32768
+announcements	InnoDB	1	16384	81920
+basic_education_content	InnoDB	14	16384	0
+categories	InnoDB	4	16384	0
+content_migrations	InnoDB	0	16384	0
+csrf_tokens	InnoDB	334	65536	0
+department_page_content	InnoDB	37	16384	0
+departments	InnoDB	13	16384	49152
+events	InnoDB	13	16384	49152
+faqs	InnoDB	0	16384	16384
+fb_api_call_log	InnoDB	3	16384	16384
+fb_posts_cache	InnoDB	70	98304	49152
+hero_slides	InnoDB	2	16384	16384
+homepage_president	InnoDB	1	16384	32768
+homepage_text	InnoDB	3	16384	0
+media_library	InnoDB	180	49152	16384
+news	InnoDB	2	16384	65536
+news_images	InnoDB	0	16384	32768
+office_services	InnoDB	0	16384	16384
+offices	InnoDB	0	16384	0
+page_sections	InnoDB	13	16384	65536
+page_visits	InnoDB	52	16384	32768
+page_visits_daily	InnoDB	270	16384	16384
+pages	InnoDB	10	16384	16384
+program_items	InnoDB	157	65536	16384
+program_sections	InnoDB	0	16384	16384
+programs	InnoDB	19	49152	81920
+site_visitors	InnoDB	18	16384	32768
+slug_history	InnoDB	0	16384	16384
+student_achievement_photos	InnoDB	3	16384	16384
+student_achievements	InnoDB	1	16384	32768
+student_org_categories	InnoDB	6	16384	16384
+student_org_gallery	InnoDB	0	16384	32768
+student_org_page_content	InnoDB	1	16384	0
+student_organizations	InnoDB	3	16384	81920
+tuition_fee_content	InnoDB	0	16384	0
+tuition_fee_documents	InnoDB	0	16384	16384
+users	InnoDB	1	16384	16384
+TABLE_NAME	INDEX_NAME	NON_UNIQUE	SEQ_IN_INDEX	COLUMN_NAME
+activity_logs	fk_log_user	1	1	user_id
+activity_logs	PRIMARY	0	1	log_id
+admin_offices	idx_admin_offices_section	1	1	section_key
+admin_offices	idx_admin_offices_section	1	2	display_order
+admin_offices	PRIMARY	0	1	office_id
+admin_people	idx_admin_people_section	1	1	section_key
+admin_people	idx_admin_people_section	1	2	display_order
+admin_people	PRIMARY	0	1	person_id
+admin_sections	PRIMARY	0	1	section_key
+announcement_images	fk_annimg_announcement	1	1	announcement_id
+announcement_images	fk_annimg_media	1	1	media_id
+announcement_images	PRIMARY	0	1	image_id
+announcements	fk_ann_cat	1	1	category_id
+announcements	fk_ann_user	1	1	user_id
+announcements	idx_announcements_dept	1	1	dept_id
+announcements	idx_announcements_pinned	1	1	is_pinned
+announcements	idx_announcements_pinned	1	2	pinned_at
+announcements	idx_announcements_program	1	1	program
+announcements	PRIMARY	0	1	announcement_id
+basic_education_content	PRIMARY	0	1	page_key
+basic_education_content	PRIMARY	0	2	field_key
+categories	PRIMARY	0	1	category_id
+content_migrations	PRIMARY	0	1	migration_key
+csrf_tokens	PRIMARY	0	1	token_id
+department_page_content	PRIMARY	0	1	dept_id
+department_page_content	PRIMARY	0	2	field_key
+departments	fk_dept_dean_media	1	1	dean_media_id
+departments	fk_dept_logo	1	1	media_id
+departments	PRIMARY	0	1	dept_id
+departments	uq_departments_slug	0	1	slug
+events	fk_evt_cat	1	1	category_id
+events	fk_evt_media	1	1	media_id
+events	fk_evt_user	1	1	user_id
+events	PRIMARY	0	1	event_id
+faqs	fk_faq_cat	1	1	category_id
+faqs	PRIMARY	0	1	faq_id
+fb_api_call_log	called_at	1	1	called_at
+fb_api_call_log	PRIMARY	0	1	id
+fb_posts_cache	fk_fbcache_media	1	1	image_media_id
+fb_posts_cache	idx_fbcache_category	1	1	category_id
+fb_posts_cache	idx_fbcache_pinned	1	1	is_pinned
+fb_posts_cache	idx_fbcache_pinned	1	2	pinned_at
+fb_posts_cache	PRIMARY	0	1	fb_post_id
+hero_slides	fk_hero_slides_user	1	1	created_by
+hero_slides	PRIMARY	0	1	slide_id
+homepage_president	fk_president_media	1	1	media_id
+homepage_president	fk_president_user	1	1	updated_by
+homepage_president	PRIMARY	0	1	id
+homepage_text	PRIMARY	0	1	text_key
+media_library	fk_media_user	1	1	created_by
+media_library	PRIMARY	0	1	media_id
+news	fk_news_cat	1	1	category_id
+news	fk_news_media	1	1	featured_image
+news	fk_news_user	1	1	user_id
+news	idx_news_pinned	1	1	is_pinned
+news	idx_news_pinned	1	2	pinned_at
+news	PRIMARY	0	1	news_id
+news_images	fk_newsimg_media	1	1	media_id
+news_images	fk_newsimg_news	1	1	news_id
+news_images	PRIMARY	0	1	image_id
+office_services	fk_svc_office	1	1	office_id
+office_services	PRIMARY	0	1	service_id
+offices	PRIMARY	0	1	office_id
+page_sections	fk_page_sections_user	1	1	updated_by
+page_sections	fk_ps_page	1	1	page_id
+page_sections	idx_page_sections_review	1	1	review_status
+page_sections	PRIMARY	0	1	section_id
+page_sections	uniq_page_section_key	0	1	page_id
+page_sections	uniq_page_section_key	0	2	section_key
+page_visits	idx_visit_count	1	1	visit_count
+page_visits	PRIMARY	0	1	page_id
+page_visits	uq_page_url	0	1	page_url
+page_visits_daily	idx_visit_date	1	1	visit_date
+page_visits_daily	PRIMARY	0	1	page_id
+page_visits_daily	PRIMARY	0	2	visit_date
+pages	PRIMARY	0	1	page_id
+pages	uniq_pages_slug	0	1	slug
+program_items	idx_program_items_order	1	1	program_id
+program_items	idx_program_items_order	1	2	item_type
+program_items	idx_program_items_order	1	3	display_order
+program_items	PRIMARY	0	1	item_id
+program_sections	idx_program_sections_order	1	1	program_id
+program_sections	idx_program_sections_order	1	2	display_order
+program_sections	PRIMARY	0	1	section_id
+programs	idx_programs_dept	1	1	dept_id
+programs	idx_programs_image	1	1	image_media_id
+programs	idx_programs_pdf	1	1	pdf_media_id
+programs	PRIMARY	0	1	program_id
+programs	uq_programs_code	0	1	program_code
+programs	uq_programs_slug	0	1	slug
+site_visitors	idx_visitor	1	1	visitor_hash
+site_visitors	PRIMARY	0	1	id
+site_visitors	uq_visitor_day	0	1	visit_date
+site_visitors	uq_visitor_day	0	2	visitor_hash
+slug_history	PRIMARY	0	1	id
+slug_history	uq_slug_history_type_slug	0	1	type
+slug_history	uq_slug_history_type_slug	0	2	old_slug
+student_achievement_photos	achievement_photo_order	1	1	achievement_id
+student_achievement_photos	achievement_photo_order	1	2	sort_order
+student_achievement_photos	achievement_photo_order	1	3	photo_id
+student_achievement_photos	PRIMARY	0	1	photo_id
+student_achievements	achievement_featured	1	1	status
+student_achievements	achievement_featured	1	2	is_featured
+student_achievements	achievement_featured	1	3	sort_order
+student_achievements	achievement_listing	1	1	status
+student_achievements	achievement_listing	1	2	academic_year
+student_achievements	achievement_listing	1	3	sort_order
+student_achievements	PRIMARY	0	1	achievement_id
+student_org_categories	name	0	1	name
+student_org_categories	PRIMARY	0	1	category_id
+student_org_gallery	gallery_order	1	1	org_id
+student_org_gallery	gallery_order	1	2	display_order
+student_org_gallery	gallery_order	1	3	image_id
+student_org_gallery	media_id	1	1	media_id
+student_org_gallery	PRIMARY	0	1	image_id
+student_org_page_content	PRIMARY	0	1	field_key
+student_organizations	cover_media_id	1	1	cover_media_id
+student_organizations	logo_media_id	1	1	logo_media_id
+student_organizations	org_category	1	1	category_id
+student_organizations	org_public_order	1	1	status
+student_organizations	org_public_order	1	2	display_order
+student_organizations	org_public_order	1	3	org_id
+student_organizations	PRIMARY	0	1	org_id
+student_organizations	slug	0	1	slug
+tuition_fee_content	PRIMARY	0	1	field_key
+tuition_fee_documents	file_path	0	1	file_path
+tuition_fee_documents	PRIMARY	0	1	document_id
+users	email	0	1	email
+users	PRIMARY	0	1	user_id
+TABLE_NAME	COLUMN_NAME	COLUMN_TYPE	IS_NULLABLE	COLUMN_DEFAULT	EXTRA
+activity_logs	log_id	int	NO	NULL	auto_increment
+activity_logs	user_id	int	YES	NULL	
+activity_logs	action	varchar(255)	NO	NULL	
+activity_logs	table_name	varchar(100)	YES	NULL	
+activity_logs	record_id	int	YES	NULL	
+activity_logs	description	text	YES	NULL	
+activity_logs	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+admin_offices	office_id	int	NO	NULL	auto_increment
+admin_offices	section_key	varchar(60)	NO	heads-of-student-services	
+admin_offices	office_name	varchar(255)	NO	NULL	
+admin_offices	head_name	varchar(255)	NO		
+admin_offices	head_role	varchar(500)	NO		
+admin_offices	media_id	int	YES	NULL	
+admin_offices	image_path	varchar(500)	YES	NULL	
+admin_offices	phone	varchar(100)	YES	NULL	
+admin_offices	email	varchar(255)	YES	NULL	
+admin_offices	location	varchar(255)	YES	NULL	
+admin_offices	hours	text	YES	NULL	
+admin_offices	services	text	YES	NULL	
+admin_offices	display_order	int	NO	0	
+admin_offices	archived_at	datetime	YES	NULL	
+admin_offices	updated_at	timestamp	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+admin_people	person_id	int	NO	NULL	auto_increment
+admin_people	section_key	varchar(60)	NO	NULL	
+admin_people	name	varchar(255)	NO	NULL	
+admin_people	role	varchar(500)	NO		
+admin_people	media_id	int	YES	NULL	
+admin_people	image_path	varchar(500)	YES	NULL	
+admin_people	display_order	int	NO	0	
+admin_people	archived_at	datetime	YES	NULL	
+admin_people	updated_at	timestamp	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+admin_sections	section_key	varchar(60)	NO	NULL	
+admin_sections	title	varchar(255)	NO	NULL	
+admin_sections	description	text	YES	NULL	
+admin_sections	layout	enum('people','offices')	NO	people	
+admin_sections	display_order	int	NO	0	
+admin_sections	updated_by	int	YES	NULL	
+admin_sections	updated_at	timestamp	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+announcement_images	image_id	int	NO	NULL	auto_increment
+announcement_images	announcement_id	int	NO	NULL	
+announcement_images	media_id	int	NO	NULL	
+announcement_images	display_order	int	NO	0	
+announcement_images	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+announcements	announcement_id	int	NO	NULL	auto_increment
+announcements	category_id	int	YES	NULL	
+announcements	program	varchar(10)	NO	ALL	
+announcements	dept_id	int	YES	NULL	
+announcements	user_id	int	YES	NULL	
+announcements	title	varchar(500)	NO	NULL	
+announcements	slug	varchar(500)	NO	NULL	
+announcements	content	longtext	YES	NULL	
+announcements	featured_image	int	YES	NULL	
+announcements	status	enum('draft','pending','published','archived')	NO	draft	
+announcements	is_pinned	tinyint(1)	NO	0	
+announcements	pinned_at	datetime	YES	NULL	
+announcements	published_at	datetime	YES	NULL	
+announcements	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+announcements	updated_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+basic_education_content	page_key	varchar(60)	NO	NULL	
+basic_education_content	field_key	varchar(100)	NO	NULL	
+basic_education_content	content	mediumtext	NO	NULL	
+basic_education_content	updated_at	timestamp	YES	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+categories	category_id	int	NO	NULL	auto_increment
+categories	category_name	varchar(150)	NO	NULL	
+categories	category_color	varchar(7)	YES	NULL	
+categories	description	text	YES	NULL	
+categories	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+content_migrations	migration_key	varchar(100)	NO	NULL	
+content_migrations	applied_at	timestamp	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+csrf_tokens	token_id	int	NO	NULL	auto_increment
+csrf_tokens	user_id	int	YES	NULL	
+csrf_tokens	token	varchar(255)	NO	NULL	
+csrf_tokens	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+csrf_tokens	expires_at	datetime	NO	NULL	
+department_page_content	dept_id	int	NO	NULL	
+department_page_content	field_key	varchar(80)	NO	NULL	
+department_page_content	content	text	NO	NULL	
+department_page_content	updated_at	timestamp	YES	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+departments	dept_id	int	NO	NULL	auto_increment
+departments	dept_name	varchar(255)	NO	NULL	
+departments	slug	varchar(50)	YES	NULL	
+departments	department_type	enum('college','basic-education')	NO	college	
+departments	description	text	YES	NULL	
+departments	faculty_head	varchar(255)	YES	NULL	
+departments	media_id	int	YES	NULL	
+departments	dean_name	varchar(255)	YES	NULL	
+departments	dean_title	varchar(255)	YES	NULL	
+departments	dean_bio	text	YES	NULL	
+departments	dean_media_id	int	YES	NULL	
+departments	dean_phone	varchar(100)	YES	NULL	
+departments	dean_email	varchar(255)	YES	NULL	
+departments	dean_office	varchar(255)	YES	NULL	
+departments	dean_hours	varchar(255)	YES	NULL	
+departments	theme_color	varchar(7)	YES	NULL	
+departments	about_text	text	YES	NULL	
+departments	hero_text	varchar(255)	YES	NULL	
+departments	facebook_url	varchar(255)	YES	NULL	
+departments	office_label	varchar(100)	YES	NULL	
+departments	archived_at	datetime	YES	NULL	
+departments	office_building_id	varchar(40)	YES	NULL	
+departments	office_floor	varchar(40)	YES	NULL	
+departments	office_room	varchar(40)	YES	NULL	
+departments	office_details	varchar(500)	YES	NULL	
+events	event_id	int	NO	NULL	auto_increment
+events	category_id	int	YES	NULL	
+events	program	varchar(10)	NO	ALL	
+events	user_id	int	YES	NULL	
+events	title	varchar(500)	NO	NULL	
+events	location	varchar(500)	YES	NULL	
+events	start_date	datetime	YES	NULL	
+events	end_date	datetime	YES	NULL	
+events	media_id	int	YES	NULL	
+events	status	enum('draft','pending','published','archived')	NO	draft	
+events	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+events	updated_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+faqs	faq_id	int	NO	NULL	auto_increment
+faqs	category_id	int	YES	NULL	
+faqs	question	text	NO	NULL	
+faqs	answer	longtext	NO	NULL	
+faqs	display_order	int	NO	0	
+faqs	created_by	int	YES	NULL	
+faqs	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+fb_api_call_log	id	int	NO	NULL	auto_increment
+fb_api_call_log	called_at	datetime	NO	NULL	
+fb_posts_cache	fb_post_id	varchar(64)	NO	NULL	
+fb_posts_cache	message	text	NO	NULL	
+fb_posts_cache	image_media_id	int	YES	NULL	
+fb_posts_cache	category_id	int	YES	NULL	
+fb_posts_cache	category_locked	tinyint(1)	NO	0	
+fb_posts_cache	permalink_url	varchar(500)	YES	NULL	
+fb_posts_cache	is_pinned	tinyint(1)	NO	0	
+fb_posts_cache	pinned_at	datetime	YES	NULL	
+fb_posts_cache	created_time	datetime	NO	NULL	
+fb_posts_cache	fetched_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+hero_slides	slide_id	int	NO	NULL	auto_increment
+hero_slides	media_type	enum('image','video')	NO	image	
+hero_slides	media_path	varchar(255)	NO	NULL	
+hero_slides	media_path_mobile	varchar(255)	YES	NULL	
+hero_slides	poster_path	varchar(255)	YES	NULL	
+hero_slides	title	varchar(100)	YES	NULL	
+hero_slides	subtitle	varchar(150)	YES	NULL	
+hero_slides	btn1_text	varchar(30)	YES	NULL	
+hero_slides	btn1_link	varchar(255)	YES	NULL	
+hero_slides	btn2_text	varchar(30)	YES	NULL	
+hero_slides	btn2_link	varchar(255)	YES	NULL	
+hero_slides	display_order	int	NO	0	
+hero_slides	status	enum('published','draft')	NO	published	
+hero_slides	show_on_mobile	tinyint(1)	NO	1	
+hero_slides	show_gradient	tinyint(1)	NO	1	
+hero_slides	created_by	int	YES	NULL	
+hero_slides	created_at	datetime	YES	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+hero_slides	updated_at	datetime	YES	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+homepage_president	id	tinyint unsigned	NO	NULL	
+homepage_president	name	varchar(255)	YES	NULL	
+homepage_president	title	varchar(255)	YES	NULL	
+homepage_president	org	varchar(255)	YES	NULL	
+homepage_president	eyebrow	varchar(255)	YES	NULL	
+homepage_president	heading	varchar(255)	YES	NULL	
+homepage_president	greeting	varchar(255)	YES	NULL	
+homepage_president	message	text	YES	NULL	
+homepage_president	media_id	int	YES	NULL	
+homepage_president	updated_by	int	YES	NULL	
+homepage_president	updated_at	timestamp	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+homepage_text	text_key	varchar(60)	NO	NULL	
+homepage_text	value	text	YES	NULL	
+homepage_text	media_id	int	YES	NULL	
+homepage_text	updated_by	int	YES	NULL	
+homepage_text	updated_at	timestamp	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+media_library	media_id	int	NO	NULL	auto_increment
+media_library	file_name	varchar(255)	NO	NULL	
+media_library	file_type	varchar(100)	NO	NULL	
+media_library	file_size	int	NO	NULL	
+media_library	file_path	varchar(500)	NO	NULL	
+media_library	created_by	int	YES	NULL	
+media_library	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+news	news_id	int	NO	NULL	auto_increment
+news	category_id	int	YES	NULL	
+news	user_id	int	YES	NULL	
+news	title	varchar(500)	NO	NULL	
+news	slug	varchar(500)	NO	NULL	
+news	content	longtext	YES	NULL	
+news	author	varchar(255)	YES	NULL	
+news	category	varchar(20)	NO	Others	
+news	featured_image	int	YES	NULL	
+news	status	enum('draft','pending','published','archived')	NO	draft	
+news	is_pinned	tinyint(1)	NO	0	
+news	pinned_at	datetime	YES	NULL	
+news	published_at	datetime	YES	NULL	
+news	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+news	updated_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+news	academic_year	varchar(9)	YES	NULL	
+news_images	image_id	int	NO	NULL	auto_increment
+news_images	news_id	int	NO	NULL	
+news_images	media_id	int	NO	NULL	
+news_images	display_order	int	NO	0	
+news_images	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+office_services	service_id	int	NO	NULL	auto_increment
+office_services	office_id	int	NO	NULL	
+office_services	service_name	varchar(255)	NO	NULL	
+office_services	description	text	YES	NULL	
+office_services	requirements	text	YES	NULL	
+office_services	procedure	text	YES	NULL	
+office_services	display_order	int	NO	0	
+offices	office_id	int	NO	NULL	auto_increment
+offices	office_name	varchar(255)	NO	NULL	
+offices	description	text	YES	NULL	
+offices	email	varchar(255)	YES	NULL	
+offices	contact_no	varchar(50)	YES	NULL	
+offices	location	varchar(255)	YES	NULL	
+offices	office_hours	varchar(255)	YES	NULL	
+offices	media_id	int	YES	NULL	
+page_sections	section_id	int	NO	NULL	auto_increment
+page_sections	page_id	int	YES	NULL	
+page_sections	section_key	varchar(60)	YES	NULL	
+page_sections	title	varchar(500)	YES	NULL	
+page_sections	subtitle	varchar(500)	YES	NULL	
+page_sections	content	longtext	YES	NULL	
+page_sections	draft_content	mediumtext	YES	NULL	
+page_sections	status	enum('draft','published')	NO	published	
+page_sections	review_status	enum('none','pending','rejected')	NO	none	
+page_sections	submitted_by	int	YES	NULL	
+page_sections	submitted_at	datetime	YES	NULL	
+page_sections	reviewed_by	int	YES	NULL	
+page_sections	reviewed_at	datetime	YES	NULL	
+page_sections	review_note	varchar(500)	YES	NULL	
+page_sections	updated_by	int	YES	NULL	
+page_sections	updated_at	timestamp	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+page_sections	media_id	int	YES	NULL	
+page_sections	display_order	int	NO	0	
+page_visits	page_id	int unsigned	NO	NULL	auto_increment
+page_visits	page_url	varchar(255)	NO	NULL	
+page_visits	page_title	varchar(255)	NO		
+page_visits	visit_count	int unsigned	NO	0	
+page_visits	last_visited	datetime	NO	NULL	
+page_visits	created_at	datetime	NO	NULL	
+page_visits_daily	page_id	int unsigned	NO	NULL	
+page_visits_daily	visit_date	date	NO	NULL	
+page_visits_daily	views	int unsigned	NO	0	
+pages	page_id	int	NO	NULL	auto_increment
+pages	title	varchar(500)	NO	NULL	
+pages	slug	varchar(500)	NO	NULL	
+pages	description	text	YES	NULL	
+pages	page_type	varchar(100)	YES	NULL	
+pages	display_order	int	NO	0	
+pages	status	enum('active','inactive')	NO	active	
+pages	created_by	int	YES	NULL	
+pages	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+pages	updated_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+program_items	item_id	int	NO	NULL	auto_increment
+program_items	program_id	int	NO	NULL	
+program_items	item_type	varchar(20)	NO	NULL	
+program_items	title	varchar(255)	NO		
+program_items	subtitle	varchar(255)	YES	NULL	
+program_items	body	text	YES	NULL	
+program_items	icon	varchar(60)	YES	NULL	
+program_items	letter	varchar(4)	YES	NULL	
+program_items	image_media_id	int	YES	NULL	
+program_items	image_path	varchar(255)	YES	NULL	
+program_items	display_order	int	NO	0	
+program_items	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+program_sections	section_id	int	NO	NULL	auto_increment
+program_sections	program_id	int	NO	NULL	
+program_sections	section_type	varchar(50)	NO	NULL	
+program_sections	title	varchar(255)	YES	NULL	
+program_sections	subtitle	varchar(500)	YES	NULL	
+program_sections	content	json	YES	NULL	
+program_sections	display_order	int	NO	0	
+program_sections	is_visible	tinyint(1)	NO	1	
+program_sections	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+program_sections	updated_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+programs	program_id	int	NO	NULL	auto_increment
+programs	program_code	varchar(10)	NO	NULL	
+programs	slug	varchar(60)	YES	NULL	
+programs	description	text	YES	NULL	
+programs	image_media_id	int	YES	NULL	
+programs	theme_color	varchar(7)	YES	NULL	
+programs	theme_color_light	varchar(7)	YES	NULL	
+programs	dept_id	int	YES	NULL	
+programs	pdf_media_id	int	YES	NULL	
+programs	program_name	varchar(255)	YES	NULL	
+programs	is_published	tinyint(1)	NO	1	
+programs	core_values_enabled	tinyint(1)	NO	0	
+programs	hero_media_id	int	YES	NULL	
+programs	seal_media_id	int	YES	NULL	
+programs	page_content	json	YES	NULL	
+site_visitors	id	int unsigned	NO	NULL	auto_increment
+site_visitors	visitor_hash	char(64)	NO	NULL	
+site_visitors	visit_date	date	NO	NULL	
+site_visitors	first_seen	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+slug_history	id	int	NO	NULL	auto_increment
+slug_history	type	enum('department','program')	NO	NULL	
+slug_history	old_slug	varchar(60)	NO	NULL	
+slug_history	target_id	int	NO	NULL	
+slug_history	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+student_achievement_photos	photo_id	int unsigned	NO	NULL	auto_increment
+student_achievement_photos	achievement_id	int unsigned	NO	NULL	
+student_achievement_photos	image_path	varchar(500)	NO	NULL	
+student_achievement_photos	caption	varchar(255)	NO		
+student_achievement_photos	sort_order	int unsigned	NO	0	
+student_achievements	achievement_id	int unsigned	NO	NULL	auto_increment
+student_achievements	title	varchar(255)	NO	NULL	
+student_achievements	description	text	NO	NULL	
+student_achievements	program_organization	varchar(255)	NO		
+student_achievements	category_label	varchar(100)	NO		
+student_achievements	academic_year	varchar(9)	YES	NULL	
+student_achievements	image_path	varchar(500)	YES	NULL	
+student_achievements	status	enum('draft','published')	NO	draft	
+student_achievements	is_featured	tinyint(1)	NO	0	
+student_achievements	sort_order	int unsigned	NO	0	
+student_achievements	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+student_achievements	updated_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+student_achievements	thumbnail_path	varchar(500)	YES	NULL	
+student_achievements	achievers	text	YES	NULL	
+student_org_categories	category_id	int	NO	NULL	auto_increment
+student_org_categories	name	varchar(100)	NO	NULL	
+student_org_categories	display_order	int	NO	0	
+student_org_categories	created_at	timestamp	YES	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+student_org_gallery	image_id	int	NO	NULL	auto_increment
+student_org_gallery	org_id	int	NO	NULL	
+student_org_gallery	media_id	int	NO	NULL	
+student_org_gallery	display_order	int	NO	0	
+student_org_page_content	field_key	varchar(80)	NO	NULL	
+student_org_page_content	content	text	NO	NULL	
+student_org_page_content	updated_at	timestamp	YES	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+student_organizations	org_id	int	NO	NULL	auto_increment
+student_organizations	slug	varchar(180)	NO	NULL	
+student_organizations	name	varchar(255)	NO	NULL	
+student_organizations	category_id	int	YES	NULL	
+student_organizations	description	text	YES	NULL	
+student_organizations	about_text	text	YES	NULL	
+student_organizations	vision	text	YES	NULL	
+student_organizations	mission	text	YES	NULL	
+student_organizations	facebook_url	varchar(500)	YES	NULL	
+student_organizations	logo_media_id	int	YES	NULL	
+student_organizations	cover_media_id	int	YES	NULL	
+student_organizations	status	enum('draft','published')	NO	draft	
+student_organizations	display_order	int	NO	0	
+student_organizations	created_at	timestamp	YES	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+student_organizations	updated_at	timestamp	YES	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+tuition_fee_content	field_key	varchar(80)	NO	NULL	
+tuition_fee_content	content	text	NO	NULL	
+tuition_fee_content	updated_at	timestamp	YES	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+tuition_fee_documents	document_id	int	NO	NULL	auto_increment
+tuition_fee_documents	category_key	varchar(40)	NO	NULL	
+tuition_fee_documents	title	varchar(255)	NO	NULL	
+tuition_fee_documents	file_path	varchar(500)	NO	NULL	
+tuition_fee_documents	file_size	int	NO	NULL	
+tuition_fee_documents	updated_at	timestamp	YES	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+users	user_id	int	NO	NULL	auto_increment
+users	first_name	varchar(100)	NO	NULL	
+users	last_name	varchar(100)	NO	NULL	
+users	email	varchar(255)	NO	NULL	
+users	password	varchar(255)	NO	NULL	
+users	role	enum('Super Admin','Content Admin','Content Editor','Office Staff')	NO	Content Editor	
+users	status	enum('active','inactive')	NO	active	
+users	otp_code	varchar(10)	YES	NULL	
+users	otp_expires_at	datetime	YES	NULL	
+users	otp_verified	tinyint(1)	NO	0	
+users	login_attempts	int	NO	0	
+users	locked_until	datetime	YES	NULL	
+users	remember_token	varchar(255)	YES	NULL	
+users	remember_token_expires_at	datetime	YES	NULL	
+users	last_login	datetime	YES	NULL	
+users	created_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED
+users	updated_at	datetime	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+TABLE_NAME	CONSTRAINT_NAME	COLUMN_NAME	REFERENCED_TABLE_NAME	REFERENCED_COLUMN_NAME
+activity_logs	fk_log_user	user_id	users	user_id
+announcement_images	fk_annimg_announcement	announcement_id	announcements	announcement_id
+announcement_images	fk_annimg_media	media_id	media_library	media_id
+announcements	fk_ann_cat	category_id	categories	category_id
+announcements	fk_ann_dept	dept_id	departments	dept_id
+announcements	fk_ann_user	user_id	users	user_id
+department_page_content	department_page_content_department	dept_id	departments	dept_id
+departments	fk_dept_dean_media	dean_media_id	media_library	media_id
+departments	fk_dept_logo	media_id	media_library	media_id
+events	fk_evt_cat	category_id	categories	category_id
+events	fk_evt_media	media_id	media_library	media_id
+events	fk_evt_user	user_id	users	user_id
+faqs	fk_faq_cat	category_id	categories	category_id
+fb_posts_cache	fk_fbcache_category	category_id	categories	category_id
+fb_posts_cache	fk_fbcache_media	image_media_id	media_library	media_id
+hero_slides	fk_hero_slides_user	created_by	users	user_id
+homepage_president	fk_president_media	media_id	media_library	media_id
+homepage_president	fk_president_user	updated_by	users	user_id
+media_library	fk_media_user	created_by	users	user_id
+news	fk_news_cat	category_id	categories	category_id
+news	fk_news_media	featured_image	media_library	media_id
+news	fk_news_user	user_id	users	user_id
+news_images	fk_newsimg_media	media_id	media_library	media_id
+news_images	fk_newsimg_news	news_id	news	news_id
+office_services	fk_svc_office	office_id	offices	office_id
+page_sections	fk_page_sections_user	updated_by	users	user_id
+page_sections	fk_ps_page	page_id	pages	page_id
+program_items	fk_program_items_program	program_id	programs	program_id
+program_sections	fk_program_sections_program	program_id	programs	program_id
+programs	fk_programs_dept	dept_id	departments	dept_id
+programs	fk_programs_image	image_media_id	media_library	media_id
+programs	fk_programs_pdf	pdf_media_id	media_library	media_id
+student_achievement_photos	student_achievement_photos_ibfk_1	achievement_id	student_achievements	achievement_id
+student_org_gallery	student_org_gallery_ibfk_1	org_id	student_organizations	org_id
+student_org_gallery	student_org_gallery_ibfk_2	media_id	media_library	media_id
+student_organizations	student_organizations_ibfk_1	category_id	student_org_categories	category_id
+student_organizations	student_organizations_ibfk_2	logo_media_id	media_library	media_id
+student_organizations	student_organizations_ibfk_3	cover_media_id	media_library	media_id

@@ -1,0 +1,78 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {spawn}=require('node:child_process');
+const profile=fs.mkdtempSync(path.join(os.tmpdir(),'gnci-calendar-widget-'));
+const browser=spawn(process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function until(work,message){for(let end=Date.now()+30000;Date.now()<end;){if(await work())return;await delay(50);}throw Error(message);}
+let socket;
+(async()=>{
+    await until(()=>fs.existsSync(path.join(profile,'DevToolsActivePort')),'Chrome did not start');
+    const port=fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0];
+    const tabs=await(await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+    socket=new WebSocket(tabs.find(tab=>tab.type==='page').webSocketDebuggerUrl);
+    await new Promise(resolve=>socket.addEventListener('open',resolve,{once:true}));
+    let serial=0;const pending=new Map();
+    socket.addEventListener('message',event=>{const packet=JSON.parse(event.data);if(packet.id&&pending.has(packet.id)){pending.get(packet.id)(packet);pending.delete(packet.id);}});
+    const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++serial;pending.set(id,result=>result.error?reject(Error(JSON.stringify(result.error))):resolve(result.result));socket.send(JSON.stringify({id,method,params}));});
+    const evaluate=async expression=>{const result=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));return result.result.value;};
+    const base=process.env.BASE_URL||'http://localhost:8080';
+    await send('Page.enable');await send('Network.enable');
+    await send('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*','*cdn.jsdelivr.net*','*cdnjs.cloudflare.com*','*facebook.com*','*youtube.com*']});
+    await send('Page.addScriptToEvaluateOnNewDocument',{source:"try{sessionStorage.setItem('gncIntroSeen','1')}catch(_){}"});
+    for(const width of [1440,390]) {
+        await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+        await send('Page.navigate',{url:base+'/'});await until(()=>evaluate('document.readyState==="complete"&&Boolean(document.getElementById("calendarProgramWidget"))'),'Home did not load');
+        assert.equal(await evaluate('document.getElementById("calendarProgramWidget").getBoundingClientRect().top>innerHeight'),true,'Widget stays in calendar section');
+        await evaluate('document.querySelector(".gnc-cal-heading-row").scrollIntoView({block:"start",behavior:"instant"});window.scrollBy({top:-90,behavior:"instant"})');await delay(1400);
+        await until(()=>evaluate('!document.getElementById("calendarProgramWidget").hidden'),'Widget not shown in calendar');
+        assert.equal(await evaluate('(()=>{const heading=document.querySelector(".gnc-cal-head").getBoundingClientRect(),row=document.querySelector(".gnc-cal-heading-row").getBoundingClientRect();return Math.abs(heading.left+heading.width/2-row.left-row.width/2)<2})()'),true,'Calendar heading is centered across the full section');
+        const layout=await evaluate('(()=>{const a=document.querySelector(".gnc-cal-card").getBoundingClientRect(),b=document.querySelector(".gnc-evs").getBoundingClientRect();return {beside:b.left>=a.right,below:b.top>=a.bottom,fit:b.right<=innerWidth&&a.right<=innerWidth,aligned:Math.abs(a.top-b.top)<2&&Math.abs(a.bottom-b.bottom)<2}})()');
+        assert.equal(width>=992?layout.beside:layout.below,true,'Upcoming events sits right on desktop and below on mobile');
+        assert.equal(layout.fit,true,'Calendar and upcoming events fit the viewport');
+        if(width>=992)assert.equal(layout.aligned,true,'Upcoming Events matches the calendar top and bottom edges');
+        assert.equal(await evaluate('Boolean(document.querySelector(".gnc-cal-heading-row #calendarProgramWidget"))'),true,'Programs button is beside the calendar heading');
+        await evaluate('document.getElementById("calendarProgramToggle").click()');
+        assert.equal(await evaluate('document.getElementById("calendarProgramPanel").hidden'),false);
+        assert.equal(await evaluate('Array.from(document.querySelectorAll(".gnc-programs-list-item")).every(row=>row.querySelector(".gnc-programs-list-fullname")?.textContent.trim())'),true,'Every program shows its full saved name');
+        assert.equal(await evaluate('document.getElementById("calendarProgramToggle").getAttribute("aria-expanded")'),'true');
+        assert.equal(await evaluate('(()=>{const r=document.getElementById("calendarProgramPanel").getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()'),true,'Panel fits viewport');
+        await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+        assert.equal(await evaluate('document.getElementById("calendarProgramPanel").hidden'),true,'Escape closes widget');
+        assert.equal(await evaluate('document.activeElement.id'),'calendarProgramToggle');
+        await evaluate('document.getElementById("calendarProgramToggle").click();document.querySelector(".gnc-cal-heading").click()');
+        assert.equal(await evaluate('document.getElementById("calendarProgramPanel").hidden'),true,'Outside click closes widget');
+        await evaluate('document.getElementById("calendarProgramToggle").click();window.__widgetTestToken="retained"');
+        const y=await evaluate('scrollY');const selected=await evaluate('(()=>{const rows=Array.from(document.querySelectorAll(".gnc-programs-list-item"));window.__widgetProgramTarget=rows.find(row=>row.querySelector(".gnc-programs-code").textContent==="BSCRIM")||rows[0];return window.__widgetProgramTarget.querySelector(".gnc-programs-code").textContent})()');
+        await evaluate('window.__widgetProgramTarget.click()');
+        await until(()=>evaluate('Boolean(document.querySelector(".gnc-programs-list-item-active"))'),'Program filter not applied');
+        assert.equal(await evaluate('new URLSearchParams(location.search).get("program")'),selected);
+        assert.equal(await evaluate('window.__widgetTestToken'),'retained','Program filter avoids reload');
+        assert.equal(await evaluate('document.getElementById("calendarProgramPanel").hidden'),true,'Selection closes panel');
+        assert(Math.abs(await evaluate('scrollY')-y)<2,'Filtering keeps page position');
+        await evaluate('document.getElementById("calendarProgramToggle").click()');
+        const department=await evaluate('document.querySelector("[data-calendar-department]").getAttribute("data-calendar-department")');
+        await evaluate('document.querySelector("[data-calendar-department]").click()');
+        await until(()=>evaluate('Boolean(document.querySelector(".gnc-calendar-department-active"))'),'Department filter not applied');
+        assert.equal(await evaluate('new URLSearchParams(location.search).get("department")'),department);
+        assert.equal(await evaluate('new URLSearchParams(location.search).has("program")'),false,'Department selection clears program selection');
+        assert.equal(await evaluate('window.__widgetTestToken'),'retained','Department filtering avoids reload');
+        await evaluate('document.querySelector(".gnc-cal-nav").click()');
+        await until(()=>evaluate('new URLSearchParams(location.search).has("evt_month")'),'Month navigation did not finish');
+        assert.equal(await evaluate('new URLSearchParams(location.search).get("department")'),department,'Month navigation preserves department');
+        await evaluate('document.getElementById("calendarProgramToggle").click();document.querySelector(".gnc-calendar-filter-reset").click()');
+        await until(()=>evaluate('!new URLSearchParams(location.search).has("department")'),'Reset did not clear department');
+        assert.equal(await evaluate('new URLSearchParams(location.search).has("program")'),false);
+        await evaluate('document.getElementById("calendarProgramToggle").click()');await delay(250);
+        const screenshot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(os.tmpdir(),'gnci-calendar-widget-'+width+'.png'),Buffer.from(screenshot.data,'base64'));
+        await evaluate('window.scrollTo({top:0,behavior:"instant"})');await until(()=>evaluate('document.getElementById("calendarProgramWidget").getBoundingClientRect().top>innerHeight'),'Widget remains outside calendar');
+        await until(()=>evaluate('document.getElementById("calendarProgramPanel").hidden'),'Panel closes after leaving calendar');
+        await evaluate('window.scrollTo({top:document.documentElement.scrollHeight,behavior:"instant"})');await delay(300);
+        assert.equal(await evaluate('document.getElementById("calendarProgramWidget").getBoundingClientRect().bottom<0'),true,'Widget scrolls away with calendar');
+        console.log('PASS '+width+'px: calendar-only visibility, toggle, panel fit, Escape/outside dismissal, program filtering and no page jump');
+    }
+    console.log('No database changes.');
+})().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
+    if(socket)socket.close();browser.kill();await delay(1000);
+    if(path.dirname(profile)===os.tmpdir()&&path.basename(profile).startsWith('gnci-calendar-widget-'))try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:3,retryDelay:200});}catch{}
+});

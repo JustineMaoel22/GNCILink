@@ -46,6 +46,54 @@ if (in_array($action, $heroStateChanging, true)) {
 
 try {
     switch ($action) {
+        case 'save_department_order':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Please refresh the editor and try again.']);
+                break;
+            }
+            require_once __DIR__ . '/../../components/department-public.php';
+            try {
+                $order = json_decode((string)($_POST['order'] ?? ''), true);
+                if (!is_array($order)) throw new InvalidArgumentException('Invalid department order.');
+                saveDepartmentOrder((string)($_POST['scope'] ?? ''), $order);
+                echo json_encode(['success' => true]);
+            } catch (InvalidArgumentException $e) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+        case 'save_department_page_text':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Please refresh the editor and try again.']);
+                break;
+            }
+            $changes = json_decode((string)($_POST['texts'] ?? ''), true);
+            if (!is_array($changes)) throw new InvalidArgumentException('Invalid department text changes.');
+            $fields = saveDepartmentPageContent((int)($_POST['dept_id'] ?? 0), $changes);
+            echo json_encode(['success' => true, 'fields' => $fields]);
+            break;
+        case 'save_department_office_location':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((string)($_POST['csrf_token'] ?? '')) || ($_SESSION['user_role'] ?? '') !== 'Super Admin') {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Only Super Admin with a valid session can update office locations.']);
+                break;
+            }
+            try {
+                $input = json_decode((string)($_POST['location'] ?? ''), true);
+                if (!is_array($input)) throw new InvalidArgumentException('Invalid office location.');
+                $payload = saveDepartmentOfficeLocation((int)($_POST['dept_id'] ?? 0), $input);
+                echo json_encode(['success' => true, 'department' => $payload]);
+            } catch (InvalidArgumentException $e) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            } catch (Throwable $e) {
+                error_log('Office location save: ' . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Could not save the office location. Check that the office location database migration has been applied.']);
+            }
+            break;
         case 'save_basic_education_content':
             if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) {
                 http_response_code(403);
@@ -86,7 +134,7 @@ try {
 
             $data = [
                 'title'          => trim($_POST['title'] ?? ''),
-                'subtitle'       => trim($_POST['subtitle'] ?? ''),
+                'subtitle'       => richTextNormalize((string)($_POST['subtitle'] ?? '')),
                 'btn1_text'      => trim($_POST['btn1_text'] ?? ''),
                 'btn1_link'      => trim($_POST['btn1_link'] ?? ''),
                 'btn2_text'      => trim($_POST['btn2_text'] ?? ''),
@@ -98,7 +146,7 @@ try {
 
             // Basic length guards to match the reference UI's character limits
             if (mb_strlen($data['title']) > 100)    $data['title']    = mb_substr($data['title'], 0, 100);
-            if (mb_strlen($data['subtitle']) > 150) $data['subtitle'] = mb_substr($data['subtitle'], 0, 150);
+            if (mb_strlen($data['subtitle']) > 150) throw new Exception('The slide description is too long (maximum 150 characters including formatting).');
             if (mb_strlen($data['btn1_text']) > 30) $data['btn1_text'] = mb_substr($data['btn1_text'], 0, 30);
             if (mb_strlen($data['btn2_text']) > 30) $data['btn2_text'] = mb_substr($data['btn2_text'], 0, 30);
 

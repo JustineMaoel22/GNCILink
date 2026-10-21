@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/settings-functions.php';
 /**
  * GNC Admin Panel - Photo check (AI validation for people photos)
  *
@@ -129,6 +130,12 @@ function photoCheckImage(string $path): array {
     if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
         return ['checked' => false, 'ok' => false, 'reason' => 'invalid_image',
                 'message' => 'Please choose a valid JPG, PNG or WEBP photo.'];
+    }
+
+    // Applies to both browser prechecks and upload enforcement, before metadata,
+    // cached verdicts, service availability checks, or any AI request.
+    if (!aiImageCheckerEnabled()) {
+        return ['checked' => false, 'ok' => true, 'reason' => 'disabled', 'message' => ''];
     }
 
     if (is_file($path) && PHOTO_CHECK_BLOCK_AI && ($marker = photoCheckAiMetadata($path)) !== null) {

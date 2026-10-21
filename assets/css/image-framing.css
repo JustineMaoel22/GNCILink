@@ -1,0 +1,22 @@
+.image-frame-dialog { width: min(760px,calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; border: 1px solid #dce5df; border-radius: 16px; padding: 24px; background: #fff; color: #25362b; font: 14px/1.5 Inter,system-ui,sans-serif; box-shadow: 0 20px 70px #0005; }
+.image-frame-dialog::backdrop { background: #10271ec4; }
+.image-frame-dialog h2 { margin: 0 0 8px; font-size: 23px; color: #0b4228; }
+.image-frame-help { margin: 0 0 18px; color: #55655c; }
+.image-frame-preview { position: relative; width: min(100%,calc(55dvh * var(--image-frame-ratio,1.77778))); margin-inline: auto; overflow: hidden; background: #e6ebe7; border-radius: 8px; touch-action: none; cursor: grab; user-select: none; outline-offset: 3px; }
+.image-frame-preview.is-dragging { cursor: grabbing; }
+.image-frame-preview img { position: absolute; display: block; max-width: none !important; max-height: none !important; object-fit: fill !important; pointer-events: none; user-select: none; transform: none !important; }
+.image-frame-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.image-frame-controls input { flex: 1; min-width: 80px; accent-color: #1f5e2c; }
+.image-frame-controls output { min-width: 46px; font-variant-numeric: tabular-nums; }
+.image-frame-dialog button { border: 1px solid #ccd8ce; border-radius: 7px; padding: 8px 14px; background: #f5f8f3; color: #163f28; font: 600 14px/1.4 Inter,system-ui,sans-serif; cursor: pointer; }
+.image-frame-dialog button:disabled { opacity: .55; cursor: wait; }
+.image-frame-dialog .image-frame-save { background: #0b4228; color: #fff; border-color: #0b4228; }
+.image-frame-note { margin: 16px 0 0; font-size: 12px; color: #637167; }
+.image-frame-error { margin: 8px 0 0; color: #a12424; }
+.image-frame-error:empty { display: none; }
+.image-frame-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.image-frame-trigger { position: fixed; z-index: 18000; border: 1px solid #ffffffaa; border-radius: 6px; padding: 7px 12px; background: #0b4228; color: #fff; box-shadow: 0 3px 12px #0004; font: 600 12px/1.4 Inter,system-ui,sans-serif; cursor: pointer; }
+.image-frame-trigger[hidden] { display: none !important; }
+.ve-previewing .image-frame-trigger { display: none !important; }
+.image-frame-dialog :focus-visible,.image-frame-trigger:focus-visible { outline: 3px solid #d3a63a; outline-offset: 3px; }
+@media(max-width:575px) { .image-frame-dialog { padding: 18px; } .image-frame-controls { gap: 7px; } }

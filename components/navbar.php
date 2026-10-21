@@ -47,40 +47,33 @@ $isStudentLife = $activeSection === 'student-life';
 $isNewsAndAnnouncement = $activeSection === 'news-and-announcement';
 $isContactUs = $activeSection === 'contact-us';
 
-/* =============================================================
-   ACADEMICS MENU DATA (single source of truth)
-   -------------------------------------------------------------
-   Used to render BOTH the desktop dropdown and the mobile sidebar,
-   so the structure only has to be edited here.
-
-   - 'href'     : where clicking the label goes. Parent items keep
-                  their own link; the submenu is opened separately
-                  with the chevron button.
-   - 'children' : optional nested items (any depth).
-   - href '#'   : placeholder for pages that don't exist yet. For a
-                  parent item, clicking a '#' label just toggles its
-                  submenu instead of jumping to the top of the page.
-                  Replace '#' with the real route when the page exists.
-   ============================================================= */
+/* Academic categories share one data source between desktop and mobile.
+   College departments/programs are attached from the existing database below. */
 $academicsMenu = [
     [
-        'label'    => 'Basic Education',
-        'href'     => '/pages/academics/basic-edu/basic-edu-dept.php',
+        'label' => 'Basic Education Department',
+        'href' => '/pages/academics/basic-edu/basic-edu-dept.php',
         'children' => [
-            ['label' => 'Junior High School Regular',                        'href' => '/pages/academics/basic-edu/basic-edu-department/jhs-regular.php'],
-            ['label' => 'CASA and Grade School Montessori',   'href' => '/pages/academics/basic-edu/basic-edu-department/casa-gradeschool.php'],
-            ['label' => 'Senior High School Regular',                        'href' => '/pages/academics/basic-edu/basic-edu-department/shs-regular.php'],
-            ['label' => 'High School Montessori',                      'href' => '/pages/academics/basic-edu/basic-edu-department/hs-monte.php'],
+            ['label' => 'CASA and Grade School Montessori', 'href' => '/pages/academics/basic-edu/basic-edu-department/casa-gradeschool.php'],
+            ['label' => 'High School Montessori', 'href' => '/pages/academics/basic-edu/basic-edu-department/hs-monte.php'],
+            ['label' => 'Junior High School Regular', 'href' => '/pages/academics/basic-edu/basic-edu-department/jhs-regular.php'],
+            ['label' => 'Senior High School Regular', 'href' => '/pages/academics/basic-edu/basic-edu-department/shs-regular.php'],
         ],
     ],
     [
-        'label'    => 'College',
-        'href'     => '/pages/academics/college/college-dept.php',
-        // 'children' are filled in from the database below ($gncCollegeItems).
+        'label' => 'College Department',
+        'href' => '/pages/academics/college/college-dept.php',
+        // The existing database loader attaches the college departments here.
     ],
     [
-        'label' => 'Graduate School',
-        'href'  => '/pages/academics/graduate-school/graduate-school.php',
+        'label' => 'Graduate School Department',
+        'href' => '/pages/academics/graduate-school/graduate-school.php',
+        'children' => [
+            ['label' => 'Doctor of Philosophy in Educational Management', 'href' => '/pages/academics/graduate-school/graduate-school.php'],
+            ['label' => 'Master of Arts in Education major in Educational Management', 'href' => '/pages/academics/graduate-school/graduate-school.php'],
+            ['label' => 'Master in Business Administration', 'href' => '/pages/academics/graduate-school/graduate-school.php'],
+            ['label' => 'Master in Public Administration', 'href' => '/pages/academics/graduate-school/graduate-school.php'],
+        ],
     ],
 ];
 
@@ -145,6 +138,17 @@ $gncLoadCollegeMenu = function () use ($gncDeptPage, $gncProgramPage, &$gncFallb
             $deptSlug = trim((string) ($d['slug'] ?? ''));
             if ($deptSlug === '') continue;
 
+            // Graduate School has its own permanent bottom category in Academics.
+            // A legacy or admin-created Graduate School record may be tagged 'college';
+            // do not render that record among the dynamic college departments.
+            $deptName = trim((string) ($d['dept_name'] ?? ''));
+            $normalizedName = strtolower(preg_replace('/[^a-z0-9]+/i', ' ', $deptName));
+            $normalizedSlug = strtolower(preg_replace('/[^a-z0-9]+/i', ' ', $deptSlug));
+            if (preg_match('/\bgraduate\s+school\b/', $normalizedName) ||
+                preg_match('/\bgraduate\s+school\b/', $normalizedSlug)) {
+                continue;
+            }
+
             $item = [
                 'label' => (string) $d['dept_name'],
                 'href'  => $gncDeptPage . '?slug=' . rawurlencode($deptSlug),
@@ -187,12 +191,67 @@ echo '<!-- gnc-nav: college menu from '
 
 if ($gncCollegeItems) {
     foreach ($academicsMenu as &$topItem) {
-        if (($topItem['label'] ?? '') === 'College') {
+        if (($topItem['label'] ?? '') === 'College Department') {
             $topItem['children'] = $gncCollegeItems;
         }
     }
     unset($topItem);
 }
+
+/* Display groups match the requested menu layout. For newly requested links
+   without confirmed standalone routes, reuse an existing page or placeholder. */
+$aboutGroups = [
+    ['heading' => 'About GNCI', 'items' => [
+        ['label' => 'History of GNC', 'href' => '/pages/about/gnc-history.php'],
+        ['label' => 'Vision and Mission', 'href' => '/pages/about/vision-mission.php'],
+        ['label' => 'Core Values', 'href' => '/pages/about/core-values.php'],
+        ['label' => 'Institutional Logo and Meaning', 'href' => '/pages/about/logo-meaning.php'],
+    ]],
+    ['heading' => 'Administration', 'items' => [
+        ['label' => 'Board of Trustees', 'href' => '/pages/about/administration.php?section=board-of-trustees'],
+        ['label' => 'Corporate Officers', 'href' => '/pages/about/administration.php?section=corporate-officers'],
+        ['label' => 'Board of Administration', 'href' => '/pages/about/administration.php?section=board-of-administration'],
+        ['label' => 'Heads of Student Services', 'href' => '/pages/about/administration.php?section=heads-of-student-services'],
+    ], 'overview' => '/pages/about/administration.php'],
+];
+$academicsGroups = [
+    ['heading' => 'Basic Education Department', 'items' => $academicsMenu[0]['children'], 'overview' => $academicsMenu[0]['href']],
+    ['heading' => 'College Department', 'items' => ($academicsMenu[1]['children'] ?? []), 'overview' => $academicsMenu[1]['href']],
+    ['heading' => 'Graduate School', 'items' => $academicsMenu[2]['children'], 'overview' => $academicsMenu[2]['href']],
+];
+$admissionsGroups = [
+    ['heading' => 'Admissions', 'items' => [
+        ['label' => 'Basic Education Admission Requirements', 'href' => '/pages/admission/basic-education-admission-req.php'],
+        ['label' => 'College Admission Requirements', 'href' => '/pages/admission/admission-req.php'],
+    ]],
+    ['heading' => 'Enrollment', 'items' => [
+        ['label' => 'Enrollment Procedures', 'href' => '/pages/admission/enrollment-procedures.php'],
+    ]],
+    ['heading' => 'Finance', 'items' => [
+        ['label' => 'Tuition and Fees', 'href' => '/pages/admission/tuition-fees.php'],
+        ['label' => 'Scholarship Opportunities', 'href' => '/pages/admission/scholarship.php'],
+        ['label' => 'Online Payment Guide', 'href' => '/pages/admission/online-payment-guide.php'],
+    ]],
+];
+$studentLifeGroups = [
+    ['heading' => 'Student Affairs', 'items' => [
+        ['label' => 'Student Organizations and Leadership Programs', 'href' => '/pages/student%20life/student%20organization%20and%20leadership%20program/student-org.php'],
+    ]],
+    ['heading' => 'Campus Life & Activities', 'items' => [
+        ['label' => 'Campus Events', 'href' => '/pages/student%20life/campus-event.php'],
+        ['label' => 'Community Extension Activities', 'href' => '/coming-soon.php'],
+        ['label' => 'Sports and Athletics', 'href' => '/pages/student%20life/athletics-sports.php'],
+    ]],
+    ['heading' => 'Student Resources', 'items' => [
+        ['label' => 'OSA Student Grievance', 'href' => 'https://osaportal.infinityfreeapp.com/', 'target' => '_blank'],
+        ['label' => 'GNCI Library', 'href' => 'https://gnci-libraries.thsite.top/', 'target' => '_blank'],
+        ['label' => 'Frequently Asked Questions', 'href' => '/coming-soon.php'],
+    ]],
+    ['heading' => 'Our Community', 'items' => [
+        ['label' => 'Student Achievements', 'href' => '/pages/student%20life/student-achievement.php'],
+        ['label' => 'Alumni', 'href' => '/coming-soon.php'],
+    ]],
+];
 
 $e = function ($s) {
     return htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
@@ -201,13 +260,20 @@ $e = function ($s) {
 /* Desktop renderer (recursive): link + separate chevron button for parents */
 $renderDesktopMenu = function (array $items) use (&$renderDesktopMenu, $e) {
     foreach ($items as $item) {
+        $attrs = '';
+        if (!empty($item['target'])) {
+            $attrs .= ' target="' . $e($item['target']) . '"';
+            if ($item['target'] === '_blank') {
+                $attrs .= ' rel="noopener noreferrer"';
+            }
+        }
         if (empty($item['children'])) {
-            echo '<li><a class="dropdown-item" href="' . $e($item['href']) . '">' . $e($item['label']) . '</a></li>' . "\n";
+            echo '<li><a class="dropdown-item" href="' . $e($item['href']) . '"' . $attrs . '>' . $e($item['label']) . '</a></li>' . "\n";
             continue;
         }
         echo '<li class="gnc-dropdown-submenu">' . "\n";
         echo '  <div class="gnc-submenu-row">' . "\n";
-        echo '    <a class="dropdown-item" href="' . $e($item['href']) . '">' . $e($item['label']) . '</a>' . "\n";
+        echo '    <a class="dropdown-item" href="' . $e($item['href']) . '"' . $attrs . '>' . $e($item['label']) . '</a>' . "\n";
         echo '    <button type="button" class="gnc-submenu-toggle" aria-haspopup="true" aria-expanded="false" aria-label="Toggle ' . $e($item['label']) . ' submenu">';
         echo '<i class="bi bi-chevron-right" aria-hidden="true"></i></button>' . "\n";
         echo '  </div>' . "\n";
@@ -218,20 +284,39 @@ $renderDesktopMenu = function (array $items) use (&$renderDesktopMenu, $e) {
     }
 };
 
+/* Categorized desktop dropdown: heading, links and thin gold separators. */
+$renderDesktopGroups = function (array $groups) use ($renderDesktopMenu, $e) {
+    foreach ($groups as $i => $group) {
+        if ($i > 0) echo '<li class="gnc-menu-separator" role="separator"></li>' . "\n";
+        echo '<li class="gnc-menu-heading" role="presentation">';
+        if (!empty($group['overview'])) echo '<a href="' . $e($group['overview']) . '">' . $e($group['heading']) . '</a>';
+        else echo $e($group['heading']);
+        echo '</li>' . "\n";
+        $renderDesktopMenu($group['items']);
+    }
+};
+
 /* Mobile renderer (recursive): link + separate chevron button targeting a Bootstrap collapse */
 $mobileSubmenuCount = 0;
 $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e, &$mobileSubmenuCount) {
     echo '<ul class="list-unstyled mb-0">' . "\n";
     foreach ($items as $item) {
+        $attrs = '';
+        if (!empty($item['target'])) {
+            $attrs .= ' target="' . $e($item['target']) . '"';
+            if ($item['target'] === '_blank') {
+                $attrs .= ' rel="noopener noreferrer"';
+            }
+        }
         if (empty($item['children'])) {
-            echo '<li class="gnc-mobile-depth-' . (int) $depth . '"><a href="' . $e($item['href']) . '">' . $e($item['label']) . '</a></li>' . "\n";
+            echo '<li class="gnc-mobile-depth-' . (int) $depth . '"><a href="' . $e($item['href']) . '"' . $attrs . '>' . $e($item['label']) . '</a></li>' . "\n";
             continue;
         }
         $mobileSubmenuCount++;
-        $id = 'mAcademicsSub' . $mobileSubmenuCount;
+        $id = 'mNavSub' . $mobileSubmenuCount;
         echo '<li class="gnc-mobile-depth-' . (int) $depth . '">' . "\n";
         echo '  <div class="gnc-mobile-subrow">' . "\n";
-        echo '    <a href="' . $e($item['href']) . '">' . $e($item['label']) . '</a>' . "\n";
+        echo '    <a href="' . $e($item['href']) . '"' . $attrs . '>' . $e($item['label']) . '</a>' . "\n";
         echo '    <button type="button" class="gnc-mobile-subtoggle" data-bs-toggle="collapse" data-bs-target="#' . $id . '" aria-expanded="false" aria-controls="' . $id . '" aria-label="Toggle ' . $e($item['label']) . ' submenu">';
         echo '<i class="bi bi-chevron-down gnc-chevron" aria-hidden="true"></i></button>' . "\n";
         echo '  </div>' . "\n";
@@ -242,8 +327,28 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
     }
     echo '</ul>' . "\n";
 };
+/* Equivalent category structure in the existing mobile offcanvas. */
+$renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
+    foreach ($groups as $i => $group) {
+        echo '<div class="gnc-mobile-group">';
+        echo '<div class="gnc-mobile-group-title">';
+        if (!empty($group['overview'])) echo '<a href="' . $e($group['overview']) . '">' . $e($group['heading']) . '</a>';
+        else echo $e($group['heading']);
+        echo '</div>';
+        $renderMobileMenu($group['items'], 1);
+        echo '</div>';
+    }
+};
 ?>
 
+<?php include_once __DIR__ . '/image-framing-assets.php'; ?>
+<link rel="stylesheet" href="/assets/css/page-entrance.css?v=<?= filemtime(__DIR__ . '/../assets/css/page-entrance.css') ?>">
+<div id="gncPageEntrance" aria-hidden="true"<?= $isHome ? ' data-opening-title="Guagua National Colleges"' : '' ?>>
+    <i style="--n:0"></i><i style="--n:1"></i><i style="--n:2"></i><i style="--n:3"></i><i style="--n:4"></i><i style="--n:5"></i>
+    <div class="gnc-page-entrance-label"><img src="/assets/images/logos/gnc-logo-v1.svg" alt=""><span></span></div>
+</div>
+<script src="/assets/js/page-entrance.js?v=<?= filemtime(__DIR__ . '/../assets/js/page-entrance.js') ?>"></script>
+<script src="/assets/js/page-skeletons.js?v=<?= filemtime(__DIR__ . '/../assets/js/page-skeletons.js') ?>"></script>
 <nav id="mainNavbar" class="navbar gnc-navbar <?= $isHome ? 'fixed-top is-home' : 'sticky-top' ?> navbar-expand-xl shadow-sm">
     <div class="container">
         <a class="navbar-brand d-flex align-items-center gap-2 me-3" href="/">
@@ -273,11 +378,7 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
                     <a class="nav-link dropdown-toggle <?= $isAbout ? 'active' : '' ?>" href="#" id="aboutDropdown" role="button"
                        data-bs-toggle="dropdown" aria-expanded="false">About</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="aboutDropdown">
-                        <li><a class="dropdown-item" href="/pages/about/gnc-history.php">History of GNC</a></li>
-                        <li><a class="dropdown-item" href="/pages/about/vision-mission.php">Vision and Mission</a></li>
-                        <li><a class="dropdown-item" href="/pages/about/core-values.php">Core Values</a></li>
-                        <li><a class="dropdown-item" href="/pages/about/logo-meaning.php">Institutional Logo and Meaning</a></li>
-                        <li><a class="dropdown-item" href="/pages/about/administration.php">Administration</a></li>
+                        <?php $renderDesktopGroups($aboutGroups); ?>
                     </ul>
                 </li>
 
@@ -285,7 +386,7 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
                     <a class="nav-link dropdown-toggle <?= $isAcademics ? 'active' : '' ?>" href="#" id="academicsDropdown" role="button"
                        data-bs-toggle="dropdown" aria-expanded="false">Academics</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="academicsDropdown">
-                        <?php $renderDesktopMenu($academicsMenu); ?>
+                        <?php $renderDesktopGroups($academicsGroups); ?>
                     </ul>
                 </li>
 
@@ -293,11 +394,7 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
                     <a class="nav-link dropdown-toggle <?= $isAdmissions ? 'active' : '' ?>" href="#" id="admissionsDropdown" role="button"
                        data-bs-toggle="dropdown" aria-expanded="false">Admissions</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="admissionsDropdown">
-                        <li><a class="dropdown-item" href="/pages/admission/admission-req.php">Admission Requirements</a></li>
-                        <li><a class="dropdown-item" href="/pages/admission/enrollment-procedures.php">Enrollment Procedures</a></li>
-                        <li><a class="dropdown-item" href="/admissions/tuition-fees.php">Tuition and Fees</a></li>
-                        <li><a class="dropdown-item" href="/pages/admission/scholarship.php">Scholarship</a></li>
-                        <li><a class="dropdown-item" href="/admissions/faqs.php">FAQs</a></li>
+                        <?php $renderDesktopGroups($admissionsGroups); ?>
                     </ul>
                 </li>
 
@@ -305,12 +402,7 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
                     <a class="nav-link dropdown-toggle <?= $isStudentLife ? 'active' : '' ?>" href="#" id="studentLifeDropdown" role="button"
                        data-bs-toggle="dropdown" aria-expanded="false">Student Life</a>
                     <ul class="dropdown-menu gnc-dropdown-menu" aria-labelledby="studentLifeDropdown">
-                        <li><a class="dropdown-item" href="/student-life/organizations.php">Student Organization</a></li>
-                        <li><a class="dropdown-item" href="/student-life/leadership-programs.php">Student Leadership Programs</a></li>
-                        <li><a class="dropdown-item" href="/student-life/campus-events.php">Campus Events</a></li>
-                        <li><a class="dropdown-item" href="/student-life/community-extension.php">Community Extension Activities</a></li>
-                        <li><a class="dropdown-item" href="/student-life/athletics-sports.php">Athletics and Sports</a></li>
-                        <li><a class="dropdown-item" href="/student-life/achievements.php">Student Achievements</a></li>
+                        <?php $renderDesktopGroups($studentLifeGroups); ?>
                     </ul>
                 </li>
 
@@ -321,21 +413,8 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
                     <a class="nav-link <?= $isContactUs ? 'active' : '' ?>" href="/pages/contact-us.php">Contact Us</a>
                 </li>
 
-                <li class="nav-item d-flex align-items-center">
-                    <button id="search-toggle" class="btn-search" type="button" aria-label="Search">
-                        <i class="bi bi-search"></i>
-                    </button>
-                </li>
-                <li class="nav-item" id="search-box-item" style="display:none;">
-                    <form class="d-flex" action="#" onsubmit="return false;">
-                        <input id="search-input" class="form-control form-control-sm"
-                            type="search" placeholder="Search…" aria-label="Search"
-                            style="min-width:160px;">
-                    </form>
-                </li>
-
                 <li class="nav-item ms-2">
-                    <a class="btn-portal" href="/auth/login.php" target="_blank">
+                    <a class="btn-portal" href="/coming-soon.php" target="_blank">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill" viewBox="0 0 16 16">
                             <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
                         </svg>
@@ -371,13 +450,7 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
                     <i class="bi bi-chevron-down gnc-chevron ms-auto"></i>
                 </a>
                 <div class="collapse gnc-submenu <?= $isAbout ? 'show' : '' ?>" id="mAbout">
-                    <ul class="list-unstyled mb-0">
-                        <li><a href="/pages/about/gnc-history.php">History of GNC</a></li>
-                        <li><a href="/pages/about/vision-mission.php">Vision and Mission</a></li>
-                        <li><a href="/pages/about/core-values.php">Core Values</a></li>
-                        <li><a href="/pages/about/logo-meaning.php">Institutional Logo and Meaning</a></li>
-                        <li><a href="/pages/about/administration.php">Administration</a></li>
-                    </ul>
+                    <?php $renderMobileGroups($aboutGroups); ?>
                 </div>
             </li>
 
@@ -388,7 +461,7 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
                     <i class="bi bi-chevron-down gnc-chevron ms-auto"></i>
                 </a>
                 <div class="collapse gnc-submenu <?= $isAcademics ? 'show' : '' ?>" id="mAcademics">
-                    <?php $renderMobileMenu($academicsMenu, 1); ?>
+                    <?php $renderMobileGroups($academicsGroups); ?>
                 </div>
             </li>
 
@@ -399,13 +472,7 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
                     <i class="bi bi-chevron-down gnc-chevron ms-auto"></i>
                 </a>
                 <div class="collapse gnc-submenu <?= $isAdmissions ? 'show' : '' ?>" id="mAdmissions">
-                    <ul class="list-unstyled mb-0">
-                        <li><a href="/pages/admission/admission-req.php">Admission Requirements</a></li>
-                        <li><a href="/pages/admission/enrollment-procedures.php">Enrollment Procedures</a></li>
-                        <li><a href="/admissions/tuition-fees.php">Tuition and Fees</a></li>
-                        <li><a href="/pages/admission/scholarship.php">Scholarship</a></li>
-                        <li><a href="/admissions/faqs.php">FAQs</a></li>
-                    </ul>
+                    <?php $renderMobileGroups($admissionsGroups); ?>
                 </div>
             </li>
 
@@ -416,14 +483,7 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
                     <i class="bi bi-chevron-down gnc-chevron ms-auto"></i>
                 </a>
                 <div class="collapse gnc-submenu <?= $isStudentLife ? 'show' : '' ?>" id="mStudentLife">
-                    <ul class="list-unstyled mb-0">
-                        <li><a href="/student-life/organizations.php">Student Organization</a></li>
-                        <li><a href="/student-life/leadership-programs.php">Student Leadership Programs</a></li>
-                        <li><a href="/student-life/campus-events.php">Campus Events</a></li>
-                        <li><a href="/student-life/community-extension.php">Community Extension Activities</a></li>
-                        <li><a href="/student-life/athletics-sports.php">Athletics and Sports</a></li>
-                        <li><a href="/student-life/achievements.php">Student Achievements</a></li>
-                    </ul>
+                    <?php $renderMobileGroups($studentLifeGroups); ?>
                 </div>
             </li>
 
@@ -442,13 +502,12 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
             </li>
         </ul>
 
-        <div class="gnc-mobile-search">
-            <i class="bi bi-search"></i>
-            <input type="search" class="gnc-mobile-search-input" placeholder="Search" aria-label="Search">
-        </div>
-
-        <div class="gnc-mobile-portal">
-            <a class="btn-portal w-100 justify-content-center" href="/auth/login.php" target="_blank">
+        <div class="gnc-mobile-portal d-grid gap-2">
+            <a class="btn-portal w-100 justify-content-center" href="https://gnci-libraries.thsite.top/?fbclid=IwY2xjawVC_A5leHRuA2FlbQIxMABwZG9mAWJyaWQRMTNlekFRazQzZkY2ZWNyQXVzcnRjBmFwcF9pZBAyMjIwMzkxNzg4MjAwODkyAAEeyOb2EKxW0Q443KZcj0zm2_x6VkKVkfV1gMkucZ5BGPwP3f2AOGBadXzhc1A_aem__oMGqHHwxj1twlM5m37f_g&amp;i=1#home" target="_blank" rel="noopener noreferrer">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 6c-3-2-6-2-10-1v14c4-1 7-1 10 1 3-2 6-2 10-1V5c-4-1-7-1-10 1Z"/><path d="M12 6v14"/></svg>
+                Library
+            </a>
+            <a class="btn-portal w-100 justify-content-center" href="/coming-soon.php" target="_blank">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill" viewBox="0 0 16 16">
                     <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
                 </svg>
@@ -464,10 +523,7 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
     'use strict';
 
     /* ---------- Desktop: Academics flyouts ---------- */
-    var academicsToggle = document.getElementById('academicsDropdown');
-    var academicsItem = academicsToggle ? academicsToggle.closest('.nav-item') : null;
-
-    if (academicsItem) {
+    document.querySelectorAll('#mainNavbar .nav-item.dropdown').forEach(function (academicsItem) {
         var canHover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
         var toggleOf = function (li) {
@@ -545,7 +601,7 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
 
             // Mouse users: hover opens (CSS); make sure click-opened siblings close and flyouts fit.
             li.addEventListener('mouseenter', function () {
-                if (!canHover) return;
+                if (!canHover || document.documentElement.classList.contains('gnc-editor-preview')) return;
                 closeSiblings(li);
                 position(li);
             });
@@ -553,12 +609,12 @@ $renderMobileMenu = function (array $items, $depth) use (&$renderMobileMenu, $e,
 
         academicsItem.addEventListener('hidden.bs.dropdown', resetAll);
         academicsItem.addEventListener('mouseleave', function () {
-            if (canHover) resetAll();
+            if (canHover && !document.documentElement.classList.contains('gnc-editor-preview')) resetAll();
         });
-    }
+    });
 
     /* ---------- Mobile: placeholder ('#') parent labels toggle their submenu ---------- */
-    document.querySelectorAll('#mAcademics .gnc-mobile-subrow > a').forEach(function (a) {
+    document.querySelectorAll('#mobileNav .gnc-mobile-subrow > a').forEach(function (a) {
         if (a.getAttribute('href') !== '#') return;
         a.addEventListener('click', function (e) {
             e.preventDefault();

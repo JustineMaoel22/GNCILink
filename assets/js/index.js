@@ -1,23 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
 
-    /* ── Search toggle ── */
-    const toggle        = document.getElementById('search-toggle');
-    const searchBoxItem = document.getElementById('search-box-item');
-    const searchInput   = document.getElementById('search-input');
-
-    if (toggle && searchBoxItem && searchInput) {
-        toggle.addEventListener('click', function () {
-            const isVisible = searchBoxItem.style.display === 'flex';
-            searchBoxItem.style.display = isVisible ? 'none' : 'flex';
-            if (!isVisible) searchInput.focus();
-        });
-        document.addEventListener('click', function (e) {
-            if (!toggle.contains(e.target) && !searchBoxItem.contains(e.target)) {
-                searchBoxItem.style.display = 'none';
-            }
-        });
-    }
-
     /* ── Slideshow (supports any number of admin-managed slides) ── */
     const slideshow = document.querySelector('.hero-slideshow');
 
@@ -126,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // program filter dropdown below.
     async function refreshEventsSection(url) {
         const response = await fetch(url);
+        if (!response.ok) throw new Error('Calendar request failed: '+response.status);
         const html = await response.text();
 
         const parser = new DOMParser();
@@ -139,23 +122,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const upcomingCard = document.querySelector('.gnc-upcoming-card');
         if (newUpcoming && upcomingCard) upcomingCard.innerHTML = newUpcoming.innerHTML;
 
+        const newEvents=doc.querySelector('.gnc-evs'), events=document.querySelector('.gnc-evs');
+        if(newEvents&&events)events.innerHTML=newEvents.innerHTML;
+
         window.history.pushState({}, '', url);
+        document.dispatchEvent(new CustomEvent('calendar:updated'));
     }
 
     // Prev/Next month arrows
     document.body.addEventListener('click', async (e) => {
         const navLink = e.target.closest('.gnc-cal-nav');
-        if (!navLink) return;
+        if (!navLink || navLink.getAttribute('aria-disabled')==='true' || !navLink.href) return;
 
         e.preventDefault();
         const url = navLink.href;
+        const currentParams=new URLSearchParams(location.search);
+        const targetUrl=new URL(url);
+        ['program','department'].forEach(key=>{if(currentParams.has(key))targetUrl.searchParams.set(key,currentParams.get(key));});
 
         try {
-            await refreshEventsSection(url);
+            await refreshEventsSection(targetUrl.href);
         } catch (error) {
             console.error('Failed to load calendar:', error);
-            window.location.href = url;
+            window.location.href = targetUrl.href;
         }
+    });
+
+    document.body.addEventListener('click',async e => {
+        const link=e.target.closest('.gnc-programs-list-item,.gnc-departments-list-item,.gnc-calendar-filter-reset,.gnc-evs-head a.gnc-programs-count');
+        if(!link || e.defaultPrevented || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button!==0)return;
+        e.preventDefault();
+        const targetUrl=new URL(link.href),currentParams=new URLSearchParams(location.search);
+        ['evt_month','evt_year'].forEach(key=>{if(currentParams.has(key))targetUrl.searchParams.set(key,currentParams.get(key));});
+        try {await refreshEventsSection(targetUrl.href);}
+        catch(error){console.error('Failed to filter events:',error);window.location.href=link.href;}
     });
 
     // Program filter dropdown — stays exactly where the user is, no reload.

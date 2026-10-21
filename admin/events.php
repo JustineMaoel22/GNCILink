@@ -532,7 +532,7 @@ include __DIR__ . '/../components/header-admin.php';
 <div class="modal fade" id="eventModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-fullscreen-sm-down">
         <div class="modal-content">
-            <form id="eventForm">
+            <form data-content-publish id="eventForm">
                 <input type="hidden" name="ajax_action" id="eventFormAction" value="create">
                 <input type="hidden" name="event_id" id="eventId" value="">
                 <input type="hidden" name="csrf_token" id="csrfToken" value="<?= htmlspecialchars($evtCsrfToken) ?>">

@@ -16,7 +16,7 @@ require_once __DIR__.'/components/recommendation-catalog.php';
 </head><body>
 <?php $activeSection='home'; include __DIR__.'/components/navbar.php'; ?>
 <main class="container py-5" style="max-width:900px">
-    <a href="/#events">&larr; School calendar</a>
+    <a href="/#events" data-back>&larr; School calendar</a>
     <?php if ($event): ?>
     <article class="py-4">
         <p class="text-uppercase text-muted">School event</p>
@@ -30,4 +30,18 @@ require_once __DIR__.'/components/recommendation-catalog.php';
 </main>
 <?php include __DIR__.'/components/footer.php'; ?>
 <script src="/assets/js/bootstrap.bundle.min.js"></script>
+<script>
+(function () {
+    // "Back": return to the page the visitor came from (calendar stays filtered/scrolled as they left it)
+    document.querySelectorAll('a[data-back]').forEach(function (link) {
+        link.addEventListener('click', function (e) {
+            try {
+                if (document.referrer && new URL(document.referrer).origin === location.origin && history.length > 1) {
+                    e.preventDefault(); history.back();
+                }
+            } catch (err) {}
+        });
+    });
+}());
+</script>
 </body></html>

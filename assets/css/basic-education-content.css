@@ -1,0 +1,14 @@
+/* Empty image slots belong to the editor; public pages use saved media only. */
+.be-empty-media { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 140px; border: 2px dashed #9cb6a6; border-radius: 12px; color: #315c42; background: #f0f5f2; font: 600 14px/1.5 Inter, sans-serif; cursor: pointer; }
+.be-empty-media.has-image { border: 0; background: transparent; }
+.dept-principal-photo > .skeleton-wrap, .be-empty-media.dept-principal-img, .dept-program-img > .be-empty-media { height: 100%; }
+.be-empty-media i { font-size: 30px; }
+.be-empty-media:focus-visible { outline: 3px solid #d3a63a; outline-offset: 3px; }
+.dept-about-inner.be-text-only, .dept-principal-grid.be-text-only { grid-template-columns: minmax(0, 1fr); }
+.dept-principal-contacts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 32px; width: 100%; max-width: none; margin-left: 0; margin-right: 0; text-align: left; }
+.dept-principal-contact { min-width: 0; gap: 12px; }
+.dept-principal-contact > div, .dept-principal-contact > span { min-width: 0; }
+.dept-principal-contact > i { flex: 0 0 16px; }
+.dept-principal-contact .dept-contact-value { overflow-wrap: anywhere; }
+.dept-principal-contact.office-location-trigger { padding: 0; }
+@media (max-width: 575px) { .dept-principal-contacts-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; } }

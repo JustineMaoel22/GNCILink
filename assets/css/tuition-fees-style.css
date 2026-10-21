@@ -1,0 +1,198 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+/* Prevent horizontal overflow causing background cutoffs */
+html, body {
+    overflow-x: clip;
+    max-width: 100%;
+}
+
+.tuition-intro,
+.tuition-about,
+.tuition-programs,
+.tuition-dean,
+.tuition-requirements {
+    --gnc-green: #0b4228;
+    --gnc-green-light: #1F5E2C;
+    --gnc-green-dark: #08331e;
+    --gnc-gold: #d3a63a;
+    --gnc-gold-light: #e9b93c;
+    --gnc-maroon: #8f1230;
+    --gnc-cream: #f9f6f1;
+    --gnc-text-dark: #202020;
+    --gnc-text-gray: #6b6b66;
+    --gnc-border: #e6e1d8;
+    font-family: 'Noto Serif', serif;
+}
+
+.tuition-intro,
+.tuition-about {
+    background-color: var(--gnc-cream);
+}
+
+/* ---------- Hero ---------- */
+.tuition-hero {
+    position: relative;
+    background-color: var(--gnc-cream);
+    background-image: url('/assets/images/admission-header.png');
+    background-repeat: no-repeat;
+    background-position: right center;
+    background-size: cover;
+    border-bottom: 1px solid var(--gnc-border);
+}
+
+.tuition-hero-inner {
+    padding: 40px 15px 44px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.tuition-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: white;
+    margin-bottom: 14px;
+}
+
+.tuition-breadcrumb a {
+    color: white;
+    text-decoration: none;
+}
+
+.tuition-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.tuition-breadcrumb i {
+    font-size: 10px;
+    color: white;
+    opacity: 0.8;
+}
+
+.tuition-breadcrumb .tuition-current {
+    color: white;
+}
+
+.tuition-hero h1 {
+    font-family: 'Noto Serif', serif;
+    font-weight: 700;
+    color: var(--gnc-gold);
+    font-size: clamp(28px, 4vw, 40px);
+    margin: 0 0 8px;
+}
+
+.tuition-hero p,.tuition-hero-description {
+    font-family: 'Inter', sans-serif;
+    color: white;
+    font-size: 14px;
+    max-width: 900px;
+    margin: 0;
+}
+
+body { margin: 0; background: #f9f6f1; color: #25362b; }
+.tuition-documents {
+    display: grid; grid-template-columns: 270px minmax(0,1fr); gap: 22px;
+    max-width: 1320px; margin: 0 auto; padding: 36px 20px 64px;
+    font: 14px/1.55 'Inter',system-ui,sans-serif;
+}
+.tuition-documents *, .tuition-documents *::before, .tuition-documents *::after { box-sizing: border-box; }
+.tuition-documents [hidden] { display: none !important; }
+.fee-sidebar,.fee-viewer { min-width: 0; border: 1px solid #e6e1d8; border-radius: 14px; background: #fff; box-shadow: 0 5px 22px #183d2610; }
+.fee-sidebar { padding: 22px 15px; }
+.fee-sidebar h2 { display: flex; align-items: center; gap: 12px; margin: 0 6px 20px; color: #0b4228; font: 700 18px/1.4 'Noto Serif',Georgia,serif; }
+.fee-sidebar h2 i { font-size: 23px; color: #1f5e2c; }
+.fee-search { display: flex; align-items: center; gap: 10px; border: 1px solid #dce4dd; border-radius: 8px; padding: 9px 11px; color: #7b857f; background: #fcfdfb; }
+.fee-search:focus-within { border-color: #b18a29; box-shadow: 0 0 0 3px #e9b93c26; }
+.fee-search input { width: 100%; min-width: 0; padding: 0; background: transparent; border: 0; outline: 0; color: #25362b; font: inherit; font-size: 12px; }
+.fee-categories { display: flex; flex-direction: column; gap: 7px; margin-top: 20px; }
+.fee-category { display: flex; align-items: center; gap: 13px; position: relative; min-height: 48px; padding: 11px 12px; border-radius: 7px; color: #48564c; text-decoration: none; transition: background .15s,color .15s; }
+.fee-category > i:first-child { width: 24px; font-size: 22px; color: #1f5e2c; text-align: center; }
+.fee-category > i:last-child { margin-left: auto; font-size: 12px; }
+.fee-category:hover { background: #f3f6ef; color: #0b4228; }
+.fee-category.is-active { background: #edf3ec; color: #0b4228; font-weight: 700; }
+.fee-category.is-active::before { content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: 3px; background: #d3a63a; }
+.fee-viewer { overflow: hidden; }
+.fee-document-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 20px; border-bottom: 1px solid #e7ebe5; }
+.fee-document-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.fee-pdf-icon { display: flex; align-items: center; justify-content: center; flex: none; width: 36px; height: 44px; font-size: 30px; color: #1f5e2c; }
+.fee-document-info h2 { color: #163f28; font: 700 16px/1.45 'Noto Serif',Georgia,serif; margin: 0 0 3px; overflow-wrap: anywhere; }
+.fee-document-info p { font-size: 12px; color: #788178; margin: 0; }
+.fee-download { display: inline-flex; align-items: center; justify-content: center; flex: none; gap: 8px; border-radius: 8px; padding: 10px 15px; background: #0b4228; color: #fff; text-decoration: none; font-size: 12px; font-weight: 600; transition: background .15s; }
+.fee-download:hover { background: #1f5e2c; color: #fff; }
+.fee-document-stage { position: relative; min-height: 580px; background: #f5f4ef; }
+.fee-editor-manage { margin: 12px 20px; border: 1px dashed #8ba990; border-radius: 8px; padding: 9px 14px; background: #edf3ec; color: #0b4228; cursor: pointer; font: 600 13px Inter,system-ui,sans-serif; }
+.fee-editor-pdf-cover { position: absolute; inset: 0; z-index: 1; cursor: pointer; }
+.ve-previewing .fee-editor-manage,.ve-previewing .fee-editor-pdf-cover { display: none !important; }
+.fee-document-stage iframe { display: block; width: 100%; height: clamp(580px,74vh,850px); border: 0; background: #414846; }
+.fee-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 580px; padding: 44px 28px; text-align: center; background: radial-gradient(ellipse at center,#fff 0%,#f5f4ef 80%); }
+.fee-empty-icon { display: flex; align-items: center; justify-content: center; width: 78px; height: 78px; margin-bottom: 6px; border: 1px solid #e6dfc9; border-radius: 20px; background: #faf6e9; color: #b18a29; font-size: 35px; }
+.fee-empty-label { color: #7a692e; text-transform: uppercase; letter-spacing: .1em; font-size: 11px; font-weight: 700; }
+.fee-empty h3 { margin: 0; font: 700 25px/1.4 'Noto Serif',Georgia,serif; color: #1f5e2c; }
+.fee-empty p,.fee-empty-description { max-width: 380px; margin: 0; color: #778076; line-height: 1.8; }
+.fee-empty a { display: inline-flex; gap: 10px; align-items: center; color: #0b4228; font-weight: 600; text-underline-offset: 4px; margin-top: 6px; }
+.fee-viewer-note { padding: 12px 20px; margin: 0; color: #788178; font-size: 12px; }
+.fee-viewer-note a { color: #1f5e2c; text-underline-offset: 3px; }
+.fee-search-status { color: #778076; padding: 10px 4px; font-size: 12px; }
+.fee-document-list { margin-top: 18px; border-top: 1px solid #e6e1d8; padding-top: 12px; }
+.fee-document-choice { display: block; width: 100%; border: 0; padding: 9px 10px; border-radius: 6px; color: #1f5e2c; background: transparent; text-align: left; font: inherit; font-size: 12px; cursor: pointer; overflow-wrap: anywhere; }
+.fee-document-choice:hover { background: #edf3ec; }
+.tuition-documents a:focus-visible,.tuition-documents button:focus-visible { outline: 3px solid #d3a63a; outline-offset: 3px; }
+@media (max-width: 991px) {
+    .tuition-documents { grid-template-columns: 230px minmax(0,1fr); gap: 16px; padding-inline: 16px; }
+    .fee-document-header { flex-wrap: wrap; padding: 16px; gap: 12px; }
+}
+@media (max-width: 767px) {
+    .tuition-documents { grid-template-columns: minmax(0,1fr); padding: 24px 14px 40px; }
+    .fee-sidebar { padding: 18px 14px; }
+    .fee-sidebar h2 { margin-bottom: 14px; }
+    .fee-categories { flex-direction: row; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .fee-category { flex: 1 1 145px; font-size: 12px; padding: 9px 10px; }
+    .fee-category > i:first-child { font-size: 18px; width: 20px; }
+    .fee-document-stage,.fee-empty { min-height: 400px; }
+    .fee-document-stage iframe { height: 65vh; min-height: 420px; }
+    .fee-empty { padding: 32px 20px; }
+    .fee-empty h3 { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { .fee-category,.fee-download { transition: none; } }
+
+/* Semester policies and payment options. */
+.fee-guidance { grid-column: 1 / -1; min-width: 0; margin-top: 6px; }
+.fee-semester-notice { display: flex; align-items: center; gap: 16px; padding: 18px 22px; border: 1px solid #e6e1d8; border-radius: 7px; background: #fff; }
+.fee-notice-icon,.fee-online-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 54px; height: 54px; border-radius: 50%; }
+.fee-notice-icon { background: #215e30; color: #fff; font-size: 34px; }
+.fee-semester-notice p { margin: 0; color: #333b35; font-size: 13px; }
+.fee-semester-notice .fee-notice-title { margin-bottom: 3px; font-weight: 700; }
+.fee-policy-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 16px; margin: 28px 0; }
+.fee-policy { --policy-color: #176394; min-width: 0; padding: 20px; border-radius: 7px; background: var(--policy-color); color: #fff; }
+.fee-policy-promissory { --policy-color: #215e30; }
+.fee-policy-discounts { --policy-color: #efbf35; color: #3e3210; }
+.fee-policy-refunds { --policy-color: #b92525; }
+.fee-policy-icon { display: flex; align-items: center; justify-content: center; width: 70px; height: 70px; margin: 0 0 18px auto; border-radius: 50%; background: #faf8ef; color: var(--policy-color); font-size: 38px; }
+.fee-policy-discounts .fee-policy-icon { color: #9a7310; }
+.fee-notice-icon .material-symbols-outlined,.fee-policy-icon .material-symbols-outlined,.fee-online-icon .material-symbols-outlined { font-size: inherit; }
+.fee-policy h2 { margin: 0 0 18px; color: inherit; font: 600 19px/1.4 'Inter',system-ui,sans-serif; }
+.fee-policy h2::after { content: ''; display: block; width: 30px; height: 2px; margin-top: 6px; background: currentColor; opacity: .5; }
+.fee-policy-description { font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+.fee-policy-description p { margin: 0 0 16px; }
+.fee-policy-description > :last-child { margin-bottom: 0; }
+.fee-online-payment { display: flex; align-items: center; gap: 18px; padding: 20px 22px; border-radius: 7px; background: #e5e8de; }
+.fee-online-icon { width: 66px; height: 66px; background: #faf8ef; color: #215e30; font-size: 35px; }
+.fee-online-payment h2 { margin: 0 0 4px; color: #215e30; font: 700 14px/1.5 'Inter',system-ui,sans-serif; }
+.fee-online-description { color: #333b35; font-size: 13px; }
+.fee-online-description p { margin: 0; }
+.fee-online-payment a { display: inline-block; margin-top: 8px; color: #215e30; font-size: 12px; font-weight: 700; text-underline-offset: 3px; }
+@media (max-width: 991px) {
+    .fee-policy-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 575px) {
+    .fee-policy-grid { grid-template-columns: minmax(0,1fr); gap: 14px; margin: 20px 0; }
+    .fee-semester-notice,.fee-online-payment { align-items: flex-start; gap: 12px; padding: 18px 16px; }
+    .fee-notice-icon,.fee-online-icon { width: 42px; height: 42px; font-size: 25px; }
+    .fee-policy { padding: 22px; }
+}

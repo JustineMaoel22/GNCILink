@@ -20,12 +20,19 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <?php require_once __DIR__ . '/loading-feedback.php'; ?>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= isset($pageTitle) ? htmlspecialchars($pageTitle) . ' — ' : '' ?>GNC Admin Panel</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/header-admin-style.css">
+    <link rel="stylesheet" href="/assets/css/admin-dialogs.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/admin-dialogs.css') ?>">
+    <script src="/assets/js/admin-dialogs.js?v=<?= (int)filemtime(__DIR__ . '/../assets/js/admin-dialogs.js') ?>"></script>
+    <?php include_once __DIR__ . '/image-framing-assets.php'; ?>
+    <meta name="cms-csrf" content="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="stylesheet" href="/assets/css/content-completeness.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/content-completeness.css') ?>">
+    <script src="/assets/js/content-completeness.js?v=<?= (int)filemtime(__DIR__ . '/../assets/js/content-completeness.js') ?>"></script>
     <style>
         /* Sidebar brand: show the GNC logo instead of the yellow "G" box */
         .sidebar-brand-logo { background: transparent !important; padding: 0 !important; box-shadow: none !important; overflow: visible; }
@@ -129,9 +136,16 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
     <?php endif; ?>
 
     <!-- Administration -->
-    <?php if (hasPermission('manage_users') || hasPermission('view_logs')): ?>
+    <?php if (hasPermission('manage_users') || hasPermission('view_logs') || hasPermission('manage_settings')): ?>
     <div class="sidebar-section-label">Administration</div>
     <ul class="sidebar-nav">
+        <?php if (hasPermission('manage_settings')): ?>
+        <li>
+            <a href="/admin/settings.php" class="sidebar-link <?= $currentPage === 'settings' ? 'active' : '' ?>">
+                <i class="bi bi-gear-fill"></i> Settings
+            </a>
+        </li>
+        <?php endif; ?>
         <?php if (hasPermission('manage_users')): ?>
         <li>
             <a href="/admin/users/" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/users') !== false ? 'active' : '' ?>">

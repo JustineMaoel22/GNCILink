@@ -47,7 +47,7 @@
     if (p) {
       return ['What events are coming up for ' + p + '?', 'Show me ' + p + ' announcements.', 'Tell me about ' + p + '.', 'Where is GNC located?'];
     }
-    return ['What programs does GNC offer?', 'What are the latest announcements?', 'Tell me about BSIT.', 'Where is GNC located?'];
+    return ['What programs does GNC offer?', 'What are the latest announcements?', 'Where is GNC located?'];
   }
 
   /* ------------------------------------------------------------ safe rendering */

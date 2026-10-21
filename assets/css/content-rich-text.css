@@ -1,0 +1,32 @@
+/* Shared typography for content authored in the Visual Editor. */
+.cms-rich { overflow-wrap: anywhere; white-space: normal; }
+.cms-rich p { margin: 0 0 .85em; padding: 0; min-height: 0; font: inherit; color: inherit; }
+.cms-rich > :last-child { margin-bottom: 0; }
+.cms-rich h2,.cms-rich h3,.cms-rich h4 { margin: .8em 0 .4em; color: inherit; line-height: 1.35; }
+.cms-rich h2 { font-size: 1.4em; }.cms-rich h3 { font-size: 1.2em; }.cms-rich h4 { font-size: 1.1em; }
+.cms-rich ul,.cms-rich ol { padding-left: 1.5em; margin: .5em 0 .85em; list-style-position: outside; }
+.cms-rich ul { list-style-type: disc; }.cms-rich ol { list-style-type: decimal; }
+.cms-rich li { margin: .25em 0; }
+.cms-rich blockquote { margin: .75em 0; padding: .25em 1em; border-left: 3px solid #d3a63a; font-style: italic; }
+.cms-rich a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.cms-rich strong { font-weight: 700; }.cms-rich em { font-style: italic; }.cms-rich u { text-decoration: underline; }
+.cms-rich.ve-empty { min-height: 1.5em; }
+.org-lead-heading > .cms-rich,.org-lead-training-content > .cms-rich,.org-lead-callout > .cms-rich { font-size: 13px; }
+.org-lead-training-content > .cms-rich { margin-bottom: 20px; }
+.org-lead-callout > .cms-rich { min-width: 0; }
+.student-org-card-body > .cms-rich { font-size: 12px; line-height: 1.55; margin: 10px 0 0; }
+.student-org-card { position: relative; }
+.student-org-card > .student-org-card-link { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.student-org-card .cms-rich a { position: relative; z-index: 2; }
+.student-org-card > .student-org-card-link:focus-visible { outline: 3px solid #d3a63a; outline-offset: -3px; }
+.basic-edu-card { position: relative; }
+.basic-edu-card > .basic-edu-btn { text-decoration: none; }
+.basic-edu-card > .basic-edu-btn::after { content: ''; position: absolute; inset: 0; z-index: 1; }
+.basic-edu-card .cms-rich a { position: relative; z-index: 2; }
+.basic-edu-card > .basic-edu-btn:focus-visible { outline: 3px solid #d3a63a; outline-offset: -3px; }
+.student-org-hero > .cms-rich,.student-org-hero-inner > .cms-rich,.dynamic-org-hero-inner > .cms-rich { font: 14px/1.7 Inter,system-ui,sans-serif; color: #fff; }
+.org-values > article > .cms-rich { min-height: 32px; color: #2a3830; font-size: 14px; line-height: 1.7; text-align: justify; hyphens: auto; }
+.org-lead-icon img,.org-value-icon img { width: 28px; height: 28px; object-fit: contain; }
+.org-lead-icon .material-symbols-outlined,.org-value-icon .material-symbols-outlined { font-size: 28px; line-height: 1; }
+[data-ve-org-icon] { cursor: pointer; }
+[data-ve-org-icon]:focus-visible { outline: 3px solid #d3a63a; outline-offset: 4px; }

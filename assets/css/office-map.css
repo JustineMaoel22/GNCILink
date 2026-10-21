@@ -1,0 +1,23 @@
+.office-location-trigger{width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;border-radius:12px;transition:background .2s,box-shadow .2s}
+.office-location-trigger>span{min-width:0}.office-location-trigger .dept-contact-value{white-space:normal;overflow-wrap:anywhere}
+.office-location-trigger:hover{background:rgba(9,64,36,.06)}
+.office-location-trigger:focus-visible{outline:3px solid #eaba3b;outline-offset:4px}
+.office-map-modal{padding:0;border:1px solid rgba(9,64,36,.15);border-radius:20px;width:min(1060px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 32px);color:#16221a;background:#f9f6f1;box-shadow:0 24px 80px #0005;overflow:auto;opacity:0;transform:translateY(12px);transition:opacity .18s,transform .18s}
+.office-map-modal.is-open{opacity:1;transform:translateY(0)}
+.office-map-modal::backdrop{background:rgba(10,26,18,.6)}
+.office-map-panel{display:flex;flex-direction:column;height:min(840px,calc(100dvh - 36px));min-height:280px}
+.office-map-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:22px 24px 12px;background:#fff}
+.office-map-eyebrow{color:#567060;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.office-map-header h2{font-size:clamp(20px,3vw,28px);color:#094024;margin:5px 0;overflow-wrap:anywhere}
+.office-map-header p{margin:0;font-size:14px;line-height:1.5;color:#526057;white-space:pre-line;overflow-wrap:anywhere}
+.office-map-close{display:flex;align-items:center;justify-content:center;flex:none;width:40px;height:40px;padding:0;border:1px solid #dce4df;border-radius:50%;background:#fff;color:#094024;line-height:1;cursor:pointer}
+.office-map-close svg{display:block;flex:none;width:20px;height:20px}
+.office-map-close:focus-visible{outline:3px solid #eaba3b;outline-offset:2px}
+.office-map-help{margin:0;padding:10px 24px;font-size:13px;color:#526057}
+.office-map-frame{display:block;width:100%;flex:1;min-height:120px;border:0}
+.office-map-footer{padding:10px 20px;font-size:12px;color:#526057;text-align:center}
+html.office-map-open{overflow:hidden;scrollbar-gutter:stable}
+html.office-map-open body{overflow:clip}
+@media(max-width:560px){.office-map-modal{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);border-radius:14px}.office-map-panel{height:calc(100dvh - 20px)}.office-map-header{padding:16px}.office-map-help{padding:8px 16px}.office-map-footer{font-size:11px;padding:8px 12px}}
+@media(max-height:480px){.office-map-header{padding:8px 16px}.office-map-header h2{font-size:18px}.office-map-eyebrow,.office-map-footer{display:none}.office-map-help{padding:4px 16px}}
+@media(prefers-reduced-motion:reduce){.office-map-modal,.office-location-trigger{transition:none}}

@@ -1,0 +1,20 @@
+.gnc-auto-skeleton-image,.gnc-auto-skeleton-background,.gnc-auto-skeleton-frame {
+    background-color: #e9e5e0;
+    background-image: linear-gradient(90deg,#e9e5e0 25%,#f5f2ee 37%,#e9e5e0 63%) !important;
+    background-size: 400% 100% !important;
+    animation: gnc-page-skeleton-shimmer 1.4s ease infinite;
+}
+.gnc-auto-skeleton-frame {
+    position: absolute; z-index: 2; border-radius: inherit; pointer-events: none;
+}
+@keyframes gnc-page-skeleton-shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .gnc-auto-skeleton-image,.gnc-auto-skeleton-background,.gnc-auto-skeleton-frame { animation: none; }
+}
+@media print {
+    .gnc-auto-skeleton-frame { display: none; }
+    .gnc-auto-skeleton-image,.gnc-auto-skeleton-background { animation: none; background: none !important; }
+}

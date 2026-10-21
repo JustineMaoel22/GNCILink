@@ -17,6 +17,7 @@ if (!function_exists('getDB')) {
     require_once __DIR__ . '/../config/config.php';
 }
 require_once __DIR__ . '/../admin/admin-functions.php';
+require_once __DIR__ . '/department-order.php';
 
 /**
  * Every department keyed by slug.
@@ -271,8 +272,8 @@ function publicDepartmentFacebookEmbedUrl(string $facebookUrl): ?string {
         return null;
     }
     return 'https://www.facebook.com/plugins/page.php?href=' . rawurlencode($facebookUrl)
-        . '&tabs=&width=500&height=150&small_header=false&adapt_container_width=true'
-        . '&hide_cover=false&show_facepile=false';
+        . '&tabs=&width=500&height=130&small_header=false&adapt_container_width=true'
+        . '&hide_cover=true&show_facepile=false&show_posts=false';
 }
 
 /**

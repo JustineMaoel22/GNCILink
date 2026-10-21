@@ -16,6 +16,7 @@ const context = vm.createContext({
     plural: (n, word) => `${n} ${word}`, window: { confirm: () => true, addEventListener() {} },
     run: (label, work) => { pending = work(); },
     sendContent: async (fields, files) => { posted = { fields, files }; return { ok: true }; },
+    confirmPublish(message, done) { done(); },
     reloadEditor() {}, toast(message) { throw Error(message); }
 });
 vm.runInContext(source.slice(source.indexOf('    function EntityAdapter()'), source.indexOf('    function FeedAdapter()')), context);

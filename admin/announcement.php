@@ -369,7 +369,7 @@ include __DIR__ . '/../components/header-admin.php';
 <div class="modal fade" id="announcementModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
     <div class="modal-content">
-      <form method="POST" action="/admin/action/create-announcement.php" enctype="multipart/form-data" id="announcement-form">
+      <form data-content-publish method="POST" action="/admin/action/create-announcement.php" enctype="multipart/form-data" id="announcement-form">
         <div class="modal-header">
           <h5 class="modal-title" id="announcementModalLabel">New Announcement</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -456,14 +456,14 @@ include __DIR__ . '/../components/header-admin.php';
               </select>
             </div>
             <div class="col-12 col-sm-4">
-              <label class="form-label" for="modal-program">Program</label>
-              <select name="program" id="modal-program" class="form-select" required>
+              <label class="form-label" for="modal-program">Program <span class="text-muted fw-normal">(optional)</span></label>
+              <select name="program" id="modal-program" class="form-select" aria-describedby="modal-audience-help">
                 <?php foreach ($programCategories as $code => $label): ?>
                 <option value="<?= htmlspecialchars($code) ?>"><?= $code === 'ALL' ? 'Everyone (all programs)' : htmlspecialchars($code . ' — ' . $label) ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
-            <div class="col-12"><div class="form-text mt-0">Leave Department and Program on "Everyone" if the announcement applies to the whole school.</div></div>
+            <div class="col-12"><div class="form-text mt-0" id="modal-audience-help">Program is optional. Select a department to include all its programs, or leave both on "Everyone" for a school-wide announcement.</div></div>
           </div>
 
           <div class="ann-section-label">Visibility</div>
@@ -802,6 +802,22 @@ const modalTitleInput   = document.getElementById('modal-title');
 const modalCategory     = document.getElementById('modal-category');
 const modalProgram      = document.getElementById('modal-program');
 const modalDept         = document.getElementById('modal-dept');
+function updateAudienceHelp() {
+    const hasDepartment = Boolean(modalDept?.value);
+    const allPrograms = modalProgram?.querySelector('option[value="ALL"]');
+    if (allPrograms) allPrograms.textContent = hasDepartment ? 'All programs in this department' : 'Everyone (all programs)';
+    const help = document.getElementById('modal-audience-help');
+    if (help) help.textContent = hasDepartment
+        ? (modalProgram?.value && modalProgram.value !== 'ALL'
+            ? 'This announcement is limited to the selected department and program. Choose "All programs in this department" to include the whole department.'
+            : 'This announcement applies to all programs in the selected department. Choosing a specific program is optional.')
+        : 'Program is optional. Select a department to include all its programs, or leave both on "Everyone" for a school-wide announcement.';
+}
+modalDept?.addEventListener('change', () => {
+    if (modalProgram) modalProgram.value = 'ALL';
+    updateAudienceHelp();
+});
+modalProgram?.addEventListener('change', updateAudienceHelp);
 const modalStatus       = document.getElementById('modal-status');
 const modalActionInput  = document.getElementById('modal-action');
 const modalIdInput      = document.getElementById('modal-announcement-id');
@@ -849,6 +865,7 @@ function resetModalForm() {
     modalIdInput.value = '';
     if (modalProgram) modalProgram.value = 'ALL';
     if (modalDept) modalDept.value = '';
+    updateAudienceHelp();
     modalLabel.textContent = 'New Announcement';
     modalSaveLabel.textContent = 'Create Announcement';
     modalSaveBtn.disabled = false;
@@ -944,6 +961,7 @@ function openEditModal(btn) {
     if (modalCategory) modalCategory.value = btn.dataset.category || '';
     if (modalProgram) modalProgram.value = btn.dataset.program || 'ALL';
     if (modalDept) modalDept.value = (btn.dataset.dept && btn.dataset.dept !== '0') ? btn.dataset.dept : '';
+    updateAudienceHelp();
     if (modalStatus) modalStatus.value = btn.dataset.status || 'draft';
     updateStatusHelp();
 
@@ -1046,7 +1064,7 @@ modalGalleryInput?.addEventListener('change', () => {
 
 document.getElementById('announcement-form').addEventListener('submit', (e) => {
     document.getElementById('modal-content-input').value = modalQuill.root.innerHTML;
-    if (!modalQuill.getText().trim()) {
+    if (!modalQuill.getText().trim() && !e.target.querySelector('[name="allow_incomplete"][value="1"]')) {
         e.preventDefault();
         annToast('Please write a message for the announcement.', 'error');
         return;
@@ -1117,6 +1135,7 @@ modalRemoveWrap.style.display = 'block';
 <?php endif; ?>
 announcementModal.show();
 <?php endif; ?>
+updateAudienceHelp();
 </script>
 <?php $extraScripts = ob_get_clean(); ?>
 

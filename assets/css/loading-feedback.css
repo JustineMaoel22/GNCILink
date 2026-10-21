@@ -1,0 +1,35 @@
+#gncLoadingFeedback[hidden] { display: none !important; }
+#gncLoadingFeedback {
+    position: fixed;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(16px, env(safe-area-inset-bottom));
+    z-index: 20000;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+    padding: 13px 18px;
+    border: 1px solid #d5e4da;
+    border-radius: 12px;
+    background: #fff;
+    color: #12452c;
+    box-shadow: 0 6px 24px #123c2826;
+    font: 600 14px/1.5 system-ui, sans-serif;
+    pointer-events: none;
+}
+#gncLoadingFeedback::before {
+    content: '';
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    box-sizing: border-box;
+    border: 2px solid #d5e4da;
+    border-top-color: #166534;
+    border-radius: 50%;
+    animation: gncLoadingSpin .8s linear infinite;
+}
+@keyframes gncLoadingSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+    #gncLoadingFeedback::before { animation: none; }
+}

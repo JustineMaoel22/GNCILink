@@ -1,0 +1,50 @@
+[
+  {
+    "key": "gcash",
+    "source": "https://storyset.com/illustration/mobile-payments/rafiki",
+    "download": "https://stories.freepiklabs.com/storage/54519/7140420_Artboard-1.svg",
+    "color": "#176394"
+  },
+  {
+    "key": "banking",
+    "source": "https://storyset.com/illustration/online-transactions/rafiki",
+    "download": "https://stories.freepiklabs.com/storage/38858/Online-Transaction-%281%29_Artboard-1-copy.svg",
+    "color": "#176394"
+  },
+  {
+    "key": "send-receipt",
+    "source": "https://storyset.com/illustration/messaging/rafiki",
+    "download": "https://stories.freepiklabs.com/storage/2057/191-Messaging_Artboard-1.svg",
+    "color": "#215e30"
+  },
+  {
+    "key": "payment-details",
+    "source": "https://storyset.com/illustration/personal-data/rafiki",
+    "download": "https://stories.freepiklabs.com/storage/33988/Personal-Data_Artboard-1.svg",
+    "color": "#215e30"
+  },
+  {
+    "key": "confirmation",
+    "source": "https://storyset.com/illustration/new-message/rafiki",
+    "download": "https://stories.freepiklabs.com/storage/2253/74-New-message_Artboard-1.svg",
+    "color": "#215e30"
+  },
+  {
+    "key": "processing",
+    "source": "https://storyset.com/illustration/processing/rafiki",
+    "download": "https://stories.freepiklabs.com/storage/1204/07-Processing_Artboard-1.svg",
+    "color": "#c99c00"
+  },
+  {
+    "key": "window-3",
+    "source": "https://storyset.com/illustration/cash-payment/rafiki",
+    "download": "https://stories.freepiklabs.com/storage/15897/Cash-payment_Artboard-1.svg",
+    "color": "#c99c00"
+  },
+  {
+    "key": "claim-receipt",
+    "source": "https://storyset.com/illustration/invoice/rafiki",
+    "download": "https://stories.freepiklabs.com/storage/14510/433-Invoice_Artboard-1.svg",
+    "color": "#c99c00"
+  }
+]

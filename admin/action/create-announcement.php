@@ -198,7 +198,7 @@ if ($postAction === 'create' || $postAction === 'update') {
 
     if (empty($errors)) {
         if ($title === '') $errors[] = 'Title is required.';
-        if ($content === '' || strip_tags($content) === '') $errors[] = 'Content is required.';
+        if (($content === '' || strip_tags($content) === '') && ($_POST['allow_incomplete'] ?? '') !== '1') $errors[] = 'Content is required.';
     }
 
     // Super admins approve things themselves, so "Send for approval" is not allowed for them.
@@ -228,6 +228,7 @@ if ($postAction === 'create' || $postAction === 'update') {
             $data = [
                 'title'       => $title,
                 'content'     => $content,
+                'allow_incomplete' => ($_POST['allow_incomplete'] ?? '') === '1',
                 'category_id' => !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
                 'program'     => normalizeProgramCategory($_POST['program'] ?? null),
                 'dept_id'     => $_POST['dept_id'] ?? null, // validated in create/updateAnnouncement

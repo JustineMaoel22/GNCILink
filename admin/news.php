@@ -288,7 +288,7 @@ include __DIR__ . '/../components/header-admin.php';
 <div class="modal fade" id="newsModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
     <div class="modal-content">
-      <form method="POST" action="/admin/action/create-news.php" enctype="multipart/form-data" id="news-form">
+      <form data-content-publish method="POST" action="/admin/action/create-news.php" enctype="multipart/form-data" id="news-form">
         <div class="modal-header">
           <h5 class="modal-title" id="newsModalLabel">New Article</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -849,7 +849,7 @@ modalGalleryInput?.addEventListener('change', () => {
 
 document.getElementById('news-form').addEventListener('submit', (e) => {
     document.getElementById('modal-content-input').value = modalQuill.root.innerHTML;
-    if (!modalQuill.getText().trim()) {
+    if (!modalQuill.getText().trim() && !e.target.querySelector('[name="allow_incomplete"][value="1"]')) {
         e.preventDefault();
         annToast('Please write the story for the article.', 'error');
         return;

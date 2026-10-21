@@ -7,6 +7,7 @@ require_once __DIR__ . '/config/fb-categorizer.php';
 // The shared functions are always loaded: the homepage headings and program cards below are
 // editable in the Content Editor and read through homeText() (original wording until edited).
 require_once __DIR__ . '/admin/admin-functions.php';
+require_once __DIR__ . '/includes/image-dimensions.php';
 cePreviewActive();   // decide preview mode now, before any output (it needs the session)
 
 // ---------------------------------------------------------------
@@ -506,150 +507,18 @@ $publicAnnouncements = array_slice($publicAnnouncements, 0, 3);
 
 // ---------------------------------------------------------------
 // Events calendar (public, published only)
+require_once __DIR__ . '/components/calendar-filters.php';
+$calendarFilters=publicCalendarFilters($_GET);
+$calendarDepartments=$calendarFilters['departments'];
+$programFullNames=$calendarFilters['programs'];
+$selectedDepartment=$calendarFilters['department'];
+$selectedProgram=$calendarFilters['program'];
+$calendarFilterLabel=$calendarFilters['label'];
+$calendarFilterSql=$calendarFilters['condition'];
 // ---------------------------------------------------------------
-$evtMonth = isset($_GET['evt_month']) ? max(1, min(12, (int)$_GET['evt_month'])) : (int)date('n');
-$evtYear  = isset($_GET['evt_year'])  ? (int)$_GET['evt_year']                  : (int)date('Y');
+require __DIR__ . '/components/calendar-month.php';
 
-$evtFirstOfMonth = mktime(0, 0, 0, $evtMonth, 1, $evtYear);
-$evtDaysInMonth  = (int)date('t', $evtFirstOfMonth);
-$evtStartWeekday = (int)date('w', $evtFirstOfMonth); // 0 = Sunday
-$evtMonthLabel   = date('F Y', $evtFirstOfMonth);
-
-$evtPrevMonth = $evtMonth - 1; $evtPrevYear = $evtYear;
-if ($evtPrevMonth < 1) { $evtPrevMonth = 12; $evtPrevYear--; }
-$evtNextMonth = $evtMonth + 1; $evtNextYear = $evtYear;
-if ($evtNextMonth > 12) { $evtNextMonth = 1; $evtNextYear++; }
-
-// ---------------------------------------------------------------
-// Category colors
-// Holiday = yellow, School Event = green, Emergency = red
-// ---------------------------------------------------------------
-function evt_categoryColor(?string $categoryColor, ?string $categoryName = null): string {
-    if (!empty($categoryColor)) return $categoryColor;
-    $name = strtolower(trim($categoryName ?? ''));
-    if (strpos($name, 'holiday') !== false)   return '#EABA3B';
-    if (strpos($name, 'emergency') !== false || strpos($name, 'suspension') !== false) return '#B3312D';
-    if (strpos($name, 'school') !== false)    return '#1F5E2C';
-    return '#6c757d';
-}
-
-try {
-    $evtRangeStart = sprintf('%04d-%02d-01 00:00:00', $evtYear, $evtMonth);
-    $evtRangeEnd   = date('Y-m-d 23:59:59', mktime(0, 0, 0, $evtMonth, $evtDaysInMonth, $evtYear));
-
-    // Overlap condition: include any event that touches this month at all,
-    // not just ones that *start* in it — so multi-day events that started
-    // last month but run into this one still show up.
-    $stmt = $db->prepare("
-        SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, c.category_name, c.category_color
-        FROM events e
-        LEFT JOIN categories c ON e.category_id = c.category_id
-        WHERE e.status = 'published'
-          AND e.start_date <= ?
-          AND COALESCE(e.end_date, e.start_date) >= ?
-        ORDER BY e.start_date ASC
-    ");
-    $stmt->execute([$evtRangeEnd, $evtRangeStart]);
-    $publicMonthEvents = $stmt->fetchAll();
-} catch (Exception $e) {
-    $publicMonthEvents = [];
-}
-
-// Expand each event across every day it spans (clamped to this month),
-// so a "Jul 18 - Jul 20" event gets a chip on the 18th, 19th, and 20th —
-// matching how the admin calendar renders multi-day events.
-$publicEventsByDay = [];
-$evtMonthStartObj = new DateTime(date('Y-m-d', strtotime($evtRangeStart)));
-$evtMonthEndObj   = new DateTime(date('Y-m-d', strtotime($evtRangeEnd)));
-
-foreach ($publicMonthEvents as $ev) {
-    $evStartObj = new DateTime(date('Y-m-d', strtotime($ev['start_date'])));
-    $evEndObj   = new DateTime(date('Y-m-d', strtotime($ev['end_date'] ?: $ev['start_date'])));
-    if ($evEndObj < $evStartObj) $evEndObj = clone $evStartObj; // guard against bad data
-
-    // Clamp the event's span to the days that actually fall within this calendar month
-    $cursor  = $evStartObj > $evtMonthStartObj ? clone $evStartObj : clone $evtMonthStartObj;
-    $lastDay = $evEndObj   < $evtMonthEndObj   ? clone $evEndObj   : clone $evtMonthEndObj;
-
-    while ($cursor <= $lastDay) {
-        $day = (int)$cursor->format('j');
-        $publicEventsByDay[$day][] = $ev;
-        $cursor->modify('+1 day');
-    }
-}
-
-// ---------------------------------------------------------------
-// Program filter for the "Upcoming Events" card
-// ---------------------------------------------------------------
-// Canonical code -> full name list, kept identical to getProgramCategories()
-// in admin-functions.php so names match everywhere on the site.
-$programFullNames = [
-    'ALL'     => 'All Programs',
-    'BEEd'    => 'Bachelor of Elementary Education',
-    'BSEd'    => 'Bachelor of Secondary Education',
-    'BAEL'    => 'Bachelor of Arts in English Language',
-    'BSCE'    => 'Bachelor of Science in Civil Engineering',
-    'BSAIS'   => 'Bachelor of Science in Accounting Information Systems',
-    'BSA'     => 'Bachelor of Science in Accountancy',
-    'BSBA-FM' => 'Bachelor of Science in Business Administration major in Financial Management',
-    'BSCS'    => 'Bachelor of Science in Computer Science',
-    'BSIT'    => 'Bachelor of Science in Information Technology',
-    'BSHM'    => 'Bachelor of Science in Hospitality Management',
-    'BSTM'    => 'Bachelor of Science in Tourism Management',
-    'BSMLS'   => 'Bachelor of Science in Medical Laboratory Science',
-    'BSPh'    => 'Bachelor of Science in Pharmacy',
-    'BSN'     => 'Bachelor of Science in Nursing',
-];
-
-// A specific program is "selected" when ?program=CODE is a real, known
-// code and isn't the 'ALL' placeholder. Anything unrecognized (missing,
-// tampered, typo'd) safely falls back to no filter at all — same
-// fail-safe pattern as normalizeProgramCategory() in admin-functions.php.
-$selectedProgram = $_GET['program'] ?? null;
-if ($selectedProgram === 'ALL' || !isset($programFullNames[$selectedProgram])) {
-    $selectedProgram = null;
-}
-
-// Time is optional on events; 00:00:00 means "no time set".
-function evt_timeLabel($dt) {
-    if (empty($dt)) return '';
-    $ts = strtotime($dt);
-    return date('H:i:s', $ts) !== '00:00:00' ? date('g:i A', $ts) : '';
-}
-
-// Upcoming events (next 3 published, from today onward, any month;
-// filtered to $selectedProgram when one is chosen)
-try {
-    if ($selectedProgram !== null) {
-        // A specific program is selected: show ONLY events tagged with
-        // that exact program code. General ('ALL') / other-program events
-        // do not appear here.
-        $stmt = $db->prepare("
-            SELECT e.event_id, e.title, e.location, e.start_date, e.end_date, e.program, c.category_name, c.category_color
-            FROM events e
-            LEFT JOIN categories c ON e.category_id = c.category_id
-            WHERE e.status = 'published' AND e.start_date >= ? AND e.program = ?
-            ORDER BY e.start_date ASC
-            LIMIT 3
-        ");
-        $stmt->execute([date('Y-m-d 00:00:00'), $selectedProgram]);
-    } else {
-        // No program selected: the general/College Department view,
-        // unfiltered, same behavior as before this feature existed.
-        $stmt = $db->prepare("
-            SELECT e.event_id, e.title, e.location, e.start_date, e.end_date, e.program, c.category_name, c.category_color
-            FROM events e
-            LEFT JOIN categories c ON e.category_id = c.category_id
-            WHERE e.status = 'published' AND e.start_date >= ?
-            ORDER BY e.start_date ASC
-            LIMIT 3
-        ");
-        $stmt->execute([date('Y-m-d 00:00:00')]);
-    }
-    $upcomingEvents = $stmt->fetchAll();
-} catch (Exception $e) {
-    $upcomingEvents = [];
-}
+require __DIR__ . '/components/calendar-upcoming-data.php';
 
 // ---------------------------------------------------------------
 // Fetch programs for the homepage "Programs" card
@@ -715,7 +584,8 @@ try {
     <link href="assets/css/base-style.css" rel="stylesheet">
     <link href="assets/css/navbar-style.css" rel="stylesheet">
     <link href="assets/css/footer-style.css" rel="stylesheet">
-    <link href="assets/css/index-style.css?v=12" rel="stylesheet">
+    <link href="assets/css/index-style.css?v=<?= filemtime(__DIR__ . '/assets/css/index-style.css') ?>" rel="stylesheet">
+    <link href="assets/css/calendar-program-widget.css?v=<?= filemtime(__DIR__ . '/assets/css/calendar-program-widget.css') ?>" rel="stylesheet">
     <link href="assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="icon" type="image/x-icon" href="assets/images/logos/gnc-logo-v1.svg">
@@ -905,7 +775,7 @@ try {
                         <h1 class="hero-title-line"<?= ceMark('data-ve-field="slide-title2" data-ve-max="50" data-ve-ph="Second line (optional)" data-ve-label="Headline, second line"') ?>><?= htmlspecialchars($titleLines[1]) ?></h1>
                     <?php endif; ?>
                     <?php if (!empty($slide['subtitle']) || cePreviewActive()): ?>
-                        <p class="hero-desc"<?= ceMark('data-ve-field="slide-subtitle" data-ve-max="150" data-ve-multiline="1" data-ve-ph="Add a short description" data-ve-label="Description"') ?>><?= nl2br(htmlspecialchars($slide['subtitle'])) ?></p>
+                        <div class="hero-desc cms-rich"<?= ceMark('data-ve-field="slide-subtitle" data-ve-max="150" data-ve-multiline="1" data-ve-rich="1" data-ve-ph="Add a short description" data-ve-label="Description"') ?>><?= renderSectionContent($slide['subtitle']) ?></div>
                     <?php endif; ?>
                     <?php if ($hasButtons): ?>
                     <div class="hero-ctas">
@@ -955,9 +825,9 @@ try {
     // The three GNC pillars. Rendered as a looping marquee (2 identical groups,
     // each holding the set twice, so the -50% loop is seamless on wide screens).
     $gncPillars = [
-        ['name' => 'FIDES',    'bg' => 'fides-bg',    'icon' => 'assets/images/svg/church.svg', 'desc' => "Faith in God and One's Self."],
-        ['name' => 'SCIENTIA', 'bg' => 'scientia-bg', 'icon' => 'assets/images/svg/book.svg',   'desc' => 'Search for Truth and Knowledge.'],
-        ['name' => 'PATRIA',   'bg' => 'patria-bg',   'icon' => 'assets/images/svg/swords.svg', 'desc' => 'Love for Country.'],
+        ['name' => 'FIDES',    'bg' => 'fides-bg',    'icon' => 'assets/images/svg/Fides%20Symbol.svg',    'desc' => "Faith in God and One's Self."],
+        ['name' => 'SCIENTIA', 'bg' => 'scientia-bg', 'icon' => 'assets/images/svg/Scientia%20Symbol.svg', 'desc' => 'Search for Truth and Knowledge.'],
+        ['name' => 'PATRIA',   'bg' => 'patria-bg',   'icon' => 'assets/images/svg/Patria%20Symbol.svg',   'desc' => 'Love for Country.'],
     ];
 ?>
     <div class="gnc-pillars">
@@ -970,7 +840,7 @@ try {
                             $dup = ($g > 0 || $rep > 0); ?>
                         <li class="pillar-word<?= $dup ? ' is-dup' : '' ?>"<?= $dup ? ' aria-hidden="true"' : '' ?> title="<?= htmlspecialchars($p['desc']) ?>">
                             <span class="pillar-badge <?= $p['bg'] ?>">
-                                <img src="<?= $p['icon'] ?>" alt="" class="pillar-icon-img" loading="lazy" decoding="async">
+                                <img src="<?= $p['icon'] ?>" alt="" class="pillar-icon-img" width="64" height="64" loading="lazy" decoding="async">
                             </span>
                             <span class="pillar-label">
                                 <span class="pillar-text"><?= $p['name'] ?></span>
@@ -989,7 +859,7 @@ try {
         <div class="container gnc-news-wrap">
             <div class="gnc-news-head gnc-reveal">
                 <h2 class="gnc-news-heading"><i class="bi <?= homeIconClass('news_icon') ?> gnc-news-icon"<?= homeIconMark('news_icon') ?>></i><?= homeTextHtml('news_heading') ?><span<?= homeTextMark('news_subheading', true) ?>><?= homeTextBr('news_subheading') ?></span></h2>
-                <p class="gnc-news-sub"<?= homeTextMark('news_intro') ?>><?= htmlspecialchars(homeText('news_intro')) ?></p>
+                <div class="gnc-news-sub cms-rich"<?= homeTextMark('news_intro') ?>><?= renderSectionContent(homeText('news_intro')) ?></div>
             </div>
 
             <?php if (!empty($pinnedFeedItems)): ?>
@@ -1009,7 +879,7 @@ try {
                     ?>
                     <article class="gnc-pin-slide<?= $i === 0 ? ' is-active' : '' ?>" data-index="<?= $i ?>" aria-label="<?= ($i + 1) ?> of <?= $pinCount ?>"<?= (!$isFbPin && !empty($pin['id'])) ? ceManageMark('data-ve-post="' . $pinKind . '" data-ve-id="' . (int)$pin['id'] . '" data-ve-label="' . htmlspecialchars($pinTitle, ENT_QUOTES) . '"') : '' ?>>
                         <?php if (!empty($pin['image_path'])): ?>
-                        <img class="gnc-pin-img" src="<?= htmlspecialchars($pin['image_path']) ?>" alt="" loading="<?= $i === 0 ? 'eager' : 'lazy' ?>" decoding="async">
+                        <img class="gnc-pin-img" src="<?= htmlspecialchars($pin['image_path']) ?>" alt=""<?= gncImageDimensionAttributes($pin['image_path'],1280,720) ?> loading="<?= $i === 0 ? 'eager' : 'lazy' ?>" decoding="async">
                         <?php else: ?>
                         <div class="gnc-pin-fallback">
                             <i class="bi <?= $isFbPin ? 'bi-facebook' : ($pin['type_label'] === 'News' ? 'bi-newspaper' : 'bi-megaphone') ?>"></i>
@@ -1055,7 +925,7 @@ try {
                         <?php if (!empty($item['image_path'])): ?>
                         <img src="<?= htmlspecialchars($item['image_path']) ?>"
                              alt="<?= htmlspecialchars($item['title'] ?? 'Facebook post') ?>"
-                             loading="lazy" decoding="async">
+                             <?= gncImageDimensionAttributes($item['image_path'],1280,720) ?> loading="lazy" decoding="async">
                         <?php else: ?>
                         <div class="gnc-news-img-fallback"><i class="bi <?= $fallbackIcon ?>"></i></div>
                         <?php endif; ?>
@@ -1087,160 +957,25 @@ try {
 
     <section class="gnc-cal-sec" id="events">
         <div class="container">
+            <div class="gnc-cal-heading-row">
             <div class="gnc-cal-head gnc-reveal">
                 <span class="gnc-cal-kicker"><i class="bi <?= homeIconClass('calendar_icon') ?>"<?= homeIconMark('calendar_icon') ?>></i> <?= homeTextHtml('calendar_kicker') ?></span>
                 <h2 class="gnc-cal-heading"><?= homeTextHtml('calendar_heading') ?> <span<?= homeTextMark('calendar_accent') ?>><?= htmlspecialchars(homeText('calendar_accent')) ?></span></h2>
-                <p class="gnc-cal-sub"<?= homeTextMark('calendar_intro') ?>><?= htmlspecialchars(homeText('calendar_intro')) ?></p>
+                <div class="gnc-cal-sub cms-rich"<?= homeTextMark('calendar_intro') ?>><?= renderSectionContent(homeText('calendar_intro')) ?></div>
+            </div>
+                <?php include __DIR__ . '/components/calendar-program-filter.php'; ?>
             </div>
 
-            <div class="gnc-evs gnc-reveal">
-                <div class="gnc-evs-head">
-                    <span class="gnc-evs-title"><i class="bi bi-calendar-event-fill"></i> <?= homeTextHtml('events_label') ?></span>
-                    <?php if ($selectedProgram !== null): ?>
-                        <a href="?#events" class="gnc-programs-count text-decoration-none">
-                            <?= htmlspecialchars($selectedProgram) ?> &times;
-                        </a>
-                    <?php endif; ?>
+            <div class="row g-4 gnc-calendar-layout">
+                <div class="col-lg-8 gnc-reveal">
+                    <?php include __DIR__ . '/components/calendar-card.php'; ?>
+                </div>
+                <div class="col-lg-4">
+                    <?php include __DIR__ . '/components/calendar-upcoming-card.php'; ?>
                 </div>
 
-                <?php if (empty($upcomingEvents)): ?>
-                    <p class="gnc-evs-empty">
-                        <?php if ($selectedProgram !== null): ?>
-                            No upcoming events for <?= htmlspecialchars($selectedProgram) ?> at this time.
-                        <?php else: ?>
-                            No upcoming events at this time.
-                        <?php endif; ?>
-                    </p>
-                <?php else: ?>
-                <div class="gnc-evs-grid">
-                    <?php foreach ($upcomingEvents as $ev):
-                        $evStartTs = strtotime($ev['start_date']);
-                        $evEndTs   = !empty($ev['end_date']) ? strtotime($ev['end_date']) : null;
-                        $stLabel   = evt_timeLabel($ev['start_date']);
-                        $enLabel   = evt_timeLabel($ev['end_date'] ?? null);
-                        $multiDay  = $evEndTs !== null && date('Y-m-d', $evEndTs) !== date('Y-m-d', $evStartTs);
 
-                        if ($multiDay) {
-                            $whenLabel = date('M j', $evStartTs) . ' – ' . date('M j', $evEndTs);
-                        } elseif ($stLabel !== '') {
-                            $whenLabel = $stLabel . ($enLabel !== '' ? ' - ' . $enLabel : '');
-                        } else {
-                            $whenLabel = 'All Day';
-                        }
-                    ?>
-                    <div class="gnc-evs-item" style="--evt-color: <?= evt_categoryColor($ev['category_color'] ?? null, $ev['category_name'] ?? null) ?>;"<?= ceManageMark('data-ve-post="event" data-ve-id="' . (int)($ev['event_id'] ?? 0) . '" data-ve-date="' . htmlspecialchars(date('Y-m', $evStartTs), ENT_QUOTES) . '" data-ve-label="' . htmlspecialchars((string)($ev['title'] ?? 'Event'), ENT_QUOTES) . '"') ?>>
-                        <div class="gnc-datebox">
-                            <span class="gnc-datebox-day"><?= date('j', $evStartTs) ?></span>
-                            <span class="gnc-datebox-mon"><?= strtoupper(date('M', $evStartTs)) ?></span>
-                        </div>
-                        <div class="gnc-evs-info">
-                            <div class="gnc-evs-name"><?= htmlspecialchars($ev['title']) ?></div>
-                            <div class="gnc-evs-meta"><i class="bi bi-clock"></i> <?= htmlspecialchars($whenLabel) ?></div>
-                            <?php if (!empty($ev['location'])): ?>
-                            <div class="gnc-evs-meta"><i class="bi bi-geo-alt"></i> <?= htmlspecialchars($ev['location']) ?></div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-                <?php endif; ?>
-            </div>
 
-            <div class="row g-4">
-                <div class="col-lg-7 gnc-reveal">
-                    <div class="gnc-cal-card">
-                        <div class="gnc-cal-header">
-                            <a href="?evt_month=<?= $evtPrevMonth ?>&evt_year=<?= $evtPrevYear ?>#events" class="gnc-cal-nav">
-                                <i class="bi bi-chevron-left"></i>
-                            </a>
-                            <span class="gnc-cal-title"><?= htmlspecialchars(date('F', $evtFirstOfMonth)) ?> <span><?= htmlspecialchars(date('Y', $evtFirstOfMonth)) ?></span></span>
-                            <a href="?evt_month=<?= $evtNextMonth ?>&evt_year=<?= $evtNextYear ?>#events" class="gnc-cal-nav">
-                                <i class="bi bi-chevron-right"></i>
-                            </a>
-                        </div>
-
-                        <div class="gnc-cal-grid">
-                            <?php foreach (['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as $dow): ?>
-                                <div class="gnc-cal-dow"><?= $dow ?></div>
-                            <?php endforeach; ?>
-
-                            <?php for ($i = 0; $i < $evtStartWeekday; $i++): ?>
-                                <div class="gnc-cal-cell gnc-cal-empty"></div>
-                            <?php endfor; ?>
-
-                            <?php for ($day = 1; $day <= $evtDaysInMonth; $day++):
-                                $isToday = ($day == (int)date('j') && $evtMonth == (int)date('n') && $evtYear == (int)date('Y'));
-                                $dayEvents = $publicEventsByDay[$day] ?? [];
-                                $dayHasEvent = !empty($dayEvents);
-                                $dayTitles = $dayHasEvent ? implode("\n", array_map(function ($e) {
-                                    $t = evt_timeLabel($e['start_date']);
-                                    return $e['title'] . ($t !== '' ? ' (' . $t . ')' : '');
-                                }, $dayEvents)) : '';
-                                $visibleEvents = array_slice($dayEvents, 0, 2);
-                                $extraCount = count($dayEvents) - count($visibleEvents);
-                            ?>
-                                <div class="gnc-cal-cell<?= $isToday ? ' gnc-cal-today' : '' ?><?= $dayHasEvent ? ' gnc-cal-hasevent' : '' ?>"
-                                     <?= $dayHasEvent ? 'title="' . htmlspecialchars($dayTitles) . '"' : '' ?>>
-                                    <span class="gnc-cal-daynum"><?= $day ?></span>
-                                    <?php if ($dayHasEvent): ?>
-                                        <div class="gnc-cal-events">
-                                            <?php foreach ($visibleEvents as $e):
-                                                $c = evt_categoryColor($e['category_color'] ?? null, $e['category_name'] ?? null);
-                                            ?>
-                                                <span class="gnc-cal-event-chip" style="background:<?= $c ?>22; color:<?= $c ?>;">
-                                                    <?= htmlspecialchars($e['title']) ?>
-                                                </span>
-                                            <?php endforeach; ?>
-                                            <?php if ($extraCount > 0): ?>
-                                                <span class="gnc-cal-event-more">+<?= $extraCount ?> more</span>
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endfor; ?>
-                        </div>
-
-                        <div class="gnc-cal-legend">
-                            <span><span class="gnc-cal-dot" style="background:#EABA3B;"></span> Holiday</span>
-                            <span><span class="gnc-cal-dot" style="background:#1F5E2C;"></span> School Event</span>
-                            <span><span class="gnc-cal-dot" style="background:#B3312D;"></span> Emergency</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-lg-5 gnc-reveal">
-                    <div class="gnc-events-side-stack">
-                    <div class="gnc-upcoming-card">
-                        <div class="gnc-upcoming-header d-flex align-items-center justify-content-between">
-                            <span><i class="bi bi-mortarboard-fill"></i> Programs</span>
-                            <?php if (!empty($homePrograms)): ?>
-                                <span class="gnc-programs-count"><?= count($homePrograms) ?></span>
-                            <?php endif; ?>
-                        </div>
-                        <div class="gnc-programs-list">
-                            <?php if (empty($homePrograms)): ?>
-                                <p class="text-muted px-3 py-4 mb-0">No programs available at this time.</p>
-                            <?php else: foreach ($homePrograms as $prog):
-                                $code      = $prog['program_code'];
-                                $full      = $programFullNames[$code] ?? null;
-                                $isActive  = ($selectedProgram === $code);
-                                // Clicking a program filters the Upcoming Events card above to
-                                // that exact program (?program=CODE), on this same page — no
-                                // redirect anywhere. Clicking an already-active program clears
-                                // the filter back to the general view.
-                                $progUrl = $isActive ? '?#events' : '?program=' . rawurlencode($code) . '#events';
-                            ?>
-                                <a href="<?= htmlspecialchars($progUrl) ?>" class="gnc-programs-list-item text-decoration-none<?= $isActive ? ' gnc-programs-list-item-active' : '' ?>">
-                                    <span class="gnc-programs-code"><?= htmlspecialchars($code) ?></span>
-                                    <?php if ($full): ?>
-                                        <span class="gnc-programs-list-fullname"><?= htmlspecialchars($full) ?></span>
-                                    <?php endif; ?>
-                                </a>
-                            <?php endforeach; endif; ?>
-                        </div>
-                    </div>
-                    </div>
-                </div>
             </div>
         </div>
     </section>
@@ -1272,14 +1007,14 @@ try {
         <div class="container gnc-prog-wrap">
             <div class="gnc-prog-head gnc-reveal">
                 <h2 class="gnc-prog-heading"><i class="bi <?= homeIconClass('programs_icon') ?> gnc-prog-icon"<?= homeIconMark('programs_icon') ?>></i><?= homeTextHtml('programs_heading') ?><span<?= homeTextMark('programs_subheading', true) ?>><?= homeTextBr('programs_subheading') ?></span></h2>
-                <p class="gnc-prog-sub"<?= homeTextMark('programs_intro') ?>><?= htmlspecialchars(homeText('programs_intro')) ?></p>
+                <div class="gnc-prog-sub cms-rich"<?= homeTextMark('programs_intro') ?>><?= renderSectionContent(homeText('programs_intro')) ?></div>
             </div>
 
             <div class="gnc-prog-row gnc-reveal">
                 <div class="gnc-prog-img lazy-bg" data-bg="<?= htmlspecialchars(homeText('programs_1_image')) ?>" role="img" aria-label="<?= htmlspecialchars(homeText('programs_1_title')) ?>"<?= ceMark('data-ve-img="home-image" data-ve-key="programs_1_image" data-ve-label="Program 1 picture"') ?>></div>
                 <div class="gnc-prog-text">
                     <h3 class="gnc-prog-title"<?= homeTextMark('programs_1_title') ?>><?= htmlspecialchars(homeText('programs_1_title')) ?></h3>
-                    <p class="gnc-prog-desc"<?= homeTextMark('programs_1_text') ?>><?= htmlspecialchars(homeText('programs_1_text')) ?></p>
+                    <div class="gnc-prog-desc cms-rich"<?= homeTextMark('programs_1_text') ?>><?= renderSectionContent(homeText('programs_1_text')) ?></div>
                     <a href="<?= htmlspecialchars(homeText('programs_1_link')) ?>" class="gnc-prog-btn"<?= ceMark('data-ve-btn="1" data-ve-linkkey="programs_1_link" data-ve-link="' . ceAttr(homeText('programs_1_link')) . '"') ?>><?= homeTextHtml('programs_1_button') ?></a>
                 </div>
             </div>
@@ -1288,7 +1023,7 @@ try {
                 <div class="gnc-prog-img lazy-bg" data-bg="<?= htmlspecialchars(homeText('programs_2_image')) ?>" role="img" aria-label="<?= htmlspecialchars(homeText('programs_2_title')) ?>"<?= ceMark('data-ve-img="home-image" data-ve-key="programs_2_image" data-ve-label="Program 2 picture"') ?>></div>
                 <div class="gnc-prog-text">
                     <h3 class="gnc-prog-title"<?= homeTextMark('programs_2_title') ?>><?= htmlspecialchars(homeText('programs_2_title')) ?></h3>
-                    <p class="gnc-prog-desc"<?= homeTextMark('programs_2_text') ?>><?= htmlspecialchars(homeText('programs_2_text')) ?></p>
+                    <div class="gnc-prog-desc cms-rich"<?= homeTextMark('programs_2_text') ?>><?= renderSectionContent(homeText('programs_2_text')) ?></div>
                     <a href="<?= htmlspecialchars(homeText('programs_2_link')) ?>" class="gnc-prog-btn"<?= ceMark('data-ve-btn="1" data-ve-linkkey="programs_2_link" data-ve-link="' . ceAttr(homeText('programs_2_link')) . '"') ?>><?= homeTextHtml('programs_2_button') ?></a>
                 </div>
             </div>
@@ -1297,7 +1032,7 @@ try {
                 <div class="gnc-prog-img lazy-bg" data-bg="<?= htmlspecialchars(homeText('programs_3_image')) ?>" role="img" aria-label="<?= htmlspecialchars(homeText('programs_3_title')) ?>"<?= ceMark('data-ve-img="home-image" data-ve-key="programs_3_image" data-ve-label="Program 3 picture"') ?>></div>
                 <div class="gnc-prog-text">
                     <h3 class="gnc-prog-title"<?= homeTextMark('programs_3_title') ?>><?= htmlspecialchars(homeText('programs_3_title')) ?></h3>
-                    <p class="gnc-prog-desc"<?= homeTextMark('programs_3_text') ?>><?= htmlspecialchars(homeText('programs_3_text')) ?></p>
+                    <div class="gnc-prog-desc cms-rich"<?= homeTextMark('programs_3_text') ?>><?= renderSectionContent(homeText('programs_3_text')) ?></div>
                     <a href="<?= htmlspecialchars(homeText('programs_3_link')) ?>" class="gnc-prog-btn"<?= ceMark('data-ve-btn="1" data-ve-linkkey="programs_3_link" data-ve-link="' . ceAttr(homeText('programs_3_link')) . '"') ?>><?= homeTextHtml('programs_3_button') ?></a>
                 </div>
             </div>
@@ -1318,7 +1053,7 @@ try {
                     <div class="gnc-president-card">
                         <div class="gnc-president-photo-wrap">
                             <div class="gnc-president-seal"></div>
-                            <img src="<?= htmlspecialchars($president['photo_url']) ?>" alt="<?= htmlspecialchars($president['name']) ?>" class="gnc-president-photo" loading="lazy" decoding="async"<?= ceMark('data-ve-img="pres-photo" data-ve-label="President photo"') ?>>
+                            <img src="<?= htmlspecialchars($president['photo_url']) ?>" alt="<?= htmlspecialchars($president['name']) ?>" class="gnc-president-photo"<?= gncImageDimensionAttributes($president['photo_url'],300,380) ?> loading="lazy" decoding="async"<?= ceMark('data-ve-img="pres-photo" data-ve-label="President photo"') ?>>
                         </div>
                         <div class="gnc-president-nameplate">
                             <p class="gnc-president-name"<?= ceMark('data-ve-field="pres-name" data-ve-max="255" data-ve-ph="Name" data-ve-label="Name"') ?>><?= htmlspecialchars($president['name']) ?></p>
@@ -1334,11 +1069,7 @@ try {
 
                     <p class="gnc-president-greeting"<?= ceMark('data-ve-field="pres-greeting" data-ve-max="255" data-ve-ph="Greeting" data-ve-label="Greeting"') ?>><?= htmlspecialchars($president['greeting']) ?></p>
 
-                    <?php if (cePreviewActive()): ?><div data-ve-field="pres-message" data-ve-blocks="1" data-ve-multiline="1" data-ve-max="5000" data-ve-ph="Write the message" data-ve-label="Message"><?php endif; ?>
-                    <?php foreach (preg_split('/\R{2,}/', trim($president['message'])) as $para): ?>
-                    <p class="gnc-president-quote"><?= nl2br(htmlspecialchars(trim($para))) ?></p>
-                    <?php endforeach; ?>
-                    <?php if (cePreviewActive()): ?></div><?php endif; ?>
+                    <div class="gnc-president-quote cms-rich"<?= ceMark('data-ve-field="pres-message" data-ve-rich="1" data-ve-multiline="1" data-ve-max="5000" data-ve-ph="Write the message" data-ve-label="Message"') ?>><?= renderSectionContent($president['message']) ?></div>
                 </div>
             </div>
         </div>
@@ -1348,7 +1079,7 @@ try {
         <div class="container">
             <div class="gnc-programs-header lazy-bg gnc-reveal">
                 <h2 class="gnc-section-title" style="color: #1F5E2C;"<?= homeTextMark('campus_heading') ?>><?= htmlspecialchars(homeText('campus_heading')) ?></h2>
-                <p class="text-muted mb-0"<?= homeTextMark('campus_intro') ?>><?= htmlspecialchars(homeText('campus_intro')) ?></p>
+                <div class="text-muted mb-0 cms-rich"<?= homeTextMark('campus_intro') ?>><?= renderSectionContent(homeText('campus_intro')) ?></div>
             </div>
 
             <iframe src="campus_navigator.html"
@@ -1369,7 +1100,8 @@ try {
         (function () { var si = window.setInterval; window.setInterval = function (fn, ms) { return (ms >= 5000) ? 0 : si.apply(window, arguments); }; })();
     </script>
     <?php endif; ?>
-    <script src="assets/js/index.js"></script>
+    <script src="assets/js/index.js?v=<?= filemtime(__DIR__ . '/assets/js/index.js') ?>"></script>
+    <script src="assets/js/calendar-program-widget.js?v=<?= filemtime(__DIR__ . '/assets/js/calendar-program-widget.js') ?>" defer></script>
     <script src="assets/js/skeleton-loader.js"></script>
     <script>
         /* Opening intro: counter climbs for ~2.6s, finishes when the page has loaded (5s cap), then the panels wipe up. */
@@ -1404,6 +1136,7 @@ try {
             el.addEventListener('click', leave);   // click to skip
         })();
     </script>
+
 
     <script>
     // Make the WHOLE card clickable (not only the "Read More" button).

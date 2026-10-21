@@ -146,7 +146,7 @@ if ($postAction === 'create' || $postAction === 'update') {
 
     if (empty($errors)) {
         if ($title === '') $errors[] = 'Please type a headline for the article.';
-        if ($content === '' || strip_tags($content) === '') $errors[] = 'Please write the story before saving.';
+        if (($content === '' || strip_tags($content) === '') && ($_POST['allow_incomplete'] ?? '') !== '1') $errors[] = 'Please write the story before saving.';
     }
 
     // Super admins approve things themselves, so "Send for approval" is not allowed for them.
@@ -176,6 +176,7 @@ if ($postAction === 'create' || $postAction === 'update') {
             $data = [
                 'title'    => $title,
                 'content'  => $content,
+                'allow_incomplete' => ($_POST['allow_incomplete'] ?? '') === '1',
                 'author'   => $author,
                 'category' => $_POST['category'] ?? null,
             ];

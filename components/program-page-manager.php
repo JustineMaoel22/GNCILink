@@ -430,7 +430,7 @@ foreach ($pgPrograms as $p):
             </div>
 
             <div class="pgm-savebar" data-savebar="form">
-                <button type="button" class="btn-gnc-gold pgm-save-form"><i class="bi bi-check-lg"></i> Save</button>
+                <button data-content-publish type="button" class="btn-gnc-gold pgm-save-form"><i class="bi bi-check-lg"></i> Save</button>
                 <button type="button" class="btn btn-outline-secondary pgm-reset-form"><i class="bi bi-arrow-counterclockwise"></i> Undo changes</button>
                 <span class="pgm-dirty" hidden>Not saved yet</span>
                 <div class="alert d-none mb-0 pgm-alert" role="alert"></div>
@@ -456,7 +456,7 @@ foreach ($pgPrograms as $p):
                 <?php if ($type === 'facility'): ?>
                 <label class="btn btn-outline-secondary mb-0 pgm-multi-add"><i class="bi bi-images"></i> Upload several pictures<input type="file" multiple accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" hidden class="pgm-multi-input"></label>
                 <?php endif; ?>
-                <button type="button" class="btn-gnc-gold pgm-save-items"><i class="bi bi-check-lg"></i> Save <?= $e(mb_strtolower($label)) ?></button>
+                <button data-content-publish type="button" class="btn-gnc-gold pgm-save-items"><i class="bi bi-check-lg"></i> Save <?= $e(mb_strtolower($label)) ?></button>
                 <button type="button" class="btn btn-outline-secondary pgm-undo-items"><i class="bi bi-arrow-counterclockwise"></i> Undo changes</button>
                 <span class="pgm-limit"></span>
                 <span class="pgm-dirty" hidden>Not saved yet</span>
@@ -475,7 +475,7 @@ foreach ($pgPrograms as $p):
                 <button type="button" class="btn btn-outline-danger btn-sm pgm-pdf-remove" hidden><i class="bi bi-x-lg"></i> Remove</button>
             </div>
             <div class="pgm-savebar">
-                <button type="button" class="btn-gnc-gold pgm-save-pdf" disabled><i class="bi bi-check-lg"></i> Save PDF</button>
+                <button data-content-publish type="button" class="btn-gnc-gold pgm-save-pdf" disabled><i class="bi bi-check-lg"></i> Save PDF</button>
                 <span class="pgm-dirty" hidden>Not saved yet</span>
                 <div class="alert d-none mb-0 pgm-alert" role="alert"></div>
             </div>
@@ -1283,14 +1283,14 @@ foreach ($pgPrograms as $p):
         })();
 
         /* ── delete ── */
-        card.querySelector('.pgm-delete').addEventListener('click', function () {
+        card.querySelector('.pgm-delete').addEventListener('click', async function () {
             var name = st.program.program_name;
-            if (!confirm('Delete "' + name + '" and its whole page for good?\n\nThis cannot be undone. (To only hide it, untick "Show this program on the website" instead.)')) return;
+            if (!await window.AdminDialogs.confirm('Delete "' + name + '" and its whole page for good?\n\nThis cannot be undone. (To only hide it, untick "Show this program on the website" instead.)')) return;
             var btn = this; btn.disabled = true;
             var fd = new FormData(); fd.append('action', 'delete_program'); fd.append('program_id', pid);
             post(fd).then(function (data) {
                 if (data.success) { card.remove(); applyFilter(); }
-                else { alert(data.error || 'Could not delete the program.'); btn.disabled = false; }
+                else { window.AdminDialogs.alert(data.error || 'Could not delete the program.'); btn.disabled = false; }
             });
         });
     }
@@ -1325,7 +1325,7 @@ foreach ($pgPrograms as $p):
 
     /* Warn before leaving the page with changes that are not saved */
     window.addEventListener('beforeunload', function (ev) {
-        if (window.__pgmLeaving) return;
+        if (window.__pgmLeaving || window.__veLeaving) return;
         if (document.querySelector('.pgm-dirty:not([hidden])')) { ev.preventDefault(); ev.returnValue = ''; }
     });
 

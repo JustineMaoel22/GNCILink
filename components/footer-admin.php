@@ -11,10 +11,7 @@
 
 // ── Confirm Delete Helper ────────────────────────────────────────
 function confirmDelete(message = 'Are you sure you want to delete this item?') {
-    return new Promise(resolve => {
-        if (confirm(message)) resolve(true);
-        else resolve(false);
-    });
+    return window.AdminDialogs.confirm(message, { title: 'Delete this item?', confirmText: 'Delete', danger: true });
 }
 
 // ── Generic AJAX Form Submitter ──────────────────────────────────

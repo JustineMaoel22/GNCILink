@@ -1,0 +1,38 @@
+Read-only local MySQL audit, 2026-10-20 (Asia/Manila).
+Single-run EXPLAIN ANALYZE results; times are milliseconds, not production benchmarks.
+All queries were SELECT or EXPLAIN ANALYZE SELECT. No schema/data modifications.
+
+table_name	exact_rows
+activity_logs	850
+csrf_tokens	353
+events	13
+news	1
+announcements	1
+audit	findings
+news_duplicate_slug_groups	0
+announcement_duplicate_slug_groups	0
+expired_csrf_tokens
+351
+EXPLAIN
+-> Limit: 1 row(s)  (cost=34.2 rows=1) (actual time=0.154..0.154 rows=0 loops=1)
+    -> Filter: ((csrf_tokens.user_id = 1) and (csrf_tokens.token = 'audit-nonexistent-token') and (csrf_tokens.expires_at > <cache>(now())))  (cost=34.2 rows=1.11) (actual time=0.152..0.152 rows=0 loops=1)
+        -> Table scan on csrf_tokens  (cost=34.2 rows=334) (actual time=0.0391..0.118 rows=353 loops=1)
+
+EXPLAIN
+-> Limit: 50 row(s)  (actual time=0.865..0.873 rows=50 loops=1)
+    -> Sort: al.created_at DESC, limit input to 50 row(s) per chunk  (actual time=0.865..0.87 rows=50 loops=1)
+        -> Stream results  (cost=79.8 rows=784) (actual time=0.0754..0.747 rows=850 loops=1)
+            -> Left hash join (u.user_id = al.user_id)  (cost=79.8 rows=784) (actual time=0.0673..0.445 rows=850 loops=1)
+                -> Table scan on al  (cost=80.2 rows=784) (actual time=0.00752..0.303 rows=850 loops=1)
+                -> Hash
+                    -> Table scan on u  (cost=0.00197 rows=1) (actual time=0.0477..0.0506 rows=1 loops=1)
+
+EXPLAIN
+-> Filter: ((n.slug = 'audit-nonexistent-slug') and (n.`status` = 'published'))  (cost=0.35 rows=1) (actual time=0.0139..0.0139 rows=0 loops=1)
+    -> Table scan on n  (cost=0.35 rows=1) (actual time=0.00924..0.011 rows=1 loops=1)
+
+EXPLAIN
+-> Limit: 5 row(s)  (cost=1.55 rows=5) (actual time=0.0602..0.0607 rows=4 loops=1)
+    -> Sort: `events`.start_date, limit input to 5 row(s) per chunk  (cost=1.55 rows=13) (actual time=0.0599..0.0602 rows=4 loops=1)
+        -> Filter: ((`events`.`status` = 'published') and (`events`.start_date >= <cache>(now())) and ((`events`.program = 'BSIT') or (`events`.program = 'ALL')))  (cost=1.55 rows=13) (actual time=0.0507..0.0538 rows=4 loops=1)
+            -> Table scan on events  (cost=1.55 rows=13) (actual time=0.0409..0.0466 rows=13 loops=1)

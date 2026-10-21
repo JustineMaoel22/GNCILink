@@ -186,7 +186,7 @@ $programCategoryOptions = getProgramCategories();
                 </button>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-outline-secondary btn-sm btn-program-reset" disabled>Discard Changes</button>
-                    <button type="button" class="btn-gnc-primary btn-sm btn-program-save" disabled>Save Changes</button>
+                    <button data-content-publish type="button" class="btn-gnc-primary btn-sm btn-program-save" disabled>Save Changes</button>
                 </div>
             </div>
         </div>
@@ -399,8 +399,8 @@ $programCategoryOptions = getProgramCategories();
             }).finally(function () { btn.textContent = original; });
         });
 
-        $('.btn-program-delete').addEventListener('click', function () {
-            if (!window.confirm('Delete "' + (current.name || 'this program') + '" permanently?\n\n'
+        $('.btn-program-delete').addEventListener('click', async function () {
+            if (!await window.AdminDialogs.confirm('Delete "' + (current.name || 'this program') + '" permanently?\n\n'
                 + 'Its card image and curriculum PDF will be removed if nothing else uses them.')) {
                 return;
             }
@@ -412,11 +412,11 @@ $programCategoryOptions = getProgramCategories();
                     card.style.opacity = '0';
                     setTimeout(function () { card.remove(); }, 300);
                 } else {
-                    alert(data.error || 'Could not delete the program.');
+                    window.AdminDialogs.alert(data.error || 'Could not delete the program.');
                     btn.disabled = false;
                 }
             }).catch(function () {
-                alert('Network error. Please try again.');
+                window.AdminDialogs.alert('Network error. Please try again.');
                 btn.disabled = false;
             });
         });

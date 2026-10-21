@@ -71,11 +71,15 @@ $roleName = (string)($currentUser['role'] ?? ($_SESSION['role'] ?? ''));
 $basicEduSlugs = ['casa-gradeschool', 'jhs-regular', 'hs-monte', 'shs-regular'];
 
 // Pages that are NOT edited with the text editor (they have their own tools)
-$customSlugs = ['home', 'college-departments', 'programs', 'administration', 'graduate-school'];
+$customSlugs = ['home', 'college-departments', 'programs', 'administration', 'graduate-school', 'tuition-fees', 'online-payment-guide'];
 
 // Where each page appears on the public website (shown as "View live page")
 $publicUrls = [
+    'basic-education-admission-requirements' => '/pages/admission/basic-education-admission-req.php',
+    'college-admission-requirements' => '/pages/admission/admission-req.php',
     'home'                       => '/',
+    'tuition-fees'               => '/pages/admission/tuition-fees.php',
+    'online-payment-guide'       => '/pages/admission/online-payment-guide.php',
     'vision-mission'             => '/pages/about/vision-mission.php',
     'history'                    => '/pages/about/gnc-history.php',
     'administration'             => '/pages/about/administration.php',
@@ -112,6 +116,14 @@ foreach ($editablePages as $p) $titleOf[$p['slug']] = $p['title'];
 $titleOf['basic-education'] = 'Basic Education';
 $titleOf['graduate-school'] = 'Graduate School';
 $titleOf['updates']         = 'News, announcements & events';
+$titleOf['student-organizations'] = 'Student Organizations Management';
+$titleOf['student-achievements'] = 'Student Achievements';
+$titleOf['athletics-sports'] = 'Athletics and Sports';
+$publicUrls['athletics-sports'] = '/pages/student%20life/athletics-sports.php';
+$publicUrls['student-achievements'] = '/pages/student%20life/student-achievement.php';
+$titleOf['tuition-fees'] = 'Tuition and Fees';
+$titleOf['online-payment-guide'] = 'Online Payment Guide';
+$publicUrls['student-organizations'] = studentOrganizationsUrl();
 
 // News, announcements and events keep their own editors (and their approval workflow). The Visual Editor opens those very
 // editors inside its side panel, so nothing is re-implemented and every permission check stays where it is.
@@ -139,7 +151,12 @@ function ce_postUrl(string $key, array $q = []): string {
 $sectionsBySlug = [];
 if ($canDraftPages && (($_GET['page'] ?? '') === 'history')) ensureHistoryPageSections();
 foreach ($textPages as $sp) {
-    try { $sectionsBySlug[$sp['slug']] = getPageSectionsDetailed($sp['slug']); }
+    try {
+        $sectionsBySlug[$sp['slug']] = getPageSectionsDetailed($sp['slug']);
+        if (in_array($sp['slug'],['college-admission-requirements','basic-education-admission-requirements'],true)) {
+            $sectionsBySlug[$sp['slug']] = array_values(array_filter($sectionsBySlug[$sp['slug']],static fn($section) => $section['status']==='published'));
+        }
+    }
     catch (Throwable $e) { error_log('getPageSectionsDetailed error: ' . $e->getMessage()); $sectionsBySlug[$sp['slug']] = []; }
 }
 
@@ -149,7 +166,7 @@ $pending = ($canApprove && $reviewReady) ? getPendingSections() : [];
 // ── Which panel is open? ──
 $validPanels = ['hub'];
 if ($canApprove) $validPanels[] = 'review';
-if ($canManagePages) { $validPanels[] = 'home'; $validPanels[] = 'basic-education'; }
+if ($canManagePages) { $validPanels[] = 'home'; $validPanels[] = 'basic-education'; $validPanels[] = 'student-organizations'; $validPanels[] = 'student-achievements'; $validPanels[] = 'athletics-sports'; $validPanels[] = 'tuition-fees'; $validPanels[] = 'online-payment-guide'; }
 if ($postModules && $canManagePages) $validPanels[] = 'updates';
 foreach ($textPages as $p)   $validPanels[] = $p['slug'];
 foreach ($customPages as $p) $validPanels[] = $p['slug'];
@@ -166,10 +183,14 @@ $editorMode = !in_array($activeSlug, ['hub', 'review'], true);
 
 $VE = null;
 if ($editorMode) {
-    $veKind = $activeSlug === 'home' ? 'home'
+    $veKind = $activeSlug === 'student-organizations' ? 'organizations' : ($activeSlug === 'home' ? 'home'
         : ($activeSlug === 'administration' ? 'admin'
         : ($activeSlug === 'updates' ? 'feed'
-        : (in_array($activeSlug, ['college-departments', 'programs', 'basic-education', 'graduate-school'], true) ? 'entity' : 'sections')));
+        : (in_array($activeSlug, ['college-departments', 'programs', 'basic-education', 'graduate-school'], true) ? 'entity' : 'sections'))));
+    if ($activeSlug === 'tuition-fees') $veKind = 'tuition';
+    if ($activeSlug === 'online-payment-guide') $veKind = 'payment-guide';
+    if ($activeSlug === 'student-achievements') $veKind = 'achievements';
+    if ($activeSlug === 'athletics-sports') $veKind = 'sports';
     $withPreview = function (string $url): string { return $url . (strpos($url, '?') !== false ? '&' : '?') . 'ce_preview=1'; };
 
     // The page list in the top bar
@@ -179,6 +200,11 @@ if ($editorMode) {
     foreach ($customPages as $p) $pickerPages[] = ['slug' => $p['slug'], 'title' => $p['title'], 'group' => 'Academics & people',
         'icon' => $p['slug'] === 'administration' ? 'people' : ($p['slug'] === 'programs' ? 'mortarboard' : 'building')];
     if ($canManagePages) $pickerPages[] = ['slug' => 'basic-education', 'title' => 'Basic Education', 'group' => 'Academics & people', 'icon' => 'backpack'];
+    if ($canManagePages) $pickerPages[] = ['slug'=>'student-organizations','title'=>'Student Organizations Management','group'=>'Student life','icon'=>'people'];
+    if ($canManagePages) $pickerPages[] = ['slug'=>'student-achievements','title'=>'Student Achievements','group'=>'Student life','icon'=>'trophy'];
+    if ($canManagePages) $pickerPages[] = ['slug'=>'athletics-sports','title'=>'Athletics and Sports','group'=>'Student life','icon'=>'dribbble'];
+    if ($canManagePages && !in_array('online-payment-guide',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'online-payment-guide','title'=>'Online Payment Guide','group'=>'Admissions','icon'=>'credit-card'];
+    if ($canManagePages && !in_array('tuition-fees',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'tuition-fees','title'=>'Tuition and Fees','group'=>'Admissions','icon'=>'file-earmark-pdf'];
     if ($postModules && $canManagePages) $pickerPages[] = ['slug' => 'updates', 'title' => 'News, announcements & events', 'group' => 'Posts', 'icon' => 'megaphone'];
 
     $veTitle   = $activeSlug === 'home' ? 'Homepage' : ($titleOf[$activeSlug] ?? $activeSlug);
@@ -189,7 +215,15 @@ if ($editorMode) {
     $wantProg  = (int)($_GET['program_id'] ?? 0);      // deep link to a program that was just created
     $veSection = trim((string)($_GET['section'] ?? ''));
 
-    if ($veKind === 'admin') {
+    if ($veKind === 'organizations') {
+        $subs[] = ['label'=>'All organizations','url'=>$withPreview(studentOrganizationsUrl())];
+        $publicUrl = studentOrganizationsUrl();
+        foreach (studentOrganizations(true) as $organization) {
+            $subs[] = ['key'=>$organization['slug'],'label'=>$organization['name'].($organization['status']==='draft'?' (Unpublished)':''),'url'=>$withPreview(studentOrganizationsUrl($organization['slug']))];
+            if ($wantSub === $organization['slug']) $publicUrl=studentOrganizationsUrl($organization['slug']);
+        }
+        $pageUrl=$withPreview($publicUrl);
+    } elseif ($veKind === 'admin') {
         $pageUrl = $withPreview('/pages/about/administration.php') . ($veSection !== '' ? '&section=' . rawurlencode($veSection) : '');
     } elseif ($activeSlug === 'college-departments') {
         $subs[] = ['label' => 'All departments', 'url' => $withPreview('/pages/academics/college/college-dept.php')];
@@ -202,8 +236,17 @@ if ($editorMode) {
         $pageUrl = $subs[0]['url'];
     } elseif ($activeSlug === 'programs') {
         try {
+            // Basic Education programs are cards on their department page;
+            // they do not have the standalone detail pages edited here.
+            $basicProgramDepartments = [];
+            foreach (getDepartments() as $department) {
+                if (($department['department_type'] ?? '') === 'basic-education'
+                    || in_array((string)($department['slug'] ?? ''), $basicEduSlugs, true)) {
+                    $basicProgramDepartments[(int)$department['dept_id']] = true;
+                }
+            }
             foreach (getPrograms() as $pr) {
-                if (empty($pr['slug'])) continue;
+                if (empty($pr['slug']) || isset($basicProgramDepartments[(int)($pr['dept_id'] ?? 0)])) continue;
                 if ($wantProg > 0 && (int)$pr['program_id'] === $wantProg) $wantSub = (string)$pr['slug'];
                 $subs[] = ['key' => (string)$pr['slug'], 'label' => trim(($pr['program_code'] ? $pr['program_code'] . ' – ' : '') . $pr['program_name']), 'url' => $withPreview('/pages/academics/college/program.php?slug=' . rawurlencode($pr['slug']))];
             }
@@ -283,6 +326,7 @@ if ($editorMode) {
     if ($activeSlug === 'basic-education') $drawerFile = 'basic-edu-media-manager.php';
     $drawerTitle = $veKind === 'home' ? 'Message from the President (full form)'
         : ($veKind === 'admin' ? 'More settings: archived people, tabs and offices' : ($activeSlug === 'programs' ? 'Program details' : 'Department details'));
+    if ($veKind === 'organizations') $drawerTitle = 'Student Organizations Management';
 
     $VE = [
         'csrf' => $csrfToken, 'contentHandler' => '/admin/action/page-content-handler.php', 'reviewHandler' => '/admin/action/page-review-handler.php',
@@ -295,7 +339,7 @@ if ($editorMode) {
         'programDepartments' => array_values(array_map(static function ($d) {
             return ['id' => (int)$d['dept_id'], 'name' => (string)$d['dept_name'], 'slug' => (string)($d['slug'] ?? '')];
         }, array_filter(getDepartments(), static function ($d) use ($basicEduSlugs) {
-            return empty($d['archived_at']) && !in_array((string)($d['slug'] ?? ''), $basicEduSlugs, true);
+            return empty($d['archived_at']);
         }))),
     ];
 }
@@ -325,12 +369,20 @@ foreach (getContentHubPages() as $row) {
               'where' => $publicUrls[$slug] ?? ''];
 }
 if ($canManagePages) {
+    $hub[] = ['title'=>'Online Payment Guide','type'=>'Admissions','status'=>'live','ts'=>0,'note'=>'Payment instructions, account details, links and illustrations','open'=>'online-payment-guide','href'=>'?page=online-payment-guide','where'=>$publicUrls['online-payment-guide']];
+    $hub[] = ['title'=>'Tuition and Fees','type'=>'Admissions','status'=>'live','ts'=>0,'note'=>'Tuition text, fee categories and PDF schedules','open'=>'tuition-fees','href'=>'?page=tuition-fees','where'=>$publicUrls['tuition-fees']];
     foreach ($customPages as $cp) {
         if ($cp['slug'] === 'home') continue;
         $type = $cp['slug'] === 'administration' ? 'Administration' : 'Academics';
         $hub[] = ['title' => $cp['title'], 'type' => $type, 'status' => 'live', 'ts' => 0,
                   'note' => $cp['slug'] === 'administration' ? 'People and offices' : 'Departments and programs',
                   'open' => $cp['slug'], 'href' => '?page=' . rawurlencode($cp['slug']), 'where' => $publicUrls[$cp['slug']] ?? ''];
+    }
+    $hub[] = ['title'=>'Student Organizations Management','type'=>'Student life','status'=>'live','ts'=>0,'note'=>'Organizations, categories, order and publication status','open'=>'student-organizations','href'=>'?page=student-organizations','where'=>studentOrganizationsUrl()];
+    $hub[] = ['title'=>'Student Achievements','type'=>'Student life','status'=>'live','ts'=>0,'note'=>'Achievements, uploaded pictures and academic years','open'=>'student-achievements','href'=>'?page=student-achievements','where'=>'/pages/student%20life/student-achievement.php'];
+    $hub[] = ['title'=>'Athletics and Sports','type'=>'Student life','status'=>'live','ts'=>0,'note'=>'Sports slideshow, program names and photos','open'=>'athletics-sports','href'=>'?page=athletics-sports','where'=>$publicUrls['athletics-sports']];
+    foreach (studentOrganizations(true) as $organization) {
+        $hub[] = ['title'=>$organization['name'],'type'=>'Organization','status'=>$organization['status']==='published'?'live':'draft','ts'=>strtotime($organization['updated_at']),'note'=>$organization['category_name']??'Uncategorized','open'=>'student-organizations','href'=>'?page=student-organizations&sub='.rawurlencode($organization['slug']),'where'=>studentOrganizationsUrl($organization['slug'])];
     }
     foreach (getContentHubDepartments() as $d) {
         $isBasic = !empty($d['slug']) && in_array((string)$d['slug'], $basicEduSlugs, true);
@@ -435,7 +487,7 @@ include __DIR__ . '/../components/header-admin.php';
             <div class="ve-menu-list" role="menu">
                 <?php $lastGroup = null; foreach ($pickerPages as $pp):
                     if ($pp['group'] !== $lastGroup) { echo '<div class="ve-menu-group">' . ce_e($pp['group']) . '</div>'; $lastGroup = $pp['group']; } ?>
-                <a role="menuitem" data-ve-nav class="ve-menu-item<?= $pp['slug'] === $activeSlug ? ' is-current' : '' ?>" href="?page=<?= ce_e(rawurlencode($pp['slug'])) ?>">
+                <a role="menuitem" data-ve-nav class="ve-menu-item<?= $pp['slug'] === $activeSlug ? ' is-current' : '' ?>" href="<?= ce_e($pp['href'] ?? ('?page=' . rawurlencode($pp['slug']))) ?>">
                     <i class="bi bi-<?= ce_e($pp['icon']) ?>"></i><span><?= ce_e($pp['title']) ?></span>
                 </a>
                 <?php endforeach; ?>
@@ -564,7 +616,9 @@ include __DIR__ . '/../components/header-admin.php';
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && m) m.removeAttribute('open'); });
     })();
 </script>
-<script src="/assets/js/content-edit.js?v=<?= (int)@filemtime(__DIR__ . '/../assets/js/content-edit.js') ?: 1 ?>"></script>
+<script src="/assets/js/editor-feedback.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/editor-feedback.js'),0,12) ?>"></script>
+<script src="/assets/js/department-card-order.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/department-card-order.js'),0,12) ?>"></script>
+<script src="/assets/js/content-edit.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/content-edit.js'),0,12) ?>"></script>
 
 <?php else: ?>
 <div class="ce-shell">
@@ -612,6 +666,15 @@ include __DIR__ . '/../components/header-admin.php';
                 <i class="bi <?= $icon ?>"></i><span><?= ce_e($p['title']) ?></span>
             </a>
             <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($canManagePages): ?>
+        <div class="ce-nav-group">
+            <div class="ce-nav-label">Student life</div>
+            <a class="ce-nav-link" href="?page=student-organizations"><i class="bi bi-people"></i><span>Student Organizations Management</span></a>
+            <a class="ce-nav-link" href="?page=student-achievements"><i class="bi bi-trophy"></i><span>Student Achievements</span></a>
+            <a class="ce-nav-link" href="?page=athletics-sports"><i class="bi bi-dribbble"></i><span>Athletics and Sports</span></a>
         </div>
         <?php endif; ?>
 
@@ -783,7 +846,7 @@ include __DIR__ . '/../components/header-admin.php';
                         </div>
                         <div>
                             <div class="ce-compare-label ce-compare-new">Proposed change</div>
-                            <div class="ce-prose"><?= sectionToEditorHtml($q['draft_content']) ?: '<em class="text-muted">(empty)</em>' ?></div>
+                            <div class="ce-prose" data-warning-field data-warning-label="<?= ce_e($q['section_title']) ?>" data-warning-value="<?= ce_e((string)$q['draft_content']) ?>"><?= sectionToEditorHtml($q['draft_content']) ?: '<em class="text-muted">(empty)</em>' ?></div>
                         </div>
                     </div>
                     <div class="ce-review-actions">
@@ -989,12 +1052,12 @@ include __DIR__ . '/../components/header-admin.php';
         var empty = $('#ceQueueEmpty'); if (empty) empty.hidden = n > 0 || !!$('.ce-review');
     }
     $$('.ce-review').forEach(function (card) {
-        card.addEventListener('click', function (e) {
+        card.addEventListener('click', async function (e) {
             var b = e.target.closest('[data-review]'); if (!b || b.disabled) return;
             var what = b.getAttribute('data-review');
             var note = $('.ce-review-note', card).value.trim();
             if (what === 'reject' && !note) { toast('Please write a short note so the editor knows what to change.', 'error'); $('.ce-review-note', card).focus(); return; }
-            if (what === 'approve' && !window.confirm('Approve and publish this change?\n\nIt will go live on the website.')) return;
+            if (what === 'approve' && !await window.AdminDialogs.confirm('Approve and publish this change?\n\nIt will go live on the website.')) return;
             $$('button', card).forEach(function (x) { x.disabled = true; });
             post(what, { page: card.getAttribute('data-page'), section_key: card.getAttribute('data-section'), note: note }).then(function (res) {
                 if (res && res.success) {

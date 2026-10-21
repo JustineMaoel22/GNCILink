@@ -27,11 +27,15 @@ function collegeDeptPublicUrl(array $dept): string {
     return '/pages/academics/college/college-department.php?slug=' . rawurlencode($slug);
 }
 
-// Only live departments are shown: archived (hidden) departments and rows
-// without a slug are left out. Order = creation order (dept_id).
+// Only college departments are shown, including in the editor preview.
+// Archived departments are hidden from visitors; rows without a slug are
+// always left out. Unsorted new departments follow the saved listing order.
 $publicDepartments = array_values(array_filter(getDepartments(), function ($d) use ($cePreview) {
-    return ($cePreview || empty($d['archived_at'])) && trim((string)($d['slug'] ?? '')) !== '';
+    return publicDepartmentIsCollege($d)
+        && ($cePreview || empty($d['archived_at']))
+        && trim((string)($d['slug'] ?? '')) !== '';
 }));
+$publicDepartments = departmentApplyOrder($publicDepartments, departmentStoredOrder('college'));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -44,6 +48,7 @@ $publicDepartments = array_values(array_filter(getDepartments(), function ($d) u
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&amp;display=block">
     <link href="/assets/css/col-dept-style.css" rel="stylesheet">
     <link href="/assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
@@ -87,8 +92,8 @@ $publicDepartments = array_values(array_filter(getDepartments(), function ($d) u
                     <i class="bi bi-chevron-right"></i>
                     <span class="cp-current" aria-current="page">College Departments</span>
                 </nav>
-                <h1 data-reveal style="--d: 100ms">College Departments</h1>
-                <p data-reveal style="--d: 200ms">Explore our colleges, and discover programs designed to shape your future.</p>
+                <h1 data-reveal style="--d: 100ms"<?= basicEducationMark('college-index', 'text_01') ?>><?= basicEducationText('college-index', 'text_01') ?></h1>
+                <div class="cms-rich" data-reveal style="--d: 200ms"<?= basicEducationMark('college-index', 'text_02') ?>><?= basicEducationText('college-index', 'text_02') ?></div>
             </div>
         </div>
 
@@ -97,42 +102,34 @@ $publicDepartments = array_values(array_filter(getDepartments(), function ($d) u
             <div class="cp-features-box">
 
                 <div class="cp-feature" data-reveal style="--d: 300ms">
-                    <div class="cp-feature-icon">
-                        <img src="/assets/images/svg/grad-hat-white.svg" alt="Quality Education">
-                    </div>
+                    <?= academicFeatureIcon('college-index', 'icon_01', 'cp-feature-icon') ?>
                     <div class="cp-feature-text">
-                        <h3>Quality Education</h3>
-                        <p>Curriculum designed for real-world impact.</p>
+                        <h3<?= basicEducationMark('college-index', 'text_03') ?>><?= basicEducationText('college-index', 'text_03') ?></h3>
+                        <div class="cms-rich"<?= basicEducationMark('college-index', 'text_04') ?>><?= basicEducationText('college-index', 'text_04') ?></div>
                     </div>
                 </div>
 
                 <div class="cp-feature" data-reveal style="--d: 400ms">
-                    <div class="cp-feature-icon">
-                        <img src="/assets/images/svg/person_play.svg" alt="Experienced Faculty">
-                    </div>
+                    <?= academicFeatureIcon('college-index', 'icon_02', 'cp-feature-icon') ?>
                     <div class="cp-feature-text">
-                        <h3>Experienced Faculty</h3>
-                        <p>Learn from dedicated professionals.</p>
+                        <h3<?= basicEducationMark('college-index', 'text_05') ?>><?= basicEducationText('college-index', 'text_05') ?></h3>
+                        <div class="cms-rich"<?= basicEducationMark('college-index', 'text_06') ?>><?= basicEducationText('college-index', 'text_06') ?></div>
                     </div>
                 </div>
 
                 <div class="cp-feature" data-reveal style="--d: 500ms">
-                    <div class="cp-feature-icon">
-                        <img src="/assets/images/svg/psychology-white.svg" alt="Holistic Development">
-                    </div>
+                    <?= academicFeatureIcon('college-index', 'icon_03', 'cp-feature-icon') ?>
                     <div class="cp-feature-text">
-                        <h3>Holistic Development</h3>
-                        <p>Growing minds, character and leadership.</p>
+                        <h3<?= basicEducationMark('college-index', 'text_07') ?>><?= basicEducationText('college-index', 'text_07') ?></h3>
+                        <div class="cms-rich"<?= basicEducationMark('college-index', 'text_08') ?>><?= basicEducationText('college-index', 'text_08') ?></div>
                     </div>
                 </div>
 
                 <div class="cp-feature" data-reveal style="--d: 600ms">
-                    <div class="cp-feature-icon">
-                        <img src="/assets/images/svg/real_estate_agent.svg" alt="Community Focused">
-                    </div>
+                    <?= academicFeatureIcon('college-index', 'icon_04', 'cp-feature-icon') ?>
                     <div class="cp-feature-text">
-                        <h3>Community Focused</h3>
-                        <p>Committed to nation-building and service.</p>
+                        <h3<?= basicEducationMark('college-index', 'text_09') ?>><?= basicEducationText('college-index', 'text_09') ?></h3>
+                        <div class="cms-rich"<?= basicEducationMark('college-index', 'text_10') ?>><?= basicEducationText('college-index', 'text_10') ?></div>
                     </div>
                 </div>
 
@@ -155,7 +152,7 @@ $publicDepartments = array_values(array_filter(getDepartments(), function ($d) u
         </div>
         <?php else: ?>
         <div class="cd-colleges">
-            <div class="cd-grid">
+            <div class="cd-grid"<?= ceManageMark('data-ve-department-grid="college"') ?>>
                 <?php foreach ($publicDepartments as $index => $dept):
                     $cardName = trim((string)$dept['dept_name']);
                     $logoUrl  = $dept['logo_url'] ?? null;
@@ -181,6 +178,7 @@ $publicDepartments = array_values(array_filter(getDepartments(), function ($d) u
                     }
                 ?>
                 <a class="cd-card cd-card--<?= htmlspecialchars($modifier) ?><?= ($cePreview && !empty($dept['archived_at'])) ? ' ve-hidden-card' : '' ?>"
+                   <?= ceManageMark('data-ve-department-card="' . (int)$dept['dept_id'] . '"') ?>
                    data-reveal="scale"
                    <?= $accent !== '' ? 'data-accent="1"' : '' ?>
                    style="<?= htmlspecialchars($cardStyle) ?>"
@@ -189,10 +187,14 @@ $publicDepartments = array_values(array_filter(getDepartments(), function ($d) u
                         <?php if ($cePreview && !empty($dept['archived_at'])): ?><span class="ve-hidden-badge">Hidden from the website</span><?php endif; ?>
                         <?php if ($logoUrl): ?>
                         <div class="skeleton-wrap cd-logo-wrap">
-                            <img class="cd-logo" loading="lazy" decoding="async" src="<?= htmlspecialchars($logoUrl) ?>" alt="<?= htmlspecialchars($cardName) ?> logo">
+                            <img class="cd-logo" loading="lazy" decoding="async" src="<?= htmlspecialchars($logoUrl) ?>" alt="<?= htmlspecialchars($cardName) ?> logo"<?= ceManageMark('data-ve-basic-logo-id="' . (int)$dept['dept_id'] . '"') ?>>
                         </div>
                         <?php else: ?>
+                        <?php if ($cePreview): ?>
+                        <div class="cd-logo-wrap cd-logo-empty"<?= ceManageMark('data-ve-basic-logo-id="' . (int)$dept['dept_id'] . '"') ?>><span>Add logo</span></div>
+                        <?php else: ?>
                         <div class="cd-logo-wrap cd-logo-empty" aria-hidden="true"></div>
+                        <?php endif; ?>
                         <?php endif; ?>
                         <h3 class="cd-title"><?= htmlspecialchars($cardName) ?></h3>
                         <span class="cd-underline" aria-hidden="true"></span>
@@ -212,6 +214,7 @@ $publicDepartments = array_values(array_filter(getDepartments(), function ($d) u
 
     </section>
 
+    <?= basicEducationEditorBlock('college-index') ?>
     <?php include __DIR__ . '/../../../components/footer.php'; ?>
     <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>
 

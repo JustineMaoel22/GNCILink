@@ -84,6 +84,11 @@ $programId = (int)($_POST['program_id'] ?? 0);
 try {
     switch ($action) {
 
+        case 'save_department_program_card':
+            $card = saveDepartmentProgramCard($_POST, $_FILES['image'] ?? null);
+            echo json_encode(['success' => true, 'program' => $card]);
+            break;
+
         case 'create_program':
             $id = createProgramPage($_POST);
             echo json_encode(['success' => true, 'program_id' => $id]);

@@ -121,12 +121,13 @@
                     showRejected(res.reason, res.message);
                     return;
                 }
-                if (!res || !res.success || res.checked !== true || res.ok !== true) {
+                var disabled = res && res.success === true && res.ok === true && res.reason === 'disabled';
+                if (!res || !res.success || (!disabled && res.checked !== true) || res.ok !== true) {
                     input.value = '';
                     showRejected('unavailable', (res && (res.error || res.message)) || 'The photo could not be checked. Please try again.');
                     return;
                 }
-                notice('Photo check passed. You can save your changes.');
+                if (!disabled) notice('Photo check passed. You can save your changes.');
                 close();
                 input.__pcPassed = true;
                 input.dispatchEvent(new Event('change', { bubbles: true }));

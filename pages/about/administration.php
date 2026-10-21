@@ -459,7 +459,7 @@ $photoFallback  = '/assets/images/logos/gnc-logo-v1.svg';
             <div class="admin-section-intro reveal-up">
                 <span class="admin-eyebrow">Leadership &amp; Organization</span>
                 <h2<?= ceMark('data-ve-field="admin-section-title" data-ve-key="' . ceAttr($section) . '" data-ve-max="255" data-ve-label="Section heading"') ?>><?= htmlspecialchars($current['title']); ?></h2>
-                <p<?= ceMark('data-ve-field="admin-section-desc" data-ve-key="' . ceAttr($section) . '" data-ve-max="2000" data-ve-multiline="1" data-ve-label="Text under the heading" data-ve-allow-empty="1"') ?>><?= htmlspecialchars($current['desc']); ?></p>
+                <div class="cms-rich"<?= ceMark('data-ve-field="admin-section-desc" data-ve-key="' . ceAttr($section) . '" data-ve-max="2000" data-ve-multiline="1" data-ve-rich="1" data-ve-label="Text under the heading" data-ve-allow-empty="1"') ?>><?= renderSectionContent($current['desc']); ?></div>
             </div>
 
             <?php if (($current['layout'] ?? '') === 'offices'): ?>

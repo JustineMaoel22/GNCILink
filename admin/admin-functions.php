@@ -8,8 +8,15 @@
 // SESSION MANAGEMENT
 // ============================================================
 
+require_once __DIR__ . '/settings-functions.php';
 require_once __DIR__ . '/photo-check.php';
+require_once __DIR__ . '/../includes/image-framing.php';
+require_once __DIR__ . '/rich-text.php';
 require_once __DIR__ . '/basic-education-content.php';
+require_once __DIR__ . '/department-page-content.php';
+require_once __DIR__ . '/student-organizations.php';
+require_once __DIR__ . '/../includes/office-location.php';
+require_once __DIR__ . '/../includes/student-achievements.php';
 
 /**
  * Initialize secure session
@@ -82,6 +89,7 @@ function hasPermission(string $permission): bool {
 function getPermissions(string $role): array {
     $permissionMap = [
         'Super Admin' => [
+            'manage_settings',
             'manage_users', 'add_user', 'edit_user', 'delete_user', 'assign_roles',
             'manage_announcements', 'create_announcement', 'edit_announcement', 'delete_announcement', 'publish_announcement',
             'manage_news', 'create_news', 'edit_news', 'delete_news', 'publish_news',
@@ -327,6 +335,7 @@ function uploadAnnouncementImage(?array $file): ?int {
     // Insert into media_library table
     try {
         $db = getDB();
+        imageFramingSaveUpload($filePath, $destination);
         $stmt = $db->prepare("
             INSERT INTO media_library 
             (file_name, file_type, file_size, file_path, created_by, created_at)
@@ -360,7 +369,7 @@ function createAnnouncement(array $data): ?int {
         if (empty($data['title'])) {
             throw new Exception('Title is required.');
         }
-        if (empty($data['content'])) {
+        if (empty($data['content']) && empty($data['allow_incomplete'])) {
             throw new Exception('Content is required.');
         }
         if (!isset($_SESSION['user_id'])) {
@@ -773,6 +782,7 @@ function getNewsCategories(): array {
         'Academic'      => 'Academic',
         'Achievements'  => 'Achievements',
         'Student Life'  => 'Student Life',
+        'Athletics and Sports' => 'Athletics and Sports',
         'Updates'       => 'Updates',
         'Others'        => 'Others',
     ];
@@ -844,6 +854,7 @@ function uploadNewsImage(?array $file): ?int {
     // Insert into media_library table
     try {
         $db = getDB();
+        imageFramingSaveUpload($filePath, $destination);
         $stmt = $db->prepare("
             INSERT INTO media_library 
             (file_name, file_type, file_size, file_path, created_by, created_at)
@@ -986,7 +997,7 @@ function createNews(array $data): ?int {
         if (empty($data['title'])) {
             throw new Exception('Title is required.');
         }
-        if (empty($data['content'])) {
+        if (empty($data['content']) && empty($data['allow_incomplete'])) {
             throw new Exception('Content is required.');
         }
         if (!isset($_SESSION['user_id'])) {
@@ -1774,6 +1785,7 @@ function uploadHeroMedia(?array $file, bool $imageOnly = false): ?array {
         throw new Exception('Failed to save the uploaded file.');
     }
 
+    imageFramingSaveUpload('/uploads/hero-slides/' . $filename, $destination);
     return ['type' => $type, 'path' => '/uploads/hero-slides/' . $filename];
 }
 
@@ -2250,131 +2262,6 @@ function pageReviewReady(): bool {
 }
 
 /** Does stored text contain formatting (as opposed to plain text)? */
-function richTextLooksLikeHtml(string $s): bool {
-    return (bool)preg_match('#<(p|br|h[2-4]|strong|em|u|ul|ol|li|a|blockquote)[\s>/]#i', $s);
-}
-
-/**
- * Clean HTML from the rich-text editor down to a safe allow-list:
- * paragraphs, headings (h2-h4), bold, italic, underline, lists, links,
- * block quotes and text alignment. Everything else (scripts, styles,
- * event handlers, unknown tags, odd link types) is removed. Always run
- * this on the SERVER; never trust what the browser sends.
- */
-function richTextSanitize(string $html): string {
-    $html = trim($html);
-    if ($html === '') return '';
-    if (strlen($html) > 200000) $html = substr($html, 0, 200000);
-
-    $doc  = new DOMDocument();
-    $prev = libxml_use_internal_errors(true);
-    $doc->loadHTML('<?xml encoding="UTF-8"><div id="rt-root">' . $html . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-    libxml_clear_errors();
-    libxml_use_internal_errors($prev);
-
-    $root = $doc->getElementsByTagName('div')->item(0);
-    if (!$root) return '';
-
-    $dropWithContent = ['script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'head', 'title', 'meta', 'link',
-                        'noscript', 'template', 'form', 'input', 'textarea', 'select', 'button', 'audio', 'video', 'img'];
-    $aligned = ['p', 'h2', 'h3', 'h4', 'blockquote', 'li'];
-
-    $align = function (DOMElement $el): string {
-        $a = '';
-        if (preg_match('/text-align\s*:\s*(left|center|right|justify)\b/i', (string)$el->getAttribute('style'), $m)) {
-            $a = strtolower($m[1]);
-        } elseif (in_array(strtolower((string)$el->getAttribute('align')), ['left', 'center', 'right', 'justify'], true)) {
-            $a = strtolower($el->getAttribute('align'));
-        }
-        return ($a !== '' && $a !== 'left') ? ' style="text-align:' . $a . '"' : '';
-    };
-
-    $walk = function (DOMNode $node) use (&$walk, $dropWithContent, $aligned, $align): string {
-        $out = '';
-        foreach ($node->childNodes as $c) {
-            if ($c->nodeType === XML_TEXT_NODE) {
-                $out .= htmlspecialchars((string)$c->nodeValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-                continue;
-            }
-            if ($c->nodeType !== XML_ELEMENT_NODE) continue;
-            $tag = strtolower($c->nodeName);
-            if (in_array($tag, $dropWithContent, true)) continue;
-
-            if ($tag === 'br') { $out .= '<br>'; continue; }
-            $inner = $walk($c);
-
-            if ($tag === 'b') $tag = 'strong';
-            if ($tag === 'i') $tag = 'em';
-            if ($tag === 'div') $tag = 'p';        // browsers add <div> for new lines
-
-            if ($tag === 'a') {
-                $href = trim((string)$c->getAttribute('href'));
-                $href = preg_replace('/[\x00-\x1F\x7F\s]+/', '', $href);
-                if ($href === '' || !preg_match('#^(https?://|mailto:|tel:|/(?!/)|\#)#i', $href)) { $out .= $inner; continue; }
-                $ext = preg_match('#^https?://#i', $href);
-                $out .= '<a href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8') . '"'
-                      . ($ext ? ' target="_blank" rel="noopener noreferrer"' : '') . '>' . $inner . '</a>';
-                continue;
-            }
-            if (in_array($tag, ['p', 'h2', 'h3', 'h4', 'blockquote', 'ul', 'ol', 'li', 'strong', 'em', 'u'], true)) {
-                $attr = in_array($tag, $aligned, true) ? $align($c) : '';
-                $out .= '<' . $tag . $attr . '>' . $inner . '</' . $tag . '>';
-                continue;
-            }
-            $out .= $inner;                          // unknown tag: keep its text, drop the tag
-        }
-        return $out;
-    };
-
-    $clean = $walk($root);
-    // tidy: empty paragraphs/formatting and runs of <br>
-    $clean = preg_replace('#<p(?: style="[^"]*")?>(?:\s|<br>|&nbsp;)*</p>#i', '', $clean);
-    $clean = preg_replace('#<(strong|em|u)>\s*</\1>#i', '', $clean);
-    return trim($clean);
-}
-
-/**
- * What gets stored in page_sections. Text with no formatting stays PLAIN
- * TEXT (paragraphs separated by a blank line), exactly as before, so pages
- * that print it as text keep working. Only text that really uses formatting
- * (bold, lists, headings, links, alignment...) is stored as clean HTML.
- */
-function richTextToStorage(string $html): string {
-    $clean = richTextSanitize($html);
-    if ($clean === '') return '';
-    if (!preg_match('#<(?!/?(?:p|br)\b)[a-z]#i', $clean) && strpos($clean, 'style=') === false) {
-        $t = preg_replace('#<br\s*/?>#i', "\n", $clean);
-        $t = preg_replace('#</p>\s*<p>#i', "\n\n", $t);
-        $t = preg_replace('#</?p>#i', '', $t);
-        return trim(html_entity_decode($t, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-    }
-    return $clean;
-}
-
-/** Stored text (plain or HTML) -> safe HTML for the editor. */
-function sectionToEditorHtml(?string $stored): string {
-    $s = (string)$stored;
-    if (trim($s) === '') return '';
-    if (richTextLooksLikeHtml($s)) return richTextSanitize($s);
-    $paras = preg_split('/\R{2,}/', trim($s)) ?: [];
-    return implode('', array_map(function ($p) {
-        return '<p>' . nl2br(htmlspecialchars(trim($p), ENT_QUOTES, 'UTF-8'), false) . '</p>';
-    }, $paras));
-}
-
-/**
- * Use this on PUBLIC pages wherever a section's text is printed:
- *   echo renderSectionContent(getSectionContent('vision-mission', 'vision'));
- * Plain text is escaped (line breaks kept); formatted text is printed as
- * sanitised HTML, so bold, lists, links etc. show up on the website.
- */
-function renderSectionContent(?string $stored): string {
-    $s = (string)$stored;
-    if (trim($s) === '') return '';
-    if (richTextLooksLikeHtml($s)) return richTextSanitize($s);
-    return nl2br(htmlspecialchars($s, ENT_QUOTES, 'UTF-8'));
-}
-
 /** One section with the names of the people involved (editor UI). */
 function getSectionDetailed(string $pageSlug, string $sectionKey): ?array {
     try {
@@ -2807,6 +2694,7 @@ function storeDepartmentUpload(array $file, string $kind): array {
 
     try {
         $db   = getDB();
+        imageFramingSaveUpload($filePath, $destination);
         $stmt = $db->prepare("
             INSERT INTO media_library (file_name, file_type, file_size, file_path, created_by, created_at)
             VALUES (?, ?, ?, ?, ?, NOW())
@@ -2868,13 +2756,23 @@ function deleteMediaIfUnreferenced(int $mediaId): bool {
         ['homepage_president', 'media_id'],
         ['admin_people',   'media_id'],
         ['admin_offices',  'media_id'],
+        ['student_organizations', 'logo_media_id'],
+        ['student_organizations', 'cover_media_id'],
+        ['student_org_gallery', 'media_id'],
+        ['student_org_page_content', 'content'],
     ];
 
     try {
         $db = getDB();
         foreach ($references as [$table, $column]) {
-            $stmt = $db->prepare("SELECT 1 FROM `{$table}` WHERE `{$column}` = ? LIMIT 1");
-            $stmt->execute([$mediaId]);
+            try {
+                $stmt = $db->prepare("SELECT 1 FROM `{$table}` WHERE `{$column}` = ? LIMIT 1");
+                $stmt->execute([$mediaId]);
+            } catch (PDOException $e) {
+                // Optional CMS modules may not be installed yet; absent columns cannot reference media.
+                if (in_array($e->getCode(), ['42S02', '42S22'], true)) continue;
+                throw $e;
+            }
             if ($stmt->fetchColumn() !== false) {
                 return false; // still in use somewhere
             }
@@ -3255,6 +3153,15 @@ function saveDepartmentDean(
         throw new Exception('Department not found.');
     }
 
+    if (trim($office) !== trim((string)($dept['dean_office'] ?? ''))) {
+        if (($_SESSION['user_role'] ?? '') !== 'Super Admin') {
+            throw new Exception('Only Super Admin can change office locations.');
+        }
+        if (($dept['office_building_id'] ?? null) !== null) {
+            throw new Exception('Update this office through its location card in the Visual Editor.');
+        }
+    }
+
     $hasPhoto = !empty($photoFile) && ($photoFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
 
     $newPhoto = null;
@@ -3274,7 +3181,7 @@ function saveDepartmentDean(
     };
     $name   = $clean($name);
     $title  = $clean($title);
-    $bio    = $clean($bio);
+    $bio    = $clean(richTextNormalize($bio));
     $phone  = $clean($phone);
     $email  = $clean($email);
     $office = $clean($office);
@@ -3385,6 +3292,9 @@ function saveDepartmentName(int $deptId, string $name): array {
  */
 function departmentAdminPayload(array $dept): array {
     return [
+        'office_location' => departmentOfficeLocation($dept),
+        'office_buildings' => campusOfficeBuildings(),
+        'can_edit_office' => ($_SESSION['user_role'] ?? '') === 'Super Admin',
         'dept_id'         => (int)$dept['dept_id'],
         'slug'            => $dept['slug'] ?? null,
         'name'            => $dept['dept_name'],
@@ -3467,8 +3377,9 @@ function cleanDepartmentDetails(array $data): array {
         throw new Exception('The department name is too long (maximum 255 characters).');
     }
 
-    $description = trim((string)($data['description'] ?? ''));
+    $description = richTextNormalize((string)($data['description'] ?? ''));
     $aboutText   = trim((string)($data['about_text'] ?? ''));
+    if (preg_match('/<[a-z][\s\S]*>/i', $aboutText)) $aboutText = richTextSanitize($aboutText);
     if (mb_strlen($description) > 10000 || mb_strlen($aboutText) > 10000) {
         throw new Exception('The description/about text is too long (maximum 10000 characters).');
     }
@@ -3543,6 +3454,14 @@ function saveDepartmentDetails(array $data): array {
     $db      = getDB();
     $deptId  = (int)($data['dept_id'] ?? 0);
     $details = cleanDepartmentDetails($data);
+
+    if ($deptId > 0) {
+        $current = getDepartmentById($deptId);
+        if ($current && trim((string)$details['office_label']) !== trim((string)($current['office_label'] ?? ''))
+            && ($_SESSION['user_role'] ?? '') !== 'Super Admin') {
+            throw new Exception('Only Super Admin can change office locations.');
+        }
+    }
 
     try {
         if ($deptId > 0) {
@@ -3761,7 +3680,7 @@ function saveHomepagePresident(
     $eyebrow  = $clean($eyebrow);
     $heading  = $clean($heading);
     $greeting = $clean($greeting);
-    $message  = $clean($message);
+    $message  = $clean(richTextNormalize($message));
 
     try {
         $stmt = getDB()->prepare("
@@ -4213,7 +4132,7 @@ function administrationResolvePhoto(?array $file, bool $remove, ?int $currentMed
 function saveAdministrationSection(string $sectionKey, string $title, string $description): void {
     $title = administrationCleanLine($title, 255, 'the section title', true);
 
-    $description = trim(str_replace(["\r\n", "\r"], "\n", $description));
+    $description = richTextNormalize(str_replace(["\r\n", "\r"], "\n", $description));
     if (mb_strlen($description) > 2000) {
         throw new Exception('The description is too long (maximum 2000 characters).');
     }
@@ -4665,6 +4584,7 @@ function storeProgramImageUpload(array $file): array {
 
     try {
         $db   = getDB();
+        imageFramingSaveUpload($filePath, $destination);
         $stmt = $db->prepare("
             INSERT INTO media_library (file_name, file_type, file_size, file_path, created_by, created_at)
             VALUES (?, ?, ?, ?, ?, NOW())
@@ -4747,7 +4667,7 @@ function saveProgramFull(array $data, ?array $imageFile, bool $removeImage): arr
         }
     }
 
-    $description = trim((string)($data['description'] ?? ''));
+    $description = richTextNormalize((string)($data['description'] ?? ''));
     if (mb_strlen($description) > 5000) {
         throw new Exception('The program description is too long (maximum 5000 characters).');
     }
@@ -4992,7 +4912,7 @@ function saveProgramPageDetails(int $programId, array $data, array $files = [], 
     if ($name === '') throw new Exception('The program name can\'t be empty.');
     if (mb_strlen($name) > 255) throw new Exception('The program name is too long (maximum 255 characters).');
 
-    $card = trim((string)($data['description'] ?? ''));
+    $card = richTextNormalize((string)($data['description'] ?? ''));
     if (mb_strlen($card) > 5000) throw new Exception('The short description is too long (maximum 5000 characters).');
 
     $deptId = (int)($data['dept_id'] ?? 0);
@@ -5012,6 +4932,8 @@ function saveProgramPageDetails(int $programId, array $data, array $files = [], 
         } elseif ($spec['type'] === 'path') {
             // Static pictures can't be typed in by hand: keep what is stored.
             $val = $current['content'][$key];
+        } elseif ($spec['type'] === 'long') {
+            $val = richTextNormalize($val);
         } elseif ($spec['type'] === 'text') {
             $val = preg_replace('/\s+/', ' ', $val);
         }
@@ -5162,6 +5084,7 @@ function programPageStoreBannerMedia(array $f): array {
     if (!move_uploaded_file($tmp, $dir . $name)) {
         throw new Exception('Failed to save a banner file.');
     }
+    imageFramingSaveUpload('/uploads/program-banners/' . $name, $dir . $name);
     return ['type' => $type, 'path' => '/uploads/program-banners/' . $name, 'abs' => $dir . $name];
 }
 
@@ -5336,7 +5259,7 @@ function saveProgramPageItems(int $programId, string $type, array $rows): array 
 
             $title = trim(preg_replace('/\s+/', ' ', (string)($row['title'] ?? '')));
             $sub   = trim(preg_replace('/\s+/', ' ', (string)($row['subtitle'] ?? '')));
-            $body  = trim(str_replace("\r\n", "\n", (string)($row['body'] ?? '')));
+            $body  = richTextNormalize((string)($row['body'] ?? ''));
             $icon  = programPageCleanIcon($row['icon'] ?? '', '');
             $letter = mb_substr(trim((string)($row['letter'] ?? '')), 0, 2);
 
@@ -5380,7 +5303,7 @@ function saveProgramPageItems(int $programId, string $type, array $rows): array 
                     $stored[] = $upload;
                     $mediaId = $upload['media_id'];
                     $path    = null;
-                    if ($type === 'facility') programPageOptimizeImage((int)$mediaId);
+                    // Preserve original upload bytes; framing is stored separately.
                 } elseif (!empty($row['remove_image'])) {
                     $mediaId = null;
                     $path    = null;
@@ -5581,6 +5504,10 @@ function ceField(string $name, array $o = []): string {
     if (!empty($o['label']))     $a .= ' data-ve-label="' . ceAttr($o['label']) . '"';
     if (!empty($o['ph']))        $a .= ' data-ve-ph="'    . ceAttr($o['ph'])    . '"';
     if (!empty($o['multiline'])) $a .= ' data-ve-multiline="1"';
+    if (!empty($o['rich'])) $a .= ' data-ve-rich="1"';
+    if (!empty($o['optional'])) $a .= ' data-warning-optional="true"';
+    if (!empty($o['warning_required'])) $a .= ' data-warning-required="true"';
+    if (!empty($o['section'])) $a .= ' data-warning-section="' . ceAttr($o['section']) . '"';
     return ' ' . $a;
 }
 
@@ -5722,6 +5649,9 @@ function homeTextHtml(string $key): string {
 function homeMultilineKeys(): array {
     return ['news_subheading', 'programs_subheading'];
 }
+function homeRichKeys(): array {
+    return ['news_intro','calendar_intro','programs_intro','campus_intro','programs_1_text','programs_2_text','programs_3_text'];
+}
 
 /** A multi-line block, escaped, with its line break printed as <br> (for visitors and for the editor preview). */
 function homeTextBr(string $key): string {
@@ -5753,7 +5683,7 @@ function homeTextMark(string $key, bool $multiline = false): string {
     $all = getHomeContent();
     if (!isset($all[$key])) return '';
     return ceMark('data-ve-field="home-text" data-ve-key="' . ceAttr($key) . '" data-ve-max="' . (int)$all[$key]['max']
-        . '" data-ve-label="' . ceAttr($all[$key]['label']) . '"' . ($multiline ? ' data-ve-multiline="1"' : ''));
+        . '" data-ve-label="' . ceAttr($all[$key]['label']) . '"' . ($multiline||in_array($key,homeRichKeys(),true) ? ' data-ve-multiline="1"' : '') . (in_array($key,homeRichKeys(),true)?' data-ve-rich="1"':''));
 }
 
 /** The editor's copy of every block (JSON-safe). */
@@ -5766,6 +5696,11 @@ function homeContentAdminPayload(): array {
 }
 
 function homeContentEnsureTable(): void {
+    // CREATE TABLE, even IF NOT EXISTS, implicitly commits an open MySQL transaction.
+    // Existing installations only need a read here; never disturb their caller's transaction.
+    try { getDB()->query('SELECT 1 FROM homepage_text LIMIT 1'); return; }
+    catch(PDOException $e){if($e->getCode()!=='42S02')throw $e;}
+    if(getDB()->inTransaction())throw new RuntimeException('Create the homepage text table before starting a content transaction.');
     getDB()->exec("
         CREATE TABLE IF NOT EXISTS homepage_text (
             text_key   VARCHAR(60) NOT NULL PRIMARY KEY,
@@ -5789,7 +5724,9 @@ function saveHomeContent(array $texts, array $images): array {
     $clean = [];
     foreach ($texts as $key => $val) {
         if (!isset($schema[$key]) || $schema[$key]['type'] === 'image') throw new Exception('That part of the homepage cannot be edited.');
-        if (in_array($key, homeMultilineKeys(), true)) {
+        if(in_array($key,homeRichKeys(),true)){
+            $val=richTextNormalize((string)$val);
+        } elseif (in_array($key, homeMultilineKeys(), true)) {
             // keep the line break the editor typed (one at most per gap), tidy the spaces around it
             $val = trim(preg_replace('/[ \t]*\n[ \t]*/', "\n", preg_replace('/\n{2,}/', "\n", preg_replace('/[ \t]+/', ' ', str_replace("\r", '', (string)$val)))));
         } else {

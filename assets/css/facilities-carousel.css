@@ -1,0 +1,140 @@
+/* =====================================================================
+   FACILITIES - coverflow carousel
+   Centre photo is full size; neighbours shrink and tuck behind it.
+   program.php sets data-pos on each slide: -2, -1, 0, 1, 2 or "hide".
+   ===================================================================== */
+.fcar {
+    position: relative;
+    margin-top: 2rem;
+}
+
+.fcar-stage {
+    position: relative;
+    height: clamp(260px, 36vw, 440px);
+    overflow: hidden;
+    outline: none;
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.fcar-slide {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 46%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate3d(-50%, 0, 0) scale(1);
+    /* Light animation: only transform + opacity (compositor-only, no repaint),
+       short and snappy. No shadow, no overlay, no clipping on the moving layer. */
+    transition: transform .36s cubic-bezier(.22, .61, .36, 1), opacity .36s linear;
+    will-change: transform, opacity;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.fcar-slide img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 14px;
+    pointer-events: none;
+    -webkit-user-drag: none;
+}
+
+/* Three photos on stage: centre + one each side (sides are smaller and slightly faded).
+   program.php sets data-pos: -1, 0, 1, or hide-l / hide-r for everything else. */
+.fcar-slide[data-pos="0"]  { opacity: 1;   pointer-events: auto; z-index: 5; cursor: zoom-in; transform: translate3d(-50%, 0, 0) scale(1); }
+.fcar-slide[data-pos="-1"] { opacity: .6;  pointer-events: auto; z-index: 4; transform: translate3d(calc(-50% - 62%), 0, 0) scale(.8); }
+.fcar-slide[data-pos="1"]  { opacity: .6;  pointer-events: auto; z-index: 4; transform: translate3d(calc(-50% + 62%), 0, 0) scale(.8); }
+.fcar-slide[data-pos="hide-l"] { opacity: 0; pointer-events: none; z-index: 1; transform: translate3d(calc(-50% - 90%), 0, 0) scale(.65); }
+.fcar-slide[data-pos="hide-r"] { opacity: 0; pointer-events: none; z-index: 1; transform: translate3d(calc(-50% + 90%), 0, 0) scale(.65); }
+/* program.php adds this for one frame to move a hidden/wrapping slide with no animation */
+.fcar-slide.is-jump { transition: none !important; }
+
+.fcar-slide:focus-visible { outline: 3px solid var(--gnc-gold); outline-offset: -3px; }
+
+/* facility name sits on the centre photo only */
+.fcar-caption {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 2.2rem 1.1rem 0.9rem;
+    border-radius: 0 0 14px 14px;
+    text-align: left;
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.01em;
+    background: linear-gradient(to top, rgba(6, 32, 24, .82), rgba(6, 32, 24, 0));
+    opacity: 0;
+    transition: opacity .25s ease .1s;
+}
+.fcar-slide[data-pos="0"] .fcar-caption { opacity: 1; }
+
+/* arrows */
+.fcar-arrow {
+    position: absolute;
+    top: calc(clamp(260px, 36vw, 440px) / 2);
+    transform: translateY(-50%);
+    z-index: 10;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    color: var(--gnc-template-text);
+    background: rgba(255, 255, 255, .92);
+    box-shadow: var(--ds-shadow-md, 0 6px 18px rgba(0, 0, 0, .15));
+    cursor: pointer;
+    transition: background-color .2s ease, color .2s ease, transform .2s ease;
+}
+.fcar-arrow:hover { background: var(--gnc-template); color: #fff; transform: translateY(-50%) scale(1.07); }
+.fcar-arrow:focus-visible { outline: 3px solid var(--gnc-gold); outline-offset: 2px; }
+.fcar-prev { left: 0; }
+.fcar-next { right: 0; }
+
+/* dots */
+.fcar-dots {
+    display: flex;
+    justify-content: center;
+    gap: .6rem;
+    margin-top: 1.4rem;
+}
+.fcar-dot {
+    width: 11px;
+    height: 11px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--gnc-template, #307056);
+    background: transparent;
+    cursor: pointer;
+    transition: background-color .25s ease, transform .25s ease, width .3s var(--ds-ease, ease);
+}
+.fcar-dot:hover { transform: scale(1.2); }
+.fcar-dot.is-active { background: var(--gnc-gold); border-color: var(--gnc-gold); width: 26px; border-radius: 999px; }
+.fcar-dot:focus-visible { outline: 3px solid var(--gnc-gold); outline-offset: 3px; }
+
+@media (max-width: 767px) {
+    .fcar-slide { width: 66%; }
+    .fcar-slide[data-pos="-1"] { transform: translate3d(calc(-50% - 56%), 0, 0) scale(.78); }
+    .fcar-slide[data-pos="1"]  { transform: translate3d(calc(-50% + 56%), 0, 0) scale(.78); }
+    .fcar-arrow { width: 38px; height: 38px; }
+}
+
+@media (hover: none) {
+    .fcar-arrow:hover { background: rgba(255, 255, 255, .92); color: var(--gnc-template-text); transform: translateY(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fcar-slide, .fcar-caption, .fcar-dot, .fcar-arrow { transition: none; }
+}
+

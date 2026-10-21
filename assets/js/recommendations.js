@@ -5,6 +5,8 @@
     const KEY='gnc_recommendations_v1', DAY=86400000;
     const $=id=>document.getElementById(id);
     const privacy=$('gncRecPrivacy'), settings=$('gncRecSettings');
+    const dueAt=Date.now()+Math.max(0,60000-performance.now());
+    let hasOpened=false,openTimer=null,closeTimer=null,previousFocus=null,pageScroll=null;
     let state={consent:null,history:{},shown:{}}, items=[], current=null, selected=[], observed=false, lastTick=Date.now(), counted=false;
     const restricted=!!navigator.globalPrivacyControl || navigator.doNotTrack==='1';
     function load() {
@@ -40,6 +42,41 @@
         selected.forEach(i=>{state.shown[i.id]=Date.now();});
         state.shown=Object.fromEntries(Object.entries(state.shown).sort((a,b)=>a[1]-b[1]).slice(-100)); save();
     }
+    function openWhenReady() {
+        clearTimeout(openTimer);
+        if(hasOpened || !selected.length)return;
+        const remaining=dueAt-Date.now();
+        if(remaining>0){openTimer=setTimeout(openWhenReady,remaining);return;}
+        if(document.hidden)return;
+        // Let an existing map or form dialog finish before showing a suggestion.
+        if(document.querySelector('dialog[open],.modal.show')){openTimer=setTimeout(openWhenReady,1000);return;}
+        previousFocus=document.activeElement;
+        pageScroll={left:window.scrollX,top:window.scrollY,behavior:'instant'};
+        document.documentElement.classList.add('gnc-rec-modal-open');
+        section.hidden=false;section.showModal();hasOpened=true;observed=true;
+        window.scrollTo(pageScroll);
+        markShown();
+    }
+    function closeSuggestions() {
+        if(!section.open || closeTimer)return;
+        if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){section.close();return;}
+        section.classList.add('is-closing');
+        closeTimer=setTimeout(()=>{closeTimer=null;section.close();},180);
+    }
+    $('gncRecClose').addEventListener('click',closeSuggestions);
+    $('gncRecDismiss').addEventListener('click',closeSuggestions);
+    section.addEventListener('cancel',event=>{event.preventDefault();closeSuggestions();});
+    section.addEventListener('click',event=>{
+        if(event.target!==section)return;
+        const bounds=section.getBoundingClientRect();
+        if(event.clientX<bounds.left || event.clientX>bounds.right || event.clientY<bounds.top || event.clientY>bounds.bottom)closeSuggestions();
+    });
+    section.addEventListener('close',()=>{
+        clearTimeout(closeTimer);closeTimer=null;section.classList.remove('is-closing');
+        document.documentElement.classList.remove('gnc-rec-modal-open');
+        if(pageScroll)window.scrollTo(pageScroll);
+        if(previousFocus && previousFocus.isConnected)previousFocus.focus({preventScroll:true});
+    });
     function render(recordImpressions = true) {
         selected=engine.rank(items,state.consent ? state.history : {},current && current.id,state.consent ? state.shown : {});
         const cards=$('gncRecCards'); cards.replaceChildren();
@@ -54,6 +91,7 @@
             body.append(category,title,desc); a.append(img,body); cards.append(a);
         });
         section.hidden=!selected.length;
+        if(!selected.length && section.open)section.close();
         $('gncRecSummary').textContent=state.consent ? 'Suggestions based on your recent interests.' : 'Explore popular pages and recent updates.';
         $('gncRecEnable').disabled=restricted;
         $('gncRecStatus').textContent=restricted ? 'Your browser privacy signal is enabled. We use general suggestions.' : state.consent ? 'Personalization is on for this browser.' : 'Personalization is off.';
@@ -71,13 +109,9 @@
             const path=engine.canonical(location.href);
             current=items.find(i=>(i.aliases || [i.url]).some(a=>engine.canonical(a)===path)) || null;
             visit(); render();
-            if (state.consent===null) {privacy.hidden=false;settings.setAttribute('aria-expanded','true');}
-            if ('IntersectionObserver' in window) {
-                const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){observed=true;markShown();observer.disconnect();}},{threshold:.3});
-                observer.observe(section);
-            }
+            openWhenReady();
             setInterval(tick,10000);
-            document.addEventListener('visibilitychange',()=>{lastTick=Date.now();});
+            document.addEventListener('visibilitychange',()=>{lastTick=Date.now();if(!document.hidden)openWhenReady();});
             window.addEventListener('pagehide',()=>{if(state.consent)save();});
         }).catch(()=>{section.hidden=true;});
 })();

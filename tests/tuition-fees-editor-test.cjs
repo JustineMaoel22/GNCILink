@@ -1,0 +1,82 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {spawn}=require('node:child_process');
+const profile=fs.mkdtempSync(path.join(os.tmpdir(),'gnci-tuition-editor-'));
+const browser=spawn(process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function until(work,message){for(let end=Date.now()+30000;Date.now()<end;){if(await work())return;await delay(50);}throw Error(message);}
+let socket,session;
+const {execFileSync}=require('node:child_process');
+const prefix='TUITIONTEST-'+Date.now();
+const php=(...args)=>execFileSync('docker',['compose','exec','-T','--user','www-data','web','php','tests/student-organizations-test.php',...args],{encoding:'utf8',windowsHide:true});
+(async()=>{
+    await until(()=>fs.existsSync(path.join(profile,'DevToolsActivePort')),'Chrome did not start');
+    const port=fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0];
+    const tabs=await(await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+    socket=new WebSocket(tabs.find(tab=>tab.type==='page').webSocketDebuggerUrl);
+    await new Promise(resolve=>socket.addEventListener('open',resolve,{once:true}));
+    let serial=0;const pending=new Map();
+    socket.addEventListener('message',event=>{const packet=JSON.parse(event.data);if(packet.id&&pending.has(packet.id)){pending.get(packet.id)(packet);pending.delete(packet.id);}});
+    const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++serial;pending.set(id,result=>result.error?reject(Error(JSON.stringify(result.error))):resolve(result.result));socket.send(JSON.stringify({id,method,params}));});
+    const evaluate=async expression=>{const result=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));return result.result.value;};
+    const base=process.env.BASE_URL||'http://localhost:8080';
+    await send('Page.enable');await send('Network.enable');
+    await send('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*','*cdn.jsdelivr.net*','*cdnjs.cloudflare.com*','*facebook.com*','*youtube.com*']});
+    session=JSON.parse(php('session'));
+    await send('Network.setCookie',{name:session.name,value:session.id,url:base});
+    await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+    const editor=base+'/admin/content-edit.php?page=tuition-fees';
+    async function load(){await send('Page.navigate',{url:editor});await until(()=>evaluate(`Boolean(document.getElementById("veFrame")?.contentDocument?.querySelector('[data-ve-key="hero_intro"]')?.__ve)`), 'Tuition editor unavailable');}
+    const frame='document.getElementById("veFrame").contentDocument';
+    await load();
+    assert.equal(await evaluate('VE_CONFIG.page.kind'),'tuition');
+    assert.equal(await evaluate('document.getElementById("veSecondary").textContent.includes("Manage PDFs")'),true);
+    assert.equal(await evaluate(`${frame}.querySelectorAll('.fee-guidance [data-ve-field="tuition-text"][contenteditable]').length`),13,'All guidance headings, descriptions and link text are editable');
+    assert.equal(await evaluate(`${frame}.querySelectorAll('[data-ve-icon="tuition"]').length`),6,'All six guidance icons are editable');
+    await evaluate(`${frame}.querySelector('[data-ve-icon="tuition"][data-ve-key="payment_icon"]').click()`);
+    await evaluate('Array.from(document.querySelectorAll("#veTb button")).find(b=>b.textContent.includes("Change icon")).click()');
+    await evaluate('(()=>{const search=document.querySelector("#vePop input");search.value="payments";search.dispatchEvent(new Event("input",{bubbles:true}));})()');
+    await evaluate(`document.querySelector('#vePop button[title="Payments (Material Symbols)"]').click()`);
+    assert.equal(await evaluate(`${frame}.querySelector('[data-ve-key="payment_icon"] .material-symbols-outlined').textContent`),'payments');
+    assert.equal(await evaluate('document.getElementById("vePrimary").disabled'),false,'Icon edits enable Publish');
+    assert(!(await(await fetch(base+'/pages/admission/tuition-fees.php')).text()).includes('>payments</span>'),'Unpublished icons stay private');
+    const publishIcon=icon=>evaluate(`(async()=>{const fd=new FormData();fd.append('csrf_token',VE_CONFIG.csrf);fd.append('texts',JSON.stringify({payment_icon:${JSON.stringify(icon)}}));const response=await fetch('/admin/action/tuition-fees-handler.php',{method:'POST',body:fd});return {status:response.status,body:await response.json()};})()`);
+    const currentIcon=await evaluate(`JSON.parse(${frame}.getElementById('veTuitionData').textContent).fields.payment_icon.value`);
+    assert.equal((await publishIcon(currentIcon)).body.success,true,'The current library icon can be persisted through the publishing endpoint');
+    assert.equal((await publishIcon('<img src=x onerror=alert(1)>')).status,422,'Arbitrary icon markup is rejected');
+    await evaluate('window.__veLeaving=true');await load();
+    await evaluate(`(()=>{const field=${frame}.querySelector('[data-ve-key="hero_intro"]');field.textContent='Unpublished tuition introduction';field.dispatchEvent(new Event('input',{bubbles:true}));field.click();})()`);
+    assert.equal(await evaluate('document.getElementById("vePrimary").disabled'),false,'Text edits enable Publish');
+    assert.equal(await evaluate(`Boolean(document.querySelector('#veTb [aria-label="Bold (Ctrl+B)"]'))`),true,'Rich toolbar available');
+    await evaluate(`${frame}.querySelector('[data-fee-category="graduate-school"] i').click()`);
+    assert.equal(await evaluate(`${frame}.querySelector('[data-ve-key="hero_intro"]').textContent`),'Unpublished tuition introduction','Switching categories preserves edits');
+    const unpublished=await(await fetch(base+'/pages/admission/tuition-fees.php')).text();
+    assert(!unpublished.includes('Unpublished tuition introduction'),'Unsaved text stays private');
+    await evaluate('window.__veLeaving=true');await load();
+    await evaluate('document.getElementById("veSecondary").click();Array.from(document.querySelectorAll("#vePop button")).find(b=>b.textContent==="Add PDF").click()');
+    const pdf='%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0/Kids[]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
+    await evaluate(`(()=>{const input=Array.from(document.querySelectorAll('input[type=file]')).at(-1);const dt=new DataTransfer();dt.items.add(new File([${JSON.stringify(pdf)}],${JSON.stringify(prefix+'.pdf')},{type:'application/pdf'}));input.files=dt.files;input.dispatchEvent(new Event('change'));})()`);
+    await until(()=>evaluate(`${frame}.defaultView.GNCTuitionFees.categories.college.documents.some(d=>d.title===${JSON.stringify(prefix)})`),'PDF not staged');
+    assert(!(await(await fetch(base+'/pages/admission/tuition-fees.php')).text()).includes(prefix),'Staged PDF stays private');
+    await evaluate('document.getElementById("vePrimary").click()');
+    await until(()=>evaluate('Boolean(document.querySelector(".ve-publish-accept,.cms-completeness-publish"))'),'Publish dialog missing');
+    await evaluate('document.querySelector(".ve-publish-accept,.cms-completeness-publish").click()');
+    let published;
+    await until(async()=>{const html=await(await fetch(base+'/pages/admission/tuition-fees.php')).text();const json=JSON.parse(html.match(/id="feeDocumentsData">([\s\S]*?)<\/script>/)[1]);published=json.college.documents.find(doc=>doc.title===prefix);return !!published;},'Published PDF missing');
+    const response=await fetch(base+published.url);assert.equal(response.status,200);assert.equal((await response.text()).slice(0,5),'%PDF-');
+    await until(()=>evaluate(`Boolean(document.getElementById("veFrame")?.contentDocument?.querySelector('[data-ve-key="hero_intro"]')?.__ve)&&document.getElementById("vePrimary").disabled`),'Editor refresh');
+    const post=async(change,file)=>evaluate(`(async()=>{const fd=new FormData();fd.append('csrf_token',VE_CONFIG.csrf);fd.append('texts','{}');fd.append('documents',JSON.stringify([${JSON.stringify(change)}]));${file?"fd.append('pdf_0',new File(['invalid pdf'],'invalid.pdf',{type:'application/pdf'}));":''}const res=await fetch('/admin/action/tuition-fees-handler.php',{method:'POST',body:fd});return {status:res.status,body:await res.json()};})()`);
+    const bad=await post({id:published.id,category:'college',title:prefix+' invalid'},true);
+    assert.equal(bad.status,422,'Invalid replacement rejected');
+    const stillLive=await(await fetch(base+'/pages/admission/tuition-fees.php')).text();assert(stillLive.includes(prefix));assert(!stillLive.includes(prefix+' invalid'),'Failed upload rolls back title changes');
+    const renamed=await post({id:published.id,category:'college',title:prefix+' renamed'});assert.equal(renamed.body.success,true);
+    const removed=await post({id:published.id,category:'college',remove:true});assert.equal(removed.body.success,true);
+    assert(!(await(await fetch(base+'/pages/admission/tuition-fees.php')).text()).includes(prefix),'Removed document disappears');
+    const denied=await fetch(base+'/admin/action/tuition-fees-handler.php',{method:'POST',body:new URLSearchParams({texts:'{}',documents:'[]'})});assert.equal(denied.status,403,'Anonymous publishing rejected');
+    console.log('PASS: all guidance text and icons are editable; icon selection enables Publish, stays private, persists through the handler and rejects invalid markup; PDF publication, category switching, rename, removal and authorization.');
+})().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
+    try {execFileSync('docker',['compose','exec','-T','web','php','-r',"require 'config/config.php'; $db=getDB(); $q=$db->prepare('SELECT document_id,file_path FROM tuition_fee_documents WHERE title LIKE ?');$q->execute([$argv[1].'%']);foreach($q->fetchAll(PDO::FETCH_ASSOC) as $row){$db->prepare('DELETE FROM tuition_fee_documents WHERE document_id=?')->execute([$row['document_id']]);if(preg_match('#^/uploads/tuition-fees/[a-z-]+/[a-f0-9]{32}\\.pdf$#D',$row['file_path']))@unlink(getcwd().$row['file_path']);}",prefix],{encoding:'utf8',windowsHide:true});}catch(error){console.error('Fixture cleanup failed',error.message);process.exitCode=1;}
+    if(session)try{php('destroy_session',session.id);}catch{}
+    if(socket)socket.close();browser.kill();await delay(1000);
+    if(path.dirname(profile)===os.tmpdir()&&path.basename(profile).startsWith('gnci-tuition-editor-'))try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:3,retryDelay:200});}catch{}
+});

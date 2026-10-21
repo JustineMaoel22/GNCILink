@@ -59,7 +59,8 @@
   margin: 0 0 10px;
 }
 
-.cp-hero p {
+.cp-hero p,
+.cp-hero > .cms-rich {
   font-family: 'Inter', sans-serif;
   color: var(--gnc-text-gray);
   font-size: 15px;
@@ -112,6 +113,9 @@
   width: 40px;
   height: 40px;
 }
+.cp-feature-icon > i { color: #fff; font-size: 30px; line-height: 1; }
+.cp-feature-icon > .material-symbols-outlined { color: #fff; font-size: 34px; line-height: 1; }
+.cp-feature-icon:focus-visible { outline: 3px solid #d3a63a; outline-offset: 3px; }
 
 .cp-feature-text h3 {
   font-size: 14.5px;
@@ -120,7 +124,8 @@
   margin: 0 0 3px;
 }
 
-.cp-feature-text p {
+.cp-feature-text p,
+.cp-feature-text > .cms-rich {
   font-size: 12.5px;
   line-height: 1.35;
   color: black;
@@ -317,6 +322,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.cd-logo-empty[data-ve-basic-logo-id] {
+  display: grid;
+  place-items: center;
+  color: #307056;
+  cursor: pointer;
 }
 
 .cd-logo-empty {

@@ -27,27 +27,43 @@ function rejected(callable $operation, string $label): void {
     throw new RuntimeException($label);
 }
 function cePreviewCanManage(): bool { return $GLOBALS['preview'] ?? false; }
+function ceManageMark(string $attributes): string { return cePreviewCanManage() ? ' ' . $attributes : ''; }
 function ceField(string $name, array $options): string { return ' data-ve-field="' . $name . '"'; }
 function ceAttr($value): string { return htmlspecialchars((string)$value, ENT_QUOTES); }
 function ceData(string $id, array $data): string { return '<script id="' . $id . '">' . json_encode($data, JSON_HEX_TAG) . '</script>'; }
 
-saveBasicEducationContent('index', ['text_01' => 'Updated heading', 'text_02' => '<script>alert(1)</script>'], []);
+saveBasicEducationContent('index', ['text_01' => 'Updated heading', 'text_02' => '<script>alert(1)</script>', 'icon_01' => 'bi:book', 'icon_02' => 'material:science'], []);
+check(str_contains(academicFeatureIcon('index', 'icon_02', 'basic-edu-feature-icon'), 'material-symbols-outlined') && str_contains(academicFeatureIcon('index', 'icon_02', 'basic-edu-feature-icon'), '>science</span>'), 'Saved Material Symbols render on the public page');
+check(count(array_filter(array_keys(academicFeatureIconChoices()), fn($key) => str_starts_with($key, 'bi:'))) > 2000, 'Picker includes the full Bootstrap Icons catalog');
+check(count(array_filter(array_keys(academicFeatureIconChoices()), fn($key) => str_starts_with($key, 'material:'))) > 200, 'Picker includes hundreds of Material Symbols');
+check(str_contains(academicFeatureIcon('index', 'icon_01', 'basic-edu-feature-icon'), 'bi-book'), 'Basic Education renders the saved icon');
+check(!str_contains(academicFeatureIcon('index', 'icon_01', 'basic-edu-feature-icon'), 'data-ve-icon'), 'Visitors receive no icon editing controls');
 check(basicEducationText('index', 'text_01') === 'Updated heading', 'Published edits persist and render');
 check(!str_contains(basicEducationText('index', 'text_02'), '<script>'), 'Published text is escaped');
-check(basicEducationText('index', 'text_03') !== '', 'Untouched fields keep their defaults');
+check(basicEducationText('index', 'text_03') === '', 'Unset fields stay empty without hardcoded defaults');
+check(basicEducationMedia(null, 'Photo', 'photo') === '', 'Missing public media never uses a fallback image');
+check(!basicEducationHasFields('index', ['text_03']), 'Empty cards can be hidden from visitors');
 check(basicEducationEditorBlock('index') === '' && basicEducationMark('index', 'text_01') === '', 'Visitors receive no editing markers');
 $preview = true;
+check(str_contains(basicEducationMedia(null, 'Photo', 'photo'), 'Add image'), 'Empty image slots remain editable');
 check(str_contains(basicEducationEditorBlock('index'), 'Updated heading'), 'Editor receives saved content');
 check(str_contains(basicEducationMark('index', 'text_01'), 'basic-text'), 'Managers receive editing markers');
 rejected(fn() => saveBasicEducationContent('new-page', [], []), 'Cannot add a page');
 rejected(fn() => saveBasicEducationContent('hs-monte', ['new_program' => 'New'], []), 'Cannot add program fields');
 rejected(fn() => validateBasicEducationChanges('hs-monte', ['image_01' => '/arbitrary.jpg'], []), 'Image paths cannot be posted as text');
 rejected(fn() => validateBasicEducationChanges('hs-monte', [], ['image_99' => []]), 'Cannot add program pictures');
-check(count(array_filter(basicEducationSchema()['hs-monte'], fn($f) => $f['type'] === 'image')) === 6, 'HS Montessori retains six program cards');
-check(count(array_filter(basicEducationSchema()['shs-regular'], fn($f) => $f['type'] === 'image')) === 5, 'SHS retains five program cards');
+check(array_keys(basicEducationSchema()) === ['index', 'college-index'], 'Only listing fields use the PHP metadata; department programs have no fixed slots');
+saveBasicEducationContent('college-index', ['text_01' => 'Updated <college> heading', 'text_02' => '', 'icon_02' => 'bi:star'], []);
+check(str_contains(academicFeatureIcon('college-index', 'icon_02', 'cp-feature-icon'), 'bi-star'), 'College renders the saved icon');
+check(str_contains(academicFeatureIcon('college-index', 'icon_04', 'cp-feature-icon'), '/real_estate_agent.svg'), 'Unchanged icons retain their original artwork');
+rejected(fn() => validateBasicEducationChanges('college-index', ['icon_01' => 'svg:../../file'], []), 'Only approved icon choices can be saved');
+rejected(fn() => validateBasicEducationChanges('index', ['icon_01' => '<script>'], []), 'Arbitrary icon markup is rejected');
+check(basicEducationText('college-index', 'text_01') === 'Updated &lt;college&gt; heading', 'College listing edits persist and render safely');
+check(basicEducationText('college-index', 'text_02') === '', 'Cleared College listing text stays empty');
+check(basicEducationText('college-index', 'text_03') === 'Quality Education', 'Unchanged College features keep their current text');
 getDB()->exec('CREATE TABLE departments (dept_id INTEGER, slug TEXT, department_type TEXT)');
 getDB()->exec("INSERT INTO departments VALUES (1, 'hs-monte', 'basic-education'), (2, 'coe', 'college'), (3, 'custom-basic', 'basic-education')");
-rejected(fn() => assertProgramDepartmentAllowed(1), 'Basic Education program creation is blocked');
-rejected(fn() => assertProgramDepartmentAllowed(3), 'Basic Education type is blocked regardless of slug');
+assertProgramDepartmentAllowed(1);
+assertProgramDepartmentAllowed(3);
 assertProgramDepartmentAllowed(2);
-check(true, 'College program creation remains allowed');
+check(true, 'Basic Education and College share program creation');

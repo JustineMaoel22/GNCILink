@@ -32,7 +32,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
 <!-- ───────── Person modal (Trustees / Officers / Administration) ───────── -->
 <div class="modal fade" id="admPersonModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <form class="modal-content" id="adm-person-form" autocomplete="off">
+    <form data-content-publish class="modal-content" id="adm-person-form" autocomplete="off">
       <div class="modal-header">
         <h5 class="modal-title" id="adm-person-title">Add person</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -68,7 +68,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn-gnc-primary" id="adm-person-save"><i class="bi bi-check2-circle"></i> Save</button>
+        <button data-content-publish type="submit" class="btn-gnc-primary" id="adm-person-save"><i class="bi bi-check2-circle"></i> Save</button>
       </div>
     </form>
   </div>
@@ -77,7 +77,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
 <!-- ───────── Office modal (Heads of Student Services) ───────── -->
 <div class="modal fade" id="admOfficeModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-    <form class="modal-content" id="adm-office-form" autocomplete="off">
+    <form data-content-publish class="modal-content" id="adm-office-form" autocomplete="off">
       <div class="modal-header">
         <h5 class="modal-title" id="adm-office-title">Add office</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -139,7 +139,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn-gnc-primary" id="adm-office-save"><i class="bi bi-check2-circle"></i> Save</button>
+        <button data-content-publish type="submit" class="btn-gnc-primary" id="adm-office-save"><i class="bi bi-check2-circle"></i> Save</button>
       </div>
     </form>
   </div>
@@ -272,7 +272,10 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
             })
             .then(function (data) {
                 if (!data.success) throw new Error(data.error || 'Something went wrong. Please try again.');
-                if (data.sections) state.sections = data.sections;
+                if (data.sections) {
+                    state.sections = data.sections;
+                    document.dispatchEvent(new CustomEvent('administration:updated', { detail: { source: 'settings', sections: data.sections } }));
+                }
                 return data;
             });
     }
@@ -351,12 +354,12 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
               'There is no separate Publish step here. As soon as you save, visitors see the change on the website.</span></div>' +
             '<div class="data-card mb-3">' +
               '<div class="data-card-header"><span class="data-card-title">Heading above the cards</span></div>' +
-              '<form class="adm-meta-form" id="adm-meta-form">' +
+              '<form data-content-publish class="adm-meta-form" id="adm-meta-form">' +
                 '<div class="mb-3"><label class="form-label" for="adm-meta-title">Heading</label>' +
                 '<input type="text" class="form-control" id="adm-meta-title" maxlength="255" required value="' + esc(sec.title) + '"></div>' +
                 '<div class="mb-3"><label class="form-label" for="adm-meta-desc">Short text under the heading <span class="adm-opt">optional</span></label>' +
                 '<textarea class="form-control" id="adm-meta-desc" rows="3" maxlength="2000">' + esc(sec.desc) + '</textarea></div>' +
-                '<div class="d-flex justify-content-end"><button type="submit" class="btn-gnc-primary btn-sm" id="adm-meta-save"><i class="bi bi-check2-circle"></i> Save heading</button></div>' +
+                '<div class="d-flex justify-content-end"><button data-content-publish type="submit" class="btn-gnc-primary btn-sm" id="adm-meta-save"><i class="bi bi-check2-circle"></i> Save heading</button></div>' +
               '</form>' +
             '</div>' +
             '<div class="data-card">' +
@@ -375,6 +378,26 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
     }
 
     function render() { renderTabs(); renderSection(); }
+
+    // The canvas and this panel share the same records but have separate views.
+    document.addEventListener('administration:updated', function (event) {
+        var update = event.detail;
+        if (!update || update.source !== 'canvas' || !Array.isArray(update.sections)) return;
+        var previous = current(), previousKey = state.active;
+        var title = $('adm-meta-title'), description = $('adm-meta-desc');
+        var draftTitle = previous && title && title.value !== previous.title ? title.value : null;
+        var draftDescription = previous && description && description.value !== previous.desc ? description.value : null;
+        var archivedBefore = previous ? archivedOf(previous).length : 0;
+        state.sections = update.sections;
+        // Keep the selected settings tab and any unsaved heading text intact.
+        if (!current()) state.active = state.sections.length ? state.sections[0].key : null;
+        if (current() && archivedOf(current()).length > archivedBefore) state.archivedOpen = true;
+        render();
+        if (state.active === previousKey) {
+            if (draftTitle !== null && $('adm-meta-title')) $('adm-meta-title').value = draftTitle;
+            if (draftDescription !== null && $('adm-meta-desc')) $('adm-meta-desc').value = draftDescription;
+        }
+    });
 
     // ── tabs ──
     $('adm-tabs').addEventListener('click', function (e) {
@@ -416,7 +439,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
         saveOrder(ids);
     }
 
-    $('adm-section').addEventListener('click', function (e) {
+    $('adm-section').addEventListener('click', async function (e) {
         if (e.target.closest('#adm-add, .adm-add-btn')) {
             return current().layout === 'offices' ? openOffice(null) : openPerson(null);
         }
@@ -447,7 +470,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
                 : (sec.can_archive
                     ? 'Delete “' + label + '” for good?\n\nThis cannot be undone.\n\nTip: if you may need it again, click Cancel and use “Archive” instead.'
                     : 'Delete “' + label + '”?\n\nIt will be removed from the website right away.');
-            if (!window.confirm(confirmMsg)) return;
+            if (!await window.AdminDialogs.confirm(confirmMsg)) return;
             btn.disabled = true;
             send(sec.layout === 'offices' ? 'admin_delete_office' : 'admin_delete_person',
                  sec.layout === 'offices' ? { office_id: id } : { person_id: id })

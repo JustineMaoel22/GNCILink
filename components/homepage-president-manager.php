@@ -33,7 +33,7 @@ $president = homepagePresidentAdminPayload(getHomepagePresident());
                             <div class="d-flex gap-2 mt-3 flex-wrap">
                                 <button type="button" class="btn btn-outline-secondary btn-pick-president-photo"><i class="bi bi-upload"></i> Choose a photo</button>
                                 <button type="button" class="btn btn-outline-danger btn-remove-president-photo"><i class="bi bi-trash"></i> Remove photo</button>
-                                <input type="file" class="president-photo-input" data-photo-check accept="image/jpeg,image/png,image/webp" hidden>
+                                <input type="file" id="president-photo" name="president_photo" aria-label="President photo" class="president-photo-input" data-photo-check accept="image/jpeg,image/png,image/webp" hidden>
                             </div>
                             <div class="pm-help mt-2">A clear, front-facing photo works best.</div>
                         </div>
@@ -45,16 +45,16 @@ $president = homepagePresidentAdminPayload(getHomepagePresident());
                             <div class="dept-media-label"><span class="pm-num">2</span> Name and position</div>
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <label class="form-label">Full name</label>
-                                    <input type="text" class="form-control president-name-input" placeholder="e.g. Geraldine G. Lim, MBA">
+                                    <label class="form-label" for="president-name">Full name</label>
+                                    <input type="text" id="president-name" name="president_name" class="form-control president-name-input" placeholder="e.g. Geraldine G. Lim, MBA">
                                 </div>
                                 <div class="col-sm-6">
-                                    <label class="form-label">Position</label>
-                                    <input type="text" class="form-control president-title-input" placeholder="e.g. President">
+                                    <label class="form-label" for="president-title">Position</label>
+                                    <input type="text" id="president-title" name="president_title" class="form-control president-title-input" placeholder="e.g. President">
                                 </div>
                                 <div class="col-sm-6">
-                                    <label class="form-label">School name</label>
-                                    <input type="text" class="form-control president-org-input" placeholder="e.g. Guagua National Colleges, Inc.">
+                                    <label class="form-label" for="president-org">School name</label>
+                                    <input type="text" id="president-org" name="president_org" class="form-control president-org-input" placeholder="e.g. Guagua National Colleges, Inc.">
                                 </div>
                             </div>
                         </div>
@@ -66,22 +66,22 @@ $president = homepagePresidentAdminPayload(getHomepagePresident());
                             <div class="dept-media-label"><span class="pm-num">3</span> The welcome message</div>
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <label class="form-label">Small line above the heading</label>
-                                    <input type="text" class="form-control president-eyebrow-input" placeholder="e.g. A Warm Welcome to">
+                                    <label class="form-label" for="president-eyebrow">Small line above the heading</label>
+                                    <input type="text" id="president-eyebrow" name="president_eyebrow" class="form-control president-eyebrow-input" placeholder="e.g. A Warm Welcome to">
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label">Big heading</label>
-                                    <input type="text" class="form-control president-heading-input" placeholder="e.g. Our New Students">
+                                    <label class="form-label" for="president-heading">Big heading</label>
+                                    <input type="text" id="president-heading" name="president_heading" class="form-control president-heading-input" placeholder="e.g. Our New Students">
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label">Greeting</label>
-                                    <input type="text" class="form-control president-greeting-input" placeholder="e.g. Welcome GNCians!">
+                                    <label class="form-label" for="president-greeting">Greeting</label>
+                                    <input type="text" id="president-greeting" name="president_greeting" class="form-control president-greeting-input" placeholder="e.g. Welcome GNCians!">
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label d-flex justify-content-between">
+                                    <label class="form-label d-flex justify-content-between" for="president-message">
                                         <span>Message</span><span class="pm-help president-count">0 words</span>
                                     </label>
-                                    <textarea class="form-control president-message-input" rows="6" placeholder="Type the President's welcome message here..."></textarea>
+                                    <textarea id="president-message" name="president_message" class="form-control president-message-input" rows="6" placeholder="Type the President's welcome message here..."></textarea>
                                     <div class="pm-help">Tip: press Enter twice to start a new paragraph.</div>
                                 </div>
                             </div>
@@ -129,7 +129,7 @@ $president = homepagePresidentAdminPayload(getHomepagePresident());
             <span class="pm-dirty d-none" aria-live="polite"><i class="bi bi-pencil-fill"></i> You have changes that are not saved yet</span>
             <div class="d-flex gap-2 flex-wrap ms-auto">
                 <button type="button" class="btn btn-outline-secondary btn-president-reset" disabled><i class="bi bi-arrow-counterclockwise"></i> Undo my changes</button>
-                <button type="button" class="btn-gnc-primary btn-president-save" disabled><i class="bi bi-check2-circle"></i> Save Changes</button>
+                <button data-content-publish type="button" class="btn-gnc-primary btn-president-save" disabled><i class="bi bi-check2-circle"></i> Save Changes</button>
             </div>
         </div>
     </div>
@@ -366,8 +366,8 @@ $president = homepagePresidentAdminPayload(getHomepagePresident());
         el.addEventListener('input', function () { clearAlert(); render(); });
     });
 
-    resetBtn.addEventListener('click', function () {
-        if (!window.confirm('Undo all your changes?\n\nEverything will go back to what is on the website now.')) return;
+    resetBtn.addEventListener('click', async function () {
+        if (!await window.AdminDialogs.confirm('Undo all your changes?\n\nEverything will go back to what is on the website now.')) return;
         pending = { photoFile: null, removePhoto: false };
         fillFields();
         clearAlert(); render();
@@ -411,6 +411,7 @@ $president = homepagePresidentAdminPayload(getHomepagePresident());
 
     // Warn before leaving the page with changes that were never saved.
     window.addEventListener('beforeunload', function (e) {
+        if (window.__veLeaving) return;
         if (card.dataset.dirty === '1') { e.preventDefault(); e.returnValue = ''; }
     });
 

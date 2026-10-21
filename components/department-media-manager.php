@@ -1,9 +1,8 @@
 <?php
 /**
- * GNC Admin Panel – College Departments manager (full CRUD).
- * Rendered inside the Content Editor's "College Departments" page panel
- * (see content-edit.php). One card per row of the `departments` table,
- * plus an "Add New Department" form.
+ * Shared College and Basic Education department manager.
+ * Rendered inside the Content Editor's department settings drawer.
+ * College Departments also provides an "Add New Department" form.
  *
  * Expects from the including page: $csrfToken, and admin-functions.php loaded.
  * Saves through page-content-handler.php:
@@ -14,7 +13,22 @@
  *   archive_department       – hide from / restore to the public website
  *   delete_department        – permanently remove (programs/announcements are detached, not deleted)
  */
-$departments = getDepartments();
+require_once __DIR__ . '/department-public.php';
+$departmentManagerIsBasic = $departmentManagerIsBasic ?? false;
+$departmentManagerTitle = $departmentManagerIsBasic ? 'Basic Education Departments' : 'College Departments';
+// Both managers share the same cards and editing controls, scoped to their section.
+// Keep archived departments available so managers can restore them.
+$basicDepartmentSlugs = ['casa-gradeschool', 'hs-monte', 'jhs-regular', 'shs-regular'];
+$departments = array_values(array_filter(getDepartments(), static function ($department) use ($departmentManagerIsBasic, $basicDepartmentSlugs) {
+    return $departmentManagerIsBasic
+        ? in_array((string)($department['slug'] ?? ''), $basicDepartmentSlugs, true)
+        : publicDepartmentIsCollege($department);
+}));
+if ($departmentManagerIsBasic) {
+    usort($departments, static function ($a, $b) use ($basicDepartmentSlugs) {
+        return array_search($a['slug'], $basicDepartmentSlugs, true) <=> array_search($b['slug'], $basicDepartmentSlugs, true);
+    });
+}
 // Safety net: never post an empty CSRF token, even if the including page
 // didn't pass $csrfToken into scope.
 if (empty($csrfToken)) {
@@ -25,7 +39,7 @@ if (empty($csrfToken)) {
 <div class="dept-media-intro data-card mb-3">
     <div class="dept-intro-row">
         <div class="dept-intro-main">
-            <strong class="dept-intro-title"><i class="bi bi-diagram-3"></i> College Departments</strong>
+            <strong class="dept-intro-title"><i class="bi bi-diagram-3"></i> <?= htmlspecialchars($departmentManagerTitle) ?></strong>
             <p class="dept-intro-text">
                 Each box below is one department on the website. <b>Click a department to edit it.</b>
                 Your changes show on the website as soon as you press <b>Save</b>.
@@ -36,13 +50,16 @@ if (empty($csrfToken)) {
                 <span><b>3</b> Press Save</span>
             </div>
         </div>
+        <?php if (!$departmentManagerIsBasic): ?>
         <button type="button" class="btn-gnc-gold dept-add-main" id="btn-add-department">
             <i class="bi bi-plus-lg"></i> Add a New Department
         </button>
+        <?php endif; ?>
     </div>
 </div>
 
 <!-- ── Create form ── -->
+<?php if (!$departmentManagerIsBasic): ?>
 <div class="data-card mb-3" id="dept-create-card" style="display:none">
     <div class="data-card-header">
         <span class="data-card-title"><i class="bi bi-building-add me-1"></i> Add a New Department</span>
@@ -69,12 +86,17 @@ if (empty($csrfToken)) {
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <?php if (empty($departments)): ?>
     <div class="data-card mb-3">
         <div class="empty-state">
             <i class="bi bi-building"></i>
+            <?php if ($departmentManagerIsBasic): ?>
+            <p>No Basic Education departments found.</p>
+            <?php else: ?>
             <p>There are no departments yet. Press <b>Add a New Department</b> above to create the first one — it appears on the website as soon as it is saved.</p>
+            <?php endif; ?>
         </div>
     </div>
 <?php else: foreach ($departments as $d):
@@ -94,10 +116,13 @@ if (empty($csrfToken)) {
         $programsError = true;
     }
     $isArchived = !empty($d['archived_at']);
-    $viewUrl    = '/pages/academics/college/college-department.php?slug=' . rawurlencode((string)$d['slug']);
+    $viewUrl = $departmentManagerIsBasic
+        ? '/pages/academics/basic-edu/basic-edu-department/' . rawurlencode((string)$d['slug']) . '.php'
+        : '/pages/academics/college/college-department.php?slug=' . rawurlencode((string)$d['slug']);
 ?>
     <details class="data-card mb-3 dept-media-card dept-acc" id="dept-<?= (int)$d['dept_id'] ?>"
          data-dept-id="<?= (int)$d['dept_id'] ?>"
+         data-public-url="<?= htmlspecialchars($viewUrl, ENT_QUOTES, 'UTF-8') ?>"
          data-current="<?= htmlspecialchars(json_encode($payload), ENT_QUOTES, 'UTF-8') ?>"
          <?= count($departments) === 1 ? 'open' : '' ?>>
 
@@ -155,14 +180,14 @@ if (empty($csrfToken)) {
                 <p class="dept-panel-intro">The words and details that describe this department on the website. Press <b>Save page text</b> when you are done.</p>
 
                 <div class="dept-block">
-                    <div class="dept-block-title"><i class="bi bi-card-heading"></i> Name &amp; list card <small>How this department looks in the College Departments list</small></div>
+                    <div class="dept-block-title"><i class="bi bi-card-heading"></i> Name &amp; list card <small>How this department looks in the <?= htmlspecialchars($departmentManagerTitle) ?> list</small></div>
                     <div class="row g-4">
                         <div class="col-lg-7">
                             <div class="row g-3">
                                 <div class="col-12">
                                     <label class="dept-label">Department name <span class="dept-req">*</span></label>
                                     <input type="text" class="form-control details-name-input" maxlength="255" autocomplete="off"
-                                           placeholder="e.g. College of Nursing">
+                                           placeholder="Department name">
                                     <div class="dept-help">The title shown for this department everywhere on the website.</div>
                                 </div>
                                 <div class="col-12">
@@ -191,7 +216,7 @@ if (empty($csrfToken)) {
                                 <div class="col-12">
                                     <label class="dept-label">Short description <span class="dept-opt">(optional)</span></label>
                                     <textarea class="form-control details-description-input" rows="2" maxlength="2000"
-                                              placeholder="A short summary for the College Departments list..."></textarea>
+                                              placeholder="A short summary for the department list..."></textarea>
                                     <div class="dept-help">The list card shows the first sentences of <b>“About this department”</b> below. This short description is used on the card <b>only when About is empty</b>.</div>
                                 </div>
                             </div>
@@ -249,7 +274,7 @@ Modern facilities</pre>
                 <div class="details-alert alert d-none mt-3 mb-0"></div>
                 <div class="dept-actions">
                     <button type="button" class="btn btn-outline-secondary btn-details-reset" disabled><i class="bi bi-arrow-counterclockwise"></i> Undo changes</button>
-                    <button type="button" class="btn-gnc-primary btn-details-save" disabled>Save page text</button>
+                    <button data-content-publish type="button" class="btn-gnc-primary btn-details-save" disabled>Save page text</button>
                 </div>
             </div>
 
@@ -277,7 +302,7 @@ Modern facilities</pre>
                 <div class="logo-alert alert d-none mt-3 mb-0"></div>
                 <div class="dept-actions">
                     <button type="button" class="btn btn-outline-secondary btn-logo-reset" disabled>Undo changes</button>
-                    <button type="button" class="btn-gnc-primary btn-logo-save" disabled>Save logo</button>
+                    <button data-content-publish type="button" class="btn-gnc-primary btn-logo-save" disabled>Save logo</button>
                 </div>
             </div>
 
@@ -317,7 +342,7 @@ Modern facilities</pre>
                             <div class="prog-alert alert d-none mt-3 mb-0"></div>
                             <div class="dept-actions">
                                 <button type="button" class="btn btn-outline-secondary btn-prog-reset" disabled>Undo changes</button>
-                                <button type="button" class="btn-gnc-primary btn-prog-save" disabled>Save image</button>
+                                <button data-content-publish type="button" class="btn-gnc-primary btn-prog-save" disabled>Save image</button>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -399,7 +424,7 @@ Modern facilities</pre>
                 <div class="dean-alert alert d-none mt-3 mb-0"></div>
                 <div class="dept-actions">
                     <button type="button" class="btn btn-outline-secondary btn-dean-reset" disabled>Undo changes</button>
-                    <button type="button" class="btn-gnc-primary btn-dean-save" disabled>Save Head of Office</button>
+                    <button data-content-publish type="button" class="btn-gnc-primary btn-dean-save" disabled>Save Head of Office</button>
                 </div>
             </div>
 
@@ -430,7 +455,7 @@ Modern facilities</pre>
             <!-- ── Unsaved-changes bar (appears only when something is edited) ── -->
             <div class="dept-savebar" hidden>
                 <span class="dept-savebar-text"><i class="bi bi-exclamation-circle"></i> Not saved yet: <b class="dept-savebar-list"></b></span>
-                <button type="button" class="btn-gnc-primary btn-save-all">Save everything</button>
+                <button data-content-publish type="button" class="btn-gnc-primary btn-save-all">Save everything</button>
             </div>
         </div>
     </details>
@@ -878,6 +903,7 @@ body.gnc-confirm-open { overflow: hidden; }
     var createAlert = document.getElementById('create-alert');
     var addBtn      = document.getElementById('btn-add-department');
 
+    if (addBtn) {
     addBtn.addEventListener('click', function () {
         createCard.style.display = '';
         addBtn.disabled = true;
@@ -919,6 +945,8 @@ body.gnc-confirm-open { overflow: hidden; }
         });
     });
 
+    }
+
     // ── One card per department ──
     document.querySelectorAll('.dept-media-card').forEach(function (card) {
         var current = JSON.parse(card.dataset.current);
@@ -943,7 +971,7 @@ body.gnc-confirm-open { overflow: hidden; }
         }
         function fillDetails() {
             Object.keys(dEls).forEach(function (k) { dEls[k].value = savedVal(k); });
-            if (viewLink && current.slug) viewLink.href = '/pages/academics/college/college-department.php?slug=' + encodeURIComponent(current.slug);
+            if (viewLink && card.dataset.publicUrl) viewLink.href = card.dataset.publicUrl;
             if (typeof syncPicker === 'function') syncPicker();
         }
         function detailsDirty() {
@@ -1431,7 +1459,7 @@ body.gnc-confirm-open { overflow: hidden; }
 
     // Warn before leaving the page with edits that haven't been saved.
     window.addEventListener('beforeunload', function (e) {
-        if (window.__deptLeaving) return;
+        if (window.__deptLeaving || window.__veLeaving) return;
         if (document.querySelector('.dept-media-card[data-dirty="1"]')) {
             e.preventDefault();
             e.returnValue = '';

@@ -1139,6 +1139,7 @@ a.gnc-programs-count:hover {
 
 @media (max-width: 768px) {
     /* Hero Content */
+    .hero-title-line,
     .hero-title-gold,
     .hero-title-white {
         font-size: 1.8rem;
@@ -1895,6 +1896,7 @@ a.gnc-programs-count:hover {
     transition: background .2s, color .2s, transform .2s;
 }
 .gnc-cal-sec .gnc-cal-nav:hover { background: #EABA3B; color: #094024; transform: translateY(-2px); }
+.gnc-cal-sec .gnc-cal-nav[aria-disabled="true"] { opacity: .35; cursor: default; background: transparent; color: inherit; transform: none; }
 
 /* edge-to-edge table-style grid */
 .gnc-cal-sec .gnc-cal-grid {
