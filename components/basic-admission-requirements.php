@@ -64,7 +64,7 @@ function basicAdmissionSectionDefaults(): array
     return $sections + basicAdmissionPresentationDefaults();
 }
 
-/** Register missing header fields when an authorized user opens the editor. */
+/** Register missing heading and tab-label fields when an authorized user opens the editor. */
 function ensureBasicAdmissionHeaderSections(): void
 {
     $db = getDB();
@@ -76,7 +76,7 @@ function ensureBasicAdmissionHeaderSections(): void
     $check = $db->prepare('SELECT section_id FROM page_sections WHERE page_id = ? AND section_key = ?');
     $insert = $db->prepare("INSERT INTO page_sections (page_id, section_key, title, content, status, display_order) VALUES (?, ?, ?, ?, 'published', ?)");
     $defaults = basicAdmissionPresentationDefaults();
-    foreach (['hero_title', 'hero_intro'] as $order => $key) {
+    foreach (array_keys($defaults) as $order => $key) {
         $check->execute([$pageId, $key]);
         if (!$check->fetchColumn()) {
             $insert->execute([$pageId, $key, $defaults[$key]['title'], $defaults[$key]['content'], $order]);

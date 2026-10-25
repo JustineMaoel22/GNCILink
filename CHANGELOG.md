@@ -16,6 +16,7 @@
 * Added forgot password functionality.
 
 ### Bug Fixes & Adjustments
+* Fixed missing Basic Education admission tab-label editor records being left unregistered on older hosted databases.
 * Added Cian's robot profile picture beside his name in the chat header.
 * Named the chatbot Cian across its widget, welcome message, accessibility labels, and assistant identity.
 * Replaced the chatbot's floating button icon with the green robot mascot, with smaller sizing on mobile.
