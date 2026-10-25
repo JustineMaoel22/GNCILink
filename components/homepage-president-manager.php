@@ -9,7 +9,7 @@ $president = homepagePresidentAdminPayload(getHomepagePresident());
     </div>
 
     <div style="padding:0 1.25rem 1.25rem">
-        <p class="pm-intro">This is the welcome message on your homepage. Change anything you like, check the preview, then click <strong>Save Changes</strong>. It goes live right away.</p>
+        <p class="pm-intro">This is the welcome message on your homepage. Change anything you like, then click <strong>Publish</strong> and confirm to put your changes on the website.</p>
 
         <div class="row g-4">
             <!-- ═══ Left: things to edit ═══ -->
@@ -275,6 +275,7 @@ $president = homepagePresidentAdminPayload(getHomepagePresident());
     }
 
     function showAlert(msg, isError) {
+        if (window.ContentEditorNotice && window.ContentEditorNotice(msg, isError)) { alertEl.classList.add('d-none'); return; }
         alertEl.className = 'president-alert alert mt-3 mb-0 ' + (isError ? 'alert-danger' : 'alert-success');
         alertEl.textContent = msg;
         if (!isError) setTimeout(function () { alertEl.classList.add('d-none'); }, 7000);

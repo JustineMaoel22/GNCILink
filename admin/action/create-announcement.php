@@ -8,6 +8,7 @@
  */
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../admin-functions.php';
+require_once __DIR__ . '/../../includes/facebook-publishing.php';
 
 initSession();
 requireLogin();
@@ -18,10 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $postAction = $_POST['action'] ?? '';
+$facebookAction = in_array($postAction, ['pin_facebook', 'unpin_facebook', 'set_fb_category'], true);
 
 if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
     $_SESSION['flash_errors'] = ['Invalid or expired request token. Please try again.'];
-    header('Location: /admin/announcement.php');
+    header('Location: ' . ($facebookAction ? '/admin/facebook-posts.php' : '/admin/announcement.php'));
     exit;
 }
 
@@ -53,7 +55,7 @@ if ($postAction === 'delete') {
 }
 
 // ============================================================
-// PIN / UNPIN A FACEBOOK POST (listed in the Announcements table)
+// PIN / UNPIN A FACEBOOK POST
 // ============================================================
 if ($postAction === 'pin_facebook' || $postAction === 'unpin_facebook') {
     $fbPostId = trim($_POST['fb_post_id'] ?? '');
@@ -77,7 +79,7 @@ if ($postAction === 'pin_facebook' || $postAction === 'unpin_facebook') {
         }
     }
 
-    header('Location: /admin/announcement.php');
+    header('Location: /admin/facebook-posts.php');
     exit;
 }
 
@@ -98,7 +100,7 @@ if ($postAction === 'set_fb_category') {
         $_SESSION['flash_success'] = 'Category updated.';
     }
 
-    header('Location: /admin/announcement.php');
+    header('Location: /admin/facebook-posts.php');
     exit;
 }
 
@@ -176,6 +178,35 @@ if ($postAction === 'create' || $postAction === 'update') {
     $isUpdate = $postAction === 'update';
     $id       = (int)($_POST['announcement_id'] ?? 0);
     $errors   = [];
+    $destination = $_POST['publish_destination'] ?? 'website';
+    $sendFacebook = in_array($destination, ['facebook', 'both'], true);
+    $facebookTransaction = false;
+    $savedId = 0;
+    if (!in_array($destination, ['website', 'facebook', 'both'], true)) $errors[] = 'Invalid publishing destination.';
+    if ($sendFacebook) {
+        if (!hasPermission('publish_announcement') || ($_POST['status'] ?? '') !== 'published') {
+            $errors[] = 'Facebook publishing requires publishing permission and Publish now. Drafts and approval requests cannot be sent to Facebook.';
+        }
+        if (($_POST['facebook_confirmed'] ?? '') !== '1') $errors[] = 'Confirm the Facebook destination before publishing.';
+        if (!facebookPublishingReady()) $errors[] = 'Run the Facebook publishing database migration first.';
+        $requestKey = $_POST['facebook_request_key'] ?? '';
+        if (!is_string($requestKey) || !preg_match('/^[a-f0-9]{64}$/D', $requestKey)) $errors[] = 'Invalid publishing request. Reload the form.';
+        if (!$errors) {
+            $connection = facebookPublishingConnection();
+            if (!$connection || !$connection['enabled'] || ($_POST['facebook_page_id'] ?? '') !== $connection['page_id']) {
+                $errors[] = 'The connected Facebook Page changed or was disconnected. Reload and confirm the destination.';
+            }
+            $receipt = getDB()->prepare('SELECT announcement_id FROM facebook_publishing_requests WHERE request_key=? AND user_id=?');
+            $receipt->execute([$requestKey, $_SESSION['user_id']]);
+            if ($receipt->fetchColumn()) {
+                $_SESSION['flash_success'] = 'This request was already saved. Check its Facebook status; edit the saved announcement to retry if needed.';
+                header('Location: /admin/announcement.php');
+                exit;
+            }
+            try { facebookPublishingLink($_POST['facebook_link'] ?? ''); }
+            catch (FacebookPublishingError $e) { $errors[] = $e->getMessage(); }
+        }
+    }
 
     if ($isUpdate) {
         $existing = $id ? getAnnouncementById($id) : null;
@@ -197,7 +228,7 @@ if ($postAction === 'create' || $postAction === 'update') {
     $content = trim($_POST['content'] ?? '');
 
     if (empty($errors)) {
-        if ($title === '') $errors[] = 'Title is required.';
+        if ($title === '' && !contentPublishAllowsIncomplete()) $errors[] = 'Title is required.';
         if (($content === '' || strip_tags($content) === '') && ($_POST['allow_incomplete'] ?? '') !== '1') $errors[] = 'Content is required.';
     }
 
@@ -208,6 +239,13 @@ if ($postAction === 'create' || $postAction === 'update') {
 
     if (empty($errors)) {
         try {
+            if ($sendFacebook) {
+                getDB()->beginTransaction();
+                $facebookTransaction = true;
+                // Unique request key is reserved in the same transaction as the saved announcement.
+                getDB()->prepare('INSERT INTO facebook_publishing_requests (request_key,user_id,announcement_id,created_at) VALUES (?,?,0,NOW())')->execute([$requestKey, $_SESSION['user_id']]);
+            }
+            $program = normalizeAnnouncementProgramCategory($_POST['program'] ?? null, $isUpdate ? ($existing['program'] ?? null) : null);
             $mediaId = null;
             if (!empty($_FILES['image']['name'] ?? '')) {
                 $mediaId = uploadAnnouncementImage($_FILES['image']);
@@ -230,7 +268,7 @@ if ($postAction === 'create' || $postAction === 'update') {
                 'content'     => $content,
                 'allow_incomplete' => ($_POST['allow_incomplete'] ?? '') === '1',
                 'category_id' => !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
-                'program'     => normalizeProgramCategory($_POST['program'] ?? null),
+                'program'     => $program,
                 'dept_id'     => $_POST['dept_id'] ?? null, // validated in create/updateAnnouncement
             ];
 
@@ -273,9 +311,45 @@ if ($postAction === 'create' || $postAction === 'update') {
                     }
                 }
             }
+            $savedId = $isUpdate ? $id : (int)($result ?? 0);
+            if ($sendFacebook && empty($errors) && $savedId) {
+                if ($destination === 'facebook') {
+                    // Keep a local editable record, but do not expose it on the public website.
+                    if (!empty(($existing ?? [])['is_pinned'])) unpinAnnouncement($savedId);
+                    getDB()->prepare("UPDATE announcements SET status='draft' WHERE announcement_id=?")->execute([$savedId]);
+                }
+                getDB()->prepare('UPDATE facebook_publishing_requests SET announcement_id=? WHERE request_key=?')->execute([$savedId, $requestKey]);
+                getDB()->prepare("INSERT IGNORE INTO announcement_facebook_deliveries (announcement_id,page_id,state,attempted_by,updated_at) VALUES (?,?,'ready',?,NOW())")->execute([$savedId, $_POST['facebook_page_id'], $_SESSION['user_id']]);
+                getDB()->commit();
+                $facebookTransaction = false;
+            } elseif ($facebookTransaction) {
+                getDB()->rollBack();
+                $facebookTransaction = false;
+            }
         } catch (Exception $e) {
-            $errors[] = $e->getMessage();
+            if ($facebookTransaction && getDB()->inTransaction()) getDB()->rollBack();
+            $errors[] = $sendFacebook ? 'The announcement could not be saved for Facebook publishing. Reload and check the announcement list before retrying.' : $e->getMessage();
         }
+    }
+
+    if (empty($errors) && $sendFacebook && $savedId) {
+        $websiteMessage = $destination === 'both' ? 'Website published. ' : 'Website hidden; editable record saved. ';
+        try {
+            // Pin the confirmed Page across connection changes between save and send.
+            $connection = facebookPublishingConnection();
+            if (!$connection || $connection['page_id'] !== ($_POST['facebook_page_id'] ?? '')) throw new FacebookPublishingError('Facebook Page changed after confirmation. Nothing was sent.');
+            $_SESSION['flash_success'] = $websiteMessage . facebookPublishAnnouncement($savedId, $_POST['facebook_link'] ?? '', $_POST['facebook_page_id'] ?? '');
+        } catch (FacebookPublishingError $e) {
+            getDB()->prepare("UPDATE announcement_facebook_deliveries SET state='failed',last_error=?,updated_at=NOW() WHERE announcement_id=? AND state IN ('ready','failed')")
+                ->execute([$e->getMessage(), $savedId]);
+            $_SESSION['flash_success'] = $websiteMessage;
+            $_SESSION['flash_errors'] = ['The announcement is saved. ' . $e->getMessage() . ' Use Edit on the saved announcement to retry.'];
+        } catch (Throwable $e) {
+            $_SESSION['flash_success'] = $websiteMessage;
+            $_SESSION['flash_errors'] = ['The announcement is saved, but Facebook delivery could not be confirmed. Check Facebook Integration before retrying.'];
+        }
+        header('Location: /admin/announcement.php');
+        exit;
     }
 
     if (empty($errors)) {

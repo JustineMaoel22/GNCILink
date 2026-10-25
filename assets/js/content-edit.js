@@ -134,6 +134,8 @@
     var toastBox = $('#ceToasts');
     function toast(message, type) {
         if (!toastBox) return;
+        if(C.requiresApproval && /Submitted for Super Admin approval|Draft saved\. It is not live/i.test(message))type='ok';
+        if(C.requiresApproval && type!=='error' && /Published|changes are live|now live/i.test(message)) message='Submitted for Super Admin approval. Published content is unchanged.';
         var t = h('div', { class: 'ce-toast ce-toast-' + (type === 'error' ? 'error' : 'ok'), role: type === 'error' ? 'alert' : 'status' }, [
             icon(type === 'error' ? 'exclamation-octagon-fill' : 'check-circle-fill'),
             h('span', { text: message }),
@@ -150,12 +152,14 @@
     function send(url, fields, files) {
         var fd = new FormData();
         fd.append('csrf_token', C.csrf);
+        if (S.publishing && S.allowIncomplete) fd.append('allow_incomplete', '1');
         Object.keys(fields || {}).forEach(function (k) { if (fields[k] !== undefined && fields[k] !== null) fd.append(k, fields[k]); });
         Object.keys(files || {}).forEach(function (k) { if (files[k]) fd.append(k, files[k], files[k].name); });
         return fetch(url, { method: 'POST', credentials: 'same-origin', body: fd }).then(function (res) {
             return res.json().catch(function () {
                 return { error: 'The server sent an unexpected reply (code ' + res.status + '). Please reload the page and try again.' };
             }).then(function (j) {
+                if(j.submitted){j.success=false;j.error=j.message;}
                 j.ok = res.ok && j.success !== false && !j.error;
                 if (!j.ok && !j.error) j.error = 'Something went wrong. Please try again.';
                 return j;
@@ -171,6 +175,24 @@
 
     // Existing-image positioning follows the same preview / Publish lifecycle as text and uploads.
     var imagePositions = {};
+    var textPlacements = {}, textLayout = null;
+    function textPlacementCount() { return Object.keys(textPlacements).reduce(function(n,key){return n+Object.keys(textPlacements[key]).length;},0); }
+    function displayPlacementCount() { return imagePositionCount()+textPlacementCount(); }
+    function applyTextPlacements() { if(S.win && S.win.GNCTextLayout)S.win.GNCTextLayout.setChanges(textPlacements); }
+    function stageTextPlacement(key,device,value,original) {
+        var entry=textPlacements[key] && textPlacements[key][device], base=entry?entry.base:original;
+        if(same(base,value)){if(textPlacements[key]){delete textPlacements[key][device];if(!Object.keys(textPlacements[key]).length)delete textPlacements[key];}}
+        else {textPlacements[key]=textPlacements[key]||{};textPlacements[key][device]={base:base,value:value};}
+        applyTextPlacements();chrome();
+    }
+    async function publishTextPlacements() {
+        if(!textPlacementCount())return;
+        var changes={};Object.keys(textPlacements).forEach(function(key){changes[key]={};Object.keys(textPlacements[key]).forEach(function(device){changes[key][device]=textPlacements[key][device].value;});});
+        var result=await send('/admin/action/text-layout-handler.php',{route:S.url,changes:JSON.stringify(changes)});
+        if(!result.ok)throw new Error(result.error||'Could not save text placement.');
+        if(S.win.GNCTextLayout)S.win.GNCTextLayout.acceptChanges(textPlacements);
+        textPlacements={};
+    }
     function imagePositionCount() { return Object.keys(imagePositions).length; }
     function previewImagePosition(path, value) {
         [window, S.win].forEach(function (win) {
@@ -198,6 +220,7 @@
     function discardImagePositions() {
         Object.keys(imagePositions).forEach(function (path) { previewImagePosition(path, imagePositions[path].base); });
         imagePositions = {};
+        textPlacements={};applyTextPlacements();
     }
 
     // ══════════════════ editor state ══════════════════
@@ -206,7 +229,8 @@
         sel: null, adapter: null, device: 'desktop', fallback: false,
         busy: false, scrollKeep: null, loadCount: 0, hoverEl: null
     };
-    var editorFeedback = null;
+    var editorFeedback = null, drafts = null;
+    function unsavedPageChanges() { return drafts && drafts.supported() ? drafts.unsaved() : S.adapter && S.adapter.dirtyCount() > 0; }
     var tb = $('#veTb'), pop = $('#vePop'), statusEl = $('#veStatus'), loader = $('#veLoader');
     var btnSecondary = $('#veSecondary'), btnPrimary = $('#vePrimary');
     var fileInput = $('#veFile');
@@ -225,7 +249,7 @@
     function pickPersonPhoto(cb, uploadTarget) {
         pickFile('image/jpeg,image/png,image/webp', cb, true, uploadTarget);
     }
-    function previewUrl(file) { return URL.createObjectURL(file); }
+    function previewUrl(file) { var url=URL.createObjectURL(file);if(window.GNCEditorDrafts)window.GNCEditorDrafts.trackUrl(url,file);return url; }
 
     // ══════════════════ popover (small forms next to the toolbar) ══════════════════
     var popOnClose = null;
@@ -260,17 +284,28 @@
         popBelowToolbar(box, null, true);
         confirm.focus();
     }
-    function confirmPublish(message, onConfirm) {
-        if (D.querySelector('.ve-publish-dialog')) return;
-        if (typeof S !== 'undefined' && (S.busy || S.completenessPending)) return;
-        if (window.ContentCompleteness && typeof S !== 'undefined' && S.doc) {
-            var report = window.ContentCompleteness.inspect(S.doc);
+    function confirmPublish(message, onConfirm, options) {
+        options = options || {};
+        if(C.requiresApproval && drafts && drafts.supported() && !(options.root && options.root.ownerDocument !== D)) {
+            window.AdminDialogs.confirm('Submit these changes for Super Admin approval? The published page will stay unchanged.', {title:'Submit for approval',confirmText:'Submit'}).then(async function(ok){
+                if(!ok){if(options.cancel)options.cancel();return;}
+                try{await run('Submitting…',async function(){var result=await drafts.submit();toast(result.message || 'Submitted for approval.','ok');});}
+                catch(error){toast(error.message,'error');}
+                if(options.cancel)options.cancel();
+            });
+            return;
+        }
+        if (D.querySelector('.ve-publish-dialog') || (typeof S !== 'undefined' && (S.busy || S.completenessPending))) { if (options.cancel) options.cancel(); return; }
+        S.allowIncomplete = false;
+        var reviewRoot = options.root || (typeof S !== 'undefined' && S.doc);
+        if (window.ContentCompleteness && reviewRoot) {
+            var report = window.ContentCompleteness.inspect(reviewRoot, { includeOptional: true });
             if (report.missing.length) {
                 S.completenessPending = true;
-                window.ContentCompleteness.review({ root: S.doc, report: report, csrf: C.csrf }).then(function (proceed) {
+                window.ContentCompleteness.review({ root: reviewRoot, report: report, csrf: options.csrf || C.csrf }).then(function (proceed) {
                     S.completenessPending = false;
-                    if (proceed) onConfirm();
-                }).catch(function () { S.completenessPending = false; toast('Could not inspect the page. Please try again.', 'error'); });
+                    if (proceed) { S.allowIncomplete = true; onConfirm(); } else if (options.cancel) options.cancel();
+                }).catch(function () { S.completenessPending = false; if (options.cancel) options.cancel(); toast('Could not inspect the page. Please try again.', 'error'); });
                 return;
             }
         }
@@ -283,7 +318,7 @@
         dialog.appendChild(h('div', { class: 've-publish-content' }, [
             h('span', { class: 've-publish-icon', 'aria-hidden': 'true' }, [icon('cloud-upload')]),
             h('h2', { id: 'vePublishTitle', text: 'Ready to publish?' }),
-            h('p', { id: 'vePublishMessage', text: message }),
+            h('p', { id: 'vePublishMessage', text: 'Publish your changes to the live website?' }),
             h('div', { class: 've-publish-actions' }, [cancel, publish])
         ]));
         dialog.addEventListener('click', function (event) {
@@ -295,11 +330,25 @@
             var confirmed = dialog.returnValue === 'publish';
             dialog.remove();
             if (previousFocus && previousFocus.isConnected) previousFocus.focus({ preventScroll: true });
-            if (confirmed) onConfirm();
+            if (confirmed) onConfirm(); else if (options.cancel) options.cancel();
         }, { once: true });
         D.body.appendChild(dialog);
         dialog.showModal();
     }
+    window.ContentEditorWorkflow = {
+        confirm: function (options) {
+            options = options || {};
+            return new Promise(function (resolve) {
+                confirmPublish('Publish your changes to the live website?', function () { resolve(true); }, { root: options.root, csrf: options.csrf, cancel: function () { resolve(false); } });
+            });
+        },
+        notify: function (message, error) {
+            var draft = /\b(draft|unpublished|pending|approval|submitted)\b/i.test(message);
+            var saved = /\b(saved|published|updated|created)\b/i.test(message);
+            var approval = /\b(pending|approval|submitted)\b/i.test(message);
+            toast(error ? message : approval ? message : draft ? 'Draft saved. Your changes are not live yet.' : saved ? 'Published. Your changes are live now.' : message, error ? 'error' : 'ok');
+        }
+    };
     document.addEventListener('mousedown', function (e) {
         if (!pop.hidden && !pop.contains(e.target) && !tb.contains(e.target)) closePop();
     });
@@ -363,12 +412,14 @@
         '.ve-previewing .ve-add-tile,.ve-previewing .ve-hero-hint,.ve-previewing .ve-hidden-badge{display:none!important}',
         '.ve-previewing [data-ve-field].ve-empty,.ve-previewing .ve-ghost{display:none!important}',
         '.ve-previewing [data-ve-org-add],.ve-previewing [data-ve-org-details],.ve-previewing [data-ve-org-categories],.ve-previewing [data-ve-org-gallery-add],.ve-previewing .org-cover-editor{display:none!important}',
-        '.ve-previewing [data-ve-org-assign-category]{display:none!important}',
+        '.ve-previewing [data-ve-org-assign-category],.ve-previewing [data-ve-enrollment-add]{display:none!important}',
         '.ve-previewing .ve-hover,.ve-previewing .ve-selected{outline:none!important}',
         '.ve-previewing [data-ve-field],.ve-previewing [data-ve-item],.ve-previewing [data-ve-pick],.ve-previewing [data-ve-post],.ve-previewing [data-ve-goto],.ve-previewing [data-ve-img]{cursor:default!important}',
         '[data-ve-img],[data-ve-person],[data-ve-office],[data-ve-slide],[data-ve-icon]{cursor:pointer}',
         '[data-ve-img]{-webkit-user-drag:none;user-select:none}',
-        '.ve-ghost{opacity:.65!important;background:transparent!important;border:2px dashed currentColor!important;box-shadow:none!important}',
+        '.ve-ghost{opacity:1!important;background:#fff!important;color:#0b4228!important;border:2px dashed #176b42!important;box-shadow:0 2px 10px rgba(0,0,0,.18)!important}',
+        '.ve-ghost .ve-empty::before{opacity:1;font-style:normal;color:inherit}',
+        '.ve-ghost:hover,.ve-ghost:focus-within{background:#fff7df!important;border-color:#0b4228!important;box-shadow:0 0 0 3px rgba(234,186,59,.45)!important}',
         '.ve-ghost svg{display:none}',
         '[data-ve-status="draft"]::after{content:"DRAFT \\00B7  hidden from visitors";position:absolute;top:92px;right:20px;z-index:30;background:#b45309;color:#fff;font:700 11px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;padding:8px 12px;border-radius:99px;pointer-events:none}',
         '.ve-locked{opacity:.85;cursor:not-allowed}',
@@ -395,6 +446,7 @@
     }
     /** Load (or reload) the page. keepScroll puts the reader back where they were. */
     function loadFrame(url, keepScroll) {
+        if (S.publishing) { S.publishReload = {url:url, keepScroll:keepScroll}; return; }
         discardImagePositions();
         closePop(); select(null);
         if (url) S.url = url;
@@ -424,11 +476,28 @@
             return fatal('Your session has ended. Reload this page and sign in again.');
         }
         if (editorFeedback) { editorFeedback.dispose(); editorFeedback=null; }
+        if(textLayout){textLayout.dispose();textLayout=null;}
         S.doc = doc; S.win = S.frame.contentWindow; S.loadCount++;
+        if (S.statusControlObserver) S.statusControlObserver.disconnect();
+        S.statusControlObserver = new MutationObserver(function (records) {
+            if (records.some(function (record) {
+                return (record.target.matches && record.target.matches('.image-frame-trigger')) || Array.from(record.addedNodes).concat(Array.from(record.removedNodes)).some(function (node) { return node.matches && node.matches('.image-frame-trigger'); });
+            })) positionStatus();
+        });
+        S.statusControlObserver.observe(doc.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['hidden', 'style'] });
+        if (S.statusObserver) S.statusObserver.disconnect();
+        if (window.ResizeObserver) {
+            S.statusObserver = new ResizeObserver(positionStatus);
+            S.statusObserver.observe(S.frame);
+            var statusNavbar = doc.getElementById('mainNavbar');
+            if (statusNavbar) S.statusObserver.observe(statusNavbar);
+        }
+        S.win.addEventListener('scroll', positionStatus, { passive: true });
         if (window.GNCImageFraming) window.GNCImageFraming.watch(doc);
         injectStyle(doc); bindDoc(doc);
         var again = S.adapter.mount(doc);
         if (again) return;                       // adapter swapped in its own canvas; wait for that load
+        if(C.canPublish && S.win.GNCTextLayout)textLayout=S.win.GNCTextLayout.create({state:function(){return {busy:S.busy,preview:S.preview};},stage:stageTextPlacement});
         if (window.GNCEditorFeedback) editorFeedback = window.GNCEditorFeedback.create({
             document:doc,uiDocument:D,frame:S.frame,
             state:function(){return {pending:S.adapter.dirtyCount(),busy:S.busy,preview:S.preview};},
@@ -440,6 +509,10 @@
         if (S.scrollKeep !== null) { S.win.scrollTo(0, S.scrollKeep); S.scrollKeep = null; }
         chrome();
         if (S.adapter.afterMount) S.adapter.afterMount();
+        if (drafts && drafts.supported()) {
+            loader.hidden = false; S.busy = true;
+            drafts.load(S.url).finally(function () { S.busy = false; loader.hidden = true; chrome(); });
+        }
     });
 
     // ══════════════════ fields: plain-text editing in place ══════════════════
@@ -492,6 +565,7 @@
     function bindDoc(doc) {
         var win = doc.defaultView;
         doc.addEventListener('click', function (e) {
+            if(e.target.closest('[data-text-layout-control]') || (textLayout && textLayout.consume())){e.preventDefault();return;}
             if(S.adapter.consumeClick && S.adapter.consumeClick()){e.preventDefault();e.stopImmediatePropagation();return;}
             var t = e.target;
             if (S.preview) {                      // Preview: nothing is editable; links still move between pages
@@ -504,6 +578,7 @@
             var a = t.closest ? t.closest('a') : null;
             if (d && d.kind === 'none') { e.preventDefault(); return; }       // the item already opened its own popover
             if (d) {
+                if (d.stop) e.stopPropagation();
                 if (d.prevent !== false && !(d.el && d.el.isContentEditable && !d.noCaret)) e.preventDefault();
                 else if (a) e.preventDefault();
                 select(d); return;
@@ -531,7 +606,7 @@
         doc.addEventListener('mouseleave', function () { if (S.hoverEl) { S.hoverEl.classList.remove('ve-hover'); S.hoverEl = null; } });
         doc.addEventListener('keydown', function (e) {
             if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); shortcutSave(); return; }
-            var emptyMedia = e.target.closest && e.target.closest('.be-empty-media,[data-ve-icon="academic-feature"],[data-ve-icon="tuition"],[data-ve-org-icon]');
+            var emptyMedia = e.target.closest && e.target.closest('.be-empty-media,[data-ve-icon="academic-feature"],[data-ve-icon="department-statement"],[data-ve-icon="program-statement"],[data-ve-icon="tuition"],[data-ve-org-icon]');
             if (emptyMedia && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); emptyMedia.click(); return; }
             var el = fieldOf(e.target);
             if (e.key === 'Escape') { if (D.activeElement === S.frame && doc.activeElement) doc.activeElement.blur(); select(null); return; }
@@ -620,13 +695,25 @@
     function renderToolbar() {
         tb.innerHTML = '';
         var items = S.sel && S.adapter.toolbar ? S.adapter.toolbar(S.sel) : [];
+        if(textLayout){
+            var textTarget=S.sel && S.sel.el;
+            var layoutMedia=textTarget && textTarget.hasAttribute('data-gnc-layout-media');
+            textLayout.select(textTarget);
+            if(textLayout.eligible(textTarget))items=[{icon:'arrows-move',label:layoutMedia?'Move and resize logo':'Move and resize text',on:textLayout.active(),run:function(){textLayout.toggle();renderToolbar();}},{icon:'grid-3x3',label:'Snap to grid',title:'Snap to grid',on:textLayout.snapping(),run:function(){textLayout.toggleSnap();renderToolbar();}},{icon:'arrow-counterclockwise',label:layoutMedia?'Reset logo placement':'Reset text placement',run:function(){textLayout.reset();}}].concat(items||[]);
+            if(textLayout.eligible(textTarget)&&!layoutMedia)items=[
+                {icon:'dash',label:'Smaller text',run:function(){textLayout.changeFontSize(-2);renderToolbar();}},
+                {type:'chip',text:Math.round(textLayout.fontSize()*100)/100+' px'},
+                {icon:'plus',label:'Bigger text',run:function(){textLayout.changeFontSize(2);renderToolbar();}},
+                {icon:'arrow-counterclockwise',label:'Default text size',run:function(){textLayout.changeFontSize(null);renderToolbar();}}
+            ].concat(items);
+        }
         if (S.sel && window.GNCImageFraming) {
             var photoTarget = (S.sel.kind === 'office' || S.sel.kind === 'person')
                 ? S.sel.el.querySelector('[data-ve-img="office-photo"],[data-ve-img="person-photo"]') : null;
             var frameTarget = window.GNCImageFraming.findTarget(photoTarget || S.sel.el);
             if (frameTarget) items = [{icon:'arrows-move',label:'Reposition image',run:function () { window.GNCImageFraming.edit(frameTarget); }}].concat(items || []);
         }
-        if(S.sel&&S.sel.el&&S.sel.el.__ve&&S.sel.el.__ve.rich)items=richTextTools().concat(items||[]);
+        if(S.sel&&S.sel.el&&S.sel.el.__ve&&S.sel.el.__ve.rich&&!items.some(function(item){return item.type==='select'&&item.title==='Text style';}))items=richTextTools().concat(items||[]);
         if (!items || !items.length) { tb.hidden = true; return; }
         items.forEach(function (it) { if (it) tb.appendChild(buildItem(it)); });
         tb.hidden = false; tb.style.visibility = 'hidden'; placeTb(true);
@@ -719,11 +806,29 @@
         return it;
     }
 
+    function positionStatus() {
+        if (!statusEl || !S.doc) return;
+        var navbar = S.doc.getElementById('mainNavbar');
+        var canvas = $('#veCanvas');
+        if (!canvas) return;
+        var bottom = navbar ? navbar.getBoundingClientRect().bottom : 0;
+        statusEl.style.top = Math.max(16, S.frame.getBoundingClientRect().top - canvas.getBoundingClientRect().top + bottom + 12) + 'px';
+        var reposition = S.doc.querySelector('.image-frame-trigger:not([hidden])');
+        if (reposition) {
+            var frameBounds = S.frame.getBoundingClientRect(), control = reposition.getBoundingClientRect(), notice = statusEl.getBoundingClientRect();
+            var controlTop = frameBounds.top + control.top, controlBottom = frameBounds.top + control.bottom;
+            var controlLeft = frameBounds.left + control.left, controlRight = frameBounds.left + control.right;
+            if (notice.left < controlRight && notice.right > controlLeft && notice.top < controlBottom && notice.bottom > controlTop) {
+                statusEl.style.top = controlBottom - canvas.getBoundingClientRect().top + 12 + 'px';
+            }
+        }
+    }
     function setStatus(text, tone) {
         statusEl.className = 've-status ve-status-' + (tone || 'ok');
         statusEl.textContent = '';
         statusEl.appendChild(icon(tone === 'warn' ? 'circle-fill' : tone === 'busy' ? 'arrow-repeat' : tone === 'err' ? 'exclamation-circle-fill' : 'check-circle-fill'));
         statusEl.appendChild(D.createTextNode(' ' + text));
+        positionStatus();
     }
     function paintBtn(btn, def) {
         if (!def) { btn.hidden = true; return; }
@@ -735,29 +840,55 @@
         if (!S.adapter) return;
         var a = S.adapter.actions();
         paintBtn(btnSecondary, a.secondary); paintBtn(btnPrimary, a.primary);
-        if (!S.busy) { var st = S.adapter.status(); setStatus(st.text, st.tone); }
+        if(C.requiresApproval && a.primary && !btnPrimary.hidden) { btnPrimary.textContent='Submit for approval';btnPrimary.title='Send proposed changes to Super Admin'; }
+        else if(C.reviewSubmission && a.primary && !btnPrimary.hidden) btnPrimary.textContent='Approve and publish';
+        var saveDraft = $('#veSaveDraft'), discardDraft = $('#veDiscardDraft');
+        if (drafts && drafts.supported()) {
+            if (a.secondary && a.secondary.label === 'Save draft') btnSecondary.hidden = true;
+            saveDraft.hidden = false; saveDraft.disabled = S.busy || !drafts.available() || !S.adapter.dirtyCount() || drafts.saved();
+            discardDraft.hidden = !drafts.hasDraft(); discardDraft.disabled = S.busy;
+        } else { if (saveDraft) saveDraft.hidden = true; if (discardDraft) discardDraft.hidden = true; }
+        if (!S.busy) { var st = S.adapter.status(); setStatus(drafts && drafts.hasDraft() && drafts.saved() ? 'Draft saved · not live yet' : st.text, st.tone); }
         var o = $('#veOutlineBtn'); if (o) o.hidden = !S.adapter.outline;
-        if (btnCancel) btnCancel.hidden = !(S.adapter.dirtyCount() > 0) || S.preview;
+        if (btnCancel) btnCancel.hidden = !unsavedPageChanges() || S.preview;
         if (btnPageOpts) btnPageOpts.hidden = !(S.adapter.hasPageOptions && S.adapter.hasPageOptions()) || S.preview;
         if (editorFeedback) editorFeedback.refresh();
+        if(textLayout)textLayout.refresh();
     }
     /** Run an async save with the buttons locked and a status message. */
     function run(label, fn) {
         if (S.busy) return Promise.resolve();
+        S.publishing = /^Publishing/.test(label);
         S.busy = true; setStatus(label, 'busy'); chrome();
         return Promise.resolve().then(function () {
-            if (/^Publishing/.test(label) && imagePositionCount()) return publishImagePositions();
+            if (/^Publishing/.test(label)) return publishTextPlacements().then(function(){if(imagePositionCount())return publishImagePositions();});
         }).then(fn).catch(function (e) {
             console.error(e); toast(e.message || 'Something went wrong. Please try again.', 'error');
-        }).then(function () { S.busy = false; chrome(); });
+        }).then(async function () {
+            if(C.reviewSubmission && !C.requiresApproval && /^Publishing/.test(label) && !S.adapter.dirtyCount()) {
+                var approved=await send('/admin/action/editor-draft-handler.php',{action:'complete_review',page:C.page.slug,route:new URL(S.url,location.origin).pathname+new URL(S.url,location.origin).search,review_submission:C.reviewSubmission});
+                if(!approved.ok)throw Error(approved.error);C.reviewSubmission=0;
+            }
+            if ((/^Publishing/.test(label) || /^Sending/.test(label)) && drafts && drafts.hasDraft() && !S.adapter.dirtyCount()) await drafts.clear();
+            else if (/^Publishing/.test(label) && drafts && drafts.hasDraft() && S.adapter.dirtyCount()) await drafts.save();
+            S.publishing = false;
+            S.allowIncomplete = false;
+            S.busy = false; chrome();
+            if (S.publishReload) { var pendingReload=S.publishReload;S.publishReload=null;if(!S.adapter.dirtyCount())loadFrame(pendingReload.url,pendingReload.keepScroll); }
+        }).catch(function (e) { S.publishing = false; S.allowIncomplete = false; S.publishReload=null; S.busy = false; toast(e.message, 'error'); chrome(); });
     }
     function shortcutSave() {
+        var draftButton = $('#veSaveDraft');
+        if (draftButton && !draftButton.hidden) { if (!draftButton.disabled) draftButton.click(); return; }
         var a = S.adapter.actions(); var b = a.secondary && !a.secondary.disabled ? btnSecondary : btnPrimary;
         if (b && !b.disabled && !b.hidden) b.click();
     }
     D.addEventListener('keydown', function (e) { if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); shortcutSave(); } });
     btnSecondary.addEventListener('click', function () { if (S.adapter.runSecondary) S.adapter.runSecondary(); });
-    btnPrimary.addEventListener('click', function () { if (S.adapter.runPrimary) S.adapter.runPrimary(); });
+    btnPrimary.addEventListener('click', function () {
+        if(C.requiresApproval && drafts && drafts.supported()) { confirmPublish('',function(){});return; }
+        if (S.adapter.runPrimary) S.adapter.runPrimary();
+    });
 
     $$('.ve-devices [data-device]').forEach(function (b) {
         b.addEventListener('click', function () {
@@ -771,20 +902,20 @@
     // leaving the editor (page list, back link, closing the tab) with unsaved work
     var leaving = false;
     window.addEventListener('beforeunload', function (e) {
-        if (!leaving && S.adapter && S.adapter.dirtyCount() > 0) { e.preventDefault(); e.returnValue = ''; }
+        if (!leaving && unsavedPageChanges()) { e.preventDefault(); e.returnValue = ''; }
     });
     D.addEventListener('click', async function (e) {
         var a = e.target.closest ? e.target.closest('a[data-ve-nav]') : null;
         if (!a) return;
         if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
-        if (S.adapter && S.adapter.dirtyCount() > 0 && !await window.AdminDialogs.confirm('You have unsaved changes on this page.\n\nLeave without saving them?')) { e.preventDefault(); return; }
+        if (unsavedPageChanges() && !await window.AdminDialogs.confirm('You have unsaved changes on this page.\n\nLeave without saving them?')) { e.preventDefault(); return; }
         leaving = true;
         window.__veLeaving = true;
         window.location.href = a.href;
     });
     async function guardDirty(msg) {
-        return !(S.adapter && S.adapter.dirtyCount() > 0) || await window.AdminDialogs.confirm(msg || 'This reloads the preview, so your unsaved changes would be lost.\n\nContinue?');
+        return !unsavedPageChanges() || await window.AdminDialogs.confirm(msg || 'This reloads the preview, so your unsaved changes would be lost.\n\nContinue?');
     }
 
     // ══════════════════ Preview · Cancel · refresh after saving ══════════════════
@@ -846,6 +977,10 @@
     }
     /** Reload the editor screen, optionally on another page: ({page, sub, program}). */
     function reloadEditor(msg, route, preserveSettings) {
+        if (/^Published\./.test(msg || '') && drafts && drafts.hasDraft()) {
+            drafts.clear().then(function () { reloadEditor(msg, route, preserveSettings); }).catch(function (e) { toast('Published, but the saved draft could not be removed: ' + e.message, 'error'); });
+            return;
+        }
         // The drawer saves independently. Keep its unsaved form values alive
         // when Publish has saved the visual canvas, rather than navigating away.
         if (preserveSettings && D.querySelector('.dept-media-card[data-dirty="1"], .pgm-dirty:not([hidden]), .org-manager-dirty:not([hidden])')) {
@@ -931,7 +1066,130 @@
     function SectionsAdapter() {
         var page = C.page.slug;
         var photos = {};
+        var enrollmentImages = {}, enrollmentChanges = {};
+        var enrollmentCanvas = null, enrollmentBase = '', enrollmentRevision = '';
+        function enrollmentCanvasDirty() { return enrollmentCanvas !== null && JSON.stringify(enrollmentCanvas) !== enrollmentBase; }
+        function mediaChangeCount() { return Object.keys(photos).length + Object.keys(enrollmentChanges).length + (enrollmentCanvasDirty() ? 1 : 0); }
+        function enrollmentCard(id) { return S.doc.querySelector('[data-ve-enrollment-step="'+cssEsc(id)+'"]'); }
+        function paintEnrollmentCanvas(doc) {
+            var grid = doc.querySelector('[data-ve-enrollment-grid]');
+            if (!grid || !enrollmentCanvas) return;
+            grid.textContent = '';
+            enrollmentCanvas.forEach(function (step,index) {
+                var key='basic-'+step.step_id;
+                if (!enrollmentImages[key]) enrollmentImages[key]={label:'Basic Education - Step '+(index+1),url:step.illustration,default:step.illustration || '/assets/images/svg/enrollment-procedures/fresh-1.svg'};
+                var image=enrollmentImages[key], change=enrollmentChanges[key];
+                var card=h('div',{class:'enrollment-step-card is-visible','data-ve-enrollment-step':step.step_id});
+                card.appendChild(h('div',{class:'enrollment-step-label',text:'STEP '+(index+1)}));
+                function text(key,cls,label,max,multi) {
+                    var el=h(key==='instruction'?'p':'div',{class:cls,'data-ve-field':'enrollment-step-text','data-ve-key':key,'data-ve-label':label,'data-ve-max':max,'data-ve-ph':label,text:step[key]});
+                    if(multi){el.setAttribute('data-ve-multiline','');el.style.whiteSpace='pre-line';}
+                    makeField(el,function(node,value){step[key]=value;});
+                    return el;
+                }
+                card.appendChild(text('title','enrollment-step-title','Office / step title',150));
+                card.appendChild(text('location','enrollment-step-sub','Location (optional)',150));
+                card.appendChild(h('div',{class:'enrollment-step-icon','data-ve-img':'enrollment-illustration','data-ve-key':key,'data-ve-label':image.label},[
+                    h('img',{src:change ? (change.preview || image.default) : (image.url || image.default),alt:step.title,width:100,height:100})
+                ]));
+                card.appendChild(text('instruction','enrollment-step-desc','Click to add instructions',2000,true));
+                card.appendChild(h('div',{class:'enrollment-step-bar enrollment-step-bar--'+(index%2?'gold':'green')}));
+                grid.appendChild(card);
+            });
+            var add=doc.querySelector('[data-ve-enrollment-add]');if(add)add.disabled=enrollmentCanvas.length>=40;
+        }
+        function addEnrollmentCard() {
+            if (S.busy || !enrollmentCanvas || enrollmentCanvas.length>=40) return;
+            var id=Array.from(crypto.getRandomValues(new Uint8Array(16)),function(b){return b.toString(16).padStart(2,'0');}).join('');
+            enrollmentCanvas.push({step_id:id,title:'',location:'',instruction:'',illustration:'/assets/images/svg/enrollment-procedures/fresh-1.svg'});
+            paintEnrollmentCanvas(S.doc); select(null); chrome();
+            var el=enrollmentCard(id).querySelector('[data-ve-key="title"]');
+            el.scrollIntoView({block:'center',behavior:'instant'});el.focus();
+            select({kind:'enrollment-step-field',el:el,id:id,prevent:false});
+        }
+        function enrollmentStepTools(id,chip) {
+            var index=enrollmentCanvas.findIndex(function(step){return step.step_id===id;});
+            if(index<0)return [];
+            function move(offset){if(S.busy)return;var step=enrollmentCanvas.splice(index,1)[0];enrollmentCanvas.splice(index+offset,0,step);paintEnrollmentCanvas(S.doc);select(null);chrome();}
+            var tools=chip?[{type:'chip',text:'Step '+(index+1),icon:'pencil'}]:[];
+            return tools.concat([
+                {icon:'arrow-up',label:'Move step up',disabled:index===0,run:function(){move(-1);}},
+                {icon:'arrow-down',label:'Move step down',disabled:index===enrollmentCanvas.length-1,run:function(){move(1);}},
+                {icon:'trash',label:'Remove step',danger:true,run:function(){
+                    confirmPop('Remove this step?','It will be removed from the website when you publish.','Remove step',function(){
+                        var change=enrollmentChanges['basic-'+id];if(change&&change.preview)URL.revokeObjectURL(change.preview);
+                        delete enrollmentChanges['basic-'+id];enrollmentCanvas.splice(index,1);paintEnrollmentCanvas(S.doc);select(null);chrome();
+                    });
+                }}
+            ]);
+        }
+        function validateEnrollmentCanvas() {
+            if(!enrollmentCanvasDirty())return true;
+            var missing=enrollmentCanvas.find(function(step){return !step.title.trim()||!step.instruction.trim();});
+            if(!missing)return true;
+            S.doc.getElementById('basic-education-tab').click();
+            var field=enrollmentCard(missing.step_id).querySelector('[data-ve-key="'+(!missing.title.trim()?'title':'instruction')+'"]');
+            field.scrollIntoView({block:'center',behavior:'instant'});field.focus();
+            toast('Add an office/title and instructions to each step before publishing.','error');return false;
+        }
+        function enrollmentChange(sel, file, reset) {
+            if (S.busy) return;
+            var previous = enrollmentChanges[sel.key];
+            if (previous && previous.preview) URL.revokeObjectURL(previous.preview);
+            if (reset && enrollmentImages[sel.key].url === enrollmentImages[sel.key].default) delete enrollmentChanges[sel.key];
+            else enrollmentChanges[sel.key] = {reset:reset, file:file, preview:file ? previewUrl(file) : null};
+            var change = enrollmentChanges[sel.key];
+            sel.el.querySelector('img').src = change && change.preview ? change.preview : (reset ? enrollmentImages[sel.key].default : enrollmentImages[sel.key].url);
+            renderToolbar(); chrome();
+        }
+        function enrollmentTools(sel) {
+            return [
+                {type:'chip',text:enrollmentImages[sel.key].label,icon:'image'},
+                {icon:'image',label:'Change illustration',primary:true,run:function () {
+                    pickFile('image/svg+xml,image/png,image/jpeg,image/webp,.svg,.png,.jpg,.jpeg,.webp',function (file) {
+                        if (!/\.(svg|png|jpe?g|webp)$/i.test(file.name) || file.size > 5 * MB) { toast('Choose an SVG, PNG, JPG, or WEBP image of up to 5 MB.','error'); return; }
+                        enrollmentChange(sel,file,false);
+                    });
+                }},
+                {icon:'arrow-counterclockwise',label:'Restore Storyset illustration',run:function () { enrollmentChange(sel,null,true); }},
+                {icon:'box-arrow-up-right',label:'Browse Storyset',run:function () {
+                    toast('On Storyset, choose Download SVG. Then upload the .svg illustration here.','ok');
+                    window.open('https://storyset.com/','_blank','noopener,noreferrer');
+                }}
+            ];
+        }
+        function publishEnrollmentCanvasChanges() {
+            if (!Object.keys(enrollmentChanges).length && !enrollmentCanvasDirty()) return Promise.resolve(true);
+            var payload={}, files={}, fields={};
+            Object.keys(enrollmentChanges).forEach(function(key){
+                payload[key]={reset:enrollmentChanges[key].reset,expected:enrollmentImages[key].url};
+                if(enrollmentChanges[key].file)files['image_'+key]=enrollmentChanges[key].file;
+            });
+            fields.images=JSON.stringify(payload);
+            if(enrollmentCanvasDirty()){fields.steps=JSON.stringify(enrollmentCanvas);fields.revision=enrollmentRevision;}
+            return send('/admin/action/enrollment-canvas-handler.php',fields,files).then(function(res){
+                if(!res.ok){toast(res.error,'error');return false;}
+                Object.keys(enrollmentChanges).forEach(function(key){if(enrollmentChanges[key].preview)URL.revokeObjectURL(enrollmentChanges[key].preview);});
+                enrollmentChanges={};enrollmentImages=res.images;enrollmentCanvas=res.steps;enrollmentBase=JSON.stringify(res.steps);enrollmentRevision=res.revision;
+                paintEnrollmentCanvas(S.doc);
+                // College illustrations use their existing card nodes.
+                $$('[data-ve-img="enrollment-illustration"]',S.doc).forEach(function(el){var image=res.images[el.getAttribute('data-ve-key')];if(image)el.querySelector('img').src=image.url||image.default;});
+                select(null);toast('Published. Your changes are live now.','ok');return true;
+            });
+        }
+        function paintHistoryBackground(el, url, removed, pending) {
+            var box = el.closest('.quote-banner-box');
+            if (!box) return;
+            var source = removed ? el.getAttribute('data-ve-default-image') : url;
+            box.style.setProperty('--history-quote-background', 'url("' + source + '")');
+            el.setAttribute('data-ve-has-image', removed ? '0' : '1');
+            el.textContent = pending ? 'Background changed — click Publish' : 'Change background image';
+        }
         function paintPhoto(el, change) {
+            if (el.hasAttribute('data-ve-history-background')) {
+                paintHistoryBackground(el, change.url, change.remove, true);
+                return;
+            }
             el.textContent = '';
             if (!change.remove) {
                 var img = el.ownerDocument.createElement('img');
@@ -961,7 +1219,9 @@
                             return;
                         }
                         var el = S.doc.querySelector('[data-ve-img="history:' + cssEsc(key) + '"]');
-                        if (el) {
+                        if (el && el.hasAttribute('data-ve-history-background')) {
+                            paintHistoryBackground(el, res.image_url, change.remove, false);
+                        } else if (el) {
                             el.textContent = '';
                             el.setAttribute('data-ve-has-image', change.remove ? '0' : '1');
                             if (!change.remove) {
@@ -978,7 +1238,7 @@
                         }
                         if (change.url) URL.revokeObjectURL(change.url);
                         delete photos[key];
-                        toast('History photo change published.', 'ok');
+                        toast('Published. Your changes are live now.', 'ok');
                     });
                 });
             }, Promise.resolve()).then(function () { renderToolbar(); });
@@ -988,18 +1248,35 @@
                      note: s.review_note || '', by: s.submitted_by || '', el: null, base: '', dirty: false };
         });
         var admissionBaseOrders = {}, admissionUndo = [];
+        function restoreAdmissionCategory(s) {
+            var school=s.key.indexOf('custom_')===0?'college':s.key.split('_custom_')[0];
+            var scope=S.doc.querySelector('[data-admission-scope="'+cssEsc(school)+'"]');if(!scope)return;
+            var basic=school!=='college',tabId=(basic?'applicant-tab-':'tab-')+s.key,panelId=(basic?'applicant-panel-':'panel-')+s.key;
+            var tab=h('button',{type:'button',class:'req-tab',role:'tab',id:tabId,'aria-controls':panelId,'aria-selected':'false',text:s.title});
+            tab.setAttribute(basic?'data-basic-applicant':'data-target',s.key);
+            var panel=S.doc.createElement('div');panel.className='req-panel';panel.id=panelId;panel.hidden=true;panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby',tabId);
+            if(basic)panel.setAttribute('data-basic-applicant-panel',s.key);
+            s.el=S.doc.createElement('div');s.el.className='admission-req-content';s.el.setAttribute('data-ve-section',s.key);s.el.setAttribute('data-ve-label',s.title);panel.appendChild(s.el);
+            scope.querySelector('[data-admission-category-panels]').appendChild(panel);scope.querySelector('[data-ve-admission-add-category]').before(tab);
+        }
         function locked(s) { return s.review === 'pending'; }
         function byEl(el) { for (var i = 0; i < secs.length; i++) if (secs[i].el === el) return secs[i]; return null; }
         function html(s) { return cleanHtml(s.el.innerHTML); }
+        function plainSection(el) { return el.hasAttribute('data-ve-admission-label') || el.hasAttribute('data-ve-plain-section'); }
 
         function bind(s) {
             var el = s.el;
-            el.__ve = { rich: true, sec: s, onChange: function () {
+            var admissionLabel = plainSection(el);
+            el.__ve = { rich: !admissionLabel, sec: s, max: admissionLabel ? (parseInt(el.getAttribute('data-ve-max'), 10) || (s.key === 'hero_intro' ? 2000 : 150)) : 0,
+                multi: admissionLabel && (s.key === 'hero_intro' || el.hasAttribute('data-ve-multiline')), onChange: function () {
                 s.dirty = !!s.isNew || html(s) !== s.base;
                 admissionItemControls(s);
                 markAdmissionChanges(s);
             } };
-            el.innerHTML = s.html || '<p></p>';
+            if (plainSection(el)) {
+                var plain = el.ownerDocument.createElement('div'); plain.innerHTML = s.html;
+                el.textContent = plain.textContent;
+            } else el.innerHTML = s.html || '<p></p>';
             el.setAttribute('data-ve-ph', 'Write here…');
             el.setAttribute('spellcheck', 'true');
             setLock(s);
@@ -1009,7 +1286,7 @@
         }
         function setLock(s) {
             if (!s.el) return;
-            s.el.setAttribute('contenteditable', locked(s) ? 'false' : 'true');
+            s.el.setAttribute('contenteditable', locked(s) ? 'false' : (plainSection(s.el) ? PLAIN : 'true'));
             s.el.classList.toggle('ve-locked', locked(s));
             s.el.title = locked(s) ? 'Waiting for approval, so it can’t be changed right now.' : '';
             admissionItemControls(s);
@@ -1044,7 +1321,14 @@
         function apply(s, res, replace) {
             s.isNew = false;
             s.has_draft = !!res.has_draft; s.review = res.review_status || 'none'; s.note = res.review_note || ''; s.by = res.submitted_by_name || '';
-            if (replace && res.editor_html !== undefined) { s.html = res.editor_html; s.el.innerHTML = res.editor_html || '<p></p>'; s.el.classList.toggle('ve-empty', !(s.el.textContent || '').trim()); }
+            if (replace && res.editor_html !== undefined) {
+                s.html = res.editor_html;
+                if (plainSection(s.el)) {
+                    var plain = s.el.ownerDocument.createElement('div'); plain.innerHTML = res.editor_html;
+                    s.el.textContent = plain.textContent;
+                } else s.el.innerHTML = res.editor_html || '<p></p>';
+                s.el.classList.toggle('ve-empty', !(s.el.textContent || '').trim());
+            }
             s.base = html(s); s.dirty = false; setLock(s);
             rememberAdmissionItems(s); markAdmissionChanges(s);
         }
@@ -1062,12 +1346,16 @@
             }, Promise.resolve()).then(function () { return { ok: ok, errs: errs }; });
         }
         function report(r, doneWord) {
-            if (r.ok) toast(plural(r.ok, 'section') + ' ' + doneWord + '.', 'ok');
+            if (r.ok && !r.errs.length) toast(/^published/.test(doneWord) ? 'Published. Your changes are live now.' : /^saved/.test(doneWord) ? 'Draft saved. Your changes are not live yet.' : 'Submitted for approval. Your changes are not live yet.', 'ok');
             r.errs.forEach(function (m) { toast(m, 'error'); });
         }
         function publishable(s) { return !!s.el && !(s.isNew && s.removed) && (s.dirty || s.has_draft || locked(s)); }
         function submittable(s) { return !!s.el && !locked(s) && (s.dirty || (s.has_draft && s.review !== 'pending')); }
         function publishSections(list) {
+            if (page === 'enrollment-procedures') {
+                run('Publishing enrollment content...',function(){return publishEnrollmentCanvasChanges().then(function(ok){if(!ok)return;return each(list,'publish').then(function(r){report(r,'published. It is live now');});});});
+                return;
+            }
             if (S.doc.querySelector('[data-admission-scope]')) {
                 run('Publishing…', function () {
                     var orders = admissionOrders();
@@ -1081,7 +1369,7 @@
                         secs = secs.filter(function (s) { return !s.removed; });
                         admissionBaseOrders = orders; admissionUndo = [];
                         secs.forEach(markAdmissionChanges); markAdmissionLayout();
-                        toast('Published. Your admission requirements are live now.','ok');
+                        toast('Published. Your changes are live now.','ok');
                     });
                 });
                 return;
@@ -1356,7 +1644,35 @@
         var A = {
             outline: true,
             startFallback: function () { loadSrcdoc(fallbackHtml()); },
+            draftState: function (value) {
+                if (!value) return {secs:secs.map(function(s){return Object.assign({},s,{html:s.el&&!s.removed?html(s):s.html});}),photos:photos,enrollmentImages:enrollmentImages,enrollmentChanges:enrollmentChanges,enrollmentCanvas:enrollmentCanvas,enrollmentBase:enrollmentBase,enrollmentRevision:enrollmentRevision,admissionBaseOrders:admissionBaseOrders,orders:admissionOrders()};
+                photos=value.photos;enrollmentImages=value.enrollmentImages;enrollmentChanges=value.enrollmentChanges;enrollmentCanvas=value.enrollmentCanvas;enrollmentBase=value.enrollmentBase;enrollmentRevision=value.enrollmentRevision;admissionBaseOrders=value.admissionBaseOrders;
+                secs=value.secs.map(function(s){s.el=S.doc.querySelector('[data-ve-section="'+cssEsc(s.key)+'"]');return s;});
+                secs.forEach(function(s){
+                    if(!s.el&&s.isNew)restoreAdmissionCategory(s);
+                    if(s.removed&&s.el){var panel=s.el.closest('.req-panel'),tab=panel&&S.doc.getElementById(panel.getAttribute('aria-labelledby'));if(panel)panel.remove();if(tab)(tab.closest('.ve-admission-category')||tab).remove();}
+                });
+                paintEnrollmentCanvas(S.doc);
+            },
+            draftRebind: function () {
+                secs.forEach(function(s){if(!s.el||s.removed)return;var base=s.base,dirty=s.dirty;bind(s);s.base=base;s.dirty=dirty;});
+                $$('[data-admission-scope]',S.doc).forEach(admissionControls);
+                secs.forEach(markAdmissionChanges);
+                Object.keys(photos).forEach(function(key){var el=S.doc.querySelector('[data-ve-img="history:'+cssEsc(key)+'"]');if(el)paintPhoto(el,photos[key]);});
+                Object.keys(enrollmentChanges).forEach(function(key){var el=S.doc.querySelector('[data-ve-img="enrollment-illustration"][data-ve-key="'+cssEsc(key)+'"] img');if(el)el.src=enrollmentChanges[key].preview||enrollmentImages[key].default;});
+            },
             mount: function (doc) {
+                try { enrollmentImages=JSON.parse(doc.getElementById('veEnrollmentIllustrations').textContent); } catch (_) { enrollmentImages={}; }
+                if (enrollmentCanvas === null && doc.getElementById('veEnrollmentSteps')) {
+                    var canvas=JSON.parse(doc.getElementById('veEnrollmentSteps').textContent);
+                    enrollmentCanvas=canvas.steps;enrollmentBase=JSON.stringify(canvas.steps);enrollmentRevision=canvas.revision;
+                }
+                paintEnrollmentCanvas(doc);
+
+                Object.keys(enrollmentChanges).forEach(function (key) {
+                    var el=doc.querySelector('[data-ve-img="enrollment-illustration"][data-ve-key="'+cssEsc(key)+'"] img');
+                    if (el) el.src=enrollmentChanges[key].preview || enrollmentImages[key].default;
+                });
                 var found = 0;
                 secs.forEach(function (s) { s.el = doc.querySelector('[data-ve-section="' + cssEsc(s.key) + '"]'); if (s.el) found++; });
                 if (!found && !S.fallback && !doc.querySelector('[data-admission-scope]')) { loadSrcdoc(fallbackHtml()); return true; }
@@ -1387,7 +1703,8 @@
                 s.el.classList.add('ve-flash'); window.setTimeout(function () { s.el.classList.remove('ve-flash'); }, 1400);
                 select({ kind: 'rich', el: s.el, sec: s, noCaret: locked(s), prevent: false });
             },
-            pick: function (t) {
+            pick: function (t, event) {
+                if (t.closest('[data-ve-enrollment-add]')) { addEnrollmentCard(); return {kind:'none'}; }
                 if(t.closest('[data-ve-admission-drag-item],[data-ve-admission-drag-category]'))return {kind:'none'};
                 var undo=t.closest('[data-ve-admission-undo]');if(undo){undoAdmissionDeletion(undo.closest('[data-admission-scope]'));return {kind:'none'};}
                 var rename=t.closest('[data-ve-admission-rename-category]');if(rename){renameAdmissionCategory(rename.getAttribute('data-ve-admission-rename-category'),rename);return {kind:'none'};}
@@ -1398,8 +1715,30 @@
                 if (addItem) { addAdmissionItem(addItem.getAttribute('data-ve-admission-add-item'), addItem); return {kind:'none'}; }
                 var addCategory = t.closest('[data-ve-admission-add-category]');
                 if (addCategory) { addAdmissionCategory(addCategory.closest('[data-admission-scope]'), addCategory); return {kind:'none'}; }
+                var label = t.closest('[data-ve-admission-label],[data-ve-plain-section]');
+                if (label) {
+                    var labelSection = byEl(label);
+                    if (labelSection) {
+                        if (!locked(labelSection)) {
+                            // Form labels and buttons otherwise transfer focus away from their editable text.
+                            if (event && label.closest('label,[type="submit"]')) event.preventDefault();
+                            if (S.doc.activeElement !== label) {
+                                label.focus({ preventScroll: true });
+                                var caret = event && S.doc.caretRangeFromPoint && S.doc.caretRangeFromPoint(event.clientX, event.clientY);
+                                if (caret && label.contains(caret.startContainer)) {
+                                    var selection = S.win.getSelection(); selection.removeAllRanges(); selection.addRange(caret);
+                                }
+                            }
+                        }
+                        return { kind: 'admission-label', el: label, sec: labelSection, prevent: false, noCaret: locked(labelSection) };
+                    }
+                }
+                var illustration=t.closest('[data-ve-img="enrollment-illustration"]');
+                if (illustration && enrollmentImages[illustration.getAttribute('data-ve-key')]) return {kind:'enrollment-illustration',el:illustration,key:illustration.getAttribute('data-ve-key'),prevent:true};
                 var photo = t && t.closest ? t.closest('[data-ve-img^="history:"]') : null;
                 if (photo) return { kind: 'history-image', el: photo, key: photo.getAttribute('data-ve-img').slice(8), prevent: true };
+                var stepCard=t.closest('[data-ve-enrollment-step]');
+                if(stepCard){var stepField=fieldOf(t);return {kind:stepField?'enrollment-step-field':'enrollment-step',el:stepField||stepCard,id:stepCard.getAttribute('data-ve-enrollment-step'),prevent:!stepField};}
                 var el = sectionElOf(t); var s = el && byEl(el);
                 var inlineText = t.closest('[data-ve-admission-item-text]');
                 if (s && inlineText && !locked(s)) {
@@ -1409,14 +1748,26 @@
                 return s ? { kind: 'rich', el: el, sec: s, prevent: false, noCaret: locked(s) } : null;
             },
             toolbar: function (sel) {
+                if (sel.kind === 'enrollment-step-field' || sel.kind === 'enrollment-step') return enrollmentStepTools(sel.id,true);
+                if (sel.kind === 'enrollment-illustration') return enrollmentTools(sel).concat(sel.key.indexOf('basic-')===0?enrollmentStepTools(sel.key.slice(6),false):[]);
                 var s = sel.sec, it = [];
                 if (sel.kind === 'history-image') {
                     var key = sel.key, hasImage = sel.el.getAttribute('data-ve-has-image') === '1';
+                    if (sel.el.hasAttribute('data-ve-history-background')) {
+                        it.push({ type: 'chip', icon: 'image', text: photos[key] ? 'Unsaved background change' : 'Quote background' });
+                        it.push({ icon: 'image', label: 'Change background image', primary: true, run: function () {
+                            pickFile('image/jpeg,image/png,image/webp', function (file) {
+                                if (!S.busy) stagePhoto(sel, file);
+                            }, false, sel.el.closest('.quote-banner-box'));
+                        } });
+                        if (hasImage) it.push({ icon: 'arrow-counterclockwise', label: 'Restore default background', run: function () { stagePhoto(sel, null); } });
+                        return it;
+                    }
                     it.push({ type: 'chip', icon: 'image', text: photos[key] ? 'Unsaved photo change' : (hasImage ? 'History photo' : 'Empty photo slot') });
                     it.push({ icon: 'image', label: hasImage ? 'Replace photo' : 'Add photo', primary: true, run: function () {
                         pickFile('image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp', function (file) {
                             if (S.busy) return;
-                            if (file.size > 10 * MB) { toast('That photo is over 10 MB.', 'error'); return; }
+                            if (file.size > 5 * MB) { toast('That photo is over 5 MB.', 'error'); return; }
                             stagePhoto(sel, file);
                         });
                     } });
@@ -1427,7 +1778,7 @@
                     } });
                     return it;
                 }
-                if (!locked(s)) it = richTextTools();
+                if (!locked(s) && sel.kind !== 'admission-label') it = richTextTools();
                 it.push(chipFor(s));
                 if (locked(s) && C.canApprove) {
                     it.push({ icon: 'check2-circle', label: 'Approve & publish', primary: true, run: function () { review(s, 'approve'); } });
@@ -1445,7 +1796,7 @@
                 }
                 return it;
             },
-            dirtyCount: function () { return secs.filter(function (s) { return s.dirty && !(s.isNew && s.removed); }).length + Object.keys(photos).length + admissionOrderCount(); },
+            dirtyCount: function () { return secs.filter(function (s) { return s.dirty && !(s.isNew && s.removed); }).length + mediaChangeCount() + admissionOrderCount(); },
             status: function () {
                 var n = A.dirtyCount(); if (n) return { text: plural(n, 'change') + ' not saved', tone: 'warn' };
                 var p = secs.filter(locked).length; if (p) return { text: plural(p, 'section') + ' waiting for approval', tone: 'warn' };
@@ -1454,21 +1805,22 @@
             },
             actions: function () {
                 var n = A.dirtyCount();
-                var secondary = { label: 'Save draft', icon: 'save', disabled: n === 0 || Object.keys(photos).length > 0, title: Object.keys(photos).length ? 'Photo changes stay in this preview until Publish. Draft saving is available for text only.' : 'Keep your changes privately. Visitors cannot see them yet.' };
+                var secondary = { label: 'Save draft', icon: 'save', disabled: n === 0 || mediaChangeCount() > 0, title: mediaChangeCount() ? 'Image changes stay in this preview until Publish. Draft saving is available for text only.' : 'Keep your changes privately. Visitors cannot see them yet.' };
+                if (enrollmentCanvasDirty()) { secondary.disabled=true;secondary.title='Enrollment step changes stay in this preview until Publish.'; }
                 if (secs.some(function (s) { return s.isNew; })) { secondary.disabled = true; secondary.title = 'New categories stay in this preview until Publish.'; }
                 if (admissionOrderCount() || secs.some(function(s){return s.removed;})) { secondary.disabled=true;secondary.title='Category layout changes stay in this preview until Publish.'; }
-                if (C.canPublish) return { secondary: secondary, primary: { label: 'Publish', icon: 'cloud-upload', disabled: !secs.some(publishable) && !Object.keys(photos).length && !admissionOrderCount(), title: 'Put your changes on the live website' } };
+                if (C.canPublish) return { secondary: secondary, primary: { label: 'Publish', icon: 'cloud-upload', disabled: !secs.some(publishable) && !mediaChangeCount() && !admissionOrderCount(), title: 'Put your changes on the live website' } };
                 return { secondary: secondary, primary: { label: 'Submit for approval', icon: 'send', disabled: !C.reviewReady || !secs.some(submittable), title: C.reviewReady ? 'Send your changes to an administrator' : 'Approval has not been switched on yet' } };
             },
             runSecondary: function () {
-                if (Object.keys(photos).length) return;
+                if (mediaChangeCount()) return;
                 var list = secs.filter(function (s) { return s.dirty && !locked(s); }); if (!list.length) return;
                 run('Saving draft…', function () { return each(list, 'save_draft').then(function (r) { report(r, 'saved as a draft (visitors cannot see it yet)'); }); });
             },
             runPrimary: function () {
                 if (C.canPublish) {
-                    var list = secs.filter(publishable), count = list.length + Object.keys(photos).length + admissionOrderCount(); if (!count) return;
-                    confirmPublish(plural(count, 'change') + ' will go live on the website.', function () { publishSections(list); });
+                    var list = secs.filter(publishable), count = list.length + mediaChangeCount() + admissionOrderCount(); if (!count) return;
+                    confirmPublish(plural(count, 'change') + ' will go live on the website.', function () { if (!S.allowIncomplete && !validateEnrollmentCanvas()) return; publishSections(list); });
                     return;
                     run('Publishing…', function () { return each(list, 'publish').then(function (r) { report(r, 'published. It is live now'); }); });
                 } else {
@@ -1511,6 +1863,14 @@
         loadContent(HD.content);
         function hcTextKeys() { return Object.keys(HC).filter(function (k) { return HC[k].type !== 'image' && hc[k] !== HC[k].value; }); }
         function hcCount() { return hcTextKeys().length + Object.keys(hcFiles).length + Object.keys(hcReset).length; }
+        function paintHomeImage(sel, url) {
+            if (sel.area) {
+                sel.area.style.setProperty('--home-section-background', 'url(' + JSON.stringify(url) + ')');
+                sel.el.setAttribute('data-ve-background-value', url);
+            } else {
+                setBg(sel.el, url);
+            }
+        }
 
         function snap(o) {
             return { title: o.title, subtitle: o.subtitle, btn1_text: o.btn1_text, btn1_link: o.btn1_link, btn2_text: o.btn2_text, btn2_link: o.btn2_link,
@@ -1761,6 +2121,12 @@
         }
 
         var A = {
+            draftState: function (value) {
+                if(!value)return {slides:slides,cur:cur,orderDirty:orderDirty,pres:pres,presOrig:presOrig,presFile:presFile,presRemove:presRemove,HC:HC,hc:hc,hcFiles:hcFiles,hcReset:hcReset};
+                slides=value.slides;cur=value.cur;orderDirty=value.orderDirty;pres=value.pres;presOrig=value.presOrig;presFile=value.presFile;presRemove=value.presRemove;HC=value.HC;hc=value.hc;hcFiles=value.hcFiles;hcReset=value.hcReset;
+                slides.forEach(function(slide){slide.el=S.doc.querySelector('[data-ve-slide="'+slide.id+'"]');if(slide.el){bindSlide(slide);paintBg(slide);paintFlags(slide);}});bindPresident(S.doc);renderDock();
+            },
+            draftRebind: function(){slides.forEach(bindSlide);bindPresident(S.doc);renderDock();},
             mount: function (doc) {
                 var els = $$('[data-ve-slide]', doc);
                 slides.forEach(function (s) { s.el = els.filter(function (e) { return +e.getAttribute('data-ve-slide') === s.id; })[0] || null; });
@@ -1791,6 +2157,8 @@
                 if (hb) { var hf = hb.querySelector('[data-ve-field]'); if (hf) { hf.focus(); return { kind: 'hbutton', el: hf, key: hb.getAttribute('data-ve-linkkey'), a: hb, prevent: true }; } }
                 var hi = t.closest && t.closest('[data-ve-img="home-image"]');
                 if (hi) return { kind: 'himage', el: hi, key: hi.getAttribute('data-ve-key'), prevent: true };
+                var hbg = t.closest && t.closest('[data-ve-img="home-background"]');
+                if (hbg) return { kind: 'himage', el: hbg, area: hbg.closest('section'), key: hbg.getAttribute('data-ve-key'), prevent: true };
                 var hic = t.closest && t.closest('[data-ve-icon="home-icon"]');
                 if (hic && HC[hic.getAttribute('data-ve-key')]) return { kind: 'hicon', el: hic, key: hic.getAttribute('data-ve-key'), prevent: true };
                 var b = t.closest && t.closest('[data-ve-btn]');
@@ -1832,10 +2200,12 @@
                 } else if (sel.kind === 'himage') {
                     var hk = sel.key, changed = !!hcFiles[hk];
                     it.push({ type: 'chip', icon: 'image', text: (HC[hk] && HC[hk].label) || 'Picture' });
-                    it.push({ icon: 'image', label: 'Replace picture', primary: true, run: function () {
-                        pickFile('image/*', function (f) { hcFiles[hk] = f; delete hcReset[hk]; sel.el.style.backgroundImage = 'url("' + previewUrl(f) + '")'; sel.el.classList.remove('lazy-bg'); renderToolbar(); chrome(); }); } });
+                    it.push({ icon: 'image', label: sel.area ? 'Change background image' : 'Replace picture', primary: true, run: function () {
+                        pickFile('image/*', function (f) { hcFiles[hk] = f; delete hcReset[hk]; paintHomeImage(sel, previewUrl(f)); renderToolbar(); chrome(); }, false, sel.area || sel.el, !!sel.area); } });
                     if (changed || (HC[hk] && HC[hk].value !== HC[hk].default && !hcReset[hk])) it.push({ icon: 'arrow-counterclockwise', label: 'Use original', title: 'Go back to the original picture', run: function () {
-                        delete hcFiles[hk]; hcReset[hk] = true; sel.el.style.backgroundImage = 'url("' + HC[hk].default + '")'; renderToolbar(); chrome(); } });
+                        delete hcFiles[hk];
+                        if (HC[hk].value === HC[hk].default) delete hcReset[hk]; else hcReset[hk] = true;
+                        paintHomeImage(sel, '/' + HC[hk].default.replace(/^\/+/, '')); renderToolbar(); chrome(); } });
                     if (changed) it.push({ type: 'chip', tone: 'warn', icon: 'pencil', text: 'New picture, not saved yet' });
                     if (hcReset[hk]) it.push({ type: 'chip', tone: 'warn', icon: 'pencil', text: 'Will go back to the original' });
                 } else if (sel.kind === 'image') {
@@ -1893,7 +2263,7 @@
                         });
                         return p.then(function () {
                             errs.forEach(function (m) { toast(m, 'error'); });
-                            if (done) toast('Saved. ' + (published ? 'Published changes are live now.' : 'Draft slides stay hidden from visitors.'), 'ok');
+                            if (done && !errs.length) toast(published || doHome || doPres || doOrder ? 'Published. Your changes are live now.' : 'Draft saved. Your changes are not live yet.', 'ok');
                             if (done && !errs.length) return refresh(cur);       // reload from the server: proves what was saved
                             if (done) return refresh(cur);
                         });
@@ -2181,6 +2551,9 @@
 
         var A = {
             consumeClick: function(){return Date.now()<suppressClickUntil;},
+            draftState: function(value){if(!value)return {edits:edits,curKey:curKey};edits=value.edits;curKey=value.curKey;
+                Object.keys(edits.office).forEach(function(id){var el=S.doc.querySelector('[data-ve-office="'+cssEsc(id)+'"]');if(el&&edits.office[id].details)paintOfficeDetails({el:el,id:+id},edits.office[id].details);});
+            },
             mount: function (doc) { bind(doc); return false; },
             onLink: async function (a) {
                 var href = a.getAttribute('href') || '', m = /[?&]section=([^&#]+)/.exec(href);
@@ -2243,8 +2616,8 @@
             runPrimary: function () {
                 if (!A.dirtyCount()) return;
                 confirmPublish('Publish your changes to the live website?', function () {
-                    for (var id in edits.person) { var e0 = edits.person[id]; if (e0.name != null && !e0.name.trim()) { toast('A person’s name cannot be empty.', 'error'); return; } }
-                    for (var k in edits.sec) { if (edits.sec[k].title != null && !edits.sec[k].title.trim()) { toast('A heading cannot be empty.', 'error'); return; } }
+                    for (var id in edits.person) { var e0 = edits.person[id]; if (!S.allowIncomplete && e0.name != null && !e0.name.trim()) { toast('A person’s name cannot be empty.', 'error'); return; } }
+                    for (var k in edits.sec) { if (!S.allowIncomplete && edits.sec[k].title != null && !edits.sec[k].title.trim()) { toast('A heading cannot be empty.', 'error'); return; } }
                     run('Publishing…', function () {
                         var p = Promise.resolve(), errs = [], done = 0;
                         function step(fields, files) { p = p.then(function () { return sendContent(fields, files).then(function (r) { if (r.ok) { done++; if (r.sections) syncSettings(r.sections); } else errs.push(r.error); }); }); }
@@ -2260,7 +2633,7 @@
                         Object.keys(edits.order).forEach(function (k) { step({ action: 'admin_reorder', section_key: k, order: JSON.stringify(edits.order[k]) }); });
                         return p.then(function () {
                             errs.forEach(function (m) { toast(m, 'error'); });
-                            if (done) { toast('Published. Your changes are live now.', 'ok'); }
+                            if (done && !errs.length) { toast('Published. Your changes are live now.', 'ok'); }
                             if (!errs.length) edits = { sec: {}, person: {}, office: {}, order: {} };
                             if (done) reload();
                         });
@@ -2338,9 +2711,51 @@
             facility: {
                 label: 'Facility slides', icon: 'images', itemType: 'facility', data: null, sequential: false,
                 accept: 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp'
+            },
+            uniform: {
+                label: 'Uniform photos', icon: 'person-badge', itemType: 'uniform', data: null, sequential: false,
+                accept: 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp'
             }
         };
         var tab = 'banner';   // which strip is showing (kept while the preview reloads)
+        var slideReplacements = {};
+        function replacementKey(L, slide) { return L.itemType + ':' + slide.item_id; }
+        function previewReplacement(L, index, change) {
+            var node = S.doc.querySelectorAll(L.itemType === 'hero_slide' ? '.hero-slide' : L.itemType === 'uniform' ? '.template-uniform-card img' : '.fcar-slide img')[index];
+            if (!node) return;
+            if (L.itemType !== 'hero_slide') { node.src = change.url; return; }
+            var video = /^video\//.test(change.file.type) || /\.(mp4|webm)$/i.test(change.file.name);
+            // Keep the carousel's original node: its navigation holds references to it.
+            if (node.tagName === 'VIDEO') {
+                if(video){node.removeAttribute('poster');node.src=change.url;node.muted=true;node.loop=true;node.play().catch(function(){});}
+                else {node.pause();node.removeAttribute('src');node.load();node.poster=change.url;}
+                return;
+            }
+            var preview=node.querySelector('[data-ve-replacement-video]');if(preview)preview.remove();
+            if(video){
+                preview=S.doc.createElement('video');preview.setAttribute('data-ve-replacement-video','');preview.style.cssText='width:100%;height:100%;object-fit:cover';
+                preview.src=change.url;preview.muted=true;preview.loop=true;preview.setAttribute('playsinline','');node.appendChild(preview);preview.play().catch(function(){});
+            } else { node.style.backgroundImage='url('+JSON.stringify(change.url)+')';node.setAttribute('data-bg',change.url); }
+        }
+        function restoreSlideReplacements() {
+            Object.keys(LISTS).forEach(function(key){var L=LISTS[key];if(L.data)L.data.slides.forEach(function(slide,index){var change=slideReplacements[replacementKey(L,slide)];if(change)previewReplacement(L,index,change);});});
+            renderStrip();
+        }
+        async function replaceSlide(L, index) {
+            if (S.busy || !L.data || !await guardDrawer(L)) return;
+            var slide=L.data.slides[index], route=S.url;
+            fileInput.multiple=false;
+            pickFile(L.accept,function(file){
+                if(S.busy || S.url!==route || !L.data.slides.some(function(row){return row.item_id===slide.item_id;}))return;
+                var problem=fileProblem(L,file);if(problem){toast('Choose another file: '+problem+'.','error');return;}
+                var key=replacementKey(L,slide), previous=slideReplacements[key];
+                slideReplacements[key]={file:file,url:previewUrl(file)};
+                previewReplacement(L,index,slideReplacements[key]);
+                if(previous)URL.revokeObjectURL(previous.url);
+                closePop();renderStrip();chrome();
+                toast('Slide replaced in the preview. Save draft or Publish when ready.','ok');
+            },false,S.doc.querySelectorAll(L.itemType==='hero_slide'?'.hero-slide':L.itemType==='uniform'?'.template-uniform-card img':'.fcar-slide img')[index]);
+        }
 
         function readData(doc, id) {
             try { var el = doc.getElementById(id); return el ? JSON.parse(el.textContent) : null; } catch (e) { return null; }
@@ -2370,7 +2785,7 @@
             var isVid = banner && (ext === 'mp4' || ext === 'webm');
             if (!isImg && !isVid) return banner ? 'not a JPG, PNG, WEBP, GIF, MP4 or WEBM file' : 'not JPG, PNG or WEBP';
             if (isVid && f.size > 50 * MB) return 'video over 50 MB';
-            if (isImg && f.size > 10 * MB) return 'over 10 MB';
+            if (isImg && f.size > 5 * MB) return 'over 5 MB';
             return '';
         }
         /** The Facilities tab in "More settings" keeps its own copy of that list; warn before replacing unsaved edits there. */
@@ -2379,14 +2794,14 @@
             var d = D.querySelector('.pgm-card[data-pid="' + L.data.program_id + '"] .pgm-panel[data-panel="facility"] .pgm-dirty');
             return !(d && !d.hidden) || await window.AdminDialogs.confirm('The Facilities tab in “More settings” has changes you have not saved. Continuing will discard them.\n\nContinue?');
         }
-        function itemToRow(i) { return { item_id: i.item_id, title: i.title, body: i.body || '', file: null }; }
+        function itemToRow(i) { return { item_id: i.item_id, title: i.title, subtitle:i.subtitle || '', body: i.body || '', icon:i.icon || '', letter:i.letter || '', file: null }; }
         function rowsOf(list) { return list.map(itemToRow); }
 
         /** Send the whole list (the server keeps rows by item_id, adds item_id 0, and removes the ones left out). */
         function postRows(L, rows) {
             var fields = {
                 action: 'save_program_items', program_id: L.data.program_id, item_type: L.itemType,
-                items: JSON.stringify(rows.map(function (r) { return { item_id: r.item_id || 0, title: r.title, subtitle: '', body: r.body || '', icon: '', letter: '', remove_image: false }; }))
+                items: JSON.stringify(rows.map(function (r) { return { item_id: r.item_id || 0, title: r.title, subtitle: r.subtitle || '', body: r.body || '', icon: r.icon || '', letter: r.letter || '', remove_image: false }; }))
             };
             var files = {};
             rows.forEach(function (r, n) { if (r.file) files['file_' + n] = r.file; });
@@ -2398,6 +2813,7 @@
         }
         /** One save, then show the result in the preview. */
         function commit(L, rows, okMsg) {
+            if(Object.keys(slideReplacements).length){toast('Publish or discard the pending slide replacements before changing slide names, order or count.','error');return Promise.resolve();}
             return run('Saving slides…', function () {
                 return postRows(L, rows).then(function (res) {
                     if (!res.ok) { toast(res.error, 'error'); return; }
@@ -2409,6 +2825,7 @@
         }
         /** Big files (videos): upload one at a time so a single request never gets too large for the server. */
         function commitSequential(L, base, newRows) {
+            if(Object.keys(slideReplacements).length){toast('Publish or discard the pending slide replacements before adding slides.','error');return Promise.resolve();}
             return run('Uploading…', function () {
                 var cur = base.slice(), done = 0, last = null;
                 return newRows.reduce(function (p, nr, idx) {
@@ -2462,8 +2879,8 @@
                     S.win.scrollTo({ top: 0, behavior: 'smooth' });
                     var hd = S.doc.querySelectorAll('.hero-dot'); if (hd[i]) hd[i].click();
                 } else {
-                    var sec = S.doc.getElementById('facilities'); if (sec) sec.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                    var dots = S.doc.querySelectorAll('.fcar-dot'); if (dots[i]) dots[i].click();
+                    var sec = S.doc.getElementById(L.itemType==='uniform'?'template-uniform':'facilities'); if (sec) sec.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    if(L.itemType==='facility'){var dots = S.doc.querySelectorAll('.fcar-dot'); if (dots[i]) dots[i].click();}
                 }
             } catch (e) {}
         }
@@ -2472,14 +2889,17 @@
             showSlide(L, i);
             var needName = L.itemType === 'facility';
             var input = h('input', { class: 'form-control form-control-sm', type: 'text', value: s.title, maxlength: '255' });
+            var description=needName?h('textarea',{class:'form-control form-control-sm',maxlength:'500',rows:'3','aria-label':'Facility description',placeholder:'Description (optional)'}):null;
+            if(description)description.value=s.body||'';
             var go = async function () {
                 var v = input.value.trim();
                 if (!v && needName) { input.focus(); return; }
-                if (v === s.title) { closePop(); return; }
+                if (v === s.title && (!description || description.value===(s.body||''))) { closePop(); return; }
                 if (!await guardDrawer(L)) return;
                 closePop();
                 var rows = rowsOf(L.data.slides); rows[i].title = v;
-                commit(L, rows, 'Name saved.');
+                if(description)rows[i].body=description.value;
+                confirmPublish('Publish your changes to the live website?', function () { commit(L, rows, 'Published. Your changes are live now.'); });
             };
             input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(); } });
             var del = h('button', { type: 'button', class: 'btn btn-sm btn-outline-danger', on: { click: async function () {
@@ -2491,6 +2911,7 @@
             } } }, [icon('trash'), ' Delete']);
             var r = btn.getBoundingClientRect();
             var reposition = null;
+            var replace = h('button', {type:'button',class:'btn btn-sm btn-outline-secondary',text:'Replace slide',on:{click:function(){replaceSlide(L,i);}}});
             if (window.GNCImageFraming && L.itemType === 'hero_slide') {
                 var bannerImage = S.doc.querySelectorAll('.hero-slide')[i];
                 if (bannerImage && bannerImage.tagName !== 'VIDEO') {
@@ -2502,7 +2923,8 @@
             openPop(h('div', { class: 've-pop-form' }, [
                 h('label', { class: 've-pop-label', text: 'Slide ' + (i + 1) + (needName ? ' name' : ' name (optional)') }),
                 input,
-                h('div', { class: 've-pop-row' }, [reposition, h('button', { type: 'button', class: 'btn btn-sm btn-gnc', text: 'Save name', on: { click: go } }), del])
+                description,
+                h('div', { class: 've-pop-row' }, [replace, reposition, h('button', { type: 'button', class: 'btn btn-sm btn-gnc', text: 'Publish', on: { click: go } }), del])
             ]), r.left, r.top - 150);
         }
 
@@ -2518,25 +2940,27 @@
 
         function renderStrip() {
             if (!dock) return;
-            var any = LISTS.banner.data || LISTS.facility.data;
+            var any = LISTS.banner.data || LISTS.facility.data || LISTS.uniform.data;
             if (!any) { dock.hidden = true; dock.innerHTML = ''; return; }
             if (!LISTS[tab] || !LISTS[tab].data) tab = LISTS.banner.data ? 'banner' : 'facility';
             var L = LISTS[tab];
             dock.hidden = false; dock.innerHTML = '';
-            dock.appendChild(h('div', { class: 've-dock-label ve-dock-tabs', role: 'tablist' }, ['banner', 'facility'].filter(function (k) { return LISTS[k].data; }).map(function (k) {
+            dock.appendChild(h('div', { class: 've-dock-label ve-dock-tabs', role: 'tablist' }, Object.keys(LISTS).filter(function (k) { return LISTS[k].data; }).map(function (k) {
                 return h('button', { type: 'button', role: 'tab', 'aria-selected': k === tab ? 'true' : 'false', class: 've-dock-tab' + (k === tab ? ' is-on' : ''),
                     on: { click: function () { if (tab !== k) { closePop(); tab = k; renderStrip(); } } } },
                     [icon(LISTS[k].icon), h('span', { text: LISTS[k].label + ' (' + LISTS[k].data.slides.length + ')' })]);
             })));
             var track = h('div', { class: 've-dock-track', role: 'list' });
             L.data.slides.forEach(function (s, i) {
-                var media = s.media_type === 'video' ? h('span', { class: 've-thumb-img ve-thumb-video' }, [icon('camera-video')])
-                    : (s.image_url ? h('img', { class: 've-thumb-img', src: s.image_url, alt: '' }) : h('span', { class: 've-thumb-img ve-thumb-video' }, [icon('image')]));
+                var change=slideReplacements[replacementKey(L,s)], mediaUrl=change?change.url:s.image_url;
+                var isVideo=change?/\.(mp4|webm)$/i.test(change.file.name):s.media_type==='video';
+                var media = isVideo ? h('span', { class: 've-thumb-img ve-thumb-video' }, [icon('camera-video')])
+                    : (mediaUrl ? h('img', { class: 've-thumb-img', src: mediaUrl, alt: '' }) : h('span', { class: 've-thumb-img ve-thumb-video' }, [icon('image')]));
                 var b = h('button', { type: 'button', class: 've-thumb', draggable: 'true', role: 'listitem', 'data-i': i,
                     title: 'Click for slide options · drag to change the order',
                     on: { click: function () { openSlide(i, b); } } }, [
                     media, h('span', { class: 've-thumb-n', text: String(i + 1) }),
-                    h('span', { class: 've-thumb-t', text: clip(s.title || 'Untitled', 22) })]);
+                    h('span', { class: 've-thumb-t', text: (change?'* ':'')+clip(s.title || 'Untitled', 22) })]);
                 b.addEventListener('dragstart', function (e) { e.dataTransfer.setData('text/plain', String(i)); e.dataTransfer.effectAllowed = 'move'; b.classList.add('is-drag'); });
                 b.addEventListener('dragend', function () { b.classList.remove('is-drag'); $$('.ve-thumb', dock).forEach(function (x) { x.classList.remove('is-over'); }); });
                 b.addEventListener('dragover', function (e) { e.preventDefault(); b.classList.add('is-over'); });
@@ -2557,6 +2981,7 @@
             var d = ev.data;
             if (!d || d.source !== 'gnc-program-preview' || d.action !== 'facilities') return;
             if (d.mode === 'add' && LISTS.facility.data) { tab = 'facility'; renderStrip(); addSlides(); }
+            if (d.mode === 'edit' && LISTS.facility.data) { tab='facility';renderStrip();var first=dock.querySelector('.ve-thumb');if(first)openSlide(0,first); }
         });
         // slides saved from the Facilities tab in "More settings": show them in the preview and the strip
         D.addEventListener('pgm:items-saved', function (ev) {
@@ -2573,8 +2998,8 @@
         var officeChange = null;
         var BD = null, bChange = {}, bFiles = {}, bLogos = {};
         var dChange = {}, dFiles = {}, dRemove = {};   // department + head of office: edited texts, new pictures, removed pictures
-        var pChange = {}, pMeta = {}, pRows = {};       // program: edited texts, name/colour/visibility, edited cards by list
-        function resetPending() { departmentPrograms = {}; nextProgramDraft = 0; textChanges = {}; officeChange = null; dChange = {}; dFiles = {}; dRemove = {}; pChange = {}; pMeta = {}; pRows = {}; bChange = {}; bFiles = {}; bLogos = {}; }
+        var pChange = {}, pMeta = {}, pRows = {}, pPdf = null, pMedia = {};       // program: edited texts, name/colour/visibility, edited cards by list
+        function resetPending() { pPdf=null;pMedia={};slideReplacements={};departmentPrograms = {}; nextProgramDraft = 0; textChanges = {}; officeChange = null; dChange = {}; dFiles = {}; dRemove = {}; pChange = {}; pMeta = {}; pRows = {}; bChange = {}; bFiles = {}; bLogos = {}; }
 
         var DFIELD = { 'dept-name': 'dept_name', 'dept-hero': 'hero_text', 'dept-about': 'about_text', 'dept-office-label': 'office_label',
             'dean-name': 'dean_name', 'dean-title': 'dean_title', 'dean-bio': 'dean_bio', 'dean-phone': 'dean_phone',
@@ -2605,13 +3030,13 @@
         function pruneRows() { Object.keys(pRows).forEach(function (t) { if (!rowsChanged(t)) delete pRows[t]; }); }
         function listDirty() { return Object.keys(pRows).filter(rowsChanged).length; }
         function pendingCount() {
-            var n = Object.keys(bChange).length + Object.keys(bFiles).length + Object.keys(bLogos).length;
+            var n = Object.keys(slideReplacements).length + Object.keys(bChange).length + Object.keys(bFiles).length + Object.keys(bLogos).length;
             if (departmentOrder && departmentOrder.dirty()) n++;
             n += Object.keys(textChanges).length;
             n += Object.keys(departmentPrograms).filter(programCardDirty).length;
             if (officeChange) n++;
             if (DD) n += Object.keys(dChange).length + Object.keys(dFiles).length + Object.keys(dRemove).length;
-            if (PD) n += Object.keys(pChange).length + Object.keys(pMeta).length + listDirty();
+            if (PD) n += Object.keys(pChange).length + Object.keys(pMeta).length + listDirty() + (pPdf?1:0) + Object.keys(pMedia).length;
             return n;
         }
         function setItemProp(ref, val) {
@@ -2623,6 +3048,11 @@
         function itemRef(ref) { var m = /^(\w+):(\d+)/.exec(ref || ''); return m && PD && PD.items[m[1]] ? { type: m[1], i: +m[2] } : null; }
 
         function bindEditing(doc) {
+            if (PD) {
+                $$('.template-hero.has-banner,.fcar-slide img,.template-uniform-card img,.about-feature-seal-wrap', doc).forEach(function (el) {
+                    el.setAttribute('data-ve-img', 'program-picture');
+                });
+            }
             $$('[data-ve-field]', doc).forEach(function (el) {
                 var f = el.getAttribute('data-ve-field');
                 if (DD && (f === 'dept-program-name' || f === 'dept-program-description')) {
@@ -2643,10 +3073,27 @@
                 }
                 else if (DD && DFIELD[f]) {
                     var k = DFIELD[f], originalOverview = null;
-                    makeField(el, function (e, val) { dSet(k, originalOverview !== null && val === originalOverview ? dBase(k) : val); });
+                    makeField(el, function (e, val) {
+                        // The header's uppercase prefix is presentation; retain the typed name in storage.
+                        if (k === 'dept_name') val = String(e.textContent || '').replace(/\s+/g, ' ').trim();
+                        dSet(k, originalOverview !== null && val === originalOverview ? dBase(k) : val);
+                    });
                     if (el.hasAttribute('data-ve-overview')) originalOverview = readField(el);
                 }
-                else if (PD && f === 'prog-text') {
+                else if (PD && f === 'prog-name') {
+                    makeField(el, function (e, val) {
+                        // innerText includes the heading's uppercase CSS; keep the typed casing in storage.
+                        val = String(e.textContent || '').replace(/\s+/g, ' ').trim();
+                        var current = String(metaVal('name')), prefix = (current.match(/^Bachelor of (?:Science|Arts)?\s*(?:in\s+)?/i) || [''])[0];
+                        var name = e.getAttribute('data-ve-key') === 'short-name' ? prefix + val : val;
+                        pMetaSet('name', name, PD.name);
+                        $$('[data-ve-field="prog-name"]', doc).forEach(function (other) {
+                            if (other !== e) { other.textContent = other.getAttribute('data-ve-key') === 'short-name' ? shortName(name) : name; markEmpty(other); }
+                        });
+                    });
+                } else if (PD && f === 'prog-description') {
+                    makeField(el, function (e, val) { pMetaSet('description', val, PD.description); });
+                } else if (PD && f === 'prog-text') {
                     var key = el.getAttribute('data-ve-key');
                     if (PD.fields[key]) makeField(el, function (e, val) { pSet(key, val); });
                 } else if (PD && f === 'prog-item') {
@@ -2692,6 +3139,7 @@
         }
         /** Before an action that reloads the page: warn if other unsaved edits would be lost. */
         async function okToReload(except) {
+            if (drafts && drafts.saved()) return true;
             var others = pendingCount() - (except || 0);
             return others <= 0 || await window.AdminDialogs.confirm('You have other unsaved changes on this page. They will be lost when the page refreshes.\n\nContinue anyway?');
         }
@@ -2726,15 +3174,62 @@
             if (im) { im.src = url; im.removeAttribute('srcset'); im.style.opacity = ''; }
             else { el.innerHTML = ''; el.style.backgroundImage = 'url("' + url + '")'; el.style.backgroundSize = 'contain'; el.style.backgroundRepeat = 'no-repeat'; el.style.backgroundPosition = 'center'; }
         }
+        function previewDepartmentFacebook(el, url) {
+            var current = el.closest('.dept-fb-box') || el;
+            var replacement = S.doc.createElement('div');
+            var picker = S.doc.createElement('div');
+            picker.setAttribute('data-ve-pick', 'dept-facebook');
+            picker.setAttribute('data-ve-label', 'Facebook page');
+            if (url) {
+                replacement.className = 'dept-fb-box';
+                replacement.style.position = 'relative';
+                var frame = S.doc.createElement('iframe');
+                frame.src = 'https://www.facebook.com/plugins/page.php?href=' + encodeURIComponent(url)
+                    + '&tabs=&width=500&height=130&small_header=false&adapt_container_width=true'
+                    + '&hide_cover=true&show_facepile=false&show_posts=false';
+                frame.width = '500'; frame.height = '130';
+                frame.title = dVal('dept_name') + ' Facebook page';
+                frame.setAttribute('scrolling', 'no');
+                frame.setAttribute('allow', 'autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share');
+                frame.setAttribute('allowfullscreen', '');
+                picker.title = 'Click to change the Facebook page';
+                picker.style.cssText = 'position:absolute;inset:0;z-index:2;cursor:pointer';
+                replacement.appendChild(frame);
+                replacement.appendChild(picker);
+            } else {
+                replacement = picker;
+                replacement.className = 've-add-tile';
+                replacement.textContent = '+ Add the Facebook page link';
+            }
+            current.replaceWith(replacement);
+        }
         function editFacebook() {
             var el = S.doc.querySelector('[data-ve-pick="dept-facebook"]'); if (!el || !DD) return;
             var cur = dVal('facebook_url');
             formPop(el, 'Facebook page', [{ name: 'url', label: 'Address of the Facebook page', value: cur, max: 255, placeholder: 'https://www.facebook.com/your-page',
                 hint: 'Shows the page’s posts on this department’s page. Leave empty to remove it.' }], 'Apply', function (o) {
-                var v = o.url;
+                var v = o.url.trim();
                 if (v && !/^https?:\/\/(www\.)?facebook\.com\//i.test(v)) { toast('That is not a Facebook page address. It should start with https://www.facebook.com/', 'error'); return; }
-                dSet('facebook_url', v); renderToolbar(); chrome();
+                dSet('facebook_url', v); previewDepartmentFacebook(el, v); renderToolbar(); chrome();
                 toast(v ? 'Link set. Press Publish to show it on the website.' : 'The Facebook box will be removed when you publish.', 'ok');
+            });
+        }
+        function statementIconPicker(sel) {
+            var program = sel.kind === 'program-statement-icon';
+            var data = program ? PD : TD;
+            if (!data || !data.icons || !/^(vision|mission)_icon$/.test(sel.key)) return;
+            var current = program ? (own(pChange, sel.key) ? pChange[sel.key] : pBase(sel.key) || sel.el.getAttribute('data-ve-value'))
+                : (own(textChanges, sel.key) ? textChanges[sel.key] : TD.fields[sel.key].value);
+            libraryIconPicker(data.icons, current, function (spec, choice) {
+                if (program) pSet(sel.key, spec);
+                else if (spec === TD.fields[sel.key].value) delete textChanges[sel.key]; else textChanges[sel.key] = spec;
+                var node = S.doc.createElement(choice.material ? 'span' : 'i');
+                var glyphClass = program ? 'template-vm-icon-glyph' : 'dept-statement-icon-glyph';
+                node.setAttribute('aria-hidden', 'true');
+                node.className = (choice.material ? 'material-symbols-outlined' : 'bi bi-' + choice.glyph) + ' ' + glyphClass;
+                if (choice.material) node.textContent = choice.material;
+                sel.el.replaceChildren(node);
+                sel.el.setAttribute('data-ve-value', spec);
             });
         }
         function academicIconPicker(sel) {
@@ -2787,16 +3282,16 @@
             var row = departmentPrograms[key];
             return !!(row && (row.added || row.file || row.removeImage || row.program_name !== row.baseName || row.description !== row.baseDescription));
         }
-        function appendProgramCard(doc, added) {
+        function appendProgramCard(doc, added, savedKey, savedRecord) {
             var template = doc.getElementById('veDepartmentProgramTemplate'), grid = doc.querySelector('[data-ve-program-grid]');
             if (!template || !grid) return;
-            var key = 'draft-' + (++nextProgramDraft), fragment = template.content.cloneNode(true);
+            var key = savedKey || ('draft-' + (++nextProgramDraft)), fragment = template.content.cloneNode(true);
             var card = fragment.querySelector('[data-ve-program-card]');
             card.setAttribute('data-ve-program-card', key);
             if (!added) card.setAttribute('data-warning-placeholder', 'true');
             Array.prototype.forEach.call(card.querySelectorAll('[data-ve-key]'), function (el) { el.setAttribute('data-ve-key', key); });
             card.querySelector('[data-ve-program-image]').setAttribute('data-ve-program-image', key);
-            departmentPrograms[key] = { program_id: 0, program_name: '', description: '', baseName: '', baseDescription: '', hasImage: false, added: added };
+            departmentPrograms[key] = savedRecord || { program_id: 0, program_name: '', description: '', baseName: '', baseDescription: '', hasImage: false, added: added };
             grid.insertBefore(fragment, grid.querySelector('[data-ve-add="program"]'));
             bindEditing(doc);
             if (added) card.querySelector('h3').focus();
@@ -2939,6 +3434,14 @@
                     else errs.push('Head of Office: ' + r.error);
                 });
             });
+            if (dFiles.banner || dRemove.banner) p = p.then(function () {
+                var f = { action: 'save_department_banner', dept_id: DD.dept_id };
+                if (dRemove.banner && !dFiles.banner) f.remove_banner = '1';
+                return sendContent(f, dFiles.banner ? { banner: dFiles.banner } : {}).then(function (r) {
+                    if (r.ok) { did++; delete dFiles.banner; delete dRemove.banner; if (r.department) Object.keys(r.department).forEach(function (k) { DD[k] = r.department[k]; }); }
+                    else errs.push('Department banner: ' + r.error);
+                });
+            });
             if (dFiles.logo || dRemove.logo) p = p.then(function () {
                 var f = { action: 'save_department_media', dept_id: DD.dept_id };
                 if (dRemove.logo && !dFiles.logo) f.remove_logo = '1';
@@ -2961,17 +3464,7 @@
         // ── programs ──
         function shortName(n) { var s = String(n).replace(/^Bachelor of (?:Science|Arts)?\s*(?:in\s+)?/i, ''); return s !== '' ? s : String(n); }
         function pMetaSet(k, v, base) { if (String(v) === String(base)) delete pMeta[k]; else pMeta[k] = v; }
-        function metaVal(k) { return own(pMeta, k) ? pMeta[k] : (k === 'name' ? PD.name : k === 'description' ? PD.description : k === 'theme' ? PD.theme : k === 'theme_custom' ? PD.theme_custom : k === 'core_enabled' ? PD.core_enabled : PD.published); }
-        function editProgName() {
-            var el = S.doc.querySelector('[data-ve-pick="prog-name"]'); if (!el || !PD) return;
-            formPop(el, 'Program name', [
-                { name: 'name', label: 'Full program name', value: metaVal('name'), max: 255, required: true },
-                { name: 'desc', label: 'Short description (shown on the department page cards)', value: metaVal('description'), max: 5000, multiline: true }], 'Apply', function (o) {
-                pMetaSet('name', o.name, PD.name); pMetaSet('description', o.desc, PD.description);
-                $$('[data-ve-pick="prog-name"]', S.doc).forEach(function (n) { n.textContent = n.tagName === 'H1' ? shortName(o.name).toUpperCase() : o.name; });
-                renderToolbar(); chrome();
-            });
-        }
+        function metaVal(k) { return own(pMeta, k) ? pMeta[k] : (k === 'name' ? PD.name : k === 'description' ? PD.description : k === 'dept_id' ? PD.dept_id : k === 'theme' ? PD.theme : k === 'theme_custom' ? PD.theme_custom : k === 'core_enabled' ? PD.core_enabled : PD.published); }
         function postItems(type, rows) {
             var fields = { action: 'save_program_items', program_id: PD.program_id, item_type: type,
                 items: JSON.stringify(rows.map(function (r) { return { item_id: r.item_id || 0, title: r.title || '', subtitle: r.subtitle || '', body: r.body || '', icon: r.icon || '', letter: r.letter || '', remove_image: !!r.removeImg }; })) };
@@ -3036,7 +3529,7 @@
                 renderToolbar(); chrome(); return;
             }
             pickFile('image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp', function (f) {
-                if (f.size > 10 * MB) { toast('That picture is over 10 MB. Please choose a smaller one.', 'error'); return; }
+                if (f.size > 5 * MB) { toast('That picture is over 5 MB. Please choose a smaller one.', 'error'); return; }
                 row.file = f; row.removeImg = false;
                 if (bg) bg.style.backgroundImage = 'url("' + previewUrl(f) + '")';
                 cardEl.classList.remove('career-panel--plain'); renderToolbar(); chrome();
@@ -3057,6 +3550,29 @@
             it.push({ icon: 'arrow-right', title: 'Move later', disabled: r.i === n - 1, run: function () { moveItem(r, 1); } });
             it.push({ icon: 'trash', title: 'Delete this card', danger: true, run: function () { deleteItem(r); } });
         }
+        function curriculumOptions(x,y) {
+            if(!PD)return;
+            var box=h('div',{class:'ve-pop-form'},[h('strong',{class:'ve-pop-label',text:'Curriculum PDF'}),h('small',{class:'ve-pop-hint',text:pPdf?(pPdf.file?pPdf.file.name+' · not published':'Removal pending'):PD.pdf_name||'No curriculum PDF uploaded'})]);
+            box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Upload or replace PDF',on:{click:function(){
+                pickFile('application/pdf,.pdf',function(file){
+                    if(!/\.pdf$/i.test(file.name)||file.size>20*MB){toast('Choose a PDF of up to 20 MB.','error');return;}
+                    pPdf={file:file};closePop();chrome();toast('PDF ready. Save draft or Publish when ready.','ok');
+                });
+            }}}));
+            if(PD.pdf_url||(pPdf&&pPdf.file))box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-danger',text:'Remove PDF',on:{click:function(){pPdf=PD.pdf_url?{remove:true}:null;closePop();chrome();}}}));
+            if(pPdf)box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Undo PDF change',on:{click:function(){pPdf=null;closePop();chrome();}}}));
+            box.appendChild(h('small',{class:'ve-pop-hint',text:'Changes are private until you publish.'}));
+            openPop(box,x,y);
+        }
+        function programMedia(key) {
+            pickFile(key==='seal'?'image/jpeg,image/png,image/webp,image/gif,image/svg+xml,.svg':'image/jpeg,image/png,image/webp,image/gif',function(file){
+                if(file.size>5*MB){toast('Choose an image of up to 5 MB.','error');return;}
+                pMedia[key]={file:file};
+                var image=key==='seal'?S.doc.querySelector('.about-feature-seal-wrap img'):null;
+                if(image)image.src=previewUrl(file);
+                closePop();chrome();toast('Picture ready. Save draft or Publish when ready.','ok');
+            });
+        }
         function progOptions(x, y) {
             if (!PD) return;
             var box = h('div', { class: 've-pop-form' }, [h('div', { class: 've-pop-label', text: 'Program options' })]);
@@ -3067,6 +3583,15 @@
             };
             box.appendChild(sw('Show this program on the website', 'published', PD.published, 'Turn off to hide the whole page from visitors.'));
             box.appendChild(sw('Show the Core Values section', 'core_enabled', PD.core_enabled));
+            var department=h('select',{class:'form-select form-select-sm','aria-label':'Program department'});
+            (C.programDepartments||[]).forEach(function(unit){department.appendChild(h('option',{value:unit.id,text:unit.name}));});department.value=String(metaVal('dept_id'));
+            department.addEventListener('change',function(){pMetaSet('dept_id',Number(department.value),PD.dept_id);chrome();});
+            box.appendChild(h('label',{class:'ve-pop-label',text:'Department'},[department]));
+            box.appendChild(h('div',{class:'ve-pop-row'},[
+                h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Replace program seal',on:{click:function(){programMedia('seal');}}}),
+                h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Replace fallback banner',on:{click:function(){programMedia('hero');}}})
+            ]));
+            ['seal','hero'].forEach(function(key){if(PD[key+'_upload']||(pMedia[key]&&pMedia[key].file))box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Use default '+(key==='seal'?'seal':'banner'),on:{click:function(){pMedia[key]={remove:true};closePop();chrome();}}}));});
             var cur = metaVal('theme'), curHex = metaVal('theme_custom');
             var sws = h('div', { class: 've-swatches' });
             Object.keys(PD.presets).forEach(function (k) {
@@ -3083,30 +3608,7 @@
             });
             box.appendChild(h('label', { class: 've-pop-label', text: 'Page colour' }));
             box.appendChild(h('div', { class: 've-pop-row' }, [sws, color]));
-            box.appendChild(h('label', { class: 've-pop-label', text: 'Curriculum PDF' }));
-            box.appendChild(h('div', { class: 've-pop-row' }, [
-                h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: PD.pdf_name ? 'Replace PDF' : 'Upload PDF', on: { click: function () {
-                    pickFile('application/pdf,.pdf', function (file) {
-                        if (file.size > 25 * MB) { toast('That PDF is over 25 MB.', 'error'); return; }
-                        run('Uploading PDF…', function () {
-                            return send(PROG_URL, { action: 'save_program_pdf', program_id: PD.program_id }, { pdf: file }).then(function (r) {
-                                if (!r.ok) { toast(r.error, 'error'); return; }
-                                closePop(); reloadEditor('Curriculum PDF saved.', routeNow());
-                            });
-                        });
-                    });
-                } } }),
-                PD.pdf_url ? h('button', { type: 'button', class: 'btn btn-sm btn-outline-danger', text: 'Remove PDF', on: { click: async function () {
-                    if (!await window.AdminDialogs.confirm('Remove the curriculum PDF from this program?')) return;
-                    run('Removing PDF…', function () {
-                        return send(PROG_URL, { action: 'save_program_pdf', program_id: PD.program_id, remove_pdf: '1' }).then(function (r) {
-                            if (!r.ok) { toast(r.error, 'error'); return; }
-                            closePop(); reloadEditor('Curriculum PDF removed.', routeNow());
-                        });
-                    });
-                } } }) : null
-            ]));
-            box.appendChild(h('small', { class: 've-pop-hint', text: PD.pdf_name || 'No curriculum PDF is attached.' }));
+            box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Manage curriculum PDF',on:{click:function(){curriculumOptions(x,y);}}}));
             box.appendChild(h('small', { class: 've-pop-hint', text: 'These apply when you press Publish.' }));
             box.appendChild(h('button', { type: 'button', class: 'btn btn-sm btn-outline-danger', on: { click: async function () {
                 closePop();
@@ -3123,17 +3625,29 @@
         }
         function saveProg() {
             var errs = [], did = 0, p = Promise.resolve();
-            var details = Object.keys(pChange).length > 0 || Object.keys(pMeta).length > 0;
+            Object.keys(LISTS).forEach(function(key){
+                var L=LISTS[key];if(!L.data)return;
+                var rows=rowsOf(L.data.slides),changes=[];
+                rows.forEach(function(row){var id=replacementKey(L,row);if(slideReplacements[id]){row.file=slideReplacements[id].file;changes.push(id);}});
+                if(!changes.length)return;
+                p=p.then(function(){return postRows(L,rows).then(function(result){
+                    if(!result.ok){errs.push(L.label+': '+result.error);return;}
+                    did++;afterSave(L,result);changes.forEach(function(id){delete slideReplacements[id];});
+                    if(result.items)L.data.slides=result.items;
+                });});
+            });
+            var details = Object.keys(pChange).length > 0 || Object.keys(pMeta).length > 0 || Object.keys(pMedia).length > 0;
             if (details) p = p.then(function () {
-                var f = { action: 'save_program_details', program_id: PD.program_id, program_name: metaVal('name'), description: metaVal('description'), dept_id: PD.dept_id,
+                var f = { action: 'save_program_details', program_id: PD.program_id, program_name: metaVal('name'), description: metaVal('description'), dept_id: metaVal('dept_id'),
                     theme: metaVal('theme'), theme_custom: metaVal('theme_custom'), core_values_enabled: metaVal('core_enabled') ? '1' : '', is_published: metaVal('published') ? '1' : '' };
                 Object.keys(PD.fields).forEach(function (k) { f['c_' + k] = own(pChange, k) ? pChange[k] : pBase(k); });
-                return send(PROG_URL, f).then(function (r) {
+                var files={};Object.keys(pMedia).forEach(function(key){if(pMedia[key].file)files[key]=pMedia[key].file;else f['remove_'+key]='1';});
+                return send(PROG_URL, f, files).then(function (r) {
                     if (r.ok) {
                         did++;
                         Object.keys(pChange).forEach(function (k) { PD.content[k] = pChange[k]; });
-                        ['name', 'description', 'theme', 'theme_custom', 'core_enabled', 'published'].forEach(function (k) { if (own(pMeta, k)) PD[k] = pMeta[k]; });
-                        pChange = {}; pMeta = {};
+                        ['name', 'description', 'dept_id', 'theme', 'theme_custom', 'core_enabled', 'published'].forEach(function (k) { if (own(pMeta, k)) PD[k] = pMeta[k]; });
+                        pChange = {}; pMeta = {};pMedia={};
                     } else errs.push('Page text: ' + r.error);
                 });
             });
@@ -3144,16 +3658,27 @@
                     });
                 });
             });
+            if(pPdf)p=p.then(function(){return send(PROG_URL,{action:'save_program_pdf',program_id:PD.program_id,remove_pdf:pPdf.remove?'1':''},pPdf.file?{pdf:pPdf.file}:{}).then(function(result){
+                if(result.ok){did++;pPdf=null;}else errs.push('Curriculum PDF: '+result.error);
+            });});
             return p.then(function () { return { did: did, errs: errs }; });
         }
 
         var A = {
+            draftState: function(value){
+                if(!value)return {textChanges:textChanges,departmentPrograms:departmentPrograms,nextProgramDraft:nextProgramDraft,officeChange:officeChange,bChange:bChange,bFiles:bFiles,bLogos:bLogos,dChange:dChange,dFiles:dFiles,dRemove:dRemove,pChange:pChange,pMeta:pMeta,pRows:pRows,slideReplacements:slideReplacements,pPdf:pPdf,pMedia:pMedia,departmentOrder:departmentOrder&&departmentOrder.order()};
+                textChanges=value.textChanges;departmentPrograms=value.departmentPrograms;nextProgramDraft=value.nextProgramDraft;officeChange=value.officeChange;bChange=value.bChange;bFiles=value.bFiles;bLogos=value.bLogos;dChange=value.dChange;dFiles=value.dFiles;dRemove=value.dRemove;pChange=value.pChange;pMeta=value.pMeta;pRows=value.pRows;slideReplacements=value.slideReplacements||{};pPdf=value.pPdf||null;pMedia=value.pMedia||{};
+                Object.keys(departmentPrograms).forEach(function(key){if(!S.doc.querySelector('[data-ve-program-card="'+cssEsc(key)+'"]'))appendProgramCard(S.doc,false,key,departmentPrograms[key]);});
+                bindEditing(S.doc);
+            },
+            draftRebind:function(){bindEditing(S.doc);restoreSlideReplacements();if(pMedia.seal&&pMedia.seal.file){var seal=S.doc.querySelector('.about-feature-seal-wrap img');if(seal)seal.src=previewUrl(pMedia.seal.file);}},
             mount: function (doc) {
                 if (departmentOrder) { departmentOrder.dispose(); departmentOrder=null; }
                 resetPending();
                 LISTS.banner.data = readData(doc, 'veBannerData');
                 LISTS.facility.data = readData(doc, 'veFacData');
                 DD = readData(doc, 'veDeptData'); PD = readData(doc, 'veProgData');
+                LISTS.uniform.data = PD ? {program_id:PD.program_id,limit:PD.limits.uniform,slides:PD.items.uniform || []} : null;
                 TD = readData(doc, 'veDeptPageData');
                 BD = readData(doc, 'veBasicData');
                 var programCards = readData(doc, 'veDeptProgramsData');
@@ -3183,12 +3708,29 @@
             },
             pick: function (t) {
                 if (!t || !t.closest) return null;
+                var programSection = t.closest('[data-ve-program-section]');
+                if (programSection && PD) {
+                    var sectionKey = programSection.getAttribute('data-ve-program-section');
+                    if (sectionKey === 'uniform' || sectionKey === 'curriculum') {
+                        if(sectionKey==='uniform'){tab='uniform';renderStrip();}
+                        else {var rect=programSection.getBoundingClientRect(),frameRect=S.frame.getBoundingClientRect();curriculumOptions(rect.left+frameRect.left,rect.top+frameRect.top);}
+                        return { kind: 'none' };
+                    }
+                }
                 if (t.closest('[data-ve-department-drag]')) return {kind:'none'};
                 var fe = fieldOf(t);
                 if (fe) {
                     if (!fe.__ve) return null;
                     var it0 = fe.getAttribute('data-ve-field') === 'prog-item' ? fe.closest('[data-ve-item]') : null;
                     return { kind: 'field', el: fe, item: it0 ? it0.getAttribute('data-ve-item') : null, prevent: false };
+                }
+                var statementIcon = t.closest('[data-ve-icon="department-statement"],[data-ve-icon="program-statement"]');
+                if (statementIcon) {
+                    var statementKey = statementIcon.getAttribute('data-ve-key');
+                    var programStatement = statementIcon.getAttribute('data-ve-icon') === 'program-statement';
+                    if (/^(vision|mission)_icon$/.test(statementKey) && (programStatement ? PD : TD)) {
+                        return { kind: programStatement ? 'program-statement-icon' : 'department-statement-icon', el: statementIcon, key: statementKey, prevent: true };
+                    }
                 }
                 var academicIcon = t.closest('[data-ve-icon="academic-feature"]');
                 if (academicIcon && BD) return { kind: 'academic-icon', el: academicIcon, key: academicIcon.getAttribute('data-ve-key'), prevent: true };
@@ -3199,13 +3741,24 @@
                 var basicLogo = t.closest('[data-ve-basic-logo-id]');
                 if (basicLogo && BD) return { kind: 'basic-logo', el: basicLogo, id: +basicLogo.getAttribute('data-ve-basic-logo-id'), prevent: true };
                 var img = t.closest('[data-ve-img]');
-                if (img && DD) { var w = img.getAttribute('data-ve-img'); if (w === 'dept-logo' || w === 'dean-photo') return { kind: 'dimg', el: img, which: w, prevent: true }; }
+                if (img && DD) { var w = img.getAttribute('data-ve-img'); if (w === 'dept-logo' || w === 'dean-photo' || w === 'dept-banner') return { kind: 'dimg', el: img, which: w, prevent: true }; }
+                if (PD && !t.closest('a,button:not(.fcar-slide),[data-ve-pick],[data-ve-add],[data-ve-icon],.hero-dots,.fcar-controls')) {
+                    var seal = t.closest('.about-feature-seal-wrap');
+                    if (seal) return {kind:'program-media',el:seal,key:'seal',prevent:true};
+                    var picture = t.closest('.fcar-slide,.template-uniform-card img,.template-hero.has-banner');
+                    if (picture && !(picture.matches('.template-hero') && t.closest('[data-ve-item]'))) {
+                        var listKey = picture.matches('.template-hero') ? 'banner' : picture.matches('.fcar-slide') ? 'facility' : 'uniform';
+                        var selector = listKey === 'banner' ? '.hero-slide' : listKey === 'facility' ? '.fcar-slide' : '.template-uniform-card img';
+                        var active = listKey === 'banner' ? picture.querySelector('.hero-slide.is-active') : picture;
+                        var index = Array.prototype.indexOf.call(S.doc.querySelectorAll(selector),active);
+                        if (index >= 0 && LISTS[listKey].data && LISTS[listKey].data.slides[index]) return {kind:'program-slide',el:picture,listKey:listKey,index:index,prevent:true,stop:true};
+                    }
+                }
                 var pk = t.closest('[data-ve-pick]');
                 if (pk) {
                     var pv = pk.getAttribute('data-ve-pick');
                     if (pv === 'office-location' && DD) { editOfficeLocation(pk); return { kind: 'none' }; }
                     if (pv === 'dept-facebook' && DD) { editFacebook(); return { kind: 'none' }; }
-                    if (pv === 'prog-name' && PD) { editProgName(); return { kind: 'none' }; }
                 }
                 var add = t.closest('[data-ve-add]');
                 if (add) {
@@ -3224,7 +3777,11 @@
             },
             toolbar: function (sel) {
                 var it = [];
-                if (sel.kind === 'field') {
+                if (sel.kind === 'program-slide') {
+                    it.push({icon:'image',label:'Replace picture',primary:true,run:function(){replaceSlide(LISTS[sel.listKey],sel.index);}});
+                } else if (sel.kind === 'program-media') {
+                    it.push({icon:'image',label:'Replace picture',primary:true,run:function(){programMedia(sel.key);}});
+                } else if (sel.kind === 'field') {
                     var v = sel.el.__ve || {}, len = readField(sel.el).length;
                     it.push({ type: 'chip', icon: 'pencil', text: (v.label || 'Text') + (v.max ? '  ·  ' + len + ' / ' + v.max : '') });
                     if (v.overview) return richTextTools().concat(it);
@@ -3248,6 +3805,8 @@
                     it.push({ type: 'chip', icon: 'card-text', text: 'Click the text to edit it' });
                     itemActions(it, sel.item);
                     if (!r0) it.length = 0;
+                } else if (sel.kind === 'program-statement-icon' || sel.kind === 'department-statement-icon') {
+                    it.push({ icon: 'grid-3x3-gap', label: 'Change icon', primary: true, run: function () { statementIconPicker(sel); } });
                 } else if (sel.kind === 'academic-icon') {
                     it.push({ icon: 'grid-3x3-gap', label: 'Change icon', primary: true, run: function () { academicIconPicker(sel); } });
                 } else if (sel.kind === 'basic-image') {
@@ -3266,13 +3825,31 @@
                         });
                     } });
                 } else if (sel.kind === 'dimg') {
-                    var logo = sel.which === 'dept-logo', key = logo ? 'logo' : 'photo';
-                    var has = (!!(logo ? DD.logo_url : DD.dean_photo_url) && !dRemove[key]) || !!dFiles[key];
-                    it.push({ type: 'chip', icon: 'image', text: logo ? 'Department logo' : 'Head of Office photo' });
+                    var logo = sel.which === 'dept-logo', banner = sel.which === 'dept-banner', key = banner ? 'banner' : (logo ? 'logo' : 'photo');
+                    var has = (!!(banner ? DD.banner_url : (logo ? DD.logo_url : DD.dean_photo_url)) && !dRemove[key]) || !!dFiles[key];
+                    it.push({ type: 'chip', icon: 'image', text: banner ? 'Header background' : (logo ? 'Department logo' : 'Head of Office photo') });
                     it.push({ icon: 'image', label: has ? 'Replace' : 'Add picture', primary: true, run: function () {
-                        pickFile(logo ? 'image/*' : 'image/jpeg,image/png,image/webp', function (f) { dFiles[key] = f; delete dRemove[key]; showPic(sel.el, previewUrl(f)); renderToolbar(); chrome(); }, !logo);
+                        pickFile(logo ? 'image/*' : 'image/jpeg,image/png,image/webp', function (f) {
+                            if (f.size > 5 * MB) { toast('That picture is over 5 MB.', 'error'); return; }
+                            dFiles[key] = f; delete dRemove[key];
+                            if (banner) {
+                                var layer = sel.el.ownerDocument.querySelector('[data-dept-banner-image]');
+                                var image = layer && layer.querySelector('img');
+                                if (image) { image.hidden = false; showPic(layer, previewUrl(f)); }
+                            } else if (logo) {
+                                Array.prototype.forEach.call(sel.el.ownerDocument.querySelectorAll('[data-ve-img="dept-logo"]'), function (el) { showPic(el, previewUrl(f)); });
+                            } else showPic(sel.el, previewUrl(f));
+                            renderToolbar(); chrome();
+                        }, !logo && !banner, banner ? sel.el.ownerDocument.querySelector('[data-dept-banner-image]') : sel.el);
                     } });
-                    if (has) it.push({ icon: 'trash', title: 'Remove the picture', danger: true, run: function () { dRemove[key] = true; delete dFiles[key]; sel.el.style.opacity = '.25'; renderToolbar(); chrome(); } });
+                    if (has) it.push({ icon: 'trash', title: 'Remove the picture', danger: true, run: function () {
+                        dRemove[key] = true; delete dFiles[key];
+                        if (banner) {
+                            var image = sel.el.ownerDocument.querySelector('[data-dept-banner-image] img');
+                            if (image) { image.hidden = true; image.removeAttribute('src'); }
+                        } else sel.el.style.opacity = '.25';
+                        renderToolbar(); chrome();
+                    } });
                     if (dFiles[key]) it.push({ type: 'chip', tone: 'warn', icon: 'pencil', text: 'New picture, not saved yet' });
                     if (dRemove[key]) it.push({ type: 'chip', tone: 'warn', icon: 'pencil', text: 'Will be removed' });
                 } else if (sel.kind === 'goto') {
@@ -3318,7 +3895,7 @@
                     run('Publishing…', function () {
                         return (mode === 'prog' ? saveProg() : saveDept()).then(function (r) {
                             r.errs.forEach(function (m) { toast(m, 'error'); });
-                            if (r.did && !r.errs.length) reloadEditor('Published. Your changes are live on the website.', routeNow(), true);
+                            if (r.did && !r.errs.length) reloadEditor('Published. Your changes are live now.', routeNow(), true);
                             else if (r.did) toast('Some changes were saved. Fix the problem above and publish again.', 'ok');
                         });
                     });
@@ -3346,7 +3923,7 @@
         }
         function bind(root){$$('[data-ve-field="achievement-field"]',root).forEach(function(field){makeField(field,function(el,text){var rec=record(el);if(rec)update(rec,el.getAttribute('data-ve-key'),text,el);});});}
         function previewImage(rec,url,kind){nodes(rec).forEach(function(card){$$('[data-ve-achievement-image]',card).forEach(function(cover){var thumb=cover.getAttribute('data-ve-achievement-image')==='thumbnail';if(kind==='thumbnail'&&!thumb&&(rec.file||rec.base.image_path))return;if(kind!=='thumbnail'&&thumb&&(rec.thumbnail||rec.base.thumbnail_path))return;var img=cover.tagName==='IMG'?cover:$('img',cover);if(!img){img=S.doc.createElement('img');cover.insertBefore(img,cover.firstChild);}img.src=url;var placeholder=$('.achievement-card-placeholder',cover);if(placeholder)placeholder.remove();});});}
-        function pickImage(rec,kind,done){pickFile('image/jpeg,image/png,image/webp,image/gif',function(file){if(file.size>8*MB){toast('Use a picture of up to 8 MB.','error');return;}if(kind==='thumbnail')rec.thumbnail=file;else rec.file=file;previewImage(rec,previewUrl(file),kind);if(done)done(file);chrome();});}
+        function pickImage(rec,kind,done){pickFile('image/jpeg,image/png,image/webp,image/gif',function(file){if(file.size>5*MB){toast('Use a picture of up to 5 MB.','error');return;}if(kind==='thumbnail')rec.thumbnail=file;else rec.file=file;previewImage(rec,previewUrl(file),kind);if(done)done(file);chrome();});}
         function showAchievers(rec){
             var photos=[],seen=new Set(),thumbnail=rec.thumbnail||rec.base.thumbnail_path||rec.file||rec.base.image_path;
             function include(source,caption){if(!source||source===thumbnail||seen.has(source))return;seen.add(source);photos.push({url:typeof source==='string'?source:previewUrl(source),caption:caption||''});}
@@ -3373,7 +3950,7 @@
         }
         function failure(error){toast(error.message||'Could not save achievements.','error');}
         function remove(rec){confirmPop('Delete achievement?','This will be removed when you publish your changes.','Remove',function(){nodes(rec).forEach(function(node){node.remove();});if(rec.base.achievement_id)rec.removed=true;else delete records[keyOf(rec)];select(null);chrome();});}
-        function draft(rec){closePop();run('Saving draft…',async function(){try{await save([keyOf(rec)],true);toast('Achievement saved as a draft.','ok');}catch(error){failure(error);}});}
+        function draft(rec){closePop();savePageDraft();}
         function settings(rec){
             if(!rec)return;
             var status=h('select',{class:'form-select form-select-sm','aria-label':'Achievement visibility'},[h('option',{value:'draft',text:'Draft'}),h('option',{value:'published',text:'Published'})]);status.value=value(rec,'status')||'draft';
@@ -3388,30 +3965,35 @@
             var gallery=h('div',{class:'achievement-media-editor'});
             var uploadStatus=h('small',{class:'achievement-upload-status','data-achievement-upload-status':true,role:'status','aria-live':'polite'});
             function renderPhotos(){var active=rec.photos.filter(function(photo){return !photo.remove;}),queued=active.filter(function(photo){return photo.file;}).length;uploadStatus.textContent=active.length+' photos'+(queued?' · '+queued+' new photos ready to save':'');gallery.replaceChildren();active.forEach(function(photo){var caption=h('input',{class:'form-control form-control-sm',maxlength:255,'aria-label':'Achiever name / Photo caption',value:photo.caption||'',placeholder:'Achiever name / Caption (optional)',on:{input:function(){photo.caption=caption.value;chrome();}}});gallery.appendChild(h('div',{class:'achievement-media-row'},[h('img',{src:photo.file?previewUrl(photo.file):photo.image_path,alt:photo.caption||'Main photo'}),h('div',{},[photo.file?h('small',{class:'achievement-upload-filename',text:photo.file.name}):null,caption,h('button',{type:'button',class:'btn btn-sm btn-outline-danger',text:'Remove photo',on:{click:function(){photo.remove=true;renderPhotos();chrome();}}})])]));});}
-            function queuePhotos(files){files=Array.from(files||[]);if(!files.length)return;if(rec.photos.filter(function(photo){return !photo.remove;}).length+files.length>20){toast('Choose up to 20 photos per achievement.','error');return;}if(files.some(function(file){return file.size>8*MB;})){toast('Each picture must be at most 8 MB.','error');return;}if(files.some(function(file){return file.type?!/^image\/(jpeg|png|webp|gif)$/.test(file.type):!(/\.(jpe?g|png|webp|gif)$/i.test(file.name));})){toast('Choose JPG, PNG, WebP or GIF photos.','error');return;}files.forEach(function(file){rec.photos.push({photo_id:0,caption:'',file:file,remove:false});});renderPhotos();chrome();}
+            function queuePhotos(files){files=Array.from(files||[]);if(!files.length)return;if(rec.photos.filter(function(photo){return !photo.remove;}).length+files.length>20){toast('Choose up to 20 photos per achievement.','error');return;}if(files.some(function(file){return file.size>5*MB;})){toast('Each picture must be at most 5 MB.','error');return;}if(files.some(function(file){return file.type?!/^image\/(jpeg|png|webp|gif)$/.test(file.type):!(/\.(jpe?g|png|webp|gif)$/i.test(file.name));})){toast('Choose JPG, PNG, WebP or GIF photos.','error');return;}files.forEach(function(file){rec.photos.push({photo_id:0,caption:'',file:file,remove:false});});renderPhotos();chrome();}
             function addPhotos(){var input=h('input',{type:'file',multiple:true,accept:'image/jpeg,image/png,image/webp,image/gif','data-achievement-gallery-picker':true,hidden:true});input.addEventListener('change',function(){queuePhotos(input.files);input.remove();});input.addEventListener('cancel',function(){input.remove();},{once:true});D.body.appendChild(input);input.click();}
             var dropzone=h('button',{type:'button',class:'achievement-upload-dropzone','data-achievement-upload-dropzone':true,text:'Add achiever photos',on:{click:addPhotos,dragover:function(event){event.preventDefault();dropzone.classList.add('is-dragging');},dragleave:function(){dropzone.classList.remove('is-dragging');},drop:function(event){event.preventDefault();event.stopPropagation();dropzone.classList.remove('is-dragging');queuePhotos(event.dataTransfer.files);}}});
             function photoChoice(kind,title,hint){var source=kind==='thumbnail'?(rec.thumbnail||rec.base.thumbnail_path||rec.file||rec.base.image_path):(rec.file||rec.base.image_path);var image=h('img',{class:'achievement-choice-preview',alt:title,hidden:!source,src:source?(typeof source==='string'?source:previewUrl(source)):null}),empty=h('span',{class:'achievement-choice-empty',text:'No photo chosen',hidden:!!source});return h('section',{class:'achievement-photo-choice'},[h('strong',{text:title}),image,empty,h('p',{class:'ve-pop-hint',text:hint}),h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:kind==='thumbnail'?'Change card cover':'Change featured photo',on:{click:function(){pickImage(rec,kind,function(file){image.src=previewUrl(file);image.hidden=false;empty.hidden=true;});}}})]);}
             renderPhotos();
             popBelowToolbar(h('div',{class:'ve-pop-form'},[h('strong',{class:'ve-pop-label',text:'Achievement settings'}),h('label',{text:'Category'}),categorySelect,category,h('small',{class:'ve-pop-hint',text:'Choose an existing category or add a new one. Published categories appear in the filter beside Academic Year.'}),h('label',{text:'Description'}),description,h('div',{class:'achievement-photo-choices'},[
                 photoChoice('thumbnail','Card cover photo','Shown on the small card under More Achievements.'),photoChoice('main','Featured slideshow photo (optional)','Shown in the large slideshow at the top. If left empty, the card cover is used.')
-            ]),h('strong',{text:'Achiever photos'}),h('small',{class:'ve-pop-hint',text:'Photos visitors see after clicking an achievement. Photos appear in upload order, with the first uploaded photo shown first.'}),dropzone,h('small',{class:'ve-pop-hint',text:'Choose several photos together, or drag and drop them here. Up to 20 photos, 8 MB each. You can leave captions blank.'}),uploadStatus,gallery,h('label',{text:'Visibility'}),status,h('label',{},[featured,h('span',{text:' Include in the large slideshow at the top'})]),h('div',{class:'ve-pop-row'},[
+            ]),h('strong',{text:'Achiever photos'}),h('small',{class:'ve-pop-hint',text:'Photos visitors see after clicking an achievement. Photos appear in upload order, with the first uploaded photo shown first.'}),dropzone,h('small',{class:'ve-pop-hint',text:'Choose several photos together, or drag and drop them here. Up to 20 photos, 5 MB each. You can leave captions blank.'}),uploadStatus,gallery,h('label',{text:'Visibility'}),status,h('label',{},[featured,h('span',{text:' Include in the large slideshow at the top'})]),h('div',{class:'ve-pop-row'},[
                 h('button',{type:'button',class:'btn btn-sm btn-gnc',text:'Apply',on:{click:function(){update(rec,'category_label',category.value.trim());update(rec,'description',description.value);update(rec,'status',status.value);update(rec,'is_featured',featured.checked?1:0);closePop();chrome();}}}),
                 h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Save draft',on:{click:function(){update(rec,'category_label',category.value.trim());update(rec,'description',description.value);update(rec,'is_featured',featured.checked?1:0);draft(rec);}}})
             ])]),null,true);
         }
-        function add(){
-            if(!data||S.busy)return;
+        function add(savedKey,savedRecord){
+            if(!data||(!savedRecord&&S.busy))return;
             var grid=$('#achievementGrid',S.doc);if(!grid)return;
-            var key='new-'+(++serial),rec=entry({achievement_id:0,title:'',description:'',program_organization:'',category_label:'',academic_year:'',image_path:null,status:'published',is_featured:0,sort_order:0});records[key]=rec;
+            var key=savedKey||('new-'+(++serial)),rec=savedRecord||entry({achievement_id:0,title:'',description:'',program_organization:'',category_label:'',academic_year:'',image_path:null,status:'published',is_featured:0,sort_order:0});records[key]=rec;
             function field(tag,key,label,max,cls){return h(tag,{'class':cls||'','data-ve-field':'achievement-field','data-ve-key':key,'data-ve-label':label,'data-ve-ph':'Add '+label.toLowerCase(),'data-ve-max':max||255,...(['description','program_organization','category_label'].includes(key)?{'data-warning-optional':'true'}:{}),...(key==='description'?{'data-ve-multiline':'1'}:{})});}
             var card=h('article',{class:'achievement-card','data-ve-achievement-id':key},[
                 h('div',{class:'achievement-card-cover','data-ve-achievement-image':'thumbnail'},[h('div',{class:'achievement-card-placeholder achievement-cover-prompt'},[icon('image'),h('span',{text:'Add cover photo'})]),field('span','category_label','Category',100,'achievement-card-category')]),
                 field('h3','title','Achievement title'),h('p',{class:'achievement-card-meta'},[field('span','program_organization','Program / Organization'),h('span',{text:' | Academic Year '}),field('span','academic_year','Academic year',9)])
             ]);
-            var slot=$('[data-ve-achievement-add]',grid);if(slot)slot.replaceWith(card);else grid.appendChild(card);var empty=$('.achievement-grid-empty',S.doc);if(empty)empty.remove();bind(card);card.scrollIntoView({block:'center',behavior:'smooth'});var title=$('[data-ve-key="title"]',card);select({kind:'field',el:title});title.focus();chrome();
+            var slot=$('[data-ve-achievement-add]',grid);if(slot)slot.replaceWith(card);else grid.appendChild(card);var empty=$('.achievement-grid-empty',S.doc);if(empty)empty.remove();bind(card);if(savedRecord)return;card.scrollIntoView({block:'center',behavior:'smooth'});var title=$('[data-ve-key="title"]',card);select({kind:'field',el:title});title.focus();chrome();
         }
         return {
+            draftState:function(value){
+                if(!value)return {records:records,serial:serial};records=value.records;serial=value.serial;
+                Object.keys(records).forEach(function(key){var rec=records[key],node=S.doc.querySelector('[data-ve-achievement-id="'+cssEsc(key)+'"]');if(rec.removed){if(node)node.remove();}else if(!node)add(key,rec);});bind(S.doc);
+            },
+            draftRebind:function(){bind(S.doc);},
             mount:function(doc){try{data=JSON.parse(doc.getElementById('veAchievementData').textContent);}catch(error){data=null;}records={};if(!data)return false;(data.records||[]).forEach(function(row){records[row.achievement_id]=entry(row);});bind(doc);
                 var filter=$('.achievement-filter',doc);if(filter)filter.addEventListener('submit',async function(event){event.preventDefault();if(!await guardDirty())return;var url=new URL(data.url,window.location.origin);new FormData(filter).forEach(function(value,key){if(value&&(key==='academic_year'||key==='category'))url.searchParams.set(key,value);});url.searchParams.set('ce_preview','1');loadFrame(url.pathname+url.search+'#more-achievements');});return false;},
             pick:function(target){if(target.closest('[data-ve-achievement-add]')){add();return {kind:'none'};}var button=target.closest('[data-ve-achievement-settings]');if(button){select({kind:'achievement-card',el:button.closest('[data-ve-achievement-id]')});settings(record(button));return {kind:'none'};}var field=fieldOf(target);if(field&&field.__ve)return {kind:'field',el:field};var image=target.closest('[data-ve-achievement-image]');if(image)return {kind:'achievement-image',el:image};var card=target.closest('[data-ve-achievement-id]');return card?{kind:'achievement-card',el:card}:null;},
@@ -3421,7 +4003,7 @@
             status:function(){return {text:dirty()?plural(dirty(),'unsaved achievement'):'Everything here is saved',tone:dirty()?'warn':'ok'};},
             actions:function(){return {secondary:{label:'Add Achievement',icon:'plus-circle',disabled:!data},primary:{label:'Publish',icon:'cloud-upload',disabled:!data||!dirty()}};},
             runSecondary:add,
-            runPrimary:function(){if(!dirty())return;confirmPublish('Publish these achievement changes?',function(){run('Publishing…',async function(){try{await save(Object.keys(records).filter(function(key){return changed(records[key]);}));reloadEditor('Student achievements saved.',{page:'student-achievements'},true);}catch(error){failure(error);}});});}
+            runPrimary:function(){if(!dirty())return;confirmPublish('Publish these achievement changes?',function(){run('Publishing…',async function(){try{await save(Object.keys(records).filter(function(key){return changed(records[key]);}));reloadEditor('Published. Your changes are live now.',{page:'student-achievements'},true);}catch(error){failure(error);}});});}
         };
     }
 
@@ -3464,11 +4046,11 @@
             }
             return result.organization;
         }
-        function addOrganization() {
-            if(!data||S.busy)return;
+        function addOrganization(savedKey,savedRecord) {
+            if(!data||(!savedRecord&&S.busy))return;
             var grid=$('.student-org-grid',S.doc);
             if(!grid){navigate(data.listingUrl+'?ce_preview=1&add_org=1');return;}
-            var id='new-'+(++serial), rec=entry({name:'',description:'',about_text:'',vision:'',mission:'',facebook_url:'',status:'draft',category_id:null});records[id]=rec;
+            var id=savedKey||('new-'+(++serial)), rec=savedRecord||entry({name:'',description:'',about_text:'',vision:'',mission:'',facebook_url:'',status:'draft',category_id:null});records[id]=rec;
             var card=h('article',{'class':'student-org-card','data-ve-org-card':id,'data-ve-label':'New organization'},[
                 h('div',{class:'student-org-card-cover'},[h('span',{class:'org-cover-picture','data-ve-org-media':'cover','data-warning-image':true,'data-warning-label':'Organization cover',text:'Add cover image'}),h('span',{class:'student-org-draft',text:'Unpublished'})]),
                 h('div',{class:'student-org-card-body'},[
@@ -3477,7 +4059,7 @@
                     h('button',{type:'button',class:'org-canvas-control','data-ve-org-details':true,text:'Edit organization page'}),
                     h('button',{type:'button',class:'org-canvas-control','data-ve-org-assign-category':true,text:'Assign category'})])]);
             grid.insertBefore(card,$('[data-ve-org-add]',grid));var empty=$('.student-org-empty',S.doc);if(empty)empty.remove();editFields(card);
-            card.scrollIntoView({block:'center',behavior:'smooth'});var field=$('[data-ve-key="name"]',card);select({kind:'field',el:field});field.focus();chrome();
+            if(savedRecord)return;card.scrollIntoView({block:'center',behavior:'smooth'});var field=$('[data-ve-key="name"]',card);select({kind:'field',el:field});field.focus();chrome();
         }
         function openDetails(rec) {
             if(S.busy)return;
@@ -3528,9 +4110,7 @@
             });
         }
         function saveUnpublished(rec) {
-            function persist(){run('Saving unpublished...',async function(){try{await save(rec,'draft');toast('Saved unpublished. Visitors cannot see this organization.','ok');chrome();}catch(error){failure(error);}});}
-            if(rec.base.status==='published')confirmPop('Unpublish organization?','Save this organization as unpublished and hide it from visitors.','Save unpublished',persist,false);
-            else persist();
+            closePop();savePageDraft();
         }
         function move(rec,direction) {
             if(dirty()){toast('Save or publish your changes before changing the order.','warn');return;}
@@ -3553,6 +4133,18 @@
             var sub=$('#veSub'); if (sub) sub.value=withParam(url,'ce_preview','1');
         }
         return {
+            draftState:function(value){
+                if(!value)return {records:records,settings:settings,pageFiles:pageFiles,pageRemoved:pageRemoved,serial:serial};records=value.records;settings=value.settings;pageFiles=value.pageFiles;pageRemoved=value.pageRemoved;serial=value.serial;
+                if(!data.organization)Object.keys(records).forEach(function(key){if(!S.doc.querySelector('[data-ve-org-card="'+cssEsc(key)+'"]'))addOrganization(key,records[key]);});editFields(S.doc);
+                if(data.organization){
+                    var rec=record(null),add=$('[data-ve-org-gallery-add]',S.doc);
+                    if(rec&&add){
+                        rec.galleryRemoved.forEach(function(id){var tile=S.doc.querySelector('[data-ve-org-gallery="'+cssEsc(String(id))+'"]');if(tile)tile.remove();});
+                        rec.gallery.forEach(function(file,index){if(file)add.before(h('a',{'data-ve-org-gallery':'new-'+index,href:'#'},[h('img',{src:previewUrl(file),alt:'New gallery image'})]));});
+                    }
+                }
+            },
+            draftRebind:function(){editFields(S.doc);},
             mount: function (doc) {
                 try { data=JSON.parse(doc.getElementById('veOrgData').textContent); } catch (_) { data=null; }
                 records={};settings={};pageFiles={};pageRemoved={};if(!data)return false;
@@ -3599,7 +4191,7 @@
                 var rec=record(selected.el);
                 if(selected.kind==='field'||selected.kind==='org-card'){
                     var items=selected.kind==='field'?[{type:'chip',icon:'pencil',text:selected.el.__ve.label||'Text'}]:[];
-                    if(rec)items=items.concat([{icon:'pencil-square',label:'Edit page',run:function(){openDetails(rec);}},{icon:'tags',label:'Category',run:function(){categories(rec);}},{icon:'save',label:'Save unpublished',run:function(){saveUnpublished(rec);}},{icon:'cloud-upload',title:'Publish organization',run:function(){confirmPublish('Publish this organization?',function(){run('Publishing...',async function(){try{await save(rec,'published');toast('Organization published.','ok');chrome();renderToolbar();}catch(error){failure(error);}});});}},{icon:'arrow-left',title:'Move earlier',run:function(){move(rec,-1);}},{icon:'arrow-right',title:'Move later',run:function(){move(rec,1);}},{icon:'trash',title:'Delete organization',danger:true,run:function(){removeOrganization(rec,selected.el);}}]);
+                    if(rec)items=items.concat([{icon:'pencil-square',label:'Edit page',run:function(){openDetails(rec);}},{icon:'tags',label:'Category',run:function(){categories(rec);}},{icon:'save',label:'Save draft',run:function(){saveUnpublished(rec);}},{icon:'cloud-upload',title:'Publish organization',run:function(){confirmPublish('Publish this organization?',function(){run('Publishing...',async function(){try{await save(rec,'published');toast('Published. Your changes are live now.','ok');chrome();renderToolbar();}catch(error){failure(error);}});});}},{icon:'arrow-left',title:'Move earlier',run:function(){move(rec,-1);}},{icon:'arrow-right',title:'Move later',run:function(){move(rec,1);}},{icon:'trash',title:'Delete organization',danger:true,run:function(){removeOrganization(rec,selected.el);}}]);
                     return items;
                 }
                 if (selected.kind!=='org-media') return [];
@@ -3621,7 +4213,7 @@
             dirtyCount: dirty,
             status: function(){return {text:dirty()?plural(dirty(),'unsaved change'):'Everything here is saved',tone:dirty()?'warn':'ok'};},
             hasPageOptions: function(){return !!data;},
-            pageOptions: function(x,y){var rec=record(null);var buttons=[h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Manage categories',on:{click:function(){categories(null);}}})];if(rec)buttons.push(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Save unpublished',on:{click:function(){closePop();saveUnpublished(rec);}}}),h('button',{type:'button',class:'btn btn-sm btn-outline-danger',text:'Delete organization',on:{click:function(){removeOrganization(rec,null);}}}));openPop(h('div',{class:'ve-pop-form'},buttons),x,y);},
+            pageOptions: function(x,y){var rec=record(null);var buttons=[h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Manage categories',on:{click:function(){categories(null);}}})];if(rec)buttons.push(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Save draft',on:{click:function(){closePop();saveUnpublished(rec);}}}),h('button',{type:'button',class:'btn btn-sm btn-outline-danger',text:'Delete organization',on:{click:function(){removeOrganization(rec,null);}}}));openPop(h('div',{class:'ve-pop-form'},buttons),x,y);},
             actions: function(){return {secondary:{label:'Add Organization',icon:'plus-circle'},primary:{label:'Publish',icon:'cloud-upload',disabled:!data||(!dirty()&&(!data.organization||data.organization.status==='published'))}};},
             runSecondary: addOrganization,
             runPrimary: function(){
@@ -3631,7 +4223,7 @@
                         return (async function(){try{
                             if(Object.keys(settings).length||Object.keys(pageFiles).length||Object.keys(pageRemoved).length){var page=await request({action:'save_page',texts:JSON.stringify(settings),remove_images:JSON.stringify(Object.keys(pageRemoved))},pageFiles);Object.keys(settings).forEach(function(key){data.fields[key].value=settings[key];});if(page.images)data.images=page.images;settings={};pageFiles={};pageRemoved={};}
                             for(var id of Object.keys(records)){var rec=records[id];if(changed(rec)||(data.organization&&rec.base.status!=='published'))await save(rec,'published');}
-                            reloadEditor('Organization content published.',entityRoute(S.url),true);
+                            reloadEditor('Published. Your changes are live now.',entityRoute(S.url),true);
                         }catch(error){failure(error);}})();
                     });
                 });
@@ -3639,8 +4231,24 @@
         };
     }
     function SportsAdapter() {
-        var data=null, rows=[], texts={}, files={}, backgroundFiles={}, teams=[],teamFiles={},facilities=[],facilityFiles={},baseline='',preparing=0,speed=1,motion=true;
-        function payload(){return {texts:texts,speed:speed,sports:rows.map(function(row){return {id:row.id,name:row.name,type:row.type};}),teams:teams.map(function(team){return {id:team.id,name:team.name};}),facilities:facilities.map(function(facility){return {id:facility.id,name:facility.name};})};}
+        var data=null, rows=[], texts={}, files={}, backgroundFiles={}, teams=[],teamFiles={},facilities=[],facilityFiles={},baseline='',preparing=0,speed=1,motion=true,facebookUrl='';
+        function payload(){return {texts:texts,speed:speed,facebook_url:facebookUrl,sports:rows.map(function(row){return {id:row.id,name:row.name,type:row.type};}),teams:teams.map(function(team){return {id:team.id,name:team.name};}),facilities:facilities.map(function(facility){return {id:facility.id,name:facility.name};})};}
+        function editFacebook(){
+            askText({label:'Facebook page address',anchor:S.doc.querySelector('[data-ve-sports-facebook]'),value:facebookUrl,max:255,placeholder:'https://www.facebook.com/your-page',hint:'Leave blank to remove the Facebook page. Publish to save.',done:function(value){
+                value=value.trim();
+                if(value&&!/^https?:\/\/(www\.)?facebook\.com\/[^\s]*$/i.test(value)){toast('Use a Facebook page address starting with https://www.facebook.com/','error');return;}
+                facebookUrl=value;
+                var box=S.doc.querySelector('[data-ve-sports-facebook]');
+                if(box){
+                    box.setAttribute('data-ve-link',value);
+                    var old=box.querySelector('iframe');if(old)old.remove();
+                    var button=box.querySelector('[data-ve-sports-facebook-edit]');
+                    if(value){var frame=h('iframe',{src:'https://www.facebook.com/plugins/page.php?href='+encodeURIComponent(value)+'&tabs=&width=500&height=130&small_header=false&adapt_container_width=true&hide_cover=true&show_facepile=false&show_posts=false',width:'500',height:'130',title:'GNC Sports Club Facebook page',loading:'lazy'});box.insertBefore(frame,button);}
+                    if(button)button.textContent=value?'Change Facebook page link':'Add the Facebook page link';
+                }
+                renderToolbar();chrome();
+            }});
+        }
         function setMotion(on){
             motion=on;var page=S.doc.querySelector('[data-ve-sports-preview]'),button=S.doc.querySelector('[data-ve-sports-motion]');
             if(page)page.classList.toggle('sports-motion-preview',motion);
@@ -3675,17 +4283,17 @@
                 makeField(el,function(node,value){var row=rowOf(node);if(row){row[node.getAttribute('data-ve-field')==='sport-name'?'name':'type']=value;marquee();}});
             });
         }
-        function add(){
-            if(!data||S.preview||S.busy)return;
+        function add(saved){
+            if(!data||(!saved&&(S.preview||S.busy)))return;
             setMotion(false);
-            if(rows.length>=30){toast('Use up to 30 sports programs.','error');return;}
-            var row={id:'sport-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),name:'New sport',type:'',image:''};
-            rows.push(row);
+            if(!saved&&rows.length>=30){toast('Use up to 30 sports programs.','error');return;}
+            var row=saved||{id:'sport-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),name:'New sport',type:'',image:''};
+            if(!saved)rows.push(row);
             var name=h('strong',{'data-ve-field':'sport-name','data-ve-label':'Sport name','data-ve-max':'120',text:row.name});
             var label=h('span',{'data-ve-field':'sport-type','data-ve-label':'Sport label','data-ve-max':'80','data-ve-ph':'Add label (optional)','data-warning-optional':'true'});
             var card=h('article',{class:'athletics-sport athletics-sport--placeholder','data-ve-sport':row.id},[
                 h('img',{class:'athletics-sport-image',hidden:true,alt:'','data-ve-sport-image':true}),h('h3',{class:'athletics-sport-title'},[label,name])]);
-            S.doc.querySelector('[data-sports-original]').appendChild(card);bindSport(card);marquee();chrome();
+            S.doc.querySelector('[data-sports-original]').appendChild(card);bindSport(card);marquee();chrome();if(saved)return;
             card.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'});name.focus();
         }
         function replace(card){
@@ -3725,14 +4333,14 @@
                 var placeholder=figure.querySelector('[data-ve-team-upload]');if(placeholder)placeholder.setAttribute('hidden','');chrome();renderToolbar();
             },figure.querySelector('[data-ve-team-image]'),true);
         }
-        function addTeam(){
-            if(!data||S.preview||S.busy)return;if(teams.length>=20){toast('Use up to 20 varsity team logos.','error');return;}
-            var team={id:'team-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),name:'New team',image:''};teams.push(team);
+        function addTeam(saved){
+            if(!data||(!saved&&(S.preview||S.busy)))return;if(!saved&&teams.length>=20){toast('Use up to 20 varsity team logos.','error');return;}
+            var team=saved||{id:'team-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),name:'New team',image:''};if(!saved)teams.push(team);
             var figure=h('figure',{class:'athletics-team','data-ve-team':team.id},[
                 h('img',{class:'athletics-team-logo',hidden:true,alt:team.name,'data-ve-team-image':true}),
                 h('button',{type:'button',class:'athletics-team-upload','data-ve-team-upload':team.id,text:'Upload team logo'}),
                 h('figcaption',{'data-ve-field':'team-name','data-ve-label':'Team name','data-ve-max':120,text:team.name})]);
-            S.doc.querySelector('[data-ve-teams-grid]').appendChild(figure);bindTeam(figure);figure.scrollIntoView({block:'nearest'});chrome();replaceTeam(figure);
+            S.doc.querySelector('[data-ve-teams-grid]').appendChild(figure);bindTeam(figure);if(saved)return;figure.scrollIntoView({block:'nearest'});chrome();replaceTeam(figure);
         }
         function moveTeam(figure,delta){
             var team=teamOf(figure),i=teams.indexOf(team),other=teams[i+delta];if(!other)return;
@@ -3750,14 +4358,14 @@
                 var placeholder=figure.querySelector('[data-ve-facility-upload]');if(placeholder)placeholder.setAttribute('hidden','');chrome();renderToolbar();
             },figure);
         }
-        function addFacility(){
-            if(!data||S.preview||S.busy)return;if(facilities.length>=24){toast('Use up to 24 facility photos.','error');return;}
-            var facility={id:'facility-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),name:'New facility',image:''};facilities.push(facility);
+        function addFacility(saved){
+            if(!data||(!saved&&(S.preview||S.busy)))return;if(!saved&&facilities.length>=24){toast('Use up to 24 facility photos.','error');return;}
+            var facility=saved||{id:'facility-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),name:'New facility',image:''};if(!saved)facilities.push(facility);
             var figure=h('figure',{class:'athletics-facility-slide fcar-slide','data-ve-facility':facility.id,role:'group','aria-roledescription':'slide'},[
                 h('img',{class:'athletics-facility-photo',hidden:true,alt:facility.name,'data-ve-facility-image':true}),
                 h('button',{type:'button',class:'athletics-facility-upload','data-ve-facility-upload':true,text:'Upload facility photo'}),
                 h('figcaption',{class:'fcar-caption','data-ve-field':'facility-name','data-ve-label':'Facility name','data-ve-max':120,text:facility.name})]);
-            S.doc.querySelector('.athletics-facilities-stage').appendChild(figure);bindFacility(figure);refreshFacilities(facilities.length-1);figure.scrollIntoView({block:'nearest'});chrome();replaceFacility(figure);
+            S.doc.querySelector('.athletics-facilities-stage').appendChild(figure);bindFacility(figure);refreshFacilities(facilities.length-1);if(saved)return;figure.scrollIntoView({block:'nearest'});chrome();replaceFacility(figure);
         }
         function moveFacility(figure,delta){
             var facility=facilityOf(figure),index=facilities.indexOf(facility),other=facilities[index+delta];if(!other)return;
@@ -3765,8 +4373,18 @@
             if(delta<0)figure.parentNode.insertBefore(figure,target);else figure.parentNode.insertBefore(target,figure);refreshFacilities(index+delta);chrome();renderToolbar();
         }
         return {
+            draftState:function(value){
+                if(!value)return {rows:rows,texts:texts,files:files,backgroundFiles:backgroundFiles,teams:teams,teamFiles:teamFiles,facilities:facilities,facilityFiles:facilityFiles,baseline:baseline,speed:speed,facebookUrl:facebookUrl};
+                rows=value.rows;texts=value.texts;files=value.files;backgroundFiles=value.backgroundFiles;teams=value.teams;teamFiles=value.teamFiles;facilities=value.facilities;facilityFiles=value.facilityFiles;baseline=value.baseline;speed=value.speed;facebookUrl=value.facebookUrl;
+                [['[data-ve-sport]',rows,'data-ve-sport',add],['[data-ve-team]',teams,'data-ve-team',addTeam],['[data-ve-facility]',facilities,'data-ve-facility',addFacility]].forEach(function(group){
+                    $$(group[0],S.doc).forEach(function(node){if(!group[1].some(function(row){return row.id===node.getAttribute(group[2]);}))node.remove();});
+                    group[1].slice().forEach(function(row){if(!S.doc.querySelector('['+group[2]+'="'+cssEsc(row.id)+'"]'))group[3](row);});
+                });paintSpeed();
+            },
+            draftRebind:function(){$$('[data-ve-sport]',S.doc).forEach(bindSport);$$('[data-ve-team]',S.doc).forEach(bindTeam);$$('[data-ve-facility]',S.doc).forEach(bindFacility);marquee();refreshFacilities();},
             mount:function(doc){
                 var block=doc.getElementById('veSportsData');data=block?JSON.parse(block.textContent):null;
+                facebookUrl=data?data.content.facebook_url||'':'';
                 rows=data?JSON.parse(JSON.stringify(data.content.sports)):[];texts=data?Object.assign({},data.content.texts):{};files={};backgroundFiles={};preparing=0;speed=data&&data.content.speed!=null?Number(data.content.speed):1;baseline=snapshot();
                 teams=data?JSON.parse(JSON.stringify(data.content.teams||[])):[];teamFiles={};baseline=snapshot();
                 facilities=data?JSON.parse(JSON.stringify(data.content.facilities||[])):[];facilityFiles={};baseline=snapshot();
@@ -3781,6 +4399,7 @@
                 $$('[data-ve-sport]',doc).forEach(bindSport);$$('[data-ve-team]',doc).forEach(bindTeam);$$('[data-ve-facility]',doc).forEach(bindFacility);refreshFacilities();return false;
             },
             pick:function(target){
+                if(target.closest('[data-ve-sports-facebook]')){editFacebook();return {kind:'none'};}
                 if(target.closest('[data-ve-facility-add]')){addFacility();return {kind:'none'};}
                 var facilityUpload=target.closest('[data-ve-facility-upload]');if(facilityUpload){replaceFacility(facilityUpload.closest('[data-ve-facility]'));return {kind:'none'};}
                 if(target.closest('.athletics-facilities-controls'))return {kind:'facility-controls',el:target.closest('.athletics-facilities-controls'),prevent:false};
@@ -3835,9 +4454,6 @@
             runSecondary:add,
             runPrimary:function(){
                 if(!data||!dirty()||preparing)return;
-                if(rows.some(function(row){return !row.name.trim();})){toast('Give each sport a name before publishing.','error');return;}
-                if(teams.some(function(team){return !team.name.trim();})){toast('Give each varsity team a name before publishing.','error');return;}
-                if(facilities.some(function(facility){return !facility.name.trim();})){toast('Give each facility a name before publishing.','error');return;}
                 confirmPublish('Publish the sports slideshow and page changes?',function(){run('Publishing sports...',function(){
                     var uploads={};Object.keys(files).forEach(function(id){uploads['sport_'+id]=files[id];});
                     Object.keys(backgroundFiles).forEach(function(key){uploads['background_'+key]=backgroundFiles[key];});
@@ -3845,7 +4461,7 @@
                     Object.keys(facilityFiles).forEach(function(id){uploads['facility_'+id]=facilityFiles[id];});
                     return send('/admin/action/athletics-sports-handler.php',{content:JSON.stringify(payload()),revision:data.revision},uploads).then(function(result){
                         if(!result.ok){toast(result.error,'error');return;}
-                        files={};backgroundFiles={};teamFiles={};facilityFiles={};baseline=snapshot();reloadEditor('Sports programs published.');
+                        files={};backgroundFiles={};teamFiles={};facilityFiles={};baseline=snapshot();reloadEditor('Published. Your changes are live now.');
                     });
                 });});
             },
@@ -3856,6 +4472,208 @@
                     loadFrame(url.pathname+url.search+url.hash,true);return true;
                 }
                 return false;
+            }
+        };
+    }
+
+    function FaqAdapter() {
+        var content=null,baseline='',revision='';
+        function dirty(){return content&&JSON.stringify(content)!==baseline?1:0;}
+        function bind(){
+            $$('.faq-item summary',S.doc).forEach(function(summary){if(summary.__faqBound)return;summary.__faqBound=true;summary.addEventListener('click',function(event){if(!S.preview)event.preventDefault();});});
+            $$('[data-ve-field^="faq-"]',S.doc).forEach(function(el){
+                var kind=el.getAttribute('data-ve-field'),key=el.getAttribute('data-ve-key');
+                el.setAttribute('data-ve-ph',el.getAttribute('data-ve-label')||'Click to edit');
+                makeField(el,function(node,value){
+                    if(kind==='faq-text')content.texts[key]=value;
+                    else{var item=content.items.find(function(row){return row.id===key;});if(item)item[kind==='faq-question'?'question':'answer']=value;}
+                });
+            });
+        }
+        function field(tag,kind,row,key,label,max){
+            var el=S.doc.createElement(tag);el.textContent=row[key];
+            el.setAttribute('data-ve-field',kind);el.setAttribute('data-ve-key',row.id);el.setAttribute('data-ve-label',label);el.setAttribute('data-ve-max',max);
+            if(key==='answer')el.setAttribute('data-ve-multiline','1');return el;
+        }
+        function render(){
+            if(!content)return;
+            var list=S.doc.querySelector('[data-faq-list]'),markers={};
+            $$('[data-gnc-text]',list).forEach(function(el){markers[el.getAttribute('data-ve-field')+':'+el.getAttribute('data-ve-key')]=el.getAttribute('data-gnc-text');});
+            list.replaceChildren();
+            content.items.forEach(function(row){
+                var details=S.doc.createElement('details');details.className='faq-item';details.open=true;details.setAttribute('data-ve-faq-item',row.id);
+                var summary=S.doc.createElement('summary'),chevron=S.doc.createElement('i');chevron.className='bi bi-chevron-down';chevron.setAttribute('aria-hidden','true');
+                summary.append(field('span','faq-question',row,'question','Question',1000),chevron);
+                var answer=field('div','faq-answer',row,'answer','Answer',20000);answer.className='faq-answer';details.append(summary,answer);list.append(details);
+            });
+            $$('[data-ve-field]',list).forEach(function(el){var marker=markers[el.getAttribute('data-ve-field')+':'+el.getAttribute('data-ve-key')];if(marker)el.setAttribute('data-gnc-text',marker);});
+            list.hidden=!content.items.length;S.doc.querySelector('[data-faq-empty]').hidden=!!content.items.length;bind();
+        }
+        function add(){
+            if(!content||S.busy)return;
+            if(content.items.length>=200){toast('This page supports up to 200 FAQs.','error');return;}
+            var id='faq-new-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+            content.items.push({id:id,question:'',answer:''});select(null);render();chrome();
+            var target=S.doc.querySelector('[data-ve-faq-item="'+id+'"] [data-ve-field="faq-question"]');target.scrollIntoView({block:'center'});target.focus();
+        }
+        function move(id,step){
+            var index=content.items.findIndex(function(row){return row.id===id;}),next=index+step;
+            if(index<0||next<0||next>=content.items.length)return;
+            var item=content.items.splice(index,1)[0];content.items.splice(next,0,item);select(null);render();chrome();
+        }
+        return {
+            mount:function(doc){content=null;baseline='';revision='';var source=doc.getElementById('faqPageData');if(source){var data=JSON.parse(source.textContent);content=data.content;revision=data.revision;baseline=JSON.stringify(content);bind();}return false;},
+            draftState:function(value){if(!value)return {content:content,baseline:baseline,revision:revision};content=value.content;baseline=value.baseline;revision=value.revision;render();},
+            draftRebind:render,
+            pick:function(target){
+                if(target.closest('[data-ve-faq-add]')){add();return {kind:'none'};}
+                var el=fieldOf(target);if(el&&el.__ve)return {kind:'field',el:el,prevent:false};
+                var item=target.closest('[data-ve-faq-item]');return item?{kind:'faq-item',el:item,id:item.getAttribute('data-ve-faq-item'),prevent:true}:null;
+            },
+            toolbar:function(sel){
+                var item=sel.el.closest('[data-ve-faq-item]');if(!item)return [];
+                var id=item.getAttribute('data-ve-faq-item'),index=content.items.findIndex(function(row){return row.id===id;});
+                return [{type:'chip',icon:'question-circle',text:'FAQ'},
+                    {icon:'arrow-up',title:'Move FAQ earlier',disabled:index===0,run:function(){move(id,-1);}},
+                    {icon:'arrow-down',title:'Move FAQ later',disabled:index===content.items.length-1,run:function(){move(id,1);}},
+                    {icon:'trash',title:'Delete FAQ',danger:true,run:async function(){if(!await window.AdminDialogs.confirm('Delete this FAQ? It will be removed from the website when you publish.'))return;content.items=content.items.filter(function(row){return row.id!==id;});select(null);render();chrome();}}];
+            },
+            dirtyCount:dirty,
+            status:function(){return {text:dirty()?'You have unpublished FAQ changes.':content?'Click a question or answer to edit.':'Install the FAQ migration to start editing.',tone:dirty()?'warn':'ok'};},
+            actions:function(){return {secondary:{label:'Add FAQ',icon:'plus-lg',disabled:!content},primary:{label:'Publish',icon:'cloud-upload',disabled:!dirty()}};},
+            runSecondary:add,
+            runPrimary:function(){if(!dirty())return;confirmPublish('Publish FAQ changes?',function(){run('Publishing FAQs...',async function(){
+                var result=await send('/admin/action/faqs-handler.php',{content:JSON.stringify(content),revision:revision});
+                if(!result.ok){toast(result.error,'error');return;}
+                baseline=JSON.stringify(content);revision=result.revision;reloadEditor('Published. Your changes are live now.',{page:'faqs'},true);
+            });});}
+        };
+    }
+
+    function CommunityActivitiesAdapter() {
+        var content=null,baseline='',revision='',files={},api=null,limits={};
+        function dirty(){return content&&(JSON.stringify(content)!==baseline||Object.keys(files).length)?1:0;}
+        function activity(id){return content&&content.activities.find(function(row){return row.id===id;});}
+        function bind(){
+            if(!content)return;
+            $$('[data-ve-field^="community-"]',S.doc).forEach(function(el){
+                var kind=el.getAttribute('data-ve-field'),key=el.getAttribute('data-ve-key');
+                el.setAttribute('data-ve-ph',el.getAttribute('data-ve-label')||'Click to edit');
+                makeField(el,function(node,value){
+                    if(kind==='community-text'){
+                        content.texts[key]=value;
+                        if(key==='hero_title')S.doc.querySelector('[data-community-breadcrumb]').textContent=value;
+                    }else{
+                        var row=activity(key),property=kind.slice('community-activity-'.length);
+                        if(row)row[property]=property==='description'?value:String(node.textContent||'').replace(/\s+/g,' ').trim();
+                    }
+                });
+            });
+        }
+        function render(){
+            if(!api||!content)return;
+            api.render(content);
+            var hero=S.doc.querySelector('.community-activity-hero');
+            if(hero)hero.style.backgroundImage='url('+JSON.stringify(content.hero_image)+')';
+            var closing=S.doc.querySelector('[data-community-closing-image] img');
+            if(closing&&content.closing_image)closing.src=content.closing_image;
+            bind();
+        }
+        function add(){
+            if(!content||S.busy)return;
+            if(content.activities.length>=100){toast('This page supports up to 100 activities.','error');return;}
+            var id='activity-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+            content.activities.push({id:id,title:'',description:'',category:'',image:''});
+            select(null);render();api.select(id);chrome();
+            var target=S.doc.querySelector('[data-ve-community-card="'+cssEsc(id)+'"] h4');
+            if(target){target.scrollIntoView({block:'center'});target.focus();}
+        }
+        function replace(id){
+            if(!content||['hero','closing','showcase'].indexOf(id)<0)return;
+            var target=id==='hero'?S.doc.querySelector('.community-activity-hero'):id==='closing'?S.doc.querySelector('[data-community-closing-image]'):S.doc.querySelector('[data-community-feature]');
+            pickFile('image/jpeg,image/png,image/webp,image/gif',function(file){
+                if(file.size>5*MB||!/^image\/(jpeg|png|webp|gif)$/.test(file.type)){toast('Choose a JPG, PNG, WebP or GIF image of up to 5 MB.','error');return;}
+                files[id+'_image']=file;
+                content[id+'_image']=previewUrl(file);
+                if(S.sel&&S.sel.el&&S.sel.el.closest('[data-ve-community-card]'))select(null);
+                render();chrome();renderToolbar();
+            },false,target);
+        }
+        function move(id,step){
+            var index=content.activities.findIndex(function(row){return row.id===id;}),next=index+step;
+            if(index<0||next<0||next>=content.activities.length)return;
+            var item=content.activities.splice(index,1)[0];content.activities.splice(next,0,item);
+            select(null);render();chrome();
+        }
+        function activityActions(id){return [
+            {icon:'arrow-up',title:'Move activity earlier',run:function(){move(id,-1);}},
+            {icon:'arrow-down',title:'Move activity later',run:function(){move(id,1);}},
+            {icon:'trash',title:'Delete activity',danger:true,run:async function(){
+                if(!await window.AdminDialogs.confirm('Delete this activity? It will be removed from the public page when you publish.'))return;
+                content.activities=content.activities.filter(function(row){return row.id!==id;});delete files['image_'+id];select(null);render();chrome();
+            }}
+        ];}
+        return {
+            draftState:function(value){
+                if(!value)return {content:content,baseline:baseline,revision:revision,files:files};
+                content=value.content;baseline=value.baseline;revision=value.revision;files=value.files||{};
+                if(typeof content.showcase_image!=='string')content.showcase_image=(content.activities.find(function(row){return row.image;})||{}).image||'';
+                render();
+            },
+            draftRebind:render,
+            mount:function(doc){
+                content=null;files={};baseline='';revision='';api=doc.defaultView.GNCCommunityActivities;
+                try{var data=JSON.parse(doc.getElementById('communityPageData').textContent);content=data.content;content.showcase_image=data.showcase_image||'';limits=data.limits;revision=data.revision;baseline=JSON.stringify(content);}catch(_){}
+                bind();return false;
+            },
+            pick:function(target){
+                if(target.closest('[data-ve-community-add]')){add();return {kind:'none'};}
+                var post=postPick(target);if(post)return post;
+                var field=fieldOf(target);if(field&&field.__ve)return {kind:'field',el:field,prevent:false};
+                var image=target.closest('[data-ve-community-image]');
+                if(image&&content)return {kind:'community-image',el:image,id:image.getAttribute('data-ve-community-image'),prevent:true};
+                var card=target.closest('[data-ve-community-card]');
+                if(card&&content){api.select(card.getAttribute('data-ve-community-card'));return {kind:'community-card',el:card,id:card.getAttribute('data-ve-community-card'),prevent:true};}
+                return null;
+            },
+            toolbar:function(sel){
+                if(sel.kind==='post')return postToolbar(sel);
+                if(sel.kind==='community-image')return [{icon:'image',label:'Replace picture',primary:true,run:function(){replace(sel.id);}}];
+                if(sel.kind==='community-card')return activityActions(sel.id);
+                if(sel.kind==='field'){
+                    var card=sel.el.closest('[data-ve-community-card]');
+                    return [{type:'chip',icon:'pencil',text:sel.el.__ve.label}].concat(card?activityActions(card.getAttribute('data-ve-community-card')):[]);
+                }
+                return [];
+            },
+            onLink:function(link){
+                if(!link.closest('#community-impact .campus-recent-pagination'))return false;
+                var url=new URL(link.getAttribute('href'),new URL(S.url,window.location.origin));
+                (async function(){if(await guardDirty())loadFrame(withParam(url.pathname+url.search+url.hash,'ce_preview','1'));})();
+                return true;
+            },
+            hasPageOptions:function(){return !!content;},
+            pageOptions:function(x,y){
+                var box=h('div',{class:'ve-pop-form'},[h('strong',{text:'Community activity page'}),h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Replace banner image',on:{click:function(){replace('hero');}}})]);
+                ['empty_title','empty_description'].forEach(function(key){
+                    var label=key==='empty_title'?'Empty-state heading':'Empty-state description';
+                    var input=h(key==='empty_description'?'textarea':'input',{class:'form-control form-control-sm','aria-label':label,maxlength:limits[key]});input.value=content.texts[key];
+                    input.addEventListener('input',function(){content.texts[key]=input.value;var target=S.doc.querySelector('[data-ve-field="community-text"][data-ve-key="'+key+'"]');if(target)target.textContent=input.value;chrome();});
+                    box.appendChild(h('label',{class:'ve-pop-label',text:label},[input]));
+                });openPop(box,x,y);
+            },
+            dirtyCount:dirty,
+            status:function(){return {text:dirty()?'You have unpublished activity changes.':content?'Click text or a picture to edit. Add activities when ready.':'Install the community activities migration to edit this page.',tone:dirty()?'warn':'ok'};},
+            actions:function(){return {secondary:{label:'Add activity',icon:'plus-lg',disabled:!content},primary:{label:'Publish',icon:'cloud-upload',disabled:!dirty()}};},
+            runSecondary:add,
+            runPrimary:function(){
+                if(!dirty())return;
+                confirmPublish('Publish community activity changes?',function(){run('Publishing…',async function(){
+                    if(!S.allowIncomplete&&content.activities.some(function(row){return !row.title.trim()||!row.description.trim()||!row.category.trim();})){toast('Each activity needs a title, description and category.','error');return;}
+                    var response=await send('/admin/action/community-activities-handler.php',{content:JSON.stringify(content),revision:revision},files);
+                    if(!response.ok){toast(response.error,'error');return;}
+                    files={};baseline=JSON.stringify(content);revision=response.revision;reloadEditor('Published. Your changes are live now.',{page:'community-activities'},true);
+                });});
             }
         };
     }
@@ -3880,11 +4698,11 @@
         }
         function editDestination(link) {
             var key = link.getAttribute('data-ve-payment-link'), field = data.fields[key];
-            askText({label:field.label, value:Object.prototype.hasOwnProperty.call(texts,key) ? texts[key] : field.value, max:field.max, required:true,
+            askText({label:field.label, value:Object.prototype.hasOwnProperty.call(texts,key) ? texts[key] : field.value, max:field.max,
                 hint:'Use an https:// or http:// address, or a local path starting with /. Changes go live when you publish.',
                 done:function (value) {
-                    var valid = !/[\s\x00-\x1f\x7f<>"\\]/.test(value) && (/^\/(?!\/)/.test(value) || /^https?:\/\//i.test(value));
-                    if (valid && !value.startsWith('/')) {
+                    var valid = value === '' || (!/[\s\x00-\x1f\x7f<>"\\]/.test(value) && (/^\/(?!\/)/.test(value) || /^https?:\/\//i.test(value)));
+                    if (valid && value && !value.startsWith('/')) {
                         try { var url = new URL(value); valid = !!url.hostname; } catch (_) { valid = false; }
                     }
                     if (!valid) { toast('Enter a valid HTTP or HTTPS address, or a local path starting with /.','error'); return; }
@@ -3915,6 +4733,7 @@
             window.open('https://storyset.com/', '_blank', 'noopener,noreferrer');
         }
         return {
+            draftState:function(value){if(!value)return {changes:changes,texts:texts};changes=value.changes;texts=value.texts;},
             mount:function (doc) {
                 urls.forEach(function (url) { URL.revokeObjectURL(url); }); urls = []; changes = {}; texts = {}; data = null;
                 try { data = JSON.parse(doc.getElementById('vePaymentGuideData').textContent); } catch (_) {}
@@ -3958,7 +4777,7 @@
                         });
                         return send('/admin/action/payment-guide-handler.php', {images:JSON.stringify(payload),texts:JSON.stringify(texts)}, files).then(function (result) {
                             if (!result.ok) { toast(result.error,'error'); return; }
-                            changes = {}; texts = {}; reloadEditor('Payment guide published.');
+                            changes = {}; texts = {}; reloadEditor('Published. Your changes are live now.');
                         });
                     });
                 });
@@ -4033,6 +4852,8 @@
             openPop(box,x,y);
         }
         return {
+            draftState:function(value){if(!value)return {texts:texts,changes:changes,serial:serial,categories:api&&api.categories};texts=value.texts;changes=value.changes;serial=value.serial;if(api&&value.categories){Object.keys(value.categories).forEach(function(key){Object.assign(api.categories[key],value.categories[key]);});refresh();}},
+            draftRebind:function(){bindFields();},
             mount:function(doc){
                 urls.forEach(function(url){URL.revokeObjectURL(url);});urls=[];texts={};changes={};
                 try {data=JSON.parse(doc.getElementById('veTuitionData').textContent);api=doc.defaultView.GNCTuitionFees;}catch(_){data=null;}
@@ -4064,7 +4885,7 @@
                     var payload=list.map(function(change){return {id:change.id,category:change.category,title:change.title,remove:!!change.remove};});
                     return send('/admin/action/tuition-fees-handler.php',{texts:JSON.stringify(texts),documents:JSON.stringify(payload)},files).then(function(result){
                         if(!result.ok){toast(result.error,'error');return;}
-                        texts={};changes={};reloadEditor('Tuition and fees published.');
+                        texts={};changes={};reloadEditor('Published. Your changes are live now.');
                     });
                 });});
             },
@@ -4116,7 +4937,7 @@
         var wasEmbed = embedOpen;
         drawer.hidden = true; D.body.classList.remove('ve-drawer-open');
         if (wasEmbed && embedFrame) embedFrame.src = 'about:blank';
-        if (S.adapter.dirtyCount() === 0) loadFrame(S.url, true);       // show whatever the panel just saved
+        if (S.adapter.dirtyCount() === 0) loadFrame(S.url, true);
         else if (wasEmbed) toast('Posts you saved are live. Publish or cancel your edits on this page, then the preview shows them.', 'ok');
     }
     if (drawer) {
@@ -4126,32 +4947,47 @@
 
     // ══════════════════ start ══════════════════
     var kind = C.page.kind;
-    S.adapter = kind === 'sports' ? SportsAdapter() : kind === 'payment-guide' ? PaymentGuideAdapter() : kind === 'achievements' ? AchievementAdapter() : kind === 'tuition' ? TuitionAdapter() : kind === 'organizations' ? OrganizationAdapter() : kind === 'home' ? HomeAdapter() : kind === 'admin' ? AdminAdapter() : kind === 'sections' ? SectionsAdapter() : kind === 'feed' ? FeedAdapter() : EntityAdapter();
+    S.adapter = kind === 'faqs' ? FaqAdapter() : kind === 'community' ? CommunityActivitiesAdapter() : kind === 'sports' ? SportsAdapter() : kind === 'payment-guide' ? PaymentGuideAdapter() : kind === 'achievements' ? AchievementAdapter() : kind === 'tuition' ? TuitionAdapter() : kind === 'organizations' ? OrganizationAdapter() : kind === 'home' ? HomeAdapter() : kind === 'admin' ? AdminAdapter() : kind === 'sections' ? SectionsAdapter() : kind === 'feed' ? FeedAdapter() : EntityAdapter();
     function withImagePositions(adapter) {
         var dirty = adapter.dirtyCount, actions = adapter.actions, status = adapter.status, primary = adapter.runPrimary;
-        adapter.dirtyCount = function () { return dirty.call(adapter) + imagePositionCount(); };
+        adapter.dirtyCount = function () { return dirty.call(adapter) + displayPlacementCount(); };
         adapter.status = function () {
-            return imagePositionCount() ? { text: plural(adapter.dirtyCount(), 'unsaved change'), tone: 'warn' } : status.call(adapter);
+            return displayPlacementCount() ? { text: plural(adapter.dirtyCount(), 'unsaved change'), tone: 'warn' } : status.call(adapter);
         };
         adapter.actions = function () {
             var result = actions.call(adapter);
-            if (imagePositionCount()) {
+            if (displayPlacementCount()) {
                 result.primary = { label: 'Publish', icon: 'cloud-upload', disabled: false, title: 'Put your changes on the live website' };
                 if (result.secondary) result.secondary = Object.assign({}, result.secondary, { disabled: true });
             }
             return result;
         };
         adapter.runPrimary = function () {
-            if (imagePositionCount() && dirty.call(adapter) === 0) {
-                confirmPublish('Publish the updated image positions to the live website?', function () {
-                    run('Publishing…', function () { toast('Published. Image positions are live now.', 'ok'); });
+            if (displayPlacementCount() && dirty.call(adapter) === 0) {
+                confirmPublish('Publish the updated placements to the live website?', function () {
+                    run('Publishing…', function () { toast('Published. Your changes are live now.', 'ok'); });
                 });
             } else if (primary) return primary.call(adapter);
         };
     }
     withImagePositions(S.adapter);
+    if (window.GNCEditorDrafts) drafts=window.GNCEditorDrafts.create({
+        page:C.page.slug,adapter:function(){return S.adapter;},document:function(){return S.doc;},
+        pending:function(){return S.adapter.dirtyCount();},positions:function(){return imagePositions;},
+        textPlacements:function(){return textPlacements;},setTextPlacements:function(value){textPlacements=value;applyTextPlacements();},
+        setPositions:function(value){imagePositions=value;Object.keys(value).forEach(function(path){previewImagePosition(path,value[path].value);});},
+        clean:cleanHtml,notify:toast,refresh:chrome,
+        send:function(fields){if(C.reviewSubmission)fields.review_submission=C.reviewSubmission;return send('/admin/action/editor-draft-handler.php',fields);}
+    });
+    function savePageDraft(){if(drafts && drafts.supported() && !S.busy)return run('Saving draft…',function(){return drafts.save();});}
+    var draftSaveButton=$('#veSaveDraft'),draftDiscardButton=$('#veDiscardDraft');
+    if(draftSaveButton)draftSaveButton.addEventListener('click',savePageDraft);
+    if(draftDiscardButton)draftDiscardButton.addEventListener('click',async function(){
+        if(S.busy||!await window.AdminDialogs.confirm('Discard the saved draft and return to the published page?'))return;
+        await run('Discarding draft…',async function(){await drafts.clear();leaving=true;window.location.reload();});
+    });
     S.url = C.page.url;
-    if (kind === 'organizations') window.OrganizationEditor = { hasChanges: function () { return S.adapter.dirtyCount() > 0; } };
+    if (kind === 'organizations') window.OrganizationEditor = { hasChanges: unsavedPageChanges };
 
     var ob = $('#veOutlineBtn');
     if (ob) ob.addEventListener('click', function () { var r = ob.getBoundingClientRect(); if (S.adapter.openOutline) S.adapter.openOutline(r.left, r.bottom + 8); });
@@ -4179,7 +5015,7 @@
         loadFrame(sub.value);
     });
     var addFirst = $('#veAddFirst'); if (addFirst) addFirst.addEventListener('click', function () { var d = $('#veDock .ve-add-slide'); if (d) d.click(); });
-    window.addEventListener('resize', function () { if (S.sel) placeTb(true); });
+    window.addEventListener('resize', function () { positionStatus(); if (S.sel) placeTb(true); });
 
     // Bootstrap modals opened from inside the side panel must sit above the editor, so lift them to <body>.
     D.addEventListener('show.bs.modal', function (e) { var m = e.target; if (m && m.parentNode !== D.body) D.body.appendChild(m); });

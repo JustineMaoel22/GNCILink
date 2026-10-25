@@ -115,7 +115,7 @@ final class GncbotRetriever
         // ---- header notes
         $notes = ['TODAY: ' . date('l, F j, Y, g:i A') . '.'];
         if ($program !== null) {
-            $notes[] = 'SCOPE: program ' . $program . ' (' . ($this->programNames[$program] ?? $program) . ')'
+            $notes[] = 'SCOPE: program ' . gncbot_program_display_code($program) . ' (' . ($this->programNames[$program] ?? gncbot_program_display_code($program)) . ')'
                 . ($inferredFrom ? ' - inferred from ' . $inferredFrom . ', not stated in the question.' : ' - stated by the visitor.');
         }
         if (!empty($this->ctx['title']) || !empty($this->ctx['url'])) {
@@ -186,7 +186,7 @@ final class GncbotRetriever
         if ($this->programRows) {
             $this->programNames = array_intersect_key($this->programNames, $this->programRows)
                 + array_fill_keys(array_diff(array_keys($this->programRows), array_keys($this->programNames)), '');
-            foreach ($this->programNames as $c => $n) { if ($n === '') { $this->programNames[$c] = $c; } }
+            foreach ($this->programNames as $c => $n) { if ($n === '' || $n === $c) { $this->programNames[$c] = gncbot_program_display_code($c); } }
         }
     }
 
@@ -317,7 +317,7 @@ final class GncbotRetriever
         foreach ($by as $d => $codes) {
             $dn = $this->departments[$d]['dept_name'] ?? 'Unassigned';
             $lines[] = $dn . ':';
-            foreach ($codes as $c) { $lines[] = '  - ' . $c . ' - ' . $this->programNames[$c]; }
+            foreach ($codes as $c) { $lines[] = '  - ' . gncbot_program_display_code($c) . ' - ' . $this->programNames[$c]; }
         }
         $this->addBlock('College programs offered (' . count($this->programRows) . ' programs in total on GNCILink' . ($dept !== null ? '; filtered to one department' : '') . ')', implode("\n", $lines));
         $this->link('college_departments');
@@ -327,8 +327,9 @@ final class GncbotRetriever
     {
         $r = $this->programRows[$code] ?? null;
         if (!$r) { return; }
-        $name = $this->programNames[$code] ?? $code;
-        $lines = ["Program code: $code", "Full name: $name"];
+        $displayCode = gncbot_program_display_code($code);
+        $name = $this->programNames[$code] ?? $displayCode;
+        $lines = ["Program code: $displayCode", "Full name: $name"];
         $d = $this->departments[(int)($r['dept_id'] ?? 0)] ?? null;
         if ($d) {
             $lines[] = 'Department: ' . $d['dept_name'];
@@ -345,12 +346,12 @@ final class GncbotRetriever
             $pdf = ($r['pdf_path'][0] === '/') ? gncbot_url((string)$r['pdf_path']) : (string)$r['pdf_path'];
             $lines[] = 'Program PDF available: ' . $pdf;
             $this->allowed[$pdf] = true;
-            $this->addLink('Program PDF (' . $code . ')', $pdf);
+            $this->addLink('Program PDF (' . $displayCode . ')', $pdf);
         }
         $lines[] = 'Program events page: ' . gncbot_program_events_url($code);
         $this->allowed[gncbot_program_events_url($code)] = true;
         $lines[] = '(GNCILink stores no description, curriculum, tuition or admission details for this program.)';
-        $this->addBlock("Program: $code", implode("\n", $lines));
+        $this->addBlock("Program: $displayCode", implode("\n", $lines));
         $this->link('college_departments');
     }
 
@@ -360,7 +361,7 @@ final class GncbotRetriever
         foreach ($this->departments as $id => $d) {
             if ($dept !== null && (int)$id !== $dept) { continue; }
             $progs = [];
-            foreach ($this->programRows as $c => $r) { if ((int)$r['dept_id'] === (int)$id) { $progs[] = $c; } }
+            foreach ($this->programRows as $c => $r) { if ((int)$r['dept_id'] === (int)$id) { $progs[] = gncbot_program_display_code($c); } }
             $line = '- ' . $d['dept_name'] . ($d['slug'] ? ' (' . strtoupper($d['slug']) . ')' : '')
                   . ($d['dean_name'] ? '; Dean: ' . $d['dean_name'] : '')
                   . ($progs ? '; programs: ' . implode(', ', $progs) : '');

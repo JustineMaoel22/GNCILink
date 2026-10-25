@@ -1,0 +1,331 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+}
+html { overflow-x: hidden; }
+body { overflow-x: clip; }
+.developers-page {
+    --grad-light: #1F5E2C;
+    --grad-dark: #094024;
+    --accent-yellow: var(--gnc-gold, #EABA3B);
+}
+
+/* Hero Section Wrapper */
+.hero-section {
+    background-color: var(--grad-dark);
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+}
+
+/* --- BACKGROUND IMAGE PLACEHOLDER --- */
+.bg-image-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+}
+
+.bg-image-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Typography */
+.serif-font {
+    font-family: 'Playfair Display', serif;
+}
+
+.text-accent {
+    color: var(--gnc-gold);
+}
+
+.text-ivory {
+    color: #F9F6F1;
+}
+
+/* --- LAYOUT & CARD --- */
+.content-container {
+    position: relative;
+    z-index: 10;
+}
+
+.quote-wrapper {
+    position: relative;
+    margin-top: 3rem;
+}
+
+/* Yellow offset rectangle behind the card */
+.quote-bg-rect {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    width: 100%;
+    height: 100%;
+    background-color: var(--gnc-gold);
+    z-index: 1;
+}
+
+/* Main gradient card */
+.quote-card {
+    position: relative;
+    background: linear-gradient(-114deg, var(--grad-light), var(--grad-dark));
+    padding: 3.5rem;
+    z-index: 2;
+    color: #F9F6F1;
+}
+
+/* --- CSS SHAPES --- */
+.shape {
+    position: absolute;
+    z-index: 5;
+}
+
+/* Yellow Star Shape */
+.star-shape {
+    width: 35px;
+    height: 35px;
+    background-color: var(--gnc-gold);
+    clip-path: polygon(50% 0%, 61% 35%, 100% 50%, 61% 65%, 50% 100%, 39% 65%, 0% 50%, 39% 35%);
+    margin-bottom: 2rem;
+}
+
+/* Yellow Solid Circle */
+.circle-solid {
+    width: 200px;
+    height: 200px;
+    background-color: var(--gnc-gold);
+    border-radius: 50%;
+    top: -50px;
+    left: -50px;
+}
+
+/* Yellow Outline Circles (Holes) */
+.circle-hole {
+    border: 25px solid var(--gnc-gold);
+    border-radius: 50%;
+    background: transparent;
+}
+
+.hole-top {
+    width: 250px;
+    height: 250px;
+    top: -125px;
+    left: 45%;
+}
+
+.hole-bottom {
+    width: 200px;
+    height: 200px;
+    bottom: -125px;
+    right: -50px;
+}
+
+/* --- IMAGE ASSET PLACEHOLDERS FOR 3D GREEN SPHERES --- */
+.sphere {
+    position: absolute;
+    z-index: 6;
+}
+
+.sphere-top-left {
+    top: 8%;
+    left: 5%;
+    width: 120px;
+}
+
+.sphere-bottom-left {
+    bottom: -5%;
+    left: 5%;
+    width: 250px;
+}
+
+.sphere-bottom-right {
+    bottom: 15%;
+    right: 5%;
+    width: 100px;
+    z-index: 11;
+}
+
+/* --- ANIMATIONS --- */
+.anim-float {
+    animation: float 6s ease-in-out infinite;
+}
+
+.anim-float-delayed {
+    animation: float 7s ease-in-out infinite 2s;
+}
+
+.anim-spin-slow {
+    animation: spin 20s linear infinite;
+}
+
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+    100% { transform: translateY(0px); }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 991px) {
+    .quote-wrapper { margin-top: 4rem; margin-bottom: 4rem; }
+    .quote-card { padding: 2.5rem; }
+    .circle-solid, .hole-top, .hole-bottom { transform: scale(0.7); }
+}
+
+/* --- TEAM SECTION --- */
+.team-section {
+    background-color: #F9F6F1; /* Light beige/off-white background matching the image */
+    padding-top: 6rem;
+    padding-bottom: 6rem;
+}
+
+.section-header {
+    max-width: 700px;
+}
+
+.team-section-title {
+    color: #1F5E2C;
+}
+
+.text-dark-green {
+    color: #1F5E2C;
+}
+
+.letter-spacing-1 {
+    letter-spacing: 1px;
+}
+
+/* Team Card Styling */
+.team-card {
+    transition: transform 0.3s ease;
+}
+
+.team-card:hover {
+    transform: translateY(-5px);
+}
+
+/* Placeholder styling for images before they are loaded */
+.team-img {
+    background-color: #E2E2E2; 
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+    /* Optional: uncomment below if you want subtle borders on the images */
+    /* border: 4px solid white; */
+    /* box-shadow: 0 4px 10px rgba(0,0,0,0.05); */
+}
+
+/* Typography for Roles and Names */
+.team-role {
+    font-size: 0.75rem;
+    color: #1F5E2C;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.team-name {
+    color: var(--accent-yellow);
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+/* --- ADVISER / THANK YOU SECTION --- */
+.adviser-section {
+    position: relative;
+    padding-top: 8rem;
+    padding-bottom: 8rem;
+    z-index: 1;
+    background-color: var(--grad-dark); /* Fallback */
+}
+
+/* Background Image Container */
+.adviser-bg-image-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+}
+
+.adviser-bg-image-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
+
+/* Photo Wrapper & Image styling */
+.adviser-image-wrapper {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.adviser-img {
+    min-height: 450px;         
+    object-fit: cover;
+}
+
+/* Yellow Overlapping Name Card */
+.adviser-name-card {
+    position: absolute;
+    bottom: 20px;
+    right: -15%;
+    background-color: var(--accent-yellow);
+    padding: 1.5rem 2rem;
+    z-index: 3;
+    min-width: 320px;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 991px) {
+    .adviser-name-card {
+        right: 0;
+        bottom: -20px;
+        width: 90%;
+        margin: 0 auto;
+        left: 0;
+        min-width: auto;
+    }
+}
+
+/* --- GALLERY SECTION --- */
+.gallery-section {
+    background-color: #F9F6F1; /* Matches the Team section off-white background */
+    padding-top: 5rem;
+    padding-bottom: 5rem;
+}
+
+/* Gallery Image Wrapper ensures all images stretch to fill their grid cells properly */
+.gallery-image-wrapper {
+    height: 100%;
+    min-height: 350px; /* Gives structure before images load */
+    background-color: #E2E2E2; /* Placeholder background */
+}
+
+/* Image styling */
+.gallery-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Ensures images fill the grid space without distortion */
+    object-position: center;
+    display: block;
+}
+
+/* Responsive height adjustment for smaller screens */
+@media (max-width: 767px) {
+    .gallery-image-wrapper {
+        min-height: 250px;
+    }
+}

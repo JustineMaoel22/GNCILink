@@ -37,4 +37,11 @@ if (str_contains($html, 'id="veBasicData"')) throw new RuntimeException('Departm
 foreach (['id="veDeptProgramsData"', 'id="veDepartmentProgramTemplate"', 'data-ve-program-grid', 'data-ve-field="dept-program-name"', 'data-ve-program-image', 'data-ve-add="program"'] as $marker) {
     if (!str_contains($html, $marker)) throw new RuntimeException('Missing inline program card markup: ' . $marker);
 }
+if ($slug === 'cased') {
+    foreach (['vision_title', 'vision_text', 'mission_title', 'mission_text'] as $key) {
+        if (!str_contains($html, 'data-ve-key="' . $key . '"')) throw new RuntimeException('Missing editable department statement: ' . $key);
+    }
+} elseif (str_contains($html, 'aria-label="Department vision and mission"')) {
+    throw new RuntimeException('College department statements must not change other department layouts');
+}
 echo "PASS: $slug renders the shared layout with editable headings, contacts and media.\n";

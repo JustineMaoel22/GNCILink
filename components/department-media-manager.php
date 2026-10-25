@@ -207,7 +207,7 @@ if (empty($csrfToken)) {
                                         <button type="button" class="btn btn-sm btn-outline-secondary btn-theme-clear">Use default color</button>
                                     </div>
                                     <div class="dept-color-warn" hidden><i class="bi bi-exclamation-triangle"></i> This color is quite light, so the white button text may be hard to read. A darker color is easier on the eyes.</div>
-                                    <div class="dept-help">The color of this department's “View Department” button in the list. If unsure, leave the default.</div>
+                                    <div class="dept-help"><?= $departmentManagerIsBasic ? 'The color of this department\'s list button.' : 'Used for this department\'s list button and landing-page header text. Other page sections keep the standard site colors.' ?></div>
                                     <details class="dept-tip">
                                         <summary>I have a color code (like #1F5E2C)</summary>
                                         <input type="text" class="form-control details-theme-input mt-2" maxlength="7" placeholder="#1F5E2C" aria-label="Color code">
@@ -884,6 +884,7 @@ body.gnc-confirm-open { overflow: hidden; }
     })();
 
     function showAlert(el, msg, isError) {
+        if (window.ContentEditorNotice && window.ContentEditorNotice(msg, isError)) { el.classList.add('d-none'); return; }
         el.className = 'alert mt-3 mb-0 ' + (isError ? 'alert-danger' : 'alert-success');
         el.textContent = msg;
         if (!isError) setTimeout(function () { el.classList.add('d-none'); }, 5000);

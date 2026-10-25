@@ -50,4 +50,63 @@ foreach([['college-admission-requirements',1,'college','freshmen','transferees']
 }
 checkAdmission(admissionCategoryLabel('<h2>A &amp; B</h2>','Fallback')==='A & B','Category labels decode safe heading text');
 checkAdmission(admissionCategoryLabel('<h2></h2>','Fallback')==='Fallback','Empty headings retain an accessible tab label');
-echo "PASS: both admission pages persist rename/delete/order changes, sanitize HTML, retry safely, reject invalid layouts, and roll back failures atomically in an isolated database.\n";
+$rows = admissionRows(2); $orders = [];
+foreach ($rows as $key => $row) {
+    $scope = admissionCategoryScope('basic-education-admission-requirements', $key);
+    if ($scope !== null && $row['status'] === 'published') $orders[$scope][] = $key;
+}
+$beforeOrder = $orders;
+$presentation = [];
+foreach (basicAdmissionPresentationDefaults() as $key => $field) {
+    checkAdmission(admissionCategoryScope('basic-education-admission-requirements', $key) === null, 'Presentation fields are separate from applicant categories');
+    $presentation[] = ['key' => $key, 'title' => $field['title'], 'content' => '<strong>Updated &amp; editable ' . $key . '</strong>', 'removed' => false];
+}
+publishAdmissionPage('basic-education-admission-requirements', $presentation, $orders);
+$rows = admissionRows(2);
+foreach ($presentation as $change) {
+    $text = html_entity_decode(strip_tags($rows[$change['key']]['content']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    checkAdmission($text === 'Updated & editable ' . $change['key'], 'Headings, description and school labels persist with special characters');
+}
+$afterOrder = [];
+foreach ($rows as $key => $row) {
+    $scope = admissionCategoryScope('basic-education-admission-requirements', $key);
+    if ($scope !== null && $row['status'] === 'published') $afterOrder[$scope][] = $key;
+}
+checkAdmission($afterOrder === $beforeOrder, 'Editing presentation fields does not change category order');
+foreach ([['removed' => true], ['content' => ''], ['content' => str_repeat('x', 151)]] as $invalid) {
+    $change = array_merge($presentation[0], $invalid);
+    rejectedAdmission(fn() => publishAdmissionPage('basic-education-admission-requirements', [$change], $orders), 'Invalid heading changes rejected');
+}
+// Older installations may have requirement categories without the header rows.
+$db->exec("DELETE FROM page_sections WHERE page_id=2 AND section_key IN ('hero_title','hero_intro')");
+$before = admissionRows(2);
+ensureBasicAdmissionHeaderSections();
+$registered = admissionRows(2);
+foreach (['hero_title', 'hero_intro'] as $key) {
+    checkAdmission($registered[$key]['content'] === basicAdmissionPresentationDefaults()[$key]['content'], 'Missing header field is registered for editing');
+}
+foreach ($before as $key => $row) checkAdmission($registered[$key] === $row, 'Registering headers preserves existing requirements and school labels');
+$db->exec("UPDATE page_sections SET content='Published heading',draft_content='Draft heading',review_status='pending' WHERE page_id=2 AND section_key='hero_title'");
+$before = admissionRows(2);
+ensureBasicAdmissionHeaderSections();
+checkAdmission(admissionRows(2) === $before, 'Repeated registration preserves published content, drafts and review state');
+
+$db->exec("DELETE FROM page_sections WHERE page_id=1 AND section_key='hero_title'");
+$before = admissionRows(1);
+ensureCollegeAdmissionHeadingSection();
+$rows = admissionRows(1);
+checkAdmission($rows['hero_title']['content'] === 'College Admission Requirements', 'College heading is registered on older installations');
+foreach ($before as $key => $row) checkAdmission($rows[$key] === $row, 'Heading registration preserves College requirements and introduction');
+$orders = ['college'=>[]];
+foreach ($rows as $key => $row) if ($row['status'] === 'published' && admissionCategoryScope('college-admission-requirements', $key) === 'college') $orders['college'][] = $key;
+$heading = ['key'=>'hero_title','title'=>'Page heading','content'=>'College &amp; University Admissions','removed'=>false];
+publishAdmissionPage('college-admission-requirements', [$heading], $orders);
+checkAdmission(html_entity_decode(admissionRows(1)['hero_title']['content'], ENT_QUOTES | ENT_HTML5, 'UTF-8') === 'College & University Admissions', 'College heading persists with special characters');
+$before = admissionRows(1);
+ensureCollegeAdmissionHeadingSection();
+checkAdmission(admissionRows(1) === $before, 'Reopening College editor preserves the saved heading');
+foreach ([['removed'=>true], ['content'=>''], ['content'=>str_repeat('x',151)]] as $invalid) {
+    rejectedAdmission(fn()=>publishAdmissionPage('college-admission-requirements', [array_replace($heading,$invalid)], $orders), 'Invalid College heading rejected');
+}
+
+echo "PASS: admission content persists atomically; missing Basic Education and College headers are registered; existing content, drafts, review state and category order are preserved.\n";

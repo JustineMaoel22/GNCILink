@@ -41,8 +41,8 @@ $action     = (string)($_POST['action'] ?? '');
 $pageSlug   = trim((string)($_POST['page'] ?? ''));
 $sectionKey = trim((string)($_POST['section_key'] ?? ''));
 
-$canPublish = hasPermission('manage_page_content');
-$canDraft   = $canPublish || hasPermission('edit_page_content');
+$canPublish = rbacIsSuper() && hasPermission('manage_page_content');
+$canDraft   = hasPermission('manage_page_content') || hasPermission('edit_page_content');
 
 if (!in_array($action, ['save_draft', 'submit', 'withdraw', 'discard', 'publish', 'approve', 'reject'], true)) {
     pr_fail('Unknown action.');

@@ -1,2 +1,5 @@
 RewriteEngine On
+<FilesMatch "^\.env(?:\..*)?$">
+    Require all denied
+</FilesMatch>
 RewriteRule ^college/([a-z0-9-]+)/?$ /pages/academics/college/college-dept.php?slug=$1 [L,QSA]

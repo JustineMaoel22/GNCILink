@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Serif:wght@600;700&display=swap');
+.faq-page{background:#f9f6f1;min-height:60vh;padding:64px 24px 80px;font-family:'Inter',sans-serif;color:#293c31}
+.faq-container{width:100%;max-width:1100px;margin:0 auto}
+.faq-heading{margin-bottom:32px}
+.faq-heading h1{font:700 clamp(28px,4vw,42px)/1.3 'Noto Serif',serif;color:#1f5e2c;margin:0 0 16px;overflow-wrap:anywhere}
+.faq-heading h1::after{content:'';display:block;width:52px;height:3px;background:#eaba3b;margin-top:16px}
+.faq-heading p{margin:0;color:#637167;line-height:1.7;white-space:pre-line;overflow-wrap:anywhere}
+.faq-list{background:#fff;border:1px solid #e1e4dd;border-radius:16px;overflow:hidden}
+.faq-item+.faq-item{border-top:1px solid #eceee8}
+.faq-item summary{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 24px;cursor:pointer;list-style:none;color:#154d2c;font-size:15px;line-height:1.6;font-weight:500;transition:background-color .2s ease}
+.faq-item summary::-webkit-details-marker{display:none}
+.faq-item summary>span{min-width:0;overflow-wrap:anywhere}
+.faq-item summary i{color:#7b897d;flex-shrink:0;transition:transform .2s ease}
+.faq-item[open] summary{background:#f2f7f0}
+.faq-item[open] summary i{transform:rotate(180deg);color:#1f5e2c}
+.faq-item summary:focus-visible{outline:3px solid #d3a63a;outline-offset:-3px}
+.faq-answer{padding:4px 24px 24px;font-size:14px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;color:#4d5e52}
+.faq-editor-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+.faq-editor-actions small{color:#637167}
+.faq-empty{padding:56px 24px;text-align:center;background:#fff;border:1px solid #e1e4dd;border-radius:16px}
+.faq-empty>i{font-size:36px;color:#1f5e2c}
+.faq-empty h2{font:600 24px/1.4 'Noto Serif',serif;color:#1f5e2c;margin:16px 0}
+.faq-empty p{line-height:1.7;color:#637167;white-space:pre-wrap;overflow-wrap:anywhere}
+.faq-page [hidden]{display:none!important}
+@media(hover:hover){.faq-item summary:hover{background:#f2f7f0}}
+@media(max-width:575px){.faq-page{padding:40px 16px 56px}.faq-item summary{padding:18px 16px;gap:12px}.faq-answer{padding:4px 16px 20px}.faq-list{border-radius:12px}}
+@media(prefers-reduced-motion:reduce){.faq-item summary,.faq-item summary i{transition:none}}

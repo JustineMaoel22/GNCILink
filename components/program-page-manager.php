@@ -311,7 +311,7 @@ foreach ($pgPrograms as $p):
                         <div class="col-12">
                             <label class="pgm-label">Short description <span class="pgm-opt">(optional)</span></label>
                             <textarea class="form-control" rows="2" maxlength="5000" data-field="description"><?= $e($p['description'] ?? '') ?></textarea>
-                            <div class="pgm-help">Shown on this program's card in the department page. It is also used in the top banner if you leave the banner paragraph empty.</div>
+                            <div class="pgm-help">Shown on this program's card in the department page. The banner introduction is edited separately below.</div>
                         </div>
                     </div>
                 </div>
@@ -369,7 +369,7 @@ foreach ($pgPrograms as $p):
                     <summary><span class="pgm-sec-num"></span> Top of the page <small>The big banner</small></summary>
                     <div class="pgm-sec-body"><div class="row g-3">
                         <div class="col-12"><?php $pgField('subtitle', 'Line under the title', $c['subtitle'], 'text', 'The short italic line, for example a motto. Leave empty to hide it.'); ?></div>
-                        <div class="col-12"><?php $pgField('hero_desc', 'Banner paragraph', $c['hero_desc'], 'long', 'Leave empty to use the short description.'); ?></div>
+                        <div class="col-12"><?php $pgField('hero_desc', 'Banner paragraph', $c['hero_desc'], 'long', 'Optional. Leave empty to hide the introduction in the banner.'); ?></div>
                     </div></div>
                 </details>
 
@@ -445,7 +445,7 @@ foreach ($pgPrograms as $p):
             'why'        => ['Why choose us', 'Cards that tell students why to pick this program. Each has a title and a few sentences.'],
             'career'     => ['Careers', 'Jobs graduates can go into. Each has a small picture, a title and a description.'],
             'uniform'    => ['Uniform photos', 'Photos of the uniform. Visitors can click a photo to enlarge it.'],
-            'facility'   => ['Facilities', 'Photos of the labs, rooms and equipment students of THIS program use. Each needs a name and a picture (JPG, PNG or WEBP, up to 10 MB); the description is optional. Press “Upload several pictures” to add many at once.'],
+            'facility'   => ['Facilities', 'Photos of the labs, rooms and equipment students of THIS program use. Each needs a name and a picture (JPG, PNG or WEBP, up to 5 MB); the description is optional. Press “Upload several pictures” to add many at once.'],
         ];
         foreach ($listHelp as $type => [$label, $help]): ?>
         <div class="pgm-panel" data-panel="<?= $e($type) ?>" hidden>
@@ -705,7 +705,7 @@ foreach ($pgPrograms as $p):
     var csrf  = <?= json_encode($csrfToken ?? '') ?>;
     var STATE = <?= json_encode($pgState, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
     var LIMITS = <?= json_encode($pgLimits) ?>;
-    var IMG_MAX = 5 * 1024 * 1024, FAC_IMG_MAX = 10 * 1024 * 1024, PDF_MAX = 20 * 1024 * 1024;   // FAC_IMG_MAX: facility pictures (keep in step with PROGRAM_FACILITY_IMAGE_MAX_BYTES in admin-functions.php)
+    var IMG_MAX = 5 * 1024 * 1024, FAC_IMG_MAX = 5 * 1024 * 1024, PDF_MAX = 20 * 1024 * 1024;   // FAC_IMG_MAX: facility pictures (keep in step with PROGRAM_FACILITY_IMAGE_MAX_BYTES in admin-functions.php)
     var IMG_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
     var FAC_TYPES = ['image/jpeg', 'image/png', 'image/webp'];   // facility pictures: JPG, PNG, WEBP only
     function facTypeOk(f) { return FAC_TYPES.indexOf(f.type) !== -1 && /\.(jpe?g|png|webp)$/i.test(f.name); }
@@ -720,6 +720,7 @@ foreach ($pgPrograms as $p):
     }
     function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
     function showAlert(el, msg, bad) {
+        if (window.ContentEditorNotice && window.ContentEditorNotice(msg, bad)) { el.classList.add('d-none'); return; }
         el.className = 'alert mb-0 pgm-alert ' + (bad ? 'alert-danger' : 'alert-success');
         el.textContent = msg;
         if (!bad) setTimeout(function () { el.classList.add('d-none'); }, 4000);
@@ -1140,7 +1141,7 @@ foreach ($pgPrograms as $p):
                             if (type === 'facility') {
                                 if (!facTypeOk(f)) { showAlert(alertEl, 'That file type isn\'t allowed. Facility pictures must be JPG, PNG or WEBP.', true); return; }
                             } else if (IMG_TYPES.indexOf(f.type) === -1 && !/\.svg$/i.test(f.name)) { showAlert(alertEl, 'That file type isn\'t allowed. Use JPG, PNG, WEBP or SVG.', true); return; }
-                            if (f.size > (type === 'facility' ? FAC_IMG_MAX : IMG_MAX)) { showAlert(alertEl, 'That picture is too large. Maximum size is ' + (type === 'facility' ? '10' : '5') + ' MB.', true); return; }
+                            if (f.size > (type === 'facility' ? FAC_IMG_MAX : IMG_MAX)) { showAlert(alertEl, 'That picture is too large. Maximum size is ' + (type === 'facility' ? '5' : '5') + ' MB.', true); return; }
                             hideAlert(alertEl); r.file = f; r.remove = false; showThumb(); dirtyOn();
                         });
                         rm.addEventListener('click', function () { r.file = null; r.remove = true; showThumb(); dirtyOn(); });
@@ -1179,7 +1180,7 @@ foreach ($pgPrograms as $p):
                 files.forEach(function (f) {
                     if (rows.length >= LIMITS[type]) { skipped.push(f.name + ' (limit of ' + LIMITS[type] + ' reached)'); return; }
                     if (!facTypeOk(f)) { skipped.push(f.name + ' (not JPG, PNG or WEBP)'); return; }
-                    if (f.size > FAC_IMG_MAX) { skipped.push(f.name + ' (over 10 MB)'); return; }
+                    if (f.size > FAC_IMG_MAX) { skipped.push(f.name + ' (over 5 MB)'); return; }
                     rows.push({ item_id: 0, title: nameFromFile(f.name), subtitle: '', body: '', icon: '', letter: '', image_url: null, has_upload: false, file: f, remove: false });
                     added++;
                 });

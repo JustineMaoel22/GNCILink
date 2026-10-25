@@ -552,12 +552,12 @@ body {
 }
 
 .org-lead-topics li {
-    border: 1px solid #61723b;
+    border: 1px solid #094024;
     border-radius: 24px;
     padding: 6px 18px;
     font-size: 12px;
-    color: #29472a;
-    background: rgba(255, 245, 189, 0.22);
+    color: #fff;
+    background: #094024;
 }
 
 .org-lead-retreat {
@@ -817,3 +817,287 @@ body {
         transform: none;
     }
 }
+
+
+/* =====================================================================
+   RESPONSIVE LAYER (appended)
+   Bootstrap breakpoints: xs <576 | sm 576-767 | md 768-991 | lg 992-1199 | xl 1200-1399 | xxl 1400+
+   ===================================================================== */
+
+/* overflow-x:hidden on <body> (together with <html>) turns body into a scroll container
+   and breaks the sticky navbar. "clip" hides the overflow without that side effect. */
+body { overflow-x: clip; }
+
+/* ---------- Hero ---------- */
+.student-org-hero { background-color: #0b4228; }   /* keeps the white text readable if the image is slow or missing */
+.student-org-hero .cms-rich,
+.student-org-hero .cms-rich p {
+    font-family: "Inter", sans-serif;
+    color: #fff;
+    max-width: 900px;
+    overflow-wrap: anywhere;
+}
+.student-org-breadcrumb { row-gap: 4px; line-height: 1.4; }
+
+@media (max-width: 767px) {
+    .student-org-hero-inner { padding: 28px 16px 32px; }
+    .student-org-breadcrumb { font-size: .66rem; margin-bottom: 10px; }
+    .student-org-hero .cms-rich,
+    .student-org-hero .cms-rich p { font-size: 13.5px; line-height: 1.6; }
+}
+@media (max-width: 575px) {
+    .student-org-hero { background-position: 70% center; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+    .student-org-hero-inner { padding-top: 20px; padding-bottom: 22px; }
+}
+
+/* ---------- Directory ---------- */
+.student-org-directory h2,
+.student-org-subtitle { overflow-wrap: anywhere; }
+
+@media (max-width: 991px) {
+    .student-org-directory { padding: 32px 20px 48px; }
+}
+
+/* the whole card is tappable (the link was empty and had no size before) */
+.student-org-card { position: relative; }
+.student-org-card-link { position: absolute; inset: 0; z-index: 2; }
+
+@media (max-width: 767px) {
+    .student-org-filters { margin: 16px 0 24px; }
+    .student-org-filters a { font-size: 13px; }
+    .student-org-card-body { padding: 0 20px 20px; }
+    .student-org-empty { padding: 44px 18px; }
+}
+
+@media (max-width: 575px) {
+    .student-org-directory { padding: 28px 16px 40px; }
+    .student-org-card-logo { width: 72px; height: 72px; flex-basis: 72px; font-size: 28px; }
+    .student-org-card-heading { min-height: 78px; gap: 12px; }
+    .student-org-card h3 { font-size: 15px; }
+    .student-org-card-body > p,
+    .student-org-card-body .cms-rich { font-size: 13px; }
+    .org-add-card { min-height: 200px; }
+}
+
+/* very small phones: stack logo above the name so long names don't get squeezed */
+@media (max-width: 359px) {
+    .student-org-card-heading { flex-direction: column; align-items: flex-start; gap: 6px; padding-top: 6px; }
+    .student-org-card-logo { margin-top: -30px; }
+}
+
+/* large desktops: 4 columns would make the cards too narrow, so keep 3 and just let the page breathe */
+@media (min-width: 1600px) {
+    .student-org-directory,
+    .student-org-hero-inner { max-width: 1320px; }
+}
+
+/* ---------- Pagination ---------- */
+.student-org-pagination { flex-wrap: wrap; }
+@media (max-width: 575px) {
+    .student-org-pagination { gap: 6px; margin-top: 26px; }
+}
+
+/* ---------- Leadership section ---------- */
+.org-lead-heading { overflow-wrap: anywhere; }
+.org-lead-training-content,
+.org-lead-callout .cms-rich { overflow-wrap: anywhere; }
+
+@media (max-width: 991px) {
+    .org-lead-retreat { padding: 44px 24px 52px; }
+    .org-lead-retreat-grid { gap: 40px; }
+    .org-lead-closing-content { padding: 48px 48px; }
+}
+
+@media (max-width: 767px) {
+    .org-lead-heading { padding: 0 20px 20px; }
+    .org-lead-training { padding: 32px 20px 36px; }
+    .org-lead-training-content h3 { font-size: 20px; }
+    .org-lead-photo-frame { max-width: none; }
+}
+
+@media (max-width: 575px) {
+    .org-lead-retreat { padding: 36px 20px 44px; }
+    .org-lead-callout { gap: 14px; align-items: flex-start; }
+    .org-lead-icon { width: 46px; height: 46px; flex-basis: 46px; font-size: 21px; }
+    .org-lead-topics li { font-size: 11.5px; }
+    .org-lead-closing { min-height: 200px; }
+    .org-lead-closing-content { padding: 40px 22px; }
+    .org-lead-closing-content h2 { max-width: 100%; }
+    .org-lead-orb { width: 100px; height: 100px; }
+    .org-lead-orb-top { top: -70px; }
+    .org-lead-orb-left { bottom: -65px; left: -35px; }
+    .org-lead-orb-right { right: -30px; bottom: -50px; }
+}
+
+/* ---------- Editor controls (preview mode) ---------- */
+@media (max-width: 575px) {
+    .student-org-card .org-canvas-control { margin-top: 10px; }
+}
+
+/* ---------- Touch devices ---------- */
+@media (pointer: coarse) {
+    .student-org-filters a { padding-top: 9px; padding-bottom: 9px; }
+    .student-org-pagination a { min-width: 44px; height: 44px; }
+    .org-canvas-control { min-height: 36px; }
+}
+@media (hover: none) {
+    .student-org-card:hover { transform: none; box-shadow: 0 3px 12px #17362412; }
+    .student-org-filters a:hover:not(.is-active) { background: transparent; color: #396744; border-color: #d3a63a; }
+    .org-canvas-control:hover { transform: none; box-shadow: none; }
+}
+
+
+/* ---------- Mobile centering: directory heading, subtitle and filters ---------- */
+@media (max-width: 767px) {
+    .student-org-directory h2,
+    .student-org-subtitle { text-align: center; }
+    .student-org-directory h2:after { margin-left: auto; margin-right: auto; }
+    .student-org-filters { justify-content: center; }
+}
+
+
+/* =====================================================================
+   ANIMATION LAYER (appended)
+   - Hero entrance, scroll-reveal, hover micro-interactions, floating orbs.
+   - Scroll-reveal classes (.js-reveal) are added by JS only, so content is
+     always visible without JS and inside the editor preview.
+   - Everything is disabled under prefers-reduced-motion: reduce.
+   ===================================================================== */
+
+@keyframes org-fade-up {
+    from { opacity: 0; transform: translateY(22px); }
+    to   { opacity: 1; transform: none; }
+}
+@keyframes org-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+@keyframes org-fade-left {
+    from { opacity: 0; transform: translateX(-28px); }
+    to   { opacity: 1; transform: none; }
+}
+@keyframes org-fade-right {
+    from { opacity: 0; transform: translateX(28px); }
+    to   { opacity: 1; transform: none; }
+}
+@keyframes org-pop {
+    from { opacity: 0; transform: scale(0.8); }
+    to   { opacity: 1; transform: none; }
+}
+@keyframes org-line-grow {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+}
+@keyframes org-float-a {
+    0%, 100% { transform: translate(0, 0); }
+    50%      { transform: translate(10px, 14px); }
+}
+@keyframes org-float-b {
+    0%, 100% { transform: translate(0, 0); }
+    50%      { transform: translate(-12px, -10px); }
+}
+@keyframes org-hero-pan {
+    from { background-position: 100% center; }
+    to   { background-position: 92% center; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+
+    /* ---------- Hero entrance (plays on load, staggered) ---------- */
+    .student-org-breadcrumb { animation: org-fade-in 0.6s ease 0.05s backwards; }
+    .student-org-hero h1    { animation: org-fade-up 0.7s cubic-bezier(.2,.7,.2,1) 0.15s backwards; }
+    .student-org-hero .cms-rich { animation: org-fade-up 0.7s cubic-bezier(.2,.7,.2,1) 0.3s backwards; }
+    .student-org-hero { animation: org-hero-pan 1.6s ease-out both; }
+
+    /* ---------- Section heading underline draws in ---------- */
+    .student-org-directory h2:after {
+        transform-origin: left center;
+        animation: org-line-grow 0.7s ease 0.35s backwards;
+    }
+    @media (max-width: 767px) {
+        .student-org-directory h2:after { transform-origin: center; }
+    }
+
+    /* ---------- Filters ---------- */
+    .student-org-filters a { animation: org-pop 0.45s ease backwards; }
+    .student-org-filters a:nth-child(1) { animation-delay: 0.10s; }
+    .student-org-filters a:nth-child(2) { animation-delay: 0.16s; }
+    .student-org-filters a:nth-child(3) { animation-delay: 0.22s; }
+    .student-org-filters a:nth-child(4) { animation-delay: 0.28s; }
+    .student-org-filters a:nth-child(5) { animation-delay: 0.34s; }
+    .student-org-filters a:nth-child(n+6) { animation-delay: 0.40s; }
+    .student-org-filters a:hover { transform: translateY(-2px); }
+    .student-org-filters a { transition: background 0.18s, color 0.18s, transform 0.18s; }
+
+    /* ---------- Org cards: cover zoom, logo bounce, category slide ---------- */
+    .student-org-card-cover { overflow: hidden; }
+    .student-org-card-cover > img,
+    .org-cover-picture img { transition: transform 0.6s cubic-bezier(.2,.7,.2,1); }
+    .student-org-card:hover .student-org-card-cover > img,
+    .student-org-card:hover .org-cover-picture img { transform: scale(1.08); }
+
+    .student-org-card-logo { transition: transform 0.35s cubic-bezier(.3,1.6,.5,1), box-shadow 0.3s; }
+    .student-org-card:hover .student-org-card-logo {
+        transform: scale(1.08) rotate(-3deg);
+        box-shadow: 0 4px 14px #142f2535;
+    }
+    .student-org-category { transition: transform 0.3s ease, background 0.3s ease; }
+    .student-org-card:hover .student-org-category { transform: translateY(2px); background: #0b4228; }
+    .student-org-card h3 { transition: color 0.25s ease; }
+    .student-org-card:hover h3 { color: #1f5e2c; }
+
+    /* ---------- Pagination ---------- */
+    .student-org-pagination a { transition: background 0.18s, color 0.18s, transform 0.18s, border-color 0.18s; }
+    .student-org-pagination a:hover:not(.is-active) {
+        background: #e8f2eb;
+        border-color: #6c997a;
+        transform: translateY(-2px);
+    }
+
+    /* ---------- Add-organization tile (editor) ---------- */
+    .org-add-card { transition: background 0.2s, transform 0.2s, border-color 0.2s; }
+    .org-add-card:hover { transform: translateY(-3px); border-color: #4f8a60; }
+    .org-add-card i { transition: transform 0.3s ease; }
+    .org-add-card:hover i { transform: rotate(90deg) scale(1.15); }
+
+    /* ---------- Leadership section ---------- */
+    .org-lead-topics li { transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease; }
+    .org-lead-topics li:hover { transform: translateY(-3px); background: #1f5e2c; }
+
+    .org-lead-icon { transition: transform 0.35s cubic-bezier(.3,1.6,.5,1), background 0.25s, color 0.25s; }
+    .org-lead-callout:hover .org-lead-icon {
+        transform: scale(1.12) rotate(-6deg);
+        background: #e6bd47;
+        color: #246032;
+    }
+
+    .org-lead-photo-frame:before,
+    .org-lead-photo-frame:after { transition: transform 0.5s cubic-bezier(.2,.7,.2,1); }
+    .org-lead-photo-frame:hover:before { transform: translate(-8px, -8px); }
+    .org-lead-photo-frame:hover:after  { transform: translate(8px, 8px); }
+    .org-lead-photo img { transition: transform 0.8s cubic-bezier(.2,.7,.2,1); }
+    .org-lead-photo-frame:hover .org-lead-photo img { transform: scale(1.05); }
+
+    /* slow ambient drift for the decorative orbs */
+    .org-lead-orb-top   { animation: org-float-a 9s ease-in-out infinite; }
+    .org-lead-orb-left  { animation: org-float-b 11s ease-in-out infinite; }
+    .org-lead-orb-right { animation: org-float-a 13s ease-in-out infinite; }
+
+    /* ---------- Scroll reveal (classes added by JS) ---------- */
+    .js-reveal:not(.is-visible) { opacity: 0; }
+    .js-reveal.is-visible {
+        animation: org-fade-up 0.7s cubic-bezier(.2,.7,.2,1) var(--reveal-delay, 0s) backwards;
+    }
+    .js-reveal[data-reveal="left"].is-visible  { animation-name: org-fade-left; }
+    .js-reveal[data-reveal="right"].is-visible { animation-name: org-fade-right; }
+    .js-reveal[data-reveal="pop"].is-visible   { animation-name: org-pop; }
+    .js-reveal[data-reveal="fade"].is-visible  { animation-name: org-fade-in; }
+
+    /* the old list-enter fade would double up with the card reveal */
+    .student-org-grid { animation: none; }
+}
+
+/* the card-link overlay must never be affected by transforms on its parent's children */
+.student-org-card-link { transform: none; }

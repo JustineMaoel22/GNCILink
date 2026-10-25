@@ -9,8 +9,8 @@
  *     College Departments, Programs and Administration (existing managers)
  *
  * Roles:
- *   Super Admin / Content Admin  edit and publish directly, approve and reject
- *   Content Editor               edit page text, save drafts, submit for approval
+ *   Super Admin                  edit/publish directly, approve and reject
+ *   Content Editor               edit all page types, save private snapshots, submit for approval
  */
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../admin/admin-functions.php';
@@ -75,6 +75,8 @@ $customSlugs = ['home', 'college-departments', 'programs', 'administration', 'gr
 
 // Where each page appears on the public website (shown as "View live page")
 $publicUrls = [
+    'enrollment-procedures'      => '/pages/admission/enrollment-procedures.php',
+    'contact-us'                 => '/pages/contact-us.php',
     'basic-education-admission-requirements' => '/pages/admission/basic-education-admission-req.php',
     'college-admission-requirements' => '/pages/admission/admission-req.php',
     'home'                       => '/',
@@ -119,6 +121,10 @@ $titleOf['updates']         = 'News, announcements & events';
 $titleOf['student-organizations'] = 'Student Organizations Management';
 $titleOf['student-achievements'] = 'Student Achievements';
 $titleOf['athletics-sports'] = 'Athletics and Sports';
+$titleOf['community-activities'] = 'Community Extension Activities';
+$titleOf['faqs'] = 'Frequently Asked Questions';
+$publicUrls['faqs'] = '/pages/faq.php';
+$publicUrls['community-activities'] = '/pages/student%20life/community-activity.php';
 $publicUrls['athletics-sports'] = '/pages/student%20life/athletics-sports.php';
 $publicUrls['student-achievements'] = '/pages/student%20life/student-achievement.php';
 $titleOf['tuition-fees'] = 'Tuition and Fees';
@@ -152,6 +158,14 @@ $sectionsBySlug = [];
 if ($canDraftPages && (($_GET['page'] ?? '') === 'history')) ensureHistoryPageSections();
 foreach ($textPages as $sp) {
     try {
+        if ($sp['slug'] === 'basic-education-admission-requirements' && ($_GET['page'] ?? '') === $sp['slug']) {
+            require_once __DIR__ . '/../components/basic-admission-requirements.php';
+            ensureBasicAdmissionHeaderSections();
+        }
+        if ($sp['slug'] === 'college-admission-requirements' && ($_GET['page'] ?? '') === $sp['slug']) {
+            require_once __DIR__ . '/../components/college-admission-requirements.php';
+            ensureCollegeAdmissionHeadingSection();
+        }
         $sectionsBySlug[$sp['slug']] = getPageSectionsDetailed($sp['slug']);
         if (in_array($sp['slug'],['college-admission-requirements','basic-education-admission-requirements'],true)) {
             $sectionsBySlug[$sp['slug']] = array_values(array_filter($sectionsBySlug[$sp['slug']],static fn($section) => $section['status']==='published'));
@@ -159,6 +173,9 @@ foreach ($textPages as $sp) {
     }
     catch (Throwable $e) { error_log('getPageSectionsDetailed error: ' . $e->getMessage()); $sectionsBySlug[$sp['slug']] = []; }
 }
+
+// Empty section pages have no fields to edit. Dedicated managers use $customPages.
+$textPages = array_values(array_filter($textPages, static fn($page) => !empty($sectionsBySlug[$page['slug']])));
 
 // Approvals waiting
 $pending = ($canApprove && $reviewReady) ? getPendingSections() : [];
@@ -168,6 +185,8 @@ $validPanels = ['hub'];
 if ($canApprove) $validPanels[] = 'review';
 if ($canManagePages) { $validPanels[] = 'home'; $validPanels[] = 'basic-education'; $validPanels[] = 'student-organizations'; $validPanels[] = 'student-achievements'; $validPanels[] = 'athletics-sports'; $validPanels[] = 'tuition-fees'; $validPanels[] = 'online-payment-guide'; }
 if ($postModules && $canManagePages) $validPanels[] = 'updates';
+if ($canManagePages) $validPanels[] = 'community-activities';
+if ($canManagePages) $validPanels[] = 'faqs';
 foreach ($textPages as $p)   $validPanels[] = $p['slug'];
 foreach ($customPages as $p) $validPanels[] = $p['slug'];
 $requestedPage = (string)($_GET['page'] ?? '');
@@ -191,6 +210,8 @@ if ($editorMode) {
     if ($activeSlug === 'online-payment-guide') $veKind = 'payment-guide';
     if ($activeSlug === 'student-achievements') $veKind = 'achievements';
     if ($activeSlug === 'athletics-sports') $veKind = 'sports';
+    if ($activeSlug === 'community-activities') $veKind = 'community';
+    if ($activeSlug === 'faqs') $veKind = 'faqs';
     $withPreview = function (string $url): string { return $url . (strpos($url, '?') !== false ? '&' : '?') . 'ce_preview=1'; };
 
     // The page list in the top bar
@@ -203,6 +224,8 @@ if ($editorMode) {
     if ($canManagePages) $pickerPages[] = ['slug'=>'student-organizations','title'=>'Student Organizations Management','group'=>'Student life','icon'=>'people'];
     if ($canManagePages) $pickerPages[] = ['slug'=>'student-achievements','title'=>'Student Achievements','group'=>'Student life','icon'=>'trophy'];
     if ($canManagePages) $pickerPages[] = ['slug'=>'athletics-sports','title'=>'Athletics and Sports','group'=>'Student life','icon'=>'dribbble'];
+    if ($canManagePages) $pickerPages[] = ['slug'=>'community-activities','title'=>'Community Extension Activities','group'=>'Student life','icon'=>'heart'];
+    if ($canManagePages) $pickerPages[] = ['slug'=>'faqs','title'=>'Frequently Asked Questions','group'=>'Student resources','icon'=>'question-circle'];
     if ($canManagePages && !in_array('online-payment-guide',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'online-payment-guide','title'=>'Online Payment Guide','group'=>'Admissions','icon'=>'credit-card'];
     if ($canManagePages && !in_array('tuition-fees',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'tuition-fees','title'=>'Tuition and Fees','group'=>'Admissions','icon'=>'file-earmark-pdf'];
     if ($postModules && $canManagePages) $pickerPages[] = ['slug' => 'updates', 'title' => 'News, announcements & events', 'group' => 'Posts', 'icon' => 'megaphone'];
@@ -299,7 +322,7 @@ if ($editorMode) {
     }
     // News, announcements and events open in the side panel (on the homepage, where they appear, and on their own page here)
     $veEmbed = null;
-    if (in_array($veKind, ['home', 'feed'], true) && $postModules) {
+    if (in_array($veKind, ['home', 'feed', 'community'], true) && $postModules) {
         $openUrl = null;
         $openKey = (string)($_GET['open'] ?? '');
         if (isset($postModules[$openKey])) {
@@ -317,20 +340,28 @@ if ($editorMode) {
                     'list' => $m['file'] . '?embed=1', 'create' => ($m['canCreate'] && $m['key'] !== 'event') ? $m['file'] . '?embed=1&modal=create' : ($m['canCreate'] ? $m['file'] . '?embed=1' : null)];
         }, array_values($postModules)), 'open' => $openUrl];
     }
-    // Program page content and settings are edited in the visual canvas and its
-    // contextual options. Do not mount the legacy multi-section form drawer.
+    // Programs are edited on the canvas; their media controls live in the slide strip and page options.
     $hasDrawer = in_array($veKind, ['home', 'admin', 'entity'], true) && !in_array($activeSlug, ['programs', 'graduate-school'], true);
     $hasPanel  = $hasDrawer || $veEmbed !== null;
     $drawerFile = $veKind === 'home' ? 'homepage-president-manager.php'
-        : ($veKind === 'admin' ? 'administration-manager.php' : ($activeSlug === 'programs' ? 'program-page-manager.php' : 'department-media-manager.php'));
+        : ($veKind === 'admin' ? 'administration-manager.php' : 'department-media-manager.php');
     if ($activeSlug === 'basic-education') $drawerFile = 'basic-edu-media-manager.php';
     $drawerTitle = $veKind === 'home' ? 'Message from the President (full form)'
         : ($veKind === 'admin' ? 'More settings: archived people, tabs and offices' : ($activeSlug === 'programs' ? 'Program details' : 'Department details'));
     if ($veKind === 'organizations') $drawerTitle = 'Student Organizations Management';
 
+    if (!empty($_GET['review_submission'])) {
+        require_once __DIR__.'/../includes/content-submissions.php';
+        $proposal=rbacGetSubmission((int)$_GET['review_submission']);
+        if(!$proposal||$proposal['kind']!=='snapshot'||(!rbacIsSuper()&&(int)$proposal['user_id']!==(int)$_SESSION['user_id']))rbacFail('Submission not found.');
+        $reviewPayload=rbacReadPayload((int)$proposal['submission_id']);
+        if(($reviewPayload['page']??'')!==$activeSlug||!rbacSafePreviewRoute($reviewPayload['route']??''))rbacFail('The submitted page does not match this editor.');
+        $publicUrl=$reviewPayload['route'];$pageUrl=$withPreview($publicUrl);
+    }
     $VE = [
         'csrf' => $csrfToken, 'contentHandler' => '/admin/action/page-content-handler.php', 'reviewHandler' => '/admin/action/page-review-handler.php',
         'canPublish' => $canManagePages, 'canApprove' => $canApprove, 'reviewReady' => $reviewReady, 'hasDrawer' => $hasDrawer,
+        'requiresApproval' => !rbacIsSuper(), 'reviewSubmission' => (int)($_GET['review_submission'] ?? 0),
         'focusSection' => (string)($_GET['section'] ?? '') !== '' && $veKind !== 'admin' ? (string)$_GET['section'] : null,
         'page' => ['slug' => $activeSlug, 'title' => $veTitle, 'kind' => $veKind, 'url' => $pageUrl, 'publicUrl' => $publicUrl, 'section' => $veSection],
         'embed' => $veEmbed,
@@ -381,6 +412,8 @@ if ($canManagePages) {
     $hub[] = ['title'=>'Student Organizations Management','type'=>'Student life','status'=>'live','ts'=>0,'note'=>'Organizations, categories, order and publication status','open'=>'student-organizations','href'=>'?page=student-organizations','where'=>studentOrganizationsUrl()];
     $hub[] = ['title'=>'Student Achievements','type'=>'Student life','status'=>'live','ts'=>0,'note'=>'Achievements, uploaded pictures and academic years','open'=>'student-achievements','href'=>'?page=student-achievements','where'=>'/pages/student%20life/student-achievement.php'];
     $hub[] = ['title'=>'Athletics and Sports','type'=>'Student life','status'=>'live','ts'=>0,'note'=>'Sports slideshow, program names and photos','open'=>'athletics-sports','href'=>'?page=athletics-sports','where'=>$publicUrls['athletics-sports']];
+    $hub[] = ['title'=>'Community Extension Activities','type'=>'Student life','status'=>'live','ts'=>0,'note'=>'Activities, categories, photos and display order','open'=>'community-activities','href'=>'?page=community-activities','where'=>$publicUrls['community-activities']];
+    $hub[] = ['title'=>'Frequently Asked Questions','type'=>'Student resources','status'=>'live','ts'=>0,'note'=>'Questions, answers and display order','open'=>'faqs','href'=>'?page=faqs','where'=>$publicUrls['faqs']];
     foreach (studentOrganizations(true) as $organization) {
         $hub[] = ['title'=>$organization['name'],'type'=>'Organization','status'=>$organization['status']==='published'?'live':'draft','ts'=>strtotime($organization['updated_at']),'note'=>$organization['category_name']??'Uncategorized','open'=>'student-organizations','href'=>'?page=student-organizations&sub='.rawurlencode($organization['slug']),'where'=>studentOrganizationsUrl($organization['slug'])];
     }
@@ -514,8 +547,6 @@ include __DIR__ . '/../components/header-admin.php';
             <button type="button" data-device="mobile" aria-pressed="false" title="Phone"><i class="bi bi-phone"></i></button>
         </div>
 
-        <span class="ve-status ve-status-ok" id="veStatus" role="status" aria-live="polite"></span>
-
         <div class="ve-actions">
             <?php if ($activeSlug === 'programs' && $canManagePages): ?>
             <button type="button" class="ve-tool" id="veAddProgramBtn" title="Create a college or Graduate School program"><i class="bi bi-plus-circle"></i><span>Add Program</span></button>
@@ -530,14 +561,16 @@ include __DIR__ . '/../components/header-admin.php';
             <?php if ($veEmbed): ?>
             <button type="button" class="ve-tool" id="vePostsBtn" title="Open the list of news, announcements and events here"><i class="bi bi-megaphone"></i><span>Posts</span></button>
             <?php endif; ?>
-            <button type="button" class="ve-tool" id="vePreviewBtn" title="See the page as visitors see it (no editing outlines)"><i class="bi bi-eye"></i><span>Preview</span></button>
             <button type="button" class="ve-tool ve-tool-danger" id="veCancel" hidden title="Throw away the changes that are not saved yet"><i class="bi bi-x-circle"></i><span>Cancel</span></button>
+            <button type="button" class="btn btn-outline-secondary ve-btn" id="veDiscardDraft" title="Discard your private draft and restore the published page" hidden><span>Discard draft</span></button>
+            <button type="button" class="btn btn-outline-secondary ve-btn" id="veSaveDraft" title="Save pending preview changes privately (Ctrl/Cmd+S)" hidden><i class="bi bi-save" aria-hidden="true"></i><span>Save draft</span></button>
             <button type="button" class="btn btn-outline-secondary ve-btn" id="veSecondary" hidden></button>
             <button type="button" class="btn-gnc ve-btn" id="vePrimary" hidden></button>
         </div>
     </header>
 
     <main class="ve-canvas" id="veCanvas">
+        <span class="ve-status ve-status-ok" id="veStatus" role="status" aria-live="polite" aria-atomic="true"></span>
         <div class="ve-stage" id="veStage" data-device="desktop">
             <iframe id="veFrame" class="ve-frame" title="Website preview. Click anything to edit it."></iframe>
         </div>
@@ -584,32 +617,7 @@ include __DIR__ . '/../components/header-admin.php';
         canPublish: <?= $canManagePages ? 'true' : 'false' ?>, canApprove: <?= $canApprove ? 'true' : 'false' ?>, reviewReady: <?= $reviewReady ? 'true' : 'false' ?> };
     window.VE_CONFIG = <?= json_encode($VE, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR) ?>;
     document.body.classList.add('ve-mode');
-<?php if ($activeSlug === 'programs'): ?>
-    // Programs: "Edit details" on the Facilities carousel (in the preview) opens that program's Facilities tab here.
-    // (Adding, renaming, reordering and deleting slides is done from the strip under the page: assets/js/content-edit.js)
-    (function () {
-        var frame = document.getElementById('veFrame');
-        function openFacilities(slug) {
-            var drawer = document.getElementById('veDrawer'), btn = document.getElementById('veSettingsBtn');
-            if (drawer && drawer.hidden && btn) btn.click();
-            var cards = Array.prototype.slice.call(document.querySelectorAll('.pgm-card'));
-            var card = cards.filter(function (c) { return c.getAttribute('data-slug') === slug; })[0];
-            if (!card) return;
-            var head = card.querySelector('.pgm-head');
-            if (head && head.getAttribute('aria-expanded') !== 'true') head.click();
-            var tab = card.querySelector('.pgm-tab[data-tab="facility"]');
-            if (tab) tab.click();
-            try { card.scrollIntoView({ block: 'start' }); } catch (e) {}
-        }
-        window.addEventListener('message', function (ev) {
-            if (ev.origin !== window.location.origin) return;
-            if (!frame || ev.source !== frame.contentWindow) return;
-            var d = ev.data;
-            if (!d || d.source !== 'gnc-program-preview' || d.action !== 'facilities' || d.mode !== 'edit') return;
-            openFacilities(String(d.slug || ''));
-        });
-    })();
-<?php endif; ?>
+
     (function () {   // the page list closes when you pick something or click elsewhere
         var m = document.getElementById('vePageMenu');
         document.addEventListener('mousedown', function (e) { if (m && m.open && !m.contains(e.target)) m.removeAttribute('open'); });
@@ -618,6 +626,7 @@ include __DIR__ . '/../components/header-admin.php';
 </script>
 <script src="/assets/js/editor-feedback.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/editor-feedback.js'),0,12) ?>"></script>
 <script src="/assets/js/department-card-order.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/department-card-order.js'),0,12) ?>"></script>
+<script src="/assets/js/editor-drafts.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/editor-drafts.js'),0,12) ?>"></script>
 <script src="/assets/js/content-edit.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/content-edit.js'),0,12) ?>"></script>
 
 <?php else: ?>

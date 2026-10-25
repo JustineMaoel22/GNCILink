@@ -21,9 +21,14 @@ try {
         ++$order;
         $check->execute([$id, $key]);
         if (!$check->fetchColumn()) $insert->execute([$id, $key, $section['title'], $section['content'], $order]);
+        // Repair the previously escaped built-in plain-text labels without changing custom text or drafts.
+        if (str_starts_with($key, 'school_label_')) {
+            $db->prepare('UPDATE page_sections SET content = ? WHERE page_id = ? AND section_key = ? AND content = ?')
+                ->execute([$section['content'], $id, $key, htmlspecialchars($section['content'], ENT_QUOTES, 'UTF-8')]);
+        }
     }
     $db->commit();
-    echo "Basic Education admission requirements registered with 14 editable sections. Existing edits preserved.\n";
+    echo 'Basic Education admission requirements registered with ' . count(basicAdmissionSectionDefaults()) . " editable sections. Existing edits preserved.\n";
 } catch (Throwable $error) {
     $db->rollBack();
     throw $error;

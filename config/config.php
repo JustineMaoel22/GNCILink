@@ -64,18 +64,18 @@ define('DB_CHARSET', $_ENV['DB_CHARSET'] ?? 'utf8mb4');
 // ------------------------------------------------------------
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'GNC Admin System');
 define('APP_URL', $_ENV['APP_URL'] ?? 'http://localhost:8080/admin');
-define('SESSION_TIMEOUT', (int) $_ENV['SESSION_TIMEOUT'] ?? 1800); // 30 minutes
+define('SESSION_TIMEOUT', max(60,(int)env('SESSION_TIMEOUT',1800))); // 30 minutes
 // Validate before casting: casting a missing value first turns the fallback into 0.
 define('OTP_EXPIRY', filter_var($_ENV['OTP_EXPIRY'] ?? 300, FILTER_VALIDATE_INT,
     ['options' => ['min_range' => 1]]) ?: 300);                  // 5 minutes
-define('MAX_LOGIN_ATTEMPTS', (int) $_ENV['MAX_LOGIN_ATTEMPTS'] ?? 5);
-define('LOCKOUT_DURATION', (int) $_ENV['LOCKOUT_DURATION'] ?? 900); // 15 minutes
+define('MAX_LOGIN_ATTEMPTS', 5);
+define('LOCKOUT_DURATION', 900); // 15 minutes
 
 // ------------------------------------------------------------
 // Email Configuration (PHPMailer)
 // ------------------------------------------------------------
 define('MAIL_HOST', $_ENV['MAIL_HOST'] ?? 'smtp.gmail.com');
-define('MAIL_PORT', (int) $_ENV['MAIL_PORT'] ?? 587);
+define('MAIL_PORT', (int) env('MAIL_PORT',587));
 define('MAIL_USERNAME', $_ENV['MAIL_USERNAME'] ?? '');
 define('MAIL_PASSWORD', $_ENV['MAIL_PASSWORD'] ?? '');
 define('MAIL_FROM_NAME', $_ENV['MAIL_FROM_NAME'] ?? 'GNC Admin System');
@@ -92,7 +92,8 @@ define('FB_ACCESS_TOKEN', $_ENV['FB_ACCESS_TOKEN']);
 // ------------------------------------------------------------
 define('UPLOAD_PATH', __DIR__ . '/../uploads/');
 define('UPLOAD_URL', APP_URL . '/uploads/');
-define('MAX_FILE_SIZE', 10 * 1024 * 1024); // 10MB
+define('MAX_FILE_SIZE', 5 * 1024 * 1024); // 5 MB per saved image
+require_once __DIR__ . '/../includes/image-upload.php';
 define('ALLOWED_IMAGE_TYPES', ['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 
 define('GEMINI_API_KEY', env('GEMINI_API_KEY', ''));

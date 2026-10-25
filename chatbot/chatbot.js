@@ -12,7 +12,7 @@
   var MAX_LEN = 500, MAX_HISTORY = 6, MAX_STORED = 40, TIMEOUT_MS = 35000, STORE_KEY = 'gncbot.v1';
   var FRIENDLY = "Sorry, I'm having trouble responding right now. Please try again later.";
   var OFFLINE = "I can't reach the server right now. Please check your internet connection and try again.";
-  var WELCOME = "Hello! \uD83D\uDC4B I'm the GNCILink AI Assistant. I can help you find information about Guagua National Colleges.";
+  var WELCOME = "Hello! \uD83D\uDC4B I'm Cian, your GNCILink AI Assistant. I can help you find information about Guagua National Colleges.";
 
   var el = {
     launcher: root.querySelector('.gncbot-launcher'),
@@ -63,7 +63,11 @@
     try {
       var u = new URL(raw, location.origin);
       if (u.protocol !== 'http:' && u.protocol !== 'https:') { return null; }
-      if (u.origin === location.origin) { return { href: u.pathname + u.search + u.hash, external: false }; }
+      if (u.origin === location.origin) {
+        // Conversations saved before the route correction still contain the old URL.
+        var path = u.pathname.replace(/\/pages\/academics\/college\/college-departments\.php$/, '/pages/academics/college/college-dept.php');
+        return { href: path + u.search + u.hash, external: false };
+      }
       if (/(^|\.)facebook\.com$/i.test(u.hostname)) { return { href: u.href, external: true }; }
     } catch (e) { /* ignore */ }
     return null;
@@ -146,7 +150,7 @@
   function showTyping(on) {
     if (on && !state.typingNode) {
       var w = document.createElement('div'); w.className = 'gncbot-msg is-bot';
-      w.innerHTML = '<div class="gncbot-bubble gncbot-typing" role="status" aria-label="GNCILink AI Assistant is typing"><span></span><span></span><span></span></div>';
+      w.innerHTML = '<div class="gncbot-bubble gncbot-typing" role="status" aria-label="Cian is typing"><span></span><span></span><span></span></div>';
       el.list.appendChild(w); state.typingNode = w; scrollDown();
     } else if (!on && state.typingNode) { state.typingNode.remove(); state.typingNode = null; }
   }
@@ -237,7 +241,7 @@
     if (open) { root.classList.add('has-opened'); }
     el.panel.hidden = !open;
     el.launcher.setAttribute('aria-expanded', open ? 'true' : 'false');
-    el.launcher.setAttribute('aria-label', open ? 'Close GNCILink AI Assistant' : 'Open GNCILink AI Assistant');
+    el.launcher.setAttribute('aria-label', open ? 'Close chat with Cian' : 'Open chat with Cian');
     document.body.classList.toggle('gncbot-noscroll', open && mobileMQ.matches);
     if (open) {
       fitViewport(); scrollDown();

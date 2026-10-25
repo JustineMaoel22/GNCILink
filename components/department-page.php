@@ -24,6 +24,8 @@ $logoUrl    = $dept['logo_url'] ?? null;
 $pageTitle  = $dept ? (string)$dept['dept_name'] : 'Department Not Found';
 $isGraduateSchool = ($dept['slug'] ?? '') === 'graduate-school';
 $isBasicEducation = ($dept['department_type'] ?? '') === 'basic-education';
+$collegeBanner = $dept && !$isBasicEducation && !$isGraduateSchool ? departmentBanner($dept) : null;
+$isCollegeHeader = $dept && !$isBasicEducation && !$isGraduateSchool;
 $pageContent = $dept ? departmentPageContent($dept) : [];
 $logoUrl = $logoUrl ?: ($isGraduateSchool ? '/assets/images/logos/gnc-logo-v1.svg' : null);
 $dean['photo_url'] = $dean['photo_url'] ?: ($isGraduateSchool && is_file($_SERVER['DOCUMENT_ROOT'] . '/assets/images/maam-nazal.png') ? '/assets/images/maam-nazal.png' : null);
@@ -120,6 +122,15 @@ $aboutHtml   = cd_overview_html($aboutSource);
 $deanTitle   = trim((string)$dean['title']);
 // Banner line = "Line under the page title" (hero_text); if empty, a one-sentence summary.
 $heroTitle = $isBasicEducation ? $pageContent['hero_title']['value'] : $pageTitle;
+$heroTitleHtml = cd_h($heroTitle);
+$heroThemeStyle = '';
+if ($isCollegeHeader) {
+    require_once __DIR__ . '/program-page-public.php';
+    $heroThemeStyle = programPageThemeStyle(programPageNormalizeHex($dept['theme_color'] ?? '') ?? '#1F5E2C');
+    if (preg_match('/^(College\s+of)\s+(.+)$/iu', $heroTitle, $titleParts)) {
+        $heroTitleHtml = '<span class="dept-hero-prefix">' . cd_h($titleParts[1]) . ' </span><span class="dept-hero-subject">' . cd_h($titleParts[2]) . '</span>';
+    }
+}
 $heroBlurb = $dept
     ? (trim((string)($dept['hero_text'] ?? '')) !== ''
         ? trim((string)$dept['hero_text'])
@@ -144,6 +155,7 @@ $cdText = function (?string $v) use ($cePreview): string {
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&amp;display=block">
     <link href="/assets/css/college-dept-style.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/college-dept-style.css') ?>" rel="stylesheet">
     <link href="/assets/css/basic-education-content.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/basic-education-content.css') ?>" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
@@ -204,8 +216,13 @@ $cdText = function (?string $v) use ($cePreview): string {
     <main<?= ($dept && !empty($dept['archived_at'])) ? ceManageMark('data-ve-status="draft" style="position:relative"') : '' ?>>
 
         <!-- ═══ Hero (inside .dept-intro so the --gnc-* variables apply) ═══ -->
-        <section class="dept-intro">
+        <section class="dept-intro<?= $isCollegeHeader ? ' dept-intro-program' : '' ?>"<?= $heroThemeStyle !== '' ? ' style="' . cd_h($heroThemeStyle) . '"' : '' ?>>
             <div class="dept-hero">
+                <?php if ($isCollegeHeader): ?>
+                <div class="dept-header-banner" data-dept-banner-image<?= ceManageMark('data-ve-img="dept-banner"') ?> aria-hidden="true">
+                    <img<?= $collegeBanner ? ' src="' . cd_h($collegeBanner['file_path']) . '"' : ' hidden' ?> alt="" fetchpriority="high">
+                </div>
+                <?php endif; ?>
                 <div class="dept-hero-inner">
                     <nav class="dept-breadcrumb" aria-label="breadcrumb">
                         <span>Academics</span>
@@ -216,11 +233,24 @@ $cdText = function (?string $v) use ($cePreview): string {
                         <span class="dept-current" aria-current="page"><?= cd_h($pageTitle) ?></span>
                         <?php endif; ?>
                     </nav>
-                    <h1 class="dept-hero-title"<?= $dept ? ($isBasicEducation ? departmentPageField($dept, 'hero_title') : ceField('dept-name', ['max' => 255, 'label' => 'Department name'])) : '' ?>><?= cd_h($heroTitle) ?></h1>
-                    <?php if ($heroBlurb !== '' || ($cePreview && $dept)): ?>
+                    <div class="dept-hero-content">
+                    <?php if ($isCollegeHeader && ($logoUrl || $cePreview)): ?>
+                    <?= basicEducationMedia($logoUrl, $pageTitle . ' logo', 'dept-hero-logo', ' data-gnc-text="' . substr(hash('sha256', 'department-header-logo:' . $dept['dept_id']), 0, 24) . '" data-gnc-layout-media' . ceManageMark('data-ve-img="dept-logo"')) ?>
+                    <?php endif; ?>
+                    <div class="dept-hero-copy">
+                    <h1 class="dept-hero-title"<?= $dept ? ($isBasicEducation ? departmentPageField($dept, 'hero_title') : ceField('dept-name', ['max' => 255, 'label' => 'Department name'])) : '' ?>><?= $heroTitleHtml ?></h1>
+                    <?php if ((!$isCollegeHeader || strcasecmp(trim($heroBlurb), trim($heroTitle)) !== 0) && ($heroBlurb !== '' || ($cePreview && $dept))): ?>
                     <p class="dept-hero-blurb"<?= $dept ? ceField('dept-hero', ['max' => 255, 'label' => 'Line under the title', 'ph' => 'Add a line under the title']) : '' ?>><?= cd_h($heroBlurb) ?></p>
                     <?php endif; ?>
+                    </div>
+                    </div>
                 </div>
+                <?php if ($cePreview && $isCollegeHeader): ?>
+                <div class="dept-banner-help"<?= ceManageMark('data-ve-img="dept-banner"') ?>>
+                    <?= $collegeBanner ? 'Change header background' : 'Add header background' ?>
+                    <small>JPG, PNG or WEBP, up to 5 MB. The title and logo stay editable above the picture.</small>
+                </div>
+                <?php endif; ?>
             </div>
         </section>
 
@@ -266,6 +296,27 @@ $cdText = function (?string $v) use ($cePreview): string {
                 </div>
             </div>
         </section>
+
+        <?php if (!$isBasicEducation && !$isGraduateSchool): ?>
+        <?php $departmentStatements = array_filter(['vision', 'mission'], static fn($key) => $cePreview || trim(strip_tags($pageContent[$key . '_text']['value'])) !== ''); ?>
+        <?php if ($departmentStatements): ?>
+        <section class="dept-programs" aria-label="Department vision and mission">
+            <div class="dept-programs-inner">
+                <div class="dept-statements">
+                    <?php foreach ($departmentStatements as $statement): ?>
+                    <article class="dept-statement-card">
+                        <div class="dept-statement-head">
+                            <span class="dept-statement-icon"<?= ceManageMark('data-ve-icon="department-statement" data-ve-key="' . $statement . '_icon" role="button" tabindex="0" aria-label="Change ' . $statement . ' icon"') ?>><?= departmentStatementIcon($dept, $statement . '_icon') ?></span>
+                            <h2 class="dept-statement-title"<?= departmentPageField($dept, $statement . '_title') ?>><?= departmentPageText($dept, $statement . '_title') ?></h2>
+                        </div>
+                        <div class="dept-statement-text cms-rich"<?= departmentPageField($dept, $statement . '_text') ?>><?= departmentPageText($dept, $statement . '_text') ?></div>
+                    </article>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </section>
+        <?php endif; ?>
+        <?php endif; ?>
 
         <!-- ═══ 2 · Programs Offered (from `programs` where dept_id = this dept) ═══ -->
         <?php if (!$isBasicEducation || $cePreview || $programs): ?>
@@ -407,7 +458,7 @@ $cdText = function (?string $v) use ($cePreview): string {
             </div>
         </section>
 
-        <!-- ═══ 4 · Follow Us on Facebook (from departments.facebook_url) ═══ -->
+        <!-- ═══ 4 · Connect with Us (from departments.facebook_url) ═══ -->
         <?php if ($fbEmbedUrl !== null || $cePreview): ?>
         <section class="dept-programs dept-facebook">
             <div class="dept-programs-inner">
@@ -437,7 +488,7 @@ $cdText = function (?string $v) use ($cePreview): string {
     </main>
 
     <?= ceDeptEditorBlock($dept, $isBasicEducation ? 'basic' : ($isGraduateSchool ? 'graduate' : 'college')) ?>
-    <?= $dept ? ceData('veDeptPageData', ['dept_id' => (int)$dept['dept_id'], 'fields' => $pageContent]) : '' ?>
+    <?= $dept ? ceData('veDeptPageData', ['dept_id' => (int)$dept['dept_id'], 'fields' => $pageContent, 'icons' => array_filter(academicFeatureIconChoices(), static fn($choice) => !isset($choice['path']))]) : '' ?>
     <?= $dept ? ceData('veDeptProgramsData', array_map(fn($p) => ['program_id' => (int)$p['program_id'], 'program_name' => (string)$p['program_name'], 'description' => (string)($p['description'] ?? ''), 'image_url' => $p['image_url'] ?? null], $programs)) : '' ?>
     <?php include __DIR__ . '/footer.php'; ?>
     <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>

@@ -29,6 +29,18 @@ $pageLink = static fn($number, $filter) => studentOrganizationsUrl() . '?' . htt
     <link href="/assets/css/student-org-style.css?v=<?= filemtime(__DIR__.'/../../../assets/css/student-org-style.css') ?>" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&amp;display=block">
     <link rel="icon" href="/assets/images/logos/gnc-logo-v1.svg">
+    <?php if ($orgPreview): ?>
+    <style>
+        /* Category navigation in the admin must not replay the page entrance. */
+        .student-org-hero,
+        .student-org-breadcrumb,
+        .student-org-hero h1,
+        .student-org-hero .cms-rich,
+        .student-org-directory h2::after,
+        .student-org-filters a,
+        .student-org-grid { animation: none; }
+    </style>
+    <?php endif; ?>
 </head>
 <body>
     <?php $activeSection='student-life'; include __DIR__.'/../../../components/navbar.php'; ?>
@@ -113,5 +125,44 @@ $pageLink = static fn($number, $filter) => studentOrganizationsUrl() . '?' . htt
     </main>
     <?= ceData('veOrgData',['fields'=>$settings,'images'=>$leadershipImages,'icons'=>academicFeatureIconChoices(),'organization'=>null,'organizations'=>$visible,'categories'=>$categories,'listingUrl'=>studentOrganizationsUrl()]) ?>
     <?php include __DIR__.'/../../../components/footer.php'; ?>
+    <?php if (!$orgPreview): ?>
+    <script>
+    // Scroll-reveal: classes are added here (not in the markup), so the page stays fully visible without JS
+    // and inside the editor preview, which is excluded by the PHP check above.
+    (function () {
+        if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+        var groups = [
+            { sel: '.student-org-card',          type: 'up',    stagger: 0.09, perRow: 3 },
+            { sel: '.student-org-empty',         type: 'pop' },
+            { sel: '.student-org-pagination',    type: 'fade' },
+            { sel: '.org-lead-heading',          type: 'up' },
+            { sel: '.org-lead-training-content', type: 'up' },
+            { sel: '.org-lead-topics li',        type: 'pop',   stagger: 0.07 },
+            { sel: '.org-lead-photo-frame',      type: 'left' },
+            { sel: '.org-lead-callout',          type: 'right', stagger: 0.14 },
+            { sel: '.org-lead-closing-content',  type: 'up' }
+        ];
+
+        var io = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add('is-visible');
+                io.unobserve(entry.target);
+            });
+        }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+
+        groups.forEach(function (g) {
+            document.querySelectorAll(g.sel).forEach(function (el, i) {
+                var step = g.perRow ? i % g.perRow : i;
+                el.classList.add('js-reveal');
+                el.setAttribute('data-reveal', g.type);
+                if (g.stagger) el.style.setProperty('--reveal-delay', (step * g.stagger).toFixed(2) + 's');
+                io.observe(el);
+            });
+        });
+    })();
+    </script>
+    <?php endif; ?>
 </body>
 </html>

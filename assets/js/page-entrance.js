@@ -4,9 +4,12 @@
     if (!overlay) return;
     const root = document.documentElement;
     const editorPreview = window.top !== window.self || new URLSearchParams(location.search).has('ce_preview');
+    // Listing filters and pagination return directly to results without replaying the opening wipe.
+    const newsResults = /\/news-and-announcement\.php$/.test(location.pathname) && location.hash === '#na-results';
+    const achievementResults = /\/student-achievement\.php$/.test(location.pathname) && location.hash === '#more-achievements';
     if (editorPreview) root.classList.add('gnc-editor-preview');
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (editorPreview
+    if (editorPreview || newsResults || achievementResults
         || motion.matches || root.classList.contains('gnc-intro-on')) {
         overlay.remove();
         return;

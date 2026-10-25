@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/../includes/content-publish-policy.php';
 require_once __DIR__ . '/basic-admission-requirements.php';
 require_once __DIR__ . '/college-admission-requirements.php';
 
@@ -22,6 +23,12 @@ function admissionCategoryScope(string $page, string $key): ?string
     return null;
 }
 
+function admissionPresentationField(string $page, string $key): bool
+{
+    return ($page === 'college-admission-requirements' && in_array($key, ['hero_title', 'hero_intro'], true))
+        || ($page === 'basic-education-admission-requirements' && isset(basicAdmissionPresentationDefaults()[$key]));
+}
+
 /** Save the admission canvas in one transaction, including category order and removal. */
 function publishAdmissionPage(string $page, array $changes, array $orders): array
 {
@@ -32,10 +39,16 @@ function publishAdmissionPage(string $page, array $changes, array $orders): arra
     foreach ($changes as $change) {
         if (!is_array($change) || !is_string($change['key'] ?? null) || isset($clean[$change['key']])) throw new InvalidArgumentException('Invalid category changes.');
         $key = $change['key'];
-        if (admissionCategoryScope($page,$key) === null && !($page==='college-admission-requirements' && $key==='hero_intro')) throw new InvalidArgumentException('Invalid admission category.');
-        if (!is_string($change['title'] ?? null) || trim($change['title'])==='' || mb_strlen($change['title'])>150) throw new InvalidArgumentException('Enter a category name of up to 150 characters.');
+        if (admissionCategoryScope($page,$key) === null && !admissionPresentationField($page,$key)) throw new InvalidArgumentException('Invalid admission category.');
+        if (!is_string($change['title'] ?? null) || (trim($change['title'])==='' && !contentPublishAllowsIncomplete()) || mb_strlen($change['title'])>150) throw new InvalidArgumentException('Enter a category name of up to 150 characters.');
         if (!is_string($change['content'] ?? null) || strlen($change['content'])>100000 || !is_bool($change['removed'] ?? null)) throw new InvalidArgumentException('Invalid category content.');
-        if ($key==='hero_intro' && $change['removed']) throw new InvalidArgumentException('The introduction cannot be removed as a category.');
+        if (admissionPresentationField($page,$key) && $change['removed']) throw new InvalidArgumentException('Page headings, descriptions and tab labels cannot be removed as categories.');
+        if (($page === 'basic-education-admission-requirements' && admissionPresentationField($page,$key))
+            || ($page === 'college-admission-requirements' && $key === 'hero_title')) {
+            $text = trim(html_entity_decode(strip_tags($change['content']), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            if (($text === '' && !contentPublishAllowsIncomplete()) || mb_strlen($text) > ($key === 'hero_intro' ? 2000 : 150)) throw new InvalidArgumentException('Enter a valid heading, description or tab label.');
+            $change['content'] = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+        }
         $clean[$key] = ['title'=>trim($change['title']),'content'=>richTextToStorage($change['content']),'removed'=>$change['removed']];
     }
     $db = getDB(); $db->beginTransaction();
@@ -47,7 +60,7 @@ function publishAdmissionPage(string $page, array $changes, array $orders): arra
         $expected=[];
         foreach($rows as $key=>$row)if(admissionCategoryScope($page,$key)!==null && $row['status']==='published')$expected[$key]=true;
         foreach($clean as $key=>$change) {
-            if($key==='hero_intro')continue;
+            if(admissionPresentationField($page,$key))continue;
             if($change['removed'])unset($expected[$key]);else $expected[$key]=true;
         }
         $seen=[];

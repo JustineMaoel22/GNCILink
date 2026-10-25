@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/event-audience.php';
 /** Calendar filters share the program/department records managed by Content Editor. */
 function publicCalendarFilters(array $query): array
 {
@@ -13,10 +14,20 @@ function publicCalendarFilters(array $query): array
     if ($department!==null) $program=null;
     $condition='';$params=[];
     if ($department!==null) {
-        $condition=' AND e.program IN (SELECT program_code FROM programs WHERE dept_id = ?)';
-        $params[]=(int)$departments[$department]['dept_id'];
+        $departmentId=(int)$departments[$department]['dept_id'];
+        if (eventDepartmentsReady()) {
+            $condition=" AND (e.dept_id = ? OR (e.dept_id IS NULL AND e.program IN (SELECT program_code FROM programs WHERE dept_id = ?)))";
+            $params=[$departmentId,$departmentId];
+        } else {
+            $condition=' AND e.program IN (SELECT program_code FROM programs WHERE dept_id = ?)';
+            $params[]=$departmentId;
+        }
     } elseif ($program!==null) {
         $condition=' AND e.program = ?';$params[]=$program;
+        if (eventDepartmentsReady()) {
+            $condition=" AND (e.program = ? OR (e.program = 'ALL' AND e.dept_id = (SELECT dept_id FROM programs WHERE program_code = ? LIMIT 1)))";
+            $params[]=$program;
+        }
     }
     return ['departments'=>$departments,'programs'=>$programs,'department'=>$department,'program'=>$program,
         'condition'=>$condition,'params'=>$params,'label'=>$department!==null?$departments[$department]['dept_name']:$program];

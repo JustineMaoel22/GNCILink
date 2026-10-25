@@ -59,5 +59,6 @@ function imageFramingSaveUpload(string $path, string $absoluteFile): void
         }
     }
     $hash = hash_file('sha256', $absoluteFile);
+    $hash = $GLOBALS['imageUploadOriginalHashes'][$hash] ?? $hash;
     if (isset($metadata[$hash])) imageFramingSave($path, $metadata[$hash], isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null);
 }

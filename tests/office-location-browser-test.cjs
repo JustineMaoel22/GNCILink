@@ -51,12 +51,27 @@ let socket;
         return { selected: map.current, expected: data.building_id, highlighted: map.document.querySelector('.bld.sel').dataset.id, marker: map.document.getElementById('dest').classList.contains('go'), title: document.getElementById('officeMapTitle').textContent, office: data.name, dialogs: document.querySelectorAll('#officeMapModal').length };
     })()`);
     assert.equal(state.selected, state.expected); assert.equal(state.highlighted, state.expected); assert.equal(state.marker, true); assert.equal(state.title, state.office); assert.equal(state.dialogs, 1);
+    const locked = await evaluate(`(() => {
+        const map = document.querySelector('.office-map-frame').contentWindow;
+        const selected = map.current, route = map.document.getElementById('path').getAttribute('d');
+        const others = [...map.document.querySelectorAll('.bld')].filter(el => el.dataset.id !== selected);
+        others.forEach(el => {
+            el.dispatchEvent(new MouseEvent('click', {bubbles:true}));
+            el.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}));
+            map.go(el.dataset.id);
+        });
+        return {same:map.current===selected && map.document.getElementById('path').getAttribute('d')===route,
+            disabled:others.every(el=>el.getAttribute('tabindex')==='-1' && el.getAttribute('aria-disabled')==='true' && map.getComputedStyle(el).pointerEvents==='none'),
+            active:map.document.getElementById('b-'+selected).getAttribute('tabindex')==='0'};
+    })()`);
+    assert.deepEqual(locked,{same:true,disabled:true,active:true},'Other buildings cannot replace the assigned office route by mouse, keyboard or direct routing');
     await evaluate("document.querySelector('.office-map-frame').contentDocument.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))");
     await until(() => evaluate("!document.getElementById('officeMapModal').open"), 'Escape inside map did not close modal');
     assert.equal(await evaluate("document.activeElement.matches('[data-office-location]')"), true, 'Focus restored to location card');
     // Reuse the same iframe for another office to prove selection is dynamic.
     await evaluate(`(() => { const button = document.querySelector('[data-office-location]'); button.dataset.officeLocation = JSON.stringify({name:'Other office',building_id:'banzali',building:'Banzali Hall',floor:'3',room:'301',address:'Banzali Hall, Floor 3, Room 301'}); button.click(); })()`);
     assert.equal(await evaluate("document.querySelector('.office-map-frame').contentWindow.current"), 'banzali');
+    assert.equal(await evaluate("document.querySelector('.office-map-frame').contentDocument.getElementById('b-banzali').getAttribute('aria-disabled')"), 'false', 'Reusing the popup unlocks only the new assigned building');
     await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
     await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape' });
     await until(() => evaluate("!document.getElementById('officeMapModal').open"), 'Escape on dialog did not close');

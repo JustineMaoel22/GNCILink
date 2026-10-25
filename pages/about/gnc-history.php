@@ -82,7 +82,7 @@ $timeline = [
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-    <link href="/assets/css/gnc-history-style.css?v=7" rel="stylesheet">
+    <link href="/assets/css/gnc-history-style.css?v=<?= filemtime(__DIR__ . '/../../assets/css/gnc-history-style.css') ?>" rel="stylesheet">
     <link href="/assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
     <script>document.documentElement.classList.add('gh-js');</script>
@@ -192,7 +192,11 @@ $timeline = [
     <!-- Quote Banner Section -->
     <section class="quote-banner-section">
         <div class="container">
-            <div class="quote-banner-box reveal-up">
+            <?php $historyQuoteBackground = getPageSectionImagePath('history', 'history_quote'); ?>
+            <div class="quote-banner-box reveal-up" style="--history-quote-background:url('<?= htmlspecialchars($historyQuoteBackground ?? '/assets/images/gnc-header.png', ENT_QUOTES, 'UTF-8') ?>')">
+                <?php if ($historyImageEditing): ?>
+                <button type="button" class="history-background-edit" data-ve-img="history:history_quote" data-ve-history-background data-ve-has-image="<?= $historyQuoteBackground ? '1' : '0' ?>" data-ve-default-image="/assets/images/gnc-header.png" data-ve-label="Closing quote background"><i class="bi bi-image" aria-hidden="true"></i> Change background image</button>
+                <?php endif; ?>
                 <span class="quote-mark quote-left">&#8220;</span>
                 <div class="quote-text"<?= $historyMark('history_quote', 'History closing statement') ?>><?= renderSectionContent($historyContent('history_quote', 'From humble beginnings to a legacy of service and excellence, GNC continues to educate, inspire, and transform lives.')) ?></div>
                 <span class="quote-mark quote-right">&#8221;</span>

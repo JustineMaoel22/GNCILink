@@ -33,6 +33,8 @@ if (!function_exists('newsLocalTime')) {
 // Flash from a failed submit (set by the action handler)
 $flashErrors  = $_SESSION['flash_errors'] ?? [];
 $flashOld     = $_SESSION['flash_old'] ?? [];
+require_once __DIR__.'/../includes/content-submissions.php';
+if (isset($_GET['revise'])) $flashOld=rbacRevisionFormData('/admin/action/create-news.php');
 $flashSuccess = $_SESSION['flash_success'] ?? '';
 unset($_SESSION['flash_errors'], $_SESSION['flash_old'], $_SESSION['flash_success']);
 
@@ -49,6 +51,7 @@ if ($search !== '')         $filters['search']   = $search;
 
 $newsList       = getNews($filters, 50, 0);
 $newsCategories = getNewsCategories();
+$newsCreateCategories = array_diff_key($newsCategories, array_flip(['Updates', 'Job Opportunities', 'Scholarship']));
 $pinnedCount    = countPinnedItems();
 
 // Which modal (if any) should auto-open on load
@@ -236,7 +239,7 @@ include __DIR__ . '/../components/header-admin.php';
                             </button>
                         </form>
                         <?php endif; ?>
-                        <?php if ($canPublish || hasPermission('edit_news') || (hasPermission('edit_own_news') && $isOwner)): ?>
+                        <?php if (rbacRole() !== 'The Mirror' && ($canPublish || hasPermission('edit_news') || (hasPermission('edit_own_news') && $isOwner))): ?>
                         <form method="POST" action="/admin/action/create-news.php" class="ann-inline-form">
                             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                             <input type="hidden" name="action" value="<?= $n['status'] === 'archived' ? 'unarchive' : 'archive' ?>">
@@ -309,6 +312,7 @@ include __DIR__ . '/../components/header-admin.php';
           <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
           <input type="hidden" name="action" id="modal-action" value="create">
           <input type="hidden" name="news_id" id="modal-news-id" value="">
+          <input type="hidden" name="_review_id" value="<?= (int)($_GET['revise'] ?? 0) ?>">
 
           <div class="mb-3">
             <label class="form-label" for="modal-title">Headline <span class="text-danger">*</span></label>
@@ -333,14 +337,14 @@ include __DIR__ . '/../components/header-admin.php';
             </div>
             <div class="flex-grow-1">
               <input type="file" name="image" id="modal-image-input" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp">
-              <div class="form-text">Optional. Shown as the thumbnail on the news page and the homepage. JPG, PNG, GIF or WEBP, up to 10 MB. A wide (landscape) picture looks best.</div>
+              <div class="form-text">Optional. Shown as the thumbnail on the news page and the homepage. JPG, PNG, GIF or WEBP, up to 5 MB. A wide (landscape) picture looks best.</div>
             </div>
           </div>
 
           <div class="ann-section-label">More pictures (gallery)</div>
           <div class="mb-3">
             <input type="file" name="gallery_images[]" id="modal-gallery-input" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" multiple>
-            <div class="form-text">Optional. You can pick several photos at once — up to 10 at a time, 10 MB each.</div>
+            <div class="form-text">Optional. You can pick several photos at once — up to 10 at a time, 5 MB each.</div>
 
             <div id="modal-gallery-existing-wrap" class="mt-3" style="display:none">
               <div class="fw-semibold" style="font-size:.85rem">Pictures already in the gallery</div>
@@ -359,7 +363,7 @@ include __DIR__ . '/../components/header-admin.php';
             <div class="col-12 col-sm-6">
               <label class="form-label" for="modal-category">Type</label>
               <select name="category" id="modal-category" class="form-select">
-                <?php foreach ($newsCategories as $code => $label): ?>
+                <?php foreach ($newsCreateCategories as $code => $label): ?>
                 <option value="<?= htmlspecialchars($code) ?>"><?= htmlspecialchars($label) ?></option>
                 <?php endforeach; ?>
               </select>
@@ -437,10 +441,6 @@ include __DIR__ . '/../components/header-admin.php';
     background: rgba(201,162,39,.16); color: #C9A227; border: 1px solid rgba(201,162,39,.4);
 }
 
-.ann-table .status-badge.published { background: #1F8A3B; color: #fff; }
-.ann-table .status-badge.pending   { background: #F2B705; color: #3d2c00; }
-.ann-table .status-badge.draft     { background: #6c757d; color: #fff; }
-.ann-table .status-badge.archived  { background: #8a929a; color: #fff; }
 
 .btn-pin-toggle.is-pinned { background: #EABA3B; border-color: #EABA3B; color: #1F5E2C; }
 
@@ -464,7 +464,7 @@ include __DIR__ . '/../components/header-admin.php';
 .ann-chip-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .ann-chip {
     border: 1px solid rgba(128,128,128,.35); color: inherit; text-decoration: none;
-    border-radius: 999px; padding: .3rem .9rem; font-size: .82rem; transition: all .15s; white-space: nowrap;
+    border-radius: 999px; padding: .3rem .9rem; font-size: .82rem; transition: background var(--transition), border-color var(--transition), color var(--transition); white-space: nowrap;
 }
 .ann-chip:hover { background: rgba(128,128,128,.15); color: inherit; }
 .ann-chip.active { background: #EABA3B; border-color: #EABA3B; color: #094024; font-weight: 600; }
@@ -520,14 +520,11 @@ include __DIR__ . '/../components/header-admin.php';
 
 /* Toast */
 .ann-toast {
-    position: fixed; right: 20px; bottom: 24px; z-index: 2000; max-width: 380px;
-    background: #1F5E2C; color: #fff; padding: .75rem 1.1rem; border-radius: 10px;
-    box-shadow: 0 6px 20px rgba(0,0,0,.35); font-size: .9rem;
-    display: flex; align-items: center; gap: .5rem;
-    transform: translateY(20px); opacity: 0; transition: all .3s;
+    position: fixed; right: 20px; bottom: 24px; z-index: 2000; width: min(380px, calc(100vw - 2rem));
+    transform: translateY(20px); opacity: 0;
+    transition: transform var(--transition), opacity var(--transition);
 }
 .ann-toast.show { transform: none; opacity: 1; }
-.ann-toast.error { background: #B3312D; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 991.98px) {
@@ -602,6 +599,7 @@ const modalQuill = initQuill('modal-content-editor', 'modal-content-input', { pl
 
 // ---- Friendly toast message ----
 function annToast(msg, type) {
+    if (window.ContentEditorNotice && window.ContentEditorNotice(msg, type === 'error')) return;
     const t = document.createElement('div');
     t.className = 'ann-toast' + (type === 'error' ? ' error' : '');
     t.innerHTML = '<i class="bi bi-' + (type === 'error' ? 'exclamation-circle' : 'check-circle') + '"></i><span></span>';
@@ -661,12 +659,26 @@ function resetGalleryUI() {
     document.querySelectorAll('input[name="remove_gallery_ids[]"]').forEach(el => el.remove());
 }
 
+// Preserve a removed type only when editing an article already using it.
+const savedNewsCategoryLabels = <?= json_encode($newsCategories, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+function selectNewsCategory(code = 'Others', preserveExisting = false) {
+    if (!modalCategory) return;
+    modalCategory.querySelectorAll('[data-existing-category]').forEach(option => option.remove());
+    if (preserveExisting && savedNewsCategoryLabels[code] && !Array.from(modalCategory.options).some(option => option.value === code)) {
+        const option = new Option(savedNewsCategoryLabels[code] + ' (existing selection)', code);
+        option.dataset.existingCategory = '1';
+        modalCategory.add(option);
+    }
+    modalCategory.value = code;
+    if (!modalCategory.value) modalCategory.value = 'Others';
+}
+
 function resetModalForm() {
     document.getElementById('news-form').reset();
     modalQuill.setContents([]);
     modalActionInput.value = 'create';
     modalIdInput.value = '';
-    if (modalCategory) modalCategory.value = 'Others';
+    selectNewsCategory(<?= json_encode(isset($newsCreateCategories[$categoryFilter])?$categoryFilter:'Others') ?>);
     modalLabel.textContent = 'New Article';
     modalSaveLabel.textContent = 'Create Article';
     modalSaveBtn.disabled = false;
@@ -760,7 +772,7 @@ function openEditModal(btn) {
 
     modalTitleInput.value = btn.dataset.title || '';
     modalAuthorInput.value = btn.dataset.author || '';
-    if (modalCategory) modalCategory.value = btn.dataset.category || 'Others';
+    selectNewsCategory(btn.dataset.category || 'Others', true);
     if (modalStatus) modalStatus.value = btn.dataset.status || 'draft';
     updateStatusHelp();
 
@@ -816,8 +828,8 @@ document.getElementById('delete-news-form')?.addEventListener('submit', () => {
 modalImageInput?.addEventListener('change', () => {
     const file = modalImageInput.files[0];
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-        annToast('That picture is larger than 10 MB. Please choose a smaller one.', 'error');
+    if (file.size > 5 * 1024 * 1024) {
+        annToast('That picture is larger than 5 MB. Please choose a smaller one.', 'error');
         modalImageInput.value = '';
         return;
     }
@@ -838,8 +850,8 @@ modalGalleryInput?.addEventListener('change', () => {
         renderNewGalleryPreview();
         return;
     }
-    if (files.some(f => f.size > 10 * 1024 * 1024)) {
-        annToast('One of the pictures is larger than 10 MB. Please choose smaller ones.', 'error');
+    if (files.some(f => f.size > 5 * 1024 * 1024)) {
+        annToast('One of the pictures is larger than 5 MB. Please choose smaller ones.', 'error');
         modalGalleryInput.value = '';
         renderNewGalleryPreview();
         return;
@@ -895,7 +907,7 @@ openCreateModal();
 modalTitleInput.value = <?= json_encode($flashOld['title'] ?? '') ?>;
 modalQuill.root.innerHTML = <?= json_encode($flashOld['content'] ?? '') ?>;
 modalAuthorInput.value = <?= json_encode($flashOld['author'] ?? '') ?>;
-if (modalCategory) modalCategory.value = <?= json_encode($flashOld['category'] ?? 'Others') ?>;
+selectNewsCategory(<?= json_encode($flashOld['category'] ?? 'Others') ?>);
 if (modalStatus) modalStatus.value = <?= json_encode($flashOld['status'] ?? 'draft') ?>;
 updateStatusHelp();
 <?php endif; ?>
@@ -908,7 +920,7 @@ modalSaveLabel.textContent = 'Save Changes';
 modalTitleInput.value = <?= json_encode($modalEditing['title'] ?? '') ?>;
 modalQuill.root.innerHTML = <?= json_encode($modalEditing['content'] ?? '') ?>;
 modalAuthorInput.value = <?= json_encode($modalEditing['author'] ?? '') ?>;
-if (modalCategory) modalCategory.value = <?= json_encode($modalEditing['category'] ?? 'Others') ?>;
+selectNewsCategory(<?= json_encode($modalEditing['category'] ?? 'Others') ?>, true);
 if (modalStatus) modalStatus.value = <?= json_encode($modalEditing['status'] ?? 'draft') ?>;
 updateStatusHelp();
 <?php if (!empty($modalEditing['image_path'])): ?>

@@ -28,16 +28,24 @@ const teamsGrid=doc.appendChild(new Node('div',{'data-ve-teams-grid':''}));
 doc.createElement=tag=>new Node(tag);
 const facilityRoot=doc.appendChild(new Node('div',{class:'athletics-facilities-carousel'})),facilityStage=facilityRoot.appendChild(new Node('div',{class:'athletics-facilities-stage'})),facilityControls=facilityRoot.appendChild(new Node('div',{class:'athletics-facilities-controls'})),facilityDots=facilityControls.appendChild(new Node('div',{class:'athletics-facilities-dots'}));
 const card=h('article',{'data-ve-sport':'basketball',class:'athletics-sport'},[h('img',{'data-ve-sport-image':'',src:'/photo.png'}),h('strong',{'data-ve-field':'sport-name'}),h('span',{'data-ve-field':'sport-type'})]);group.appendChild(card);
-let posted,uploads,pending,fail=true,reloads=0,refreshes=0,cacheCalls=0,pickerTarget,preserveLogo;const navigations=[];
+let posted,uploads,pending,fail=true,reloads=0,refreshes=0,cacheCalls=0,pickerTarget,preserveLogo,facebookForm;const navigations=[];
+const facebookBox=doc.appendChild(new Node('div',{'data-ve-sports-facebook':'','data-ve-pick':'sports-facebook','data-ve-link':''}));
+const facebookEdit=facebookBox.appendChild(new Node('button',{'data-ve-sports-facebook-edit':''}));
 const slideshow=require('../assets/js/athletics-sports.js');
 const context=vm.createContext({h,URL,loadFrame:url=>navigations.push(url),window:{location:{origin:'http://localhost:8080'},GNCImageFraming:{cacheUpload:async file=>{cacheCalls++;return file;}}},$$:(s,root)=>root.querySelectorAll(s),S:{doc,win:{location:{href:'http://localhost:8080/pages/student%20life/athletics-sports.php?ce_preview=1'},GNCSportsSlideshow:{refresh:()=>{refreshes++;slideshow.refresh(doc);}}},preview:false,busy:false},MB:1024*1024,
-    makeField:(el,fn)=>{el.__ve={onChange:fn};},fieldOf:el=>el.closest('[data-ve-field]'),select(){},closePop(){},renderToolbar(){},chrome(){},toast(){},plural:(n,w)=>`${n} ${w}`,
+    makeField:(el,fn)=>{el.__ve={onChange:fn};},askText:options=>{facebookForm=options;},fieldOf:el=>el.closest('[data-ve-field]'),select(){},closePop(){},renderToolbar(){},chrome(){},toast(){},plural:(n,w)=>`${n} ${w}`,
     pickFile:(accept,fn,personPhoto,target,preserve)=>{pickerTarget=target;preserveLogo=preserve;fn({name:'sport.png',size:100});},previewUrl:()=> 'blob:new',confirmPublish:(message,fn)=>fn(),confirmPop:(title,message,label,fn)=>fn(),
     run:(label,fn)=>pending=fn(),send:async(url,fields,files)=>{posted=fields;uploads=files;return fail?{ok:false,error:'Retry'}:{ok:true};},reloadEditor:()=>reloads++});
 const source=fs.readFileSync('assets/js/content-edit.js','utf8');vm.runInContext(source.slice(source.indexOf('    function SportsAdapter()'),source.indexOf('    function PaymentGuideAdapter()')),context);
 context.S.win.GNCSportsSlideshow.refreshFacilities=(doc,index)=>slideshow.refreshFacilities(doc,index);
 (async()=>{
     const adapter=context.SportsAdapter();adapter.mount(doc);assert.equal(adapter.dirtyCount(),0);
+    assert.equal(adapter.pick(facebookEdit).kind,'none');
+    assert.equal(facebookForm.anchor,facebookBox,'Link form opens beside the Facebook control');
+    facebookForm.done('https://facebook.com.evil.example/page');assert.equal(adapter.dirtyCount(),0,'Non-Facebook hosts are rejected');
+    facebookForm.done('https://www.facebook.com/example-sports');assert.equal(adapter.dirtyCount(),1);
+    assert(facebookBox.querySelector('iframe').src.includes('href=https%3A%2F%2Fwww.facebook.com%2Fexample-sports'),'Link shows the compact Facebook header immediately');
+    facebookForm.done('');assert.equal(adapter.dirtyCount(),0,'Removing an unpublished link restores the saved state');assert.equal(facebookBox.querySelector('iframe'),null);
     context.S.adapter=adapter;const pageLink=new Node('a',{href:'?highlights_page=2&ce_preview=1#competition-highlights'});assert(adapter.onLink(pageLink));assert.equal(navigations.length,1,'Admin can browse highlights pages');
     assert(motionRoot.classes.has('sports-motion-preview'),'Slideshow plays inside the admin editor');assert.equal(motionButton.textContent,'Edit cards');
     motionButton.emit('click');assert(!motionRoot.classes.has('sports-motion-preview'));assert.equal(motionButton.textContent,'Play slideshow');assert.equal(adapter.dirtyCount(),0,'Playback is not a content change');
@@ -60,7 +68,8 @@ context.S.win.GNCSportsSlideshow.refreshFacilities=(doc,index)=>slideshow.refres
     assert(!added.classes.has('athletics-sport--placeholder'));assert.equal(added.querySelector('img').getAttribute('hidden'),null,'Uploaded photos replace the gradient');
     adapter.pick(new Node('button',{'data-ve-sports-background':'hero'}));assert.equal(pickerTarget,banner);await new Promise(setImmediate);assert.equal(banner.src,'blob:new','Banner replacement previews immediately');
     adapter.toolbar({kind:'sports-background',el:backdrop,key:'showcase'}).find(item=>item.label==='Change background image').run();await new Promise(setImmediate);assert.equal(backdrop.style.backgroundImage,'url("blob:new")','Slideshow background replacement previews immediately');assert.equal(cacheCalls,3,'All staged sports images have stable upload copies');
-    adapter.runPrimary();await pending;assert.equal(JSON.parse(posted.content).speed,1.5);assert.equal(JSON.parse(posted.content).sports[1].name,'Badminton');assert.equal(Object.keys(uploads).length,3);assert(uploads.background_hero);assert(uploads.background_showcase);assert(adapter.dirtyCount()>0,'Failed publish stays pending');assert.equal(reloads,0);
+    adapter.pick(facebookEdit);facebookForm.done('https://www.facebook.com/example-sports');
+    adapter.runPrimary();await pending;assert.equal(JSON.parse(posted.content).facebook_url,'https://www.facebook.com/example-sports');assert.equal(JSON.parse(posted.content).speed,1.5);assert.equal(JSON.parse(posted.content).sports[1].name,'Badminton');assert.equal(Object.keys(uploads).length,3);assert(uploads.background_hero);assert(uploads.background_showcase);assert(adapter.dirtyCount()>0,'Failed publish stays pending');assert.equal(reloads,0);
     fail=false;adapter.runPrimary();await pending;assert.equal(adapter.dirtyCount(),0);assert.equal(reloads,1);
     adapter.pick(new Node('button',{'data-ve-team-add':''}));await new Promise(setImmediate);
     assert.equal(teamsGrid.children.length,1);assert.equal(preserveLogo,true,'Team artwork bypasses the photo crop dialog');

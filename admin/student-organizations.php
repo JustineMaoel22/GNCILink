@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/../includes/content-publish-policy.php';
 function studentOrganizationsUrl(?string $slug = null): string {
     $base = '/pages/student%20life/student%20organization%20and%20leadership%20program/';
     return $base . ($slug === null ? 'student-org.php' : 'dynamic-org.php?slug=' . rawurlencode($slug));
@@ -14,7 +15,8 @@ function studentOrgPageFields(): array {
         'section_title' => ['Section heading', 'Student Organizations', 255],
         'section_description' => ['Section description', 'A place for every interest, every course, and every GNCian.', 1500],
         'gallery_title' => ['Gallery heading', 'Through the Lens', 255],
-        'facebook_title' => ['Facebook heading', 'Follow Us on Facebook', 255],
+        'facebook_title' => ['Facebook heading', 'Connect with Us', 255],
+        'facebook_description' => ['Facebook introduction', 'If you have concerns or need assistance feel free to message our page.', 1500],
         'leadership_title' => ['Leadership section heading', 'Leadership and Capacity Building', 255],
         'leadership_description' => ['Leadership introduction', 'Empowering student leaders with the skills, values, and confidence to make a greater impact.', 1500],
         'training_title' => ['Training heading', 'Student Leaders’ Training', 255],
@@ -126,7 +128,7 @@ function saveStudentOrganization(array $input, array $files = []): array {
         $data[$key] = trim($value);
         if(in_array($key,['description','about_text','vision','mission'],true))$data[$key]=richTextNormalize($data[$key]);
     }
-    if ($data['name'] === '') throw new InvalidArgumentException('Enter an organization name.');
+    if ($data['name'] === '' && !contentPublishAllowsIncomplete()) throw new InvalidArgumentException('Enter an organization name.');
     $status = $input['status'] ?? $current['status'] ?? 'draft';
     if (!in_array($status, ['draft','published'], true)) throw new InvalidArgumentException('Choose Published or Unpublished.');
     $category = (int)($input['category_id'] ?? $current['category_id'] ?? 0);

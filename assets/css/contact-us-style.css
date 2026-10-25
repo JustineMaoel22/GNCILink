@@ -55,6 +55,11 @@
 }
 
 /* ---------- Main section ---------- */
+.gnc-contact .gnc-contact-title .gnc-contact-title-main { color: inherit; }
+/* Keep text stationary while editing; public-page entrance effects remain unchanged. */
+.gnc-contact-editing .gnc-contact *, .gnc-contact-editing .gnc-contact *::before { animation: none !important; }
+.gnc-contact-editing .gnc-contact [data-ct-reveal] { opacity: 1; transform: none; }
+.gnc-contact-editing .gnc-contact-open { display: none; }
 .gnc-contact .gnc-contact-sec { padding: 0 0 4rem; background: #fff; }
 .gnc-contact .gnc-contact-grid { margin-top: -3.5rem; position: relative; z-index: 2; }
 

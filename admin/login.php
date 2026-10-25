@@ -10,7 +10,7 @@ initSession(); // Changed back to your original function!
 
 // Redirect if already logged in
 if (isLoggedIn()) { // Changed back to your original function!
-    header('Location: /admin/admin-dash.php'); 
+    header('Location: ' . rbacHome());
     exit;
 }
 ?>
@@ -47,10 +47,12 @@ if (isLoggedIn()) { // Changed back to your original function!
                 <?php endif; ?>
 
                 <!-- Error Alert -->
+                <?php if(isset($_GET['password_reset'])):?><div class="alert alert-success" role="status">Your password was reset successfully. Sign in with your new password.</div><?php endif;?>
                 <div id="alert-container"></div>
 
                 <!-- Login Form -->
                 <form id="login-form" method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(),ENT_QUOTES,'UTF-8') ?>">
                     <div class="form-group">
                         <label class="form-label">Email Address</label>
                         <input 
@@ -64,7 +66,8 @@ if (isLoggedIn()) { // Changed back to your original function!
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Password</label>
+                        <label class="form-label" for="password">Password</label>
+                        <div class="login-password-field">
                         <input 
                             type="password" 
                             class="form-control" 
@@ -73,6 +76,10 @@ if (isLoggedIn()) { // Changed back to your original function!
                             placeholder="Enter your password" 
                             required
                         >
+                            <button type="button" class="login-password-toggle" id="show-login-password" aria-label="Show password" aria-controls="password" aria-pressed="false">
+                                <i class="bi bi-eye-slash" aria-hidden="true"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="form-check">
@@ -91,6 +98,7 @@ if (isLoggedIn()) { // Changed back to your original function!
                         <span class="loading-spinner" id="loading-spinner"></span>
                         <span id="btn-text">Login</span>
                     </button>
+                    <p class="text-center mt-3 mb-0"><a href="/admin/forgot-password.php">Forgot Password?</a></p>
                 </form>
             </div>
 
@@ -106,6 +114,15 @@ if (isLoggedIn()) { // Changed back to your original function!
         const alertContainer = document.getElementById('alert-container');
         const loadingSpinner = document.getElementById('loading-spinner');
         const btnText = document.getElementById('btn-text');
+        const passwordToggle = document.getElementById('show-login-password');
+        passwordToggle.addEventListener('click', () => {
+            const input = document.getElementById('password');
+            const show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
+            passwordToggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+            passwordToggle.setAttribute('aria-pressed', String(show));
+            passwordToggle.querySelector('i').className = show ? 'bi bi-eye' : 'bi bi-eye-slash';
+        });
 
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -117,7 +134,7 @@ if (isLoggedIn()) { // Changed back to your original function!
             // Show loading state
             loadingSpinner.style.display = 'inline-block';
             btnText.textContent = 'Logging in...';
-            loginForm.querySelector('button').disabled = true;
+            loginForm.querySelector('button[type="submit"]').disabled = true;
 
             try {
                 const response = await fetch('/admin/auth/auth_handler.php', {
@@ -127,6 +144,7 @@ if (isLoggedIn()) { // Changed back to your original function!
                     },
                     body: new URLSearchParams({
                         action: 'login',
+                        csrf_token: loginForm.elements.csrf_token.value,
                         email: email,
                         password: password,
                         remember_me: rememberMe ? '1' : '0'
@@ -149,17 +167,12 @@ if (isLoggedIn()) { // Changed back to your original function!
             } finally {
                 loadingSpinner.style.display = 'none';
                 btnText.textContent = 'Login';
-                loginForm.querySelector('button').disabled = false;
+                loginForm.querySelector('button[type="submit"]').disabled = false;
             }
         });
 
         function showAlert(type, message) {
-            alertContainer.innerHTML = `
-                <div class="alert alert-${type}">
-                    <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
-                    ${message}
-                </div>
-            `;
+            alertContainer.replaceChildren();const alert=document.createElement('div');alert.className='alert alert-'+type;alert.setAttribute('role','alert');alert.textContent=message;alertContainer.append(alert);
 
             if (type !== 'success') {
                 setTimeout(() => {

@@ -19,6 +19,8 @@ requireLogin();
 requirePermission('manage_page_content');
 
 header('Content-Type: application/json');
+// Warnings belong in the PHP log, never ahead of the JSON response.
+ini_set('display_errors', '0');
 
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
 
@@ -46,6 +48,11 @@ if (in_array($action, $heroStateChanging, true)) {
 
 try {
     switch ($action) {
+        case 'upload_environment':
+            if ($_SERVER['REQUEST_METHOD'] !== 'GET') { http_response_code(405); echo json_encode(['success'=>false,'error'=>'Use GET.']); break; }
+            header('Cache-Control: no-store');
+            echo json_encode(['success'=>true,'environment'=>imageUploadEnvironment()],JSON_PRETTY_PRINT);
+            break;
         case 'save_department_order':
             if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) {
                 http_response_code(403);
@@ -160,7 +167,7 @@ try {
 
             if ($id > 0) {
                 // Updating an existing slide
-                if ($media === null && empty(getHeroSlideById($id)['media_path'] ?? null)) {
+                if ($media === null && empty(getHeroSlideById($id)['media_path'] ?? null) && !contentPublishAllowsIncomplete()) {
                     echo json_encode(['error' => 'A background image or video is required.']);
                     break;
                 }
@@ -173,11 +180,11 @@ try {
                 echo json_encode(['success' => true, 'slide_id' => $id]);
             } else {
                 // Creating a new slide — desktop media is required, mobile image is optional
-                if ($media === null) {
+                if ($media === null && !contentPublishAllowsIncomplete()) {
                     echo json_encode(['error' => 'Please upload a background image or video for the new slide.']);
                     break;
                 }
-                $newId = createHeroSlide($data, $media, $mobileMedia);
+                $newId = createHeroSlide($data, $media ?? ['type'=>'image','path'=>''], $mobileMedia);
                 if ($newId === false) {
                     http_response_code(400);
                     echo json_encode(['error' => 'Could not create the slide.']);
@@ -260,7 +267,7 @@ try {
             }
             if (($_POST['page'] ?? '') !== 'history') {
                 http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'Images can only be changed for History timeline entries here.']);
+                echo json_encode(['success' => false, 'error' => 'Images can only be changed for History sections here.']);
                 break;
             }
             try {
@@ -333,6 +340,21 @@ try {
         // ── College Departments: save logo changes for one department ──
         // Multipart POST: dept_id, optional logo file, optional remove_logo
         // flag ('1').
+        case 'save_department_banner':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Please refresh the editor and try again.']);
+                break;
+            }
+            try {
+                $dept = saveDepartmentBanner((int)($_POST['dept_id'] ?? 0), $_FILES['banner'] ?? null, ($_POST['remove_banner'] ?? '') === '1');
+                echo json_encode(['success' => true, 'department' => departmentAdminPayload($dept)]);
+            } catch (Exception $e) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
         case 'save_department_media':
             if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
                 http_response_code(419);
@@ -787,8 +809,9 @@ try {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Unknown action.']);
     }
-} catch (Exception $e) {
-    error_log('Page content handler error: ' . $e->getMessage());
+} catch (Throwable $e) {
+    $reference = bin2hex(random_bytes(6));
+    error_log('Page content handler [' . $reference . '] action=' . json_encode($action) . ' ' . get_class($e) . ': ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Something went wrong. Please try again.']);
+    echo json_encode(['success'=>false, 'error'=>'The server could not save this change. Ask your hosting provider to check the PHP error log. Reference: ' . $reference, 'reference'=>$reference]);
 }

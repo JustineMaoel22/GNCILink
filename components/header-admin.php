@@ -26,7 +26,7 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/header-admin-style.css">
+    <link rel="stylesheet" href="/assets/css/header-admin-style.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/header-admin-style.css') ?>">
     <link rel="stylesheet" href="/assets/css/admin-dialogs.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/admin-dialogs.css') ?>">
     <script src="/assets/js/admin-dialogs.js?v=<?= (int)filemtime(__DIR__ . '/../assets/js/admin-dialogs.js') ?>"></script>
     <?php include_once __DIR__ . '/image-framing-assets.php'; ?>
@@ -58,7 +58,7 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
      SIDEBAR
 ============================================================ -->
 <aside class="gnc-sidebar" id="gnc-sidebar">
-    <a class="sidebar-brand" href="/admin/dashboard/">
+    <a class="sidebar-brand" href="<?= htmlspecialchars(rbacHome()) ?>">
         <div class="sidebar-brand-logo"><img src="/assets/images/logos/gnc-logo-v1.svg" alt="GNC logo"></div>
         <div class="sidebar-brand-text">
             <span class="sidebar-brand-name">GNC Admin Panel</span>
@@ -66,6 +66,7 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
         </div>
     </a>
 
+    <?php if (rbacRole() !== 'The Mirror'): ?>
     <!-- Main Navigation -->
     <div class="sidebar-section-label">Main</div>
     <ul class="sidebar-nav">
@@ -75,6 +76,7 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
             </a>
         </li>
     </ul>
+    <?php endif; ?>
 
     <!-- Content -->
     <div class="sidebar-section-label">Content</div>
@@ -84,12 +86,18 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
                 <i class="bi bi-megaphone-fill"></i> Announcements
             </a>
         </li>
+        <?php if (rbacRole() !== 'The Mirror'): ?><li>
+            <a href="/admin/facebook-posts.php" class="sidebar-link <?= $currentPage === 'facebook-posts' ? 'active' : '' ?>">
+                <i class="bi bi-facebook"></i> Facebook Posts
+            </a>
+        </li>
+        <?php endif; ?>
         <li>
             <a href="/admin/news.php" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/news') !== false ? 'active' : '' ?>">
                 <i class="bi bi-newspaper"></i> News
             </a>
         </li>
-        <li>
+        <?php if (rbacRole() !== 'The Mirror'): ?><li>
             <a href="/admin/events.php" class="sidebar-link <?= $currentPage === 'events' ? 'active' : '' ?>">
                 <i class="bi bi-calendar-event-fill"></i> Events
             </a>
@@ -107,26 +115,29 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
                 <?php if ($cePending > 0): ?><span class="sidebar-badge"><?= $cePending ?></span><?php endif; ?>
             </a>
         </li>
+        <?php endif; ?>
     </ul>
 
     <!-- Workflow -->
-    <?php if (hasPermission('manage_approvals')): ?>
+    <?php if (hasPermission('manage_approvals') || hasPermission('view_own_submissions')): ?>
     <div class="sidebar-section-label">Workflow</div>
     <ul class="sidebar-nav">
         <li>
-            <a href="/admin/approvals/" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/approvals') !== false ? 'active' : '' ?>">
-                <i class="bi bi-check2-circle"></i> Approvals
+            <a href="/admin/submissions.php" class="sidebar-link <?= $currentPage === 'submissions' ? 'active' : '' ?>">
+                <i class="bi bi-check2-circle"></i> <?= rbacIsSuper() ? 'Approvals' : 'My Submissions' ?>
                 <?php
                 // Pending count badge
                 try {
                     $db = getDB();
+                    $pendingCount = rbacIsSuper() && function_exists('rbacSubmissionsReady') && rbacSubmissionsReady() ? $db->query("SELECT COUNT(*) FROM rbac_submissions WHERE status='pending'")->fetchColumn() : 0;
+                    /* Legacy content remains in the existing review panels.
                     $pendingCount = $db->query("
                         SELECT COUNT(*) FROM (
                             SELECT announcement_id FROM announcements WHERE status = 'pending'
                             UNION ALL SELECT news_id FROM news WHERE status = 'pending'
                             UNION ALL SELECT event_id FROM events WHERE status = 'pending'
                         ) x
-                    ")->fetchColumn();
+                    ")->fetchColumn(); */
                     if ($pendingCount > 0) echo '<span class="sidebar-badge">' . $pendingCount . '</span>';
                 } catch (Exception $e) {}
                 ?>
@@ -136,26 +147,19 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
     <?php endif; ?>
 
     <!-- Administration -->
-    <?php if (hasPermission('manage_users') || hasPermission('view_logs') || hasPermission('manage_settings')): ?>
+    <?php if (hasPermission('manage_users') || hasPermission('view_logs')): ?>
     <div class="sidebar-section-label">Administration</div>
     <ul class="sidebar-nav">
-        <?php if (hasPermission('manage_settings')): ?>
-        <li>
-            <a href="/admin/settings.php" class="sidebar-link <?= $currentPage === 'settings' ? 'active' : '' ?>">
-                <i class="bi bi-gear-fill"></i> Settings
-            </a>
-        </li>
-        <?php endif; ?>
         <?php if (hasPermission('manage_users')): ?>
         <li>
-            <a href="/admin/users/" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/users') !== false ? 'active' : '' ?>">
+            <a href="/admin/users.php" class="sidebar-link <?= $currentPage === 'users' ? 'active' : '' ?>">
                 <i class="bi bi-people-fill"></i> Users
             </a>
         </li>
         <?php endif; ?>
         <?php if (hasPermission('view_logs')): ?>
         <li>
-            <a href="/admin/logs/" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/logs') !== false ? 'active' : '' ?>">
+            <a href="/admin/logs.php" class="sidebar-link <?= $currentPage === 'logs' ? 'active' : '' ?>">
                 <i class="bi bi-clock-history"></i> Activity Logs
             </a>
         </li>
@@ -189,14 +193,14 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
     </button>
 
     <div class="topbar-breadcrumb">
-        <a href="/admin/dashboard/" style="text-decoration:none;color:inherit">Admin</a>
+        <a href="<?= htmlspecialchars(rbacHome()) ?>" style="text-decoration:none;color:inherit">Admin</a>
         <span>›</span>
         <?= htmlspecialchars($pageTitle ?? 'Dashboard') ?>
     </div>
 
     <div class="topbar-right">
         <?php if (hasPermission('manage_approvals')): ?>
-        <a href="/admin/approvals/" class="topbar-icon-btn" title="Pending Approvals" style="text-decoration:none">
+        <a href="/admin/submissions.php" class="topbar-icon-btn" title="Pending Approvals" style="text-decoration:none">
             <i class="bi bi-bell-fill"></i>
             <?php if (($pendingCount ?? 0) > 0): ?>
                 <span class="topbar-notif-dot"></span>
@@ -206,9 +210,11 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
         <a href="/" target="_blank" class="topbar-icon-btn" title="View Public Site" style="text-decoration:none">
             <i class="bi bi-box-arrow-up-right"></i>
         </a>
-        <a href="/admin/auth/logout.php" class="topbar-icon-btn" title="Logout" style="text-decoration:none;color:#dc3545">
-            <i class="bi bi-box-arrow-right"></i>
+        <?php if (hasPermission('manage_settings')): ?>
+        <a href="/admin/settings.php" class="topbar-icon-btn" title="Settings" aria-label="Settings" style="text-decoration:none"<?= $currentPage === 'settings' ? ' aria-current="page"' : '' ?>>
+            <i class="bi bi-gear-fill"></i>
         </a>
+        <?php endif; ?>
     </div>
 </header>
 
@@ -250,4 +256,23 @@ function showToast(message, type = 'success') {
 
 // CSRF token for AJAX
 const CSRF_TOKEN = '<?= $csrfToken ?>';
+
+// Confirm logout before ending the session.
+let logoutConfirmationPending = false;
+document.querySelectorAll('a[href="/admin/auth/logout.php"]').forEach(link => {
+    link.addEventListener('click', async event => {
+        event.preventDefault();
+        if (logoutConfirmationPending) return;
+        logoutConfirmationPending = true;
+        try {
+            const confirmed = await window.AdminDialogs.confirm(
+                'Are you sure you want to log out of the admin panel?',
+                { title: 'Log out?', confirmText: 'Log out', cancelText: 'Cancel' }
+            );
+            if (confirmed) window.location.assign(link.href);
+        } finally {
+            logoutConfirmationPending = false;
+        }
+    });
+});
 </script>

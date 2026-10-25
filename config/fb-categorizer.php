@@ -4,7 +4,7 @@
  *
  * Guesses a category for a Facebook post from its text using weighted
  * keywords (English + Filipino). Returns a category NAME that exists in
- * the `categories` table (Emergency, Holiday, Reminder, School Event),
+ * the `categories` table (Suspension, Holiday, Reminder, School Event),
  * or null for "None".
  *
  * Keyword syntax: a plain word/phrase must match as a whole word
@@ -35,7 +35,7 @@ if (!function_exists('gncNormalizeForSearch')) {
 /** keyword => weight. Tune these against your real posts. */
 function gncCategoryKeywords(): array {
     return [
-        'Emergency' => [
+        'Suspension' => [
             'emergency' => 5, 'urgent' => 3, 'typhoon' => 5, 'bagyo' => 5,
             'signal no' => 5, 'class suspension' => 6, 'suspen*' => 4,
             'walang pasok' => 6, 'no office work' => 5, 'online class*' => 4,
@@ -87,7 +87,7 @@ function gncClassifyFbPost(string $message, int $minScore = 4): ?string {
 
     $best = null;
     $bestScore = 0;
-    // Order matters on a tie: Emergency > Holiday > Reminder > School Event.
+    // Order matters on a tie: Suspension > Holiday > Reminder > School Event.
     foreach (gncCategoryKeywords() as $category => $words) {
         $score = 0;
         foreach ($words as $word => $weight) {

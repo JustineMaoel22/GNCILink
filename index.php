@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/fb-categorizer.php';
+require_once __DIR__ . '/includes/facebook-post-url.php';
 
 // Content Editor preview (?ce_preview=1): a signed-in editor sees this same page with
 // unpublished slides and small editing markers. Everyone else gets the normal page.
@@ -218,7 +219,7 @@ function getFacebookPosts(): array {
  */
 function fetchCachedFbPostsFromDb(PDO $db): array {
     $rows = $db->query("
-        SELECT f.message, f.permalink_url, f.created_time, m.file_path
+        SELECT f.fb_post_id, f.message, f.permalink_url, f.created_time, m.file_path
         FROM fb_posts_cache f
         LEFT JOIN media_library m ON f.image_media_id = m.media_id
         ORDER BY f.created_time DESC
@@ -234,7 +235,7 @@ function fetchCachedFbPostsFromDb(PDO $db): array {
             'excerpt'    => $excerpt,
             'image_path' => $row['file_path'], // e.g. /uploads/facebook/fb_12345.jpg, or null
             'date'       => $row['created_time'],
-            'link'       => $row['permalink_url'] ?? 'https://facebook.com/' . FB_PAGE_ID,
+            'link'       => gncFacebookPostUrl($row['permalink_url'], $row['fb_post_id'], FB_PAGE_ID),
         ];
     }
     return $posts;
@@ -447,7 +448,7 @@ try {
     }
 
     $stmt = $db->query("
-        SELECT f.message, f.permalink_url, f.created_time, f.pinned_at, m.file_path AS image_path
+        SELECT f.fb_post_id, f.message, f.permalink_url, f.created_time, f.pinned_at, m.file_path AS image_path
         FROM fb_posts_cache f
         LEFT JOIN media_library m ON f.image_media_id = m.media_id
         WHERE f.is_pinned = 1
@@ -465,7 +466,7 @@ try {
             'image_path' => $row['image_path'],
             'date'       => $row['created_time'],
             'pinned_at'  => $row['pinned_at'],
-            'link'       => $row['permalink_url'] ?? ('https://facebook.com/' . FB_PAGE_ID),
+            'link'       => gncFacebookPostUrl($row['permalink_url'], $row['fb_post_id'], FB_PAGE_ID),
         ];
     }
 
@@ -855,7 +856,10 @@ try {
         </div>
     </div>
 
-    <section class="gnc-news" id="announcements">
+    <section class="gnc-news" id="announcements" style="--home-section-background:url('<?= htmlspecialchars('/' . ltrim(homeText('news_background'), '/'), ENT_QUOTES, 'UTF-8') ?>')">
+        <?php if (cePreviewActive()): ?>
+        <div class="container home-background-tools"><button type="button" data-ve-img="home-background" data-ve-key="news_background" data-ve-background-value="<?= ceAttr(homeText('news_background')) ?>" data-ve-label="News &amp; Announcements background"><i class="bi bi-image" aria-hidden="true"></i> Change background image</button></div>
+        <?php endif; ?>
         <div class="container gnc-news-wrap">
             <div class="gnc-news-head gnc-reveal">
                 <h2 class="gnc-news-heading"><i class="bi <?= homeIconClass('news_icon') ?> gnc-news-icon"<?= homeIconMark('news_icon') ?>></i><?= homeTextHtml('news_heading') ?><span<?= homeTextMark('news_subheading', true) ?>><?= homeTextBr('news_subheading') ?></span></h2>
@@ -989,7 +993,7 @@ try {
                     <i class="bi bi-info-lg" style="font-size:0.85rem;"></i>
                 </span>
                 <span style="font-size:0.88rem;color:#333;">
-                    These announcements are posted on our official Facebook page. For more updates and interactions, follow us on Facebook
+                    If you have concerns or need assistance feel free to message our page.
                 </span>
             </div>
             <a href="https://www.facebook.com/gnc.edu.ph" target="_blank" rel="noopener"
@@ -997,13 +1001,16 @@ try {
             style="background:#fff;border:1px solid rgba(9,64,36,0.15);border-radius:8px;
                     padding:0.55rem 1.1rem;font-weight:600;font-size:0.85rem;color:#1a1a1a;">
                 <i class="bi bi-facebook" style="color:#1877F2;font-size:1rem;"></i>
-                Follow us on Facebook
+                Connect with Us
                 <i class="bi bi-box-arrow-up-right" style="font-size:0.8rem;color:#555;"></i>
             </a>
         </div>
     </div>
 
-    <section class="gnc-programs py-5" id="programs">
+    <section class="gnc-programs py-5" id="programs" style="--home-section-background:url('<?= htmlspecialchars('/' . ltrim(homeText('programs_background'), '/'), ENT_QUOTES, 'UTF-8') ?>')">
+        <?php if (cePreviewActive()): ?>
+        <div class="container home-background-tools"><button type="button" data-ve-img="home-background" data-ve-key="programs_background" data-ve-background-value="<?= ceAttr(homeText('programs_background')) ?>" data-ve-label="Academic Programs background"><i class="bi bi-image" aria-hidden="true"></i> Change background image</button></div>
+        <?php endif; ?>
         <div class="container gnc-prog-wrap">
             <div class="gnc-prog-head gnc-reveal">
                 <h2 class="gnc-prog-heading"><i class="bi <?= homeIconClass('programs_icon') ?> gnc-prog-icon"<?= homeIconMark('programs_icon') ?>></i><?= homeTextHtml('programs_heading') ?><span<?= homeTextMark('programs_subheading', true) ?>><?= homeTextBr('programs_subheading') ?></span></h2>

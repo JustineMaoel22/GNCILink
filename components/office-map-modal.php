@@ -9,8 +9,8 @@
             <button type="button" class="office-map-close" aria-label="Close campus map" autofocus><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
         </header>
         <p class="office-map-help" role="status"></p>
-        <iframe class="office-map-frame" title="Interactive GNCI campus map"></iframe>
+        <iframe class="office-map-frame" title="Interactive GNCI campus map" data-map-src="/campus_navigator.html?view=office&amp;v=<?= substr(hash_file('sha256', __DIR__ . '/../campus_navigator.html'), 0, 12) ?>"></iframe>
         <footer class="office-map-footer">The marker identifies the building. Floor and room details are listed above.</footer>
     </div>
 </dialog>
-<script src="/assets/js/office-map.js?v=3" defer></script>
+<script src="/assets/js/office-map.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/office-map.js'), 0, 12) ?>" defer></script>

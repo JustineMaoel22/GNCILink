@@ -117,6 +117,8 @@ html, body {
     gap: 10px;
     margin-bottom: 28px;
 }
+.enrollment-level-tabs { padding-bottom: 24px; border-bottom: 1px solid var(--gnc-border); }
+.enrollment-level-title { color: var(--gnc-green-light); font: 700 28px/1.4 'Noto Serif', serif; margin: 0 0 24px; }
 
 .enrollment-tabs .nav-link {
     font-family: 'Inter', sans-serif;
@@ -356,4 +358,12 @@ html, body {
         animation: none !important;
         transition: none !important;
     }
+}
+/* Matches the Storyset attribution in the Online Payment Guide. */
+.enrollment-art-credit {
+    margin: 24px 0 0;
+    color: #637167;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    text-align: right;
 }

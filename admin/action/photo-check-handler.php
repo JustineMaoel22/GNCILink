@@ -50,6 +50,7 @@ if (!hasPermission('manage_page_content')) photoCheckFail('You do not have permi
 if (!verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) photoCheckFail('Your session has expired. Please refresh the page.', 403);
 
 $file = $_FILES['photo'] ?? null;
+try { $file = imageUploadPrepare($file); } catch (Throwable $error) { photoCheckFail($error->getMessage(), 422); }
 if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) {
     photoCheckFail('The photo could not be read. Please try again.', 422);
 }

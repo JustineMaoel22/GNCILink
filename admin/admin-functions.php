@@ -9,6 +9,7 @@
 // ============================================================
 
 require_once __DIR__ . '/settings-functions.php';
+require_once __DIR__ . '/../includes/content-publish-policy.php';
 require_once __DIR__ . '/photo-check.php';
 require_once __DIR__ . '/../includes/image-framing.php';
 require_once __DIR__ . '/rich-text.php';
@@ -17,20 +18,29 @@ require_once __DIR__ . '/department-page-content.php';
 require_once __DIR__ . '/student-organizations.php';
 require_once __DIR__ . '/../includes/office-location.php';
 require_once __DIR__ . '/../includes/student-achievements.php';
+require_once __DIR__ . '/../includes/admin-rbac.php';
+require_once __DIR__ . '/../includes/first-login-password.php';
+require_once __DIR__ . '/../includes/auth-security.php';
 
 /**
  * Initialize secure session
  */
 function initSession() {
     if (session_status() === PHP_SESSION_NONE) {
+        $secure=authIsHttps()||!authLocalDevelopment();
+        ini_set('session.use_strict_mode','1');ini_set('session.use_only_cookies','1');ini_set('session.use_trans_sid','0');
+        session_set_cookie_params(['path'=>'/','httponly'=>true,'secure'=>$secure,'samesite'=>'Lax']);
         session_start();
         // Regenerate session ID for security
         if (!isset($_SESSION['_initiated'])) {
             session_regenerate_id(true);
             $_SESSION['_initiated'] = true;
         }
+        if(isset($_SESSION['last_activity'])&&time()-(int)$_SESSION['last_activity']>SESSION_TIMEOUT){authClearSession();header('Location: /admin/login.php?timeout=1');exit;}
         $_SESSION['last_activity'] = time();
     }
+    authEnforceTransport();
+    if (isLoggedIn()) rbacRequestBoundary();
 }
 
 /**
@@ -50,7 +60,9 @@ function getCurrentUser(): ?array {
         $db = getDB();
         $stmt = $db->prepare("SELECT * FROM users WHERE user_id = ? AND status = 'active'");
         $stmt->execute([$_SESSION['user_id']]);
-        return $stmt->fetch();
+        $user = $stmt->fetch();
+        if ($user) $user['role'] = rbacRole($user['role']);
+        return $user ?: null;
     } catch (Exception $e) {
         error_log('Get current user error: ' . $e->getMessage());
         return null;
@@ -64,8 +76,7 @@ function destroySession() {
     if (isset($_SESSION['user_id'])) {
         logActivity($_SESSION['user_id'], 'LOGOUT', null, null, 'User logged out');
     }
-    $_SESSION = [];
-    session_destroy();
+    authClearSession();
 }
 
 // ============================================================
@@ -78,7 +89,9 @@ function destroySession() {
 function hasPermission(string $permission): bool {
     if (!isLoggedIn()) return false;
     
-    $role = $_SESSION['user_role'];
+    rbacRefreshIdentity();
+    if (!empty($_SESSION['must_change_password'])) return false;
+    $role = rbacRole();
     $permissions = getPermissions($role);
     return in_array($permission, $permissions);
 }
@@ -87,6 +100,7 @@ function hasPermission(string $permission): bool {
  * Get permissions for a role
  */
 function getPermissions(string $role): array {
+    $role = rbacRole($role);
     $permissionMap = [
         'Super Admin' => [
             'manage_settings',
@@ -99,23 +113,14 @@ function getPermissions(string $role): array {
             'manage_page_content',
             'view_analytics'
         ],
-        'Content Admin' => [
-            'create_announcement', 'edit_announcement', 'delete_announcement', 'publish_announcement',
-            'create_news', 'edit_news', 'delete_news', 'publish_news',
-            'create_event', 'edit_event', 'delete_event', 'publish_event',
-            'approve_content', 'reject_content', 'request_revision',
-            'manage_approvals',
-            'manage_page_content',
-            'view_analytics'
-        ],
         'Content Editor' => [
-            'edit_page_content',
-            'create_announcement', 'edit_own_announcement', 'delete_own_announcement',
-            'create_news', 'edit_own_news', 'delete_own_news',
-            'create_event', 'edit_own_event', 'delete_own_event'
+            'manage_settings', 'manage_page_content', 'edit_page_content', 'view_analytics',
+            'manage_announcements','create_announcement','edit_announcement','delete_announcement',
+            'manage_news','create_news','edit_news','delete_news',
+            'manage_events','create_event','edit_event','delete_event', 'view_own_submissions'
         ],
-        'Office Staff' => [
-            'create_announcement', 'edit_own_announcement', 'delete_own_announcement'
+        'The Mirror' => [
+            'create_announcement','edit_own_announcement', 'create_news','edit_own_news', 'view_own_submissions'
         ]
     ];
     
@@ -140,6 +145,7 @@ function requireLogin() {
         header('Location: /admin/login.php');
         exit;
     }
+    rbacRequestBoundary();
 }
 
 // ============================================================
@@ -150,6 +156,7 @@ function requireLogin() {
  * Log user activity
  */
 function logActivity(int $userId, string $action, ?string $table = null, ?int $recordId = null, ?string $description = null): bool {
+    if(in_array($action,['LOGIN','LOGOUT','PASSWORD_CHANGED','PASSWORD_CHANGE_FAILED'],true))authAudit($userId,$action,$description??$action);
     try {
         $db = getDB();
         $stmt = $db->prepare("
@@ -167,6 +174,7 @@ function logActivity(int $userId, string $action, ?string $table = null, ?int $r
  * Get activity logs
  */
 function getActivityLogs(int $limit = 50, int $offset = 0): array {
+    if (!rbacIsSuper()) return [];
     try {
         $db = getDB();
         $stmt = $db->prepare("
@@ -214,6 +222,28 @@ function getProgramCategories(): array {
         // keep the built-in list
     }
     return $cache;
+}
+
+/** Announcement choices exclude Basic Education tracks; use their department instead. */
+function getAnnouncementProgramCategories(): array {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $cache = getProgramCategories();
+    try {
+        $rows = getDB()->query("SELECT p.program_code FROM programs p JOIN departments d ON d.dept_id = p.dept_id WHERE d.department_type = 'basic-education'")->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($rows as $code) unset($cache[$code]);
+    } catch (Throwable $e) {
+        // Older schemas have only the shipped College choices.
+        $cache = getProgramCategoriesBuiltIn();
+    }
+    return $cache;
+}
+
+/** Keep existing legacy tags on edits, but never assign new Basic Education program tags. */
+function normalizeAnnouncementProgramCategory(?string $code, ?string $existingCode = null): string {
+    $code = normalizeProgramCategory($code);
+    if (isset(getAnnouncementProgramCategories()[$code]) || $code === $existingCode) return $code;
+    throw new InvalidArgumentException('Choose a College or Graduate School program. For Basic Education, select its department instead.');
 }
 
 /** The programs the site shipped with (fallback + 'ALL'). */
@@ -288,6 +318,7 @@ function normalizeAnnouncementDept($deptId): ?int {
  * Throws an Exception with a user-friendly message on validation failure
  */
 function uploadAnnouncementImage(?array $file): ?int {
+    $file = imageUploadPrepare($file);
     if (empty($file) || $file['error'] === UPLOAD_ERR_NO_FILE) {
         return null; // no image provided — that's fine, it's optional
     }
@@ -296,10 +327,10 @@ function uploadAnnouncementImage(?array $file): ?int {
         throw new Exception('Image upload failed. Please try again.');
     }
 
-    // 10MB max
-    $maxBytes = 10 * 1024 * 1024;
+    // 5MB max
+    $maxBytes = 5 * 1024 * 1024;
     if ($file['size'] > $maxBytes) {
-        throw new Exception('Image is too large. Maximum size is 10MB.');
+        throw new Exception('Image is too large. Maximum size is 5MB.');
     }
 
     $allowed = [
@@ -366,7 +397,7 @@ function createAnnouncement(array $data): ?int {
         $db = getDB();
         
         // Validate required fields
-        if (empty($data['title'])) {
+        if (empty($data['title']) && empty($data['allow_incomplete'])) {
             throw new Exception('Title is required.');
         }
         if (empty($data['content']) && empty($data['allow_incomplete'])) {
@@ -378,7 +409,7 @@ function createAnnouncement(array $data): ?int {
         
         $slug = uniqueContentSlug('announcements', 'announcement_id', $data['title']);
         
-        $status = ($_SESSION['user_role'] === 'Super Admin' || $_SESSION['user_role'] === 'Content Admin') 
+        $status = rbacIsSuper()
                 ? $data['status'] ?? 'draft' 
                 : 'pending';
         
@@ -392,7 +423,7 @@ function createAnnouncement(array $data): ?int {
         ");
         
         $result = $stmt->execute([
-            $_SESSION['user_id'],
+            rbacContentOwnerId(),
             $data['title'],
             $slug,
             $data['content'],
@@ -413,7 +444,9 @@ function createAnnouncement(array $data): ?int {
             throw new Exception('Failed to retrieve announcement ID after creation.');
         }
         
+        rbacCreatedRecord('announcement',(int)$id);
         logActivity($_SESSION['user_id'], 'CREATE', 'announcements', $id, 'Created announcement: ' . $data['title']);
+        if($status==='published')logActivity((int)$_SESSION['user_id'],'PUBLISH','announcements',(int)$id,'Published announcement: '.$data['title']);
         
         return $id;
     } catch (Exception $e) {
@@ -435,7 +468,7 @@ function updateAnnouncement(int $id, array $data): bool {
         if (!$announcement) return false;
         
         // Check ownership for Content Editors
-        if ($_SESSION['user_role'] === 'Content Editor' && $announcement['user_id'] !== $_SESSION['user_id']) {
+        if (rbacRole() === 'The Mirror' && (int)$announcement['user_id'] !== (int)$_SESSION['user_id']) {
             return false;
         }
         
@@ -475,6 +508,10 @@ function updateAnnouncement(int $id, array $data): bool {
         ]);
         
         logActivity($_SESSION['user_id'], 'UPDATE', 'announcements', $id, 'Updated announcement: ' . $data['title']);
+        if($status==='published'){
+            if($announcement['status']==='pending')logActivity((int)$_SESSION['user_id'],'APPROVE','announcements',$id,'Approved pending announcement.');
+            logActivity((int)$_SESSION['user_id'],'PUBLISH','announcements',$id,'Published announcement changes.');
+        }
         return true;
     } catch (Exception $e) {
         error_log('Update announcement error: ' . $e->getMessage());
@@ -499,7 +536,9 @@ function getAnnouncementById(int $id): ?array {
             WHERE a.announcement_id = ?
         ");
         $stmt->execute([$id]);
-        return $stmt->fetch();
+        $row=$stmt->fetch();
+        if($row&&rbacRequestRoute()!==''&&rbacRole()==='The Mirror'&&(int)$row['user_id']!==(int)$_SESSION['user_id'])return null;
+        return $row?:null;
     } catch (Exception $e) {
         error_log('Get announcement error: ' . $e->getMessage());
         return null;
@@ -552,7 +591,7 @@ function getAnnouncements(array $filters = [], int $limit = 20, int $offset = 0)
             }
         }
         
-        if ($_SESSION['user_role'] === 'Content Editor') {
+        if (rbacRole() === 'The Mirror') {
             $query .= " AND a.user_id = ?";
             $params[] = $_SESSION['user_id'];
         }
@@ -781,8 +820,11 @@ function getNewsCategories(): array {
         'School News'   => 'School News',
         'Academic'      => 'Academic',
         'Achievements'  => 'Achievements',
-        'Student Life'  => 'Student Life',
+        'Student Life'  => 'Student Organization',
+        'Community Extension' => 'Community Extension Activity',
         'Athletics and Sports' => 'Athletics and Sports',
+        'Job Opportunities' => 'Job Opportunities',
+        'Scholarship'    => 'Scholarship',
         'Updates'       => 'Updates',
         'Others'        => 'Others',
     ];
@@ -807,6 +849,7 @@ function normalizeNewsCategory(?string $category): string {
  * media_library-backed pattern as every other upload in this project.
  */
 function uploadNewsImage(?array $file): ?int {
+    $file = imageUploadPrepare($file);
     if (empty($file) || $file['error'] === UPLOAD_ERR_NO_FILE) {
         return null; // no image provided — that's fine, it's optional
     }
@@ -815,10 +858,10 @@ function uploadNewsImage(?array $file): ?int {
         throw new Exception('Image upload failed. Please try again.');
     }
 
-    // 10MB max
-    $maxBytes = 10 * 1024 * 1024;
+    // 5MB max
+    $maxBytes = 5 * 1024 * 1024;
     if ($file['size'] > $maxBytes) {
-        throw new Exception('Image is too large. Maximum size is 10MB.');
+        throw new Exception('Image is too large. Maximum size is 5MB.');
     }
 
     $allowed = [
@@ -994,7 +1037,7 @@ function createNews(array $data): ?int {
         $db = getDB();
 
         // Validate required fields
-        if (empty($data['title'])) {
+        if (empty($data['title']) && empty($data['allow_incomplete'])) {
             throw new Exception('Title is required.');
         }
         if (empty($data['content']) && empty($data['allow_incomplete'])) {
@@ -1006,7 +1049,7 @@ function createNews(array $data): ?int {
 
         $slug = uniqueContentSlug('news', 'news_id', $data['title']);
 
-        $status = ($_SESSION['user_role'] === 'Super Admin' || $_SESSION['user_role'] === 'Content Admin')
+        $status = rbacIsSuper()
                 ? $data['status'] ?? 'draft'
                 : 'pending';
 
@@ -1020,7 +1063,7 @@ function createNews(array $data): ?int {
         ");
 
         $result = $stmt->execute([
-            $_SESSION['user_id'],
+            rbacContentOwnerId(),
             $category,
             $data['title'],
             $slug,
@@ -1041,7 +1084,9 @@ function createNews(array $data): ?int {
             throw new Exception('Failed to retrieve news ID after creation.');
         }
 
+        rbacCreatedRecord('news',(int)$id);
         logActivity($_SESSION['user_id'], 'CREATE', 'news', $id, 'Created news article: ' . $data['title']);
+        if($status==='published')logActivity((int)$_SESSION['user_id'],'PUBLISH','news',(int)$id,'Published news: '.$data['title']);
 
         return $id;
     } catch (Exception $e) {
@@ -1063,7 +1108,7 @@ function updateNews(int $id, array $data): bool {
         if (!$news) return false;
 
         // Check ownership for Content Editors
-        if ($_SESSION['user_role'] === 'Content Editor' && $news['user_id'] !== $_SESSION['user_id']) {
+        if (rbacRole() === 'The Mirror' && (int)$news['user_id'] !== (int)$_SESSION['user_id']) {
             return false;
         }
 
@@ -1110,6 +1155,10 @@ function updateNews(int $id, array $data): bool {
         ]);
 
         logActivity($_SESSION['user_id'], 'UPDATE', 'news', $id, 'Updated news article: ' . $data['title']);
+        if($status==='published'){
+            if($news['status']==='pending')logActivity((int)$_SESSION['user_id'],'APPROVE','news',$id,'Approved pending news.');
+            logActivity((int)$_SESSION['user_id'],'PUBLISH','news',$id,'Published news changes.');
+        }
         return true;
     } catch (Exception $e) {
         error_log('Update news error: ' . $e->getMessage());
@@ -1135,6 +1184,7 @@ function getNewsById(int $id): ?array {
         ");
         $stmt->execute([$id]);
         $row = $stmt->fetch();
+        if($row&&rbacRequestRoute()!==''&&rbacRole()==='The Mirror'&&(int)$row['user_id']!==(int)$_SESSION['user_id'])return null;
         return $row ?: null;
     } catch (Exception $e) {
         error_log('Get news error: ' . $e->getMessage());
@@ -1201,7 +1251,7 @@ function getNews(array $filters = [], int $limit = 20, int $offset = 0): array {
             $params[] = '%' . $escapedSearch . '%';
         }
 
-        if ($_SESSION['user_role'] === 'Content Editor') {
+        if (rbacRole() === 'The Mirror') {
             $query .= " AND n.user_id = ?";
             $params[] = $_SESSION['user_id'];
         }
@@ -1721,6 +1771,7 @@ function verifyCSRFToken(string $token): bool {
  * Throws an Exception with a user-friendly message on validation failure.
  */
 function uploadHeroMedia(?array $file, bool $imageOnly = false): ?array {
+    $file = imageUploadPrepare($file);
     if (empty($file) || $file['error'] === UPLOAD_ERR_NO_FILE) {
         return null;
     }
@@ -1759,7 +1810,7 @@ function uploadHeroMedia(?array $file, bool $imageOnly = false): ?array {
     if (isset($allowedImages[$mime])) {
         $type = 'image';
         $ext  = $allowedImages[$mime];
-        $maxBytes = 10 * 1024 * 1024; // 10MB
+        $maxBytes = 5 * 1024 * 1024; // 5MB
     } elseif (!$imageOnly && isset($allowedVideos[$mime])) {
         $type = 'video';
         $ext  = $allowedVideos[$mime];
@@ -1771,7 +1822,7 @@ function uploadHeroMedia(?array $file, bool $imageOnly = false): ?array {
     }
 
     if ($file['size'] > $maxBytes) {
-        throw new Exception('File is too large. Maximum size is ' . ($type === 'video' ? '50MB for video' : '10MB for images') . '.');
+        throw new Exception('File is too large. Maximum size is ' . ($type === 'video' ? '50MB for video' : '5MB for images') . '.');
     }
 
     $filename = bin2hex(random_bytes(16)) . '.' . $ext;
@@ -2137,9 +2188,9 @@ function getPageSectionImagePath(string $pageSlug, string $sectionKey): ?string 
     }
 }
 
-/** Attach or remove an image on an approved History timeline section. */
+/** Attach or remove an image on a History timeline section or closing quote. */
 function saveHistorySectionImage(string $sectionKey, ?array $file, bool $remove): ?string {
-    if (!preg_match('/^history_(1918|1922_1941|1941_1948|1948|1949|present)$/', $sectionKey)) {
+    if (!preg_match('/^history_(1918|1922_1941|1941_1948|1948|1949|present|quote)$/', $sectionKey)) {
         throw new Exception('That History photo slot is not valid.');
     }
     $db = getDB();
@@ -2169,6 +2220,10 @@ function saveHistorySectionImage(string $sectionKey, ?array $file, bool $remove)
  * is called).
  */
 function saveSectionDraft(string $pageSlug, string $sectionKey, string $content): bool {
+    if ($pageSlug === 'contact-us') {
+        require_once __DIR__ . '/../components/contact-page-content.php';
+        $content = contactPageValidate($sectionKey, $content);
+    }
     try {
         $db = getDB();
         $stmt = $db->prepare("
@@ -2194,6 +2249,10 @@ function saveSectionDraft(string $pageSlug, string $sectionKey, string $content)
  * (returns true) since the section is already published as-is.
  */
 function publishSection(string $pageSlug, string $sectionKey): bool {
+    if ($pageSlug === 'contact-us') {
+        require_once __DIR__ . '/../components/contact-page-content.php';
+        contactPageValidate($sectionKey, (string)getSectionContent($pageSlug, $sectionKey, true));
+    }
     try {
         $db = getDB();
         $stmt = $db->prepare("
@@ -2243,8 +2302,9 @@ function discardSectionDraft(string $pageSlug, string $sectionKey): bool {
 // (used by the redesigned Content Editor, admin/content-edit.php)
 // ============================================================
 // Roles (see getPermissions):
-//   Super Admin / Content Admin  manage_page_content  -> edit AND publish directly, and approve/reject
-//   Content Editor               edit_page_content    -> save drafts and SUBMIT them for approval
+//   Super Admin                  -> publish directly and approve/reject.
+//   Content Editor               -> private snapshots and queued change requests.
+//   The request boundary intercepts editor writes before any live handler runs.
 // A submitted draft waits in page_sections.review_status = 'pending'.
 // The public site only ever reads page_sections.content, which changes
 // only on publish / approve. Needs sql/page-approval-migration.sql.
@@ -2549,7 +2609,17 @@ function sanitizeSvgFile(string $path): bool {
  * @param string $kind 'logo' or 'pdf'
  */
 function storeDepartmentUpload(array $file, string $kind): array {
+    if (!function_exists('mb_substr')) throw new RuntimeException('Uploads require the PHP mbstring extension. Enable mbstring in your hosting PHP settings.');
+    if (!function_exists('finfo_open')) throw new RuntimeException('Uploads require the PHP Fileinfo extension. Enable fileinfo in your hosting PHP settings.');
+    $file = imageUploadPrepare($file);
     $configs = [
+        'department_banner' => [
+            'label' => 'department banner',
+            'max' => 5 * 1024 * 1024,
+            'dir' => 'department-banners',
+            'mimes' => ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'],
+            'bad' => 'Upload a JPG, PNG, or WEBP banner.',
+        ],
         'logo' => [
             'label' => 'logo image',
             'max'   => DEPT_LOGO_MAX_BYTES,
@@ -2571,14 +2641,21 @@ function storeDepartmentUpload(array $file, string $kind): array {
             'mimes' => ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'],
             'bad'   => 'Invalid image type. Allowed: JPG, PNG, GIF, WEBP, SVG.',
         ],
+        'enrollment_illustration' => [
+            'label' => 'enrollment illustration',
+            'max' => 5 * 1024 * 1024,
+            'dir' => 'enrollment-procedures',
+            'mimes' => ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'],
+            'bad' => 'Upload an SVG, PNG, JPG, or WEBP illustration.',
+        ],
         'history_image' => [
             'label' => 'history photo',
-            'max'   => 10 * 1024 * 1024,
+            'max'   => 5 * 1024 * 1024,
             'dir'   => 'history',
             'mimes' => ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'],
             'bad'   => 'Invalid image type. Allowed: JPG, PNG, WEBP.',
         ],
-        // Facility pictures (Programs > Facilities): same folder as other program pictures, but up to 10 MB.
+        // Facility pictures (Programs > Facilities): same folder as other program pictures, but up to 5 MB.
         'facility_image' => [
             'label' => 'picture',
             'max'   => PROGRAM_FACILITY_IMAGE_MAX_BYTES,
@@ -2633,7 +2710,7 @@ function storeDepartmentUpload(array $file, string $kind): array {
 
     $origExt = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
 
-    if (($kind === 'logo' || $kind === 'program_image') && $origExt === 'svg') {
+    if (in_array($kind, ['logo', 'program_image', 'enrollment_illustration'], true) && $origExt === 'svg') {
         // SVG is checked and cleaned by parsing it (finfo can't be trusted to
         // recognise every valid SVG), then stored as a plain .svg.
         if (!sanitizeSvgFile($file['tmp_name'])) {
@@ -2706,7 +2783,7 @@ function storeDepartmentUpload(array $file, string $kind): array {
             'path'     => $filePath,
             'abs'      => $destination,
         ];
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         @unlink($destination);
         error_log('Department upload media_library insert error: ' . $e->getMessage());
         throw new Exception("Failed to record the {$cfg['label']} in the media library.");
@@ -2778,6 +2855,14 @@ function deleteMediaIfUnreferenced(int $mediaId): bool {
             }
         }
 
+        // Banner references live in the department's existing content rows.
+        try {
+            $banner = $db->prepare("SELECT 1 FROM department_page_content WHERE field_key = 'banner_media_id' AND content = ? LIMIT 1");
+            $banner->execute([(string)$mediaId]);
+            if ($banner->fetchColumn() !== false) return false;
+        } catch (PDOException $e) {
+            if ($e->getCode() !== '42S02') throw $e;
+        }
         $stmt = $db->prepare("SELECT file_path FROM media_library WHERE media_id = ?");
         $stmt->execute([$mediaId]);
         $path = $stmt->fetchColumn();
@@ -3251,7 +3336,7 @@ function saveDepartmentName(int $deptId, string $name): array {
         throw new Exception('The department name contains characters that can\'t be saved.');
     }
     $clean = trim($clean);
-    if ($clean === '') {
+    if ($clean === '' && !contentPublishAllowsIncomplete()) {
         throw new Exception('Please enter a department name.');
     }
     if (mb_strlen($clean) > 255) {
@@ -3307,6 +3392,7 @@ function departmentAdminPayload(array $dept): array {
         'theme_color'     => $dept['theme_color']  ?? null,
         'archived'        => !empty($dept['archived_at']),
         'logo_url'        => $dept['logo_url'] ?? null,
+        'banner_url'      => departmentBanner($dept)['file_path'] ?? null,
         'logo_name'       => !empty($dept['logo_url']) ? ($dept['logo_name'] ?? null) : null,
         'dean_name'       => $dept['dean_name']   ?? null,
         'dean_title'      => $dept['dean_title']  ?? null,
@@ -3369,7 +3455,7 @@ function uniqueDepartmentSlug(string $name, ?int $excludeDeptId = null): string 
  */
 function cleanDepartmentDetails(array $data): array {
     $name = preg_replace('/\s+/u', ' ', trim((string)($data['dept_name'] ?? '')));
-    if ($name === null || trim($name) === '') {
+    if ($name === null || (trim($name) === '' && !contentPublishAllowsIncomplete())) {
         throw new Exception('Please enter a department name.');
     }
     $name = trim($name);
@@ -4079,12 +4165,13 @@ function getAdministrationSectionRow(string $key): ?array {
  * "Please enter the name." / "The name is too long (maximum 255 characters)."
  */
 function administrationCleanLine(string $value, int $max, string $label, bool $required = false): string {
+    if (!function_exists('mb_strlen')) throw new RuntimeException('Saving administration content requires the PHP mbstring extension. Enable mbstring in your hosting PHP settings.');
     $clean = preg_replace('/\s+/u', ' ', trim($value));
     if ($clean === null) {
         throw new Exception(ucfirst($label) . ' contains characters that can\'t be saved.');
     }
     $clean = trim($clean);
-    if ($required && $clean === '') {
+    if ($required && $clean === '' && !contentPublishAllowsIncomplete()) {
         throw new Exception('Please enter ' . $label . '.');
     }
     if (mb_strlen($clean) > $max) {
@@ -4098,6 +4185,7 @@ function administrationCleanLine(string $value, int $max, string $label, bool $r
  * line, each line trimmed, empty lines dropped, stored with "\n" newlines.
  */
 function administrationCleanLines(string $value, int $max, string $label): string {
+    if (!function_exists('mb_strlen')) throw new RuntimeException('Saving administration content requires the PHP mbstring extension. Enable mbstring in your hosting PHP settings.');
     $lines = preg_split('/\r\n|\r|\n/', $value);
     $lines = array_values(array_filter(array_map('trim', $lines), 'strlen'));
     $clean = implode("\n", $lines);
@@ -4550,6 +4638,7 @@ const PROGRAM_IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
  * user-safe message on failure, leaving nothing behind.
  */
 function storeProgramImageUpload(array $file): array {
+    $file = imageUploadPrepare($file);
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
         throw new Exception(departmentUploadErrorMessage((int)($file['error'] ?? UPLOAD_ERR_NO_FILE), 'program image'));
     }
@@ -4909,7 +4998,7 @@ function saveProgramPageDetails(int $programId, array $data, array $files = [], 
 
     // ── text ──
     $name = trim(preg_replace('/\s+/', ' ', (string)($data['program_name'] ?? '')));
-    if ($name === '') throw new Exception('The program name can\'t be empty.');
+    if ($name === '' && !contentPublishAllowsIncomplete()) throw new Exception('The program name can\'t be empty.');
     if (mb_strlen($name) > 255) throw new Exception('The program name is too long (maximum 255 characters).');
 
     $card = richTextNormalize((string)($data['description'] ?? ''));
@@ -5000,24 +5089,25 @@ function saveProgramPageDetails(int $programId, array $data, array $files = [], 
 }
 
 /** Largest single facility picture. Keep in step with the "MB" limit in the Program details form (components/program-page-manager.php). */
-const PROGRAM_FACILITY_IMAGE_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+const PROGRAM_FACILITY_IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
 /**
- * Facility pictures only: JPG / PNG / WEBP, up to 10 MB, and it must really be
+ * Facility pictures only: JPG / PNG / WEBP, up to 5 MB, and it must really be
  * an image (not just a renamed file). Throws Exception with a user-safe message.
  * $f is one $_FILES entry.
  */
 function programPageCheckFacilityImage(array $f): void {
+    $f = imageUploadPrepare($f);
     $max = PROGRAM_FACILITY_IMAGE_MAX_BYTES;
     $err = $f['error'] ?? UPLOAD_ERR_OK;
     if ($err !== UPLOAD_ERR_OK) {
         if (in_array($err, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
-            throw new Exception('A facility picture is too large. The maximum size is 10 MB.');
+            throw new Exception('A facility picture is too large. The maximum size is 5 MB.');
         }
         throw new Exception('A facility picture could not be uploaded. Please try again.');
     }
     if ((int)($f['size'] ?? 0) > $max) {
-        throw new Exception('A facility picture is too large. The maximum size is 10 MB.');
+        throw new Exception('A facility picture is too large. The maximum size is 5 MB.');
     }
     $ext = strtolower(pathinfo((string)($f['name'] ?? ''), PATHINFO_EXTENSION));
     if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
@@ -5037,15 +5127,16 @@ function programPageCheckFacilityImage(array $f): void {
 /**
  * Top-banner slideshow of a program page ("hero_slide" items): one PICTURE or VIDEO per slide.
  * Stored in /uploads/program-banners/ (not in the media library, like the homepage slideshow).
- * Pictures: JPG, PNG, WEBP, GIF up to 10 MB. Videos: MP4 or WEBM up to 50 MB.
+ * Pictures: JPG, PNG, WEBP, GIF up to 5 MB. Videos: MP4 or WEBM up to 50 MB.
  * $f is one $_FILES entry. Returns ['type' => 'image'|'video', 'path' => '/uploads/program-banners/x.ext', 'abs' => absolute path].
  * Throws Exception with a user-safe message.
  */
 function programPageStoreBannerMedia(array $f): array {
+    $f = imageUploadPrepare($f);
     $err = $f['error'] ?? UPLOAD_ERR_NO_FILE;
     if ($err !== UPLOAD_ERR_OK) {
         if (in_array($err, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
-            throw new Exception('A banner file is too large for this server (see upload_max_filesize and post_max_size in php.ini). Pictures can be up to 10 MB and videos up to 50 MB.');
+            throw new Exception('A banner file is too large for this server (see upload_max_filesize and post_max_size in php.ini). Pictures can be up to 5 MB and videos up to 50 MB.');
         }
         throw new Exception('A banner file could not be uploaded. Please try again.');
     }
@@ -5063,7 +5154,7 @@ function programPageStoreBannerMedia(array $f): array {
     finfo_close($finfo);
 
     if (isset($images[$mime])) {
-        $type = 'image'; $ext = $images[$mime]; $max = 10 * 1024 * 1024;
+        $type = 'image'; $ext = $images[$mime]; $max = 5 * 1024 * 1024;
         if (@getimagesize($tmp) === false) {
             throw new Exception('One of the banner pictures is not a valid picture.');
         }
@@ -5073,7 +5164,7 @@ function programPageStoreBannerMedia(array $f): array {
         throw new Exception('Banner slides must be a picture (JPG, PNG, WEBP, GIF) or a video (MP4, WEBM).');
     }
     if ((int)($f['size'] ?? 0) > $max) {
-        throw new Exception('A banner file is too large. The maximum is ' . ($type === 'video' ? '50 MB for a video' : '10 MB for a picture') . '.');
+        throw new Exception('A banner file is too large. The maximum is ' . ($type === 'video' ? '50 MB for a video' : '5 MB for a picture') . '.');
     }
 
     $dir = __DIR__ . '/../uploads/program-banners/';
@@ -5207,6 +5298,7 @@ function programPageOptimizeImage(int $mediaId, int $maxSide = 1920): void {
         imagedestroy($img);
 
         if ($ok && is_file($tmp) && filesize($tmp) > 0) {
+            imageUploadOptimizePath($tmp);
             rename($tmp, $file);
             clearstatcache(true, $file);
             $up = getDB()->prepare("UPDATE media_library SET file_size = ? WHERE media_id = ?");
@@ -5266,7 +5358,7 @@ function saveProgramPageItems(int $programId, string $type, array $rows): array 
             if (mb_strlen($title) > 255 || mb_strlen($sub) > 255 || mb_strlen($body) > 2000) {
                 throw new Exception('Item ' . ($i + 1) . ' has text that is too long.');
             }
-            if ($type !== 'uniform' && $type !== 'hero_slide' && $title === '') {
+            if ($type !== 'uniform' && $type !== 'hero_slide' && $title === '' && !contentPublishAllowsIncomplete()) {
                 throw new Exception(($type === 'facility' ? 'Facility ' : 'Item ') . ($i + 1) . ' needs a name.');
             }
             if ($type === 'facility' && mb_strlen($body) > 500) {
@@ -5463,10 +5555,21 @@ function cePreviewActive(): bool {
 /**
  * Editor markers for a public template, e.g.
  *   <div class="vm-text"<?= ceMark('data-ve-section="vision"') ?>>
- * Prints nothing unless the page is being previewed inside the Content Editor.
+ * Editor controls are preview-only; public text keeps an opaque display identity.
  */
 function ceMark(string $attributes): string {
-    return cePreviewActive() ? ' ' . $attributes : '';
+    return ceTextLayoutMark($attributes) . (cePreviewActive() ? ' ' . $attributes : '');
+}
+
+/** Stable public display identity; never exposes draft text or editor controls. */
+function ceTextLayoutMark(string $attributes): string {
+    foreach (['slide','person','office','sport','team','facility','program-card','achievement-id','org-card','department-card'] as $kind) {
+        if (preg_match('/data-ve-'. $kind .'="([^"]+)"/', $attributes, $scope)) return ' data-gnc-layout-scope="'.substr(hash('sha256',$kind.':'.$scope[1]),0,24).'"';
+    }
+    if (!preg_match('/data-ve-(?:field|section)="([^"]+)"/', $attributes, $field)) return '';
+    $identity = $field[0];
+    foreach (['key','id'] as $key) if (preg_match('/data-ve-'.$key.'="([^"]*)"/', $attributes, $match)) $identity .= '|'.$match[0];
+    return ' data-gnc-text="'.substr(hash('sha256',$identity),0,24).'"';
 }
 
 /** HTML-escape an attribute value for ceMark(). */
@@ -5487,17 +5590,16 @@ function cePreviewCanManage(): bool {
 
 /** Like ceMark(), but for the pages that only managers can edit (departments, programs, posts). */
 function ceManageMark(string $attributes): string {
-    return cePreviewCanManage() ? ' ' . $attributes : '';
+    return ceTextLayoutMark($attributes) . (cePreviewCanManage() ? ' ' . $attributes : '');
 }
 
 /**
  * Marker that turns an existing element into an editable text field in the Content Editor, e.g.
  *   <h1<?= ceField('dept-name', ['max' => 255, 'label' => 'Department name']) ?>>...</h1>
  * Options: key (which stored value), max (characters), label, ph (placeholder), multiline.
- * Prints nothing for visitors.
+ * Visitors receive only the opaque text display identity.
  */
 function ceField(string $name, array $o = []): string {
-    if (!cePreviewCanManage()) return '';
     $a = 'data-ve-field="' . ceAttr($name) . '"';
     if (!empty($o['key']))       $a .= ' data-ve-key="'   . ceAttr($o['key'])   . '"';
     if (!empty($o['max']))       $a .= ' data-ve-max="'   . (int)$o['max']      . '"';
@@ -5508,7 +5610,7 @@ function ceField(string $name, array $o = []): string {
     if (!empty($o['optional'])) $a .= ' data-warning-optional="true"';
     if (!empty($o['warning_required'])) $a .= ' data-warning-required="true"';
     if (!empty($o['section'])) $a .= ' data-warning-section="' . ceAttr($o['section']) . '"';
-    return ' ' . $a;
+    return ceManageMark($a);
 }
 
 /**
@@ -5546,6 +5648,8 @@ const HOME_LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed
 /** Every editable homepage block: type (text|link|icon|image), original wording, max length, label shown in the editor. */
 function homeContentSchema(): array {
     $s = [
+        'news_background'   => ['image', 'assets/images/DSC_2965.JPG', 0, 'News & Announcements background'],
+        'programs_background' => ['image', 'assets/images/classroom.JPG', 0, 'Academic Programs background'],
         'news_icon'         => ['icon', 'bi-megaphone-fill', 60, 'News heading icon'],
         'news_heading'      => ['text', 'News & Announcements', 60, 'News heading'],
         'news_subheading'   => ['text', "Stay Updated,\nStay Informed", 60, 'News heading, second part'],
@@ -5640,8 +5744,8 @@ function homeTextHtml(string $key): string {
     $all = getHomeContent();
     if (!isset($all[$key])) return '';
     $text = htmlspecialchars((string)$all[$key]['value'], ENT_QUOTES, 'UTF-8');
-    if (!cePreviewActive()) return $text;
-    return '<ve-text data-ve-field="home-text" data-ve-key="' . ceAttr($key) . '" data-ve-max="' . (int)$all[$key]['max']
+    if (!cePreviewActive()) return '<ve-text'.ceTextLayoutMark('data-ve-field="home-text" data-ve-key="'.ceAttr($key).'"').'>'.$text.'</ve-text>';
+    return '<ve-text'.ceTextLayoutMark('data-ve-field="home-text" data-ve-key="'.ceAttr($key).'"').' data-ve-field="home-text" data-ve-key="' . ceAttr($key) . '" data-ve-max="' . (int)$all[$key]['max']
          . '" data-ve-label="' . ceAttr($all[$key]['label']) . '">' . $text . '</ve-text>';
 }
 

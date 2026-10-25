@@ -1,0 +1,85 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {spawn,spawnSync}=require('node:child_process');
+const createSession=spawnSync('docker',['compose','exec','-T','--user','www-data','web','php','tests/admin-design-session.php','create'],{encoding:'utf8',windowsHide:true});
+if(createSession.status!==0)throw Error(createSession.stderr||createSession.stdout);
+const adminSession=JSON.parse(createSession.stdout);
+const auditDirectory=path.join('cache','admin-design-audit');fs.mkdirSync(auditDirectory,{recursive:true});
+const profile=fs.mkdtempSync(path.join(os.tmpdir(),'gnci-calendar-widget-'));
+const browser=spawn(process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function until(work,message){for(let end=Date.now()+30000;Date.now()<end;){if(await work())return;await delay(50);}throw Error(message);}
+let socket;
+(async()=>{
+    await until(()=>fs.existsSync(path.join(profile,'DevToolsActivePort')),'Chrome did not start');
+    const port=fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0];
+    const tabs=await(await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+    socket=new WebSocket(tabs.find(tab=>tab.type==='page').webSocketDebuggerUrl);
+    await new Promise(resolve=>socket.addEventListener('open',resolve,{once:true}));
+    let serial=0;const pending=new Map();
+    socket.addEventListener('message',event=>{const packet=JSON.parse(event.data);if(packet.id&&pending.has(packet.id)){pending.get(packet.id)(packet);pending.delete(packet.id);}});
+    const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++serial;pending.set(id,result=>result.error?reject(Error(JSON.stringify(result.error))):resolve(result.result));socket.send(JSON.stringify({id,method,params}));});
+    const evaluate=async expression=>{const result=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));return result.result.value;};
+    const base=process.env.BASE_URL||'http://localhost:8080';
+    await send('Page.enable');await send('Network.enable');
+    await send('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*','*facebook.com*','*youtube.com*']});
+    await send('Page.addScriptToEvaluateOnNewDocument',{source:"try{sessionStorage.setItem('gncIntroSeen','1')}catch(_){}"});
+
+    await send('Network.setCookie',{name:adminSession.name,value:adminSession.value,url:base,httpOnly:true});
+
+
+    await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+    const frame='document.getElementById("veFrame")?.contentDocument';
+    const editor=base+'/admin/content-edit.php?page=enrollment-procedures';
+    await send('Page.navigate',{url:editor});
+    await until(()=>evaluate(`Boolean(${frame}?.getElementById('veEnrollmentSteps')) && document.getElementById('veLoader').hidden`),'Canvas unavailable');
+    await evaluate(`${frame}.getElementById('basic-education-tab').click()`);
+    const initial=await evaluate(`${frame}.querySelectorAll('[data-ve-enrollment-step]').length`);
+    await evaluate(`${frame}.querySelector('[data-ve-enrollment-add]').click()`);
+    assert.equal(await evaluate(`${frame}.querySelectorAll('[data-ve-enrollment-step]').length`),initial+1,'Add step inserts a real card');
+    assert.equal(await evaluate('Boolean(document.getElementById("veDrawer"))'),false,'No side panel or management form');
+    assert.equal(await evaluate('location.href'),editor);
+    assert.equal(await evaluate(`${frame}.activeElement.getAttribute('data-ve-key')`),'title','New card title is editable immediately');
+    await evaluate('document.getElementById("vePrimary").click()');
+    assert.equal(await evaluate('Boolean(document.querySelector(".ve-publish-accept,.cms-completeness-publish"))'),false,'Incomplete step cannot publish');
+    await evaluate(`(()=>{const d=${frame},card=Array.from(d.querySelectorAll('[data-ve-enrollment-step]')).at(-1);for(const [key,value] of [['title','TEST inline title'],['location','TEST office'],['instruction','TEST approved instructions']]){const el=card.querySelector('[data-ve-key="'+key+'"]');el.textContent=value;el.dispatchEvent(new Event('input',{bubbles:true}));}})()`);
+    assert.equal(await evaluate('document.getElementById("vePrimary").disabled'),false);
+    await evaluate(`${frame}.querySelector('[data-ve-enrollment-add]').click()`);
+    await evaluate(`(()=>{const card=Array.from(${frame}.querySelectorAll('[data-ve-enrollment-step]')).at(-1);card.querySelector('[data-ve-key="title"]').click();})()`);
+    await evaluate("Array.from(document.querySelectorAll('#veTb button')).find(b=>b.getAttribute('aria-label')==='Move step up').click()");
+    assert.equal(await evaluate(`Array.from(${frame}.querySelectorAll('[data-ve-enrollment-step]')).at(-1).querySelector('[data-ve-key="title"]').textContent`),'TEST inline title','Toolbar reorders actual cards');
+    await evaluate(`Array.from(${frame}.querySelectorAll('[data-ve-enrollment-step]')).at(-2).querySelector('[data-ve-key="title"]').click()`);
+    await evaluate("Array.from(document.querySelectorAll('#veTb button')).find(b=>b.getAttribute('aria-label')==='Remove step').click()");
+    await evaluate("Array.from(document.querySelectorAll('#vePop button')).find(b=>b.textContent==='Remove step').click()");
+    assert.equal(await evaluate(`${frame}.querySelectorAll('[data-ve-enrollment-step]').length`),initial+1);
+    await evaluate(`Array.from(${frame}.querySelectorAll('[data-ve-enrollment-step]')).at(-1).querySelector('[data-ve-img] img').click()`);
+    assert.equal(await evaluate("Boolean(Array.from(document.querySelectorAll('#veTb button')).find(b=>b.getAttribute('aria-label')==='Change illustration'))"),true,'New card illustration edits inline');
+    await evaluate(`(()=>{const native=window.fetch;window.fetch=function(url,options){if(url==='/admin/action/enrollment-canvas-handler.php'){window.testCanvasPayload={steps:JSON.parse(options.body.get('steps')),revision:options.body.get('revision')};if(window.testCanvasSuccess){const images=JSON.parse(document.getElementById('veFrame').contentDocument.getElementById('veEnrollmentIllustrations').textContent);window.testCanvasPayload.steps.forEach((step,index)=>{images['basic-'+step.step_id]={label:'Basic Education - Step '+(index+1),url:step.illustration,default:step.illustration};});return Promise.resolve(new Response(JSON.stringify({success:true,steps:window.testCanvasPayload.steps,revision:'a'.repeat(64),images}),{status:200,headers:{'Content-Type':'application/json'}}));}return Promise.resolve(new Response(JSON.stringify({error:'TEST intercepted; no publication'}),{status:422,headers:{'Content-Type':'application/json'}}));}return native.call(this,url,options);};})()`);
+    await evaluate('document.getElementById("vePrimary").click()');
+    await until(()=>evaluate('Boolean(document.querySelector(".ve-publish-accept,.cms-completeness-publish"))'),'Main Publish confirmation missing');
+    await evaluate('document.querySelector(".ve-publish-accept,.cms-completeness-publish").click()');
+    await until(()=>evaluate('Boolean(window.testCanvasPayload)'),'Main Publish did not submit canvas');
+    assert.equal(await evaluate('testCanvasPayload.steps.at(-1).title'),'TEST inline title');
+    assert.equal(await evaluate('testCanvasPayload.steps.at(-1).instruction'),'TEST approved instructions');
+    assert.equal(await evaluate('testCanvasPayload.revision.length'),64,'Existing steps protected by revision');
+    await until(()=>evaluate('!document.getElementById("vePrimary").disabled'),'Failed save retains changes');
+    await evaluate('window.testCanvasSuccess=true;document.getElementById("vePrimary").click()');
+    await until(()=>evaluate('Boolean(document.querySelector(".ve-publish-accept,.cms-completeness-publish"))'),'Retry confirmation missing');
+    await evaluate('document.querySelector(".ve-publish-accept,.cms-completeness-publish").click()');
+    await until(()=>evaluate('document.getElementById("vePrimary").disabled'),'Successful snapshot did not clear dirty state');
+    assert.equal(await evaluate(`${frame}.querySelectorAll('[data-ve-enrollment-step]').length`),initial+1,'Published snapshot keeps its card');
+    await evaluate(`(()=>{const el=Array.from(${frame}.querySelectorAll('[data-ve-enrollment-step]')).at(-1).querySelector('[data-ve-key="instruction"]');el.textContent='TEST edited again';el.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    assert.equal(await evaluate('document.getElementById("vePrimary").disabled'),false,'Saved card remains editable inline');
+    await evaluate('document.getElementById("vePreviewBtn").click()');
+    assert.equal(await evaluate(`getComputedStyle(${frame}.querySelector('[data-ve-enrollment-add]')).display`),'none','Preview hides editing controls');
+    await evaluate('document.getElementById("vePreviewBtn").click()');
+    const live=await(await fetch(base+'/pages/admission/enrollment-procedures.php')).text();
+    assert(!live.includes('TEST inline title'));assert(!live.includes('veEnrollmentSteps'));assert(!live.includes('data-ve-enrollment-add'));
+    await send('Page.captureScreenshot',{format:'png'}).then(result=>fs.writeFileSync(path.join(auditDirectory,'enrollment-inline-card-desktop.png'),Buffer.from(result.data,'base64')));
+    await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await delay(600);
+    assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
+    console.log('PASS: Add inserts a card on the visual canvas; text fields, illustration tools, reorder/remove, incomplete validation and main Publish payload checked. No side panel and nothing published.');
+})().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
+    spawnSync('docker',['compose','exec','-T','--user','www-data','web','php','tests/admin-design-session.php','destroy',adminSession.value],{encoding:'utf8',windowsHide:true});if(socket)socket.close();browser.kill();await delay(1000);
+    if(path.dirname(profile)===os.tmpdir()&&path.basename(profile).startsWith('gnci-calendar-widget-'))try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:3,retryDelay:200});}catch{}
+});

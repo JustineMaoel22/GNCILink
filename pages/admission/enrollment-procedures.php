@@ -1,3 +1,16 @@
+<?php
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../admin/admin-functions.php';
+require_once __DIR__ . '/../../components/enrollment-procedures-content.php';
+$enrollmentPreview = cePreviewActive();
+$basicEnrollmentSteps = basicEnrollmentSteps();
+$enrollmentImages = enrollmentIllustrations($basicEnrollmentSteps);
+$basicEnrollment = basicEnrollmentDefaults();
+foreach ($basicEnrollment as $key => &$field) {
+    $field['content'] = getSectionContent('enrollment-procedures', $key, $enrollmentPreview) ?? $field['content'];
+}
+unset($field);
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,7 +21,7 @@
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-    <link href="/assets/css/enrollment-procedures-style.css" rel="stylesheet">
+    <link href="/assets/css/enrollment-procedures-style.css?v=<?= filemtime(__DIR__ . '/../../assets/css/enrollment-procedures-style.css') ?>" rel="stylesheet">
     <link href="/assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
@@ -34,7 +47,14 @@
     <section class="enrollment-procedures">
         <div class="enrollment-procedures-inner">
 
-            <ul class="nav nav-pills enrollment-tabs" id="enrollmentTab" role="tablist">
+            <ul class="nav nav-pills enrollment-tabs enrollment-level-tabs" id="enrollmentLevelTab" role="tablist" aria-label="Education level">
+                <li class="nav-item" role="presentation"><button class="nav-link active" id="college-tab" data-bs-toggle="pill" data-bs-target="#college-pane" type="button" role="tab" aria-controls="college-pane" aria-selected="true">College</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" id="basic-education-tab" data-bs-toggle="pill" data-bs-target="#basic-education-pane" type="button" role="tab" aria-controls="basic-education-pane" aria-selected="false">Basic Education</button></li>
+            </ul>
+            <div class="tab-content" id="enrollmentLevelContent">
+                <div class="tab-pane fade show active" id="college-pane" role="tabpanel" aria-labelledby="college-tab" tabindex="0">
+                    <h2 class="enrollment-level-title">College</h2>
+            <ul class="nav nav-pills enrollment-tabs" id="enrollmentTab" role="tablist" aria-label="College applicant type">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="freshmen-tab" data-bs-toggle="pill"
                         data-bs-target="#freshmen-pane" type="button" role="tab"
@@ -59,7 +79,6 @@
             </ul>
 
             <div class="tab-content" id="enrollmentTabContent">
-
                 <div class="tab-pane fade show active" id="freshmen-pane" role="tabpanel" aria-labelledby="freshmen-tab" tabindex="0">
 
                     <h2 class="enrollment-pane-title">Incoming Freshmen</h2>
@@ -89,9 +108,7 @@
                                     <div class="enrollment-step-sub"><?= htmlspecialchars($step['sub']); ?></div>
                                 <?php endif; ?>
 
-                                <div class="enrollment-step-icon skeleton-wrap">
-                                    <img src="<?= $step['icon']; ?>" alt="<?= htmlspecialchars($step['title']); ?>" width="100" height="100" loading="lazy">
-                                </div>
+                                <?= enrollmentIllustration($enrollmentImages, 'fresh-' . $step['num'], $step['title']) ?>
 
                                 <p class="enrollment-step-desc"><?= htmlspecialchars($step['desc']); ?></p>
 
@@ -130,9 +147,7 @@
                                     <div class="enrollment-step-sub"><?= htmlspecialchars($step['sub']); ?></div>
                                 <?php endif; ?>
 
-                                <div class="enrollment-step-icon skeleton-wrap">
-                                    <img src="<?= $step['icon']; ?>" alt="<?= htmlspecialchars($step['title']); ?>" width="100" height="100" loading="lazy">
-                                </div>
+                                <?= enrollmentIllustration($enrollmentImages, 'trans-' . $step['num'], $step['title']) ?>
 
                                 <p class="enrollment-step-desc"><?= htmlspecialchars($step['desc']); ?></p>
 
@@ -169,9 +184,7 @@
                                     <div class="enrollment-step-sub"><?= htmlspecialchars($step['sub']); ?></div>
                                 <?php endif; ?>
 
-                                <div class="enrollment-step-icon skeleton-wrap">
-                                    <img src="<?= $step['icon']; ?>" alt="<?= htmlspecialchars($step['title']); ?>" width="100" height="100" loading="lazy">
-                                </div>
+                                <?= enrollmentIllustration($enrollmentImages, 'old-' . $step['num'], $step['title']) ?>
 
                                 <p class="enrollment-step-desc"><?= htmlspecialchars($step['desc']); ?></p>
 
@@ -183,19 +196,52 @@
                 </div>
 
             </div>
+                </div>
+                <div class="tab-pane fade" id="basic-education-pane" role="tabpanel" aria-labelledby="basic-education-tab" tabindex="0">
+                    <h2 class="enrollment-pane-title"<?= ceMark('data-ve-section="basic_education_title" data-ve-plain-section data-ve-label="Basic Education heading"') ?>><?= htmlspecialchars(html_entity_decode(strip_tags($basicEnrollment['basic_education_title']['content']), ENT_QUOTES | ENT_HTML5, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></h2>
+                    <div class="enrollment-pane-desc"<?= ceMark('data-ve-section="basic_education_procedures" data-ve-label="Basic Education enrollment procedures"') ?>><?= renderSectionContent($basicEnrollment['basic_education_procedures']['content']) ?></div>
+                    <?php if ($basicEnrollmentSteps || cePreviewCanManage()): ?>
+                    <div class="enrollment-steps-grid"<?= ceManageMark('data-ve-enrollment-grid') ?>>
+                        <?php foreach ($basicEnrollmentSteps as $index => $step): ?>
+                        <div class="enrollment-step-card">
+                            <div class="enrollment-step-label">STEP <?= $index + 1 ?></div>
+                            <div class="enrollment-step-title"><?= htmlspecialchars($step['title'], ENT_QUOTES, 'UTF-8') ?></div>
+                            <?php if ($step['location'] !== ''): ?><div class="enrollment-step-sub"><?= htmlspecialchars($step['location'], ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
+                            <?= enrollmentIllustration($enrollmentImages, 'basic-' . $step['step_id'], $step['title']) ?>
+                            <p class="enrollment-step-desc"><?= nl2br(htmlspecialchars($step['instruction'], ENT_QUOTES, 'UTF-8')) ?></p>
+                            <div class="enrollment-step-bar enrollment-step-bar--<?= $index % 2 ? 'gold' : 'green' ?>"></div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (cePreviewCanManage()): ?>
+                    <div class="mt-3"><button type="button" class="btn btn-outline-success" data-ve-enrollment-add><i class="bi bi-plus-lg" aria-hidden="true"></i> Add step</button></div>
+                    <?php endif; ?>
+                </div>
+
+            </div>
+            <p class="enrollment-art-credit">Illustrations by <a href="https://storyset.com/" target="_blank" rel="noopener noreferrer">Storyset</a></p>
         </div>
     </section>
 
+    <?php if (cePreviewCanManage()): ?>
+    <script type="application/json" id="veEnrollmentIllustrations"><?= json_encode($enrollmentImages, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
+    <script type="application/json" id="veEnrollmentSteps"><?= json_encode(['steps'=>$basicEnrollmentSteps,'revision'=>basicEnrollmentRevision($basicEnrollmentSteps)], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
+    <?php endif; ?>
     <?php include_once __DIR__ . '/../../components/footer.php'; ?>
     <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>
     
 
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
+    <script src="/assets/js/bootstrap.bundle.min.js"></script>
     <script src="/assets/js/skeleton-loader.js"></script>
 
     <script>
     (function () {
+        function showEnrollmentAnchor() {
+            if (window.location.hash === '#basic-education-pane') bootstrap.Tab.getOrCreateInstance(document.getElementById('basic-education-tab')).show();
+        }
+        showEnrollmentAnchor();
+        window.addEventListener('hashchange', showEnrollmentAnchor);
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
             !('IntersectionObserver' in window)) { return; }
         document.documentElement.classList.add('js-reveal');
@@ -221,7 +267,7 @@
         document.querySelectorAll('.tab-pane').forEach(observePane);
 
         // Replay the reveal each time a tab is shown
-        document.querySelectorAll('#enrollmentTab [data-bs-toggle="pill"]').forEach(function (btn) {
+        document.querySelectorAll('#enrollmentTab [data-bs-toggle="pill"], #enrollmentLevelTab [data-bs-toggle="pill"]').forEach(function (btn) {
             btn.addEventListener('shown.bs.tab', function () {
                 var pane = document.querySelector(btn.getAttribute('data-bs-target'));
                 pane.querySelectorAll('.enrollment-step-card').forEach(function (card) {

@@ -140,7 +140,7 @@ function programPageFileUrl(?string $webPath): ?string {
 function programPageContentFields(): array {
     return [
         'subtitle'     => ['type' => 'text', 'max' => 255],
-        'hero_desc'    => ['type' => 'long', 'max' => 2000, 'warning_required' => true],
+        'hero_desc'    => ['type' => 'long', 'max' => 2000],
         'hero_image_path' => ['type' => 'path', 'max' => 255],
         'seal_path'    => ['type' => 'path', 'max' => 255],
         'about_title'  => ['type' => 'text', 'max' => 120],
@@ -227,6 +227,10 @@ function hydrateProgramPage(array $row): array {
     $content = [];
     foreach (array_keys(programPageContentFields()) as $key) {
         $content[$key] = isset($stored[$key]) ? (string)$stored[$key] : '';
+    }
+    // Older pages without this field may use the card text. A saved blank is intentional.
+    if (!array_key_exists('hero_desc', $stored)) {
+        $content['hero_desc'] = trim((string)($row['description'] ?? ''));
     }
     $row['content'] = $content;
 

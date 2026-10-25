@@ -62,7 +62,7 @@ let socket;
     assert.equal(await evaluate("document.querySelectorAll('.ve-publish-dialog').length"),1,'Only one popup can open');
     assert.equal(await evaluate("document.activeElement.className"),'ve-publish-cancel','Keep editing has initial focus');
     const colors = await evaluate("(() => { const button=document.querySelector('.ve-publish-accept'), style=getComputedStyle(button); return {background:style.backgroundColor,text:style.color,disabled:button.disabled}; })()");
-    assert.equal(colors.background, 'rgb(11, 61, 34)', 'Publish has its green background outside the editor container');
+    assert.equal(colors.background, await evaluate('getComputedStyle(document.documentElement).getPropertyValue("--gnc-green").trim().startsWith("#") ? (()=>{const el=document.createElement("span");el.style.color="var(--gnc-green)";document.body.append(el);const color=getComputedStyle(el).color;el.remove();return color;})() : "rgb(9, 64, 36)"'), 'Publish uses the existing brand green outside the editor container');
     assert.equal(colors.text, 'rgb(255, 255, 255)', 'Publish has readable white text');
     assert.equal(colors.disabled, false, 'Publish is enabled');
     assert.equal(await evaluate('publishCount'),0,'Opening popup does not publish');

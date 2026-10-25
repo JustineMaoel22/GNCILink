@@ -252,6 +252,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
     // ── alerts ──
     var alertTimer = null;
     function flash(msg, isError) {
+        if (window.ContentEditorNotice && window.ContentEditorNotice(msg, isError)) return;
         var el = $('adm-alert');
         el.className = 'alert mb-3 ' + (isError ? 'alert-danger' : 'alert-success');
         el.innerHTML = '<i class="bi ' + (isError ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill') + '"></i> <span>' + esc(msg) + '</span>';

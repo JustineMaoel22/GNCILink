@@ -30,6 +30,14 @@ foreach ($basicSchools as $scope => &$school) {
 }
 unset($school);
 $basicH = static fn($value) => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+$basicText = static function (string $key) use ($basicSections, $basicDefaults): string {
+    return trim(html_entity_decode(strip_tags($basicSections[$key] ?? $basicDefaults[$key]['content']), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+};
+$basicTextMark = static function (string $key) use ($basicDefaults, $basicH): string {
+    return ceMark('data-ve-section="' . $basicH($key) . '" data-ve-field="admission-label" data-ve-admission-label data-ve-label="' . $basicH($basicDefaults[$key]['title']) . '"');
+};
+foreach ($basicSchools as $key => &$school) $school['label'] = $basicText('school_label_' . $key);
+unset($school);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -53,17 +61,17 @@ $basicH = static fn($value) => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF
             <div class="admission-hero"><div class="admission-hero-inner">
                 <nav class="admission-breadcrumb" aria-label="breadcrumb">
                     <span>Admissions</span><i class="bi bi-chevron-right" aria-hidden="true"></i>
-                    <span class="admission-current">Basic Education Admission Requirements</span>
+                    <span class="admission-current"><?= $basicH($basicText('hero_title')) ?></span>
                 </nav>
-                <h1>Basic Education Admission Requirements</h1>
-                <p>Find the enrollment requirements for CASA and Grade School Montessori, Junior and Senior High School Montessori, and the Junior and Senior High School Regular programs.</p>
+                <h1<?= $basicTextMark('hero_title') ?>><?= $basicH($basicText('hero_title')) ?></h1>
+                <p<?= $basicTextMark('hero_intro') ?>><?= $basicH($basicText('hero_intro')) ?></p>
             </div></div>
         </section>
         <section class="admission-requirements" aria-label="Basic Education requirements">
             <div class="requirements-inner" data-basic-admission>
                 <div class="requirements-tabs basic-school-tabs" role="tablist" aria-label="School program">
                     <?php foreach ($basicSchools as $schoolKey => $school): $first = $schoolKey === 'casa'; ?>
-                    <button type="button" class="req-tab<?= $first ? ' is-active' : '' ?>" role="tab" id="school-tab-<?= $schoolKey ?>" aria-controls="school-panel-<?= $schoolKey ?>" aria-selected="<?= $first ? 'true' : 'false' ?>" tabindex="<?= $first ? '0' : '-1' ?>" data-basic-school="<?= $schoolKey ?>"><?= $basicH($school['label']) ?></button>
+                    <button type="button" class="req-tab<?= $first ? ' is-active' : '' ?>" role="tab" id="school-tab-<?= $schoolKey ?>" aria-controls="school-panel-<?= $schoolKey ?>" aria-selected="<?= $first ? 'true' : 'false' ?>" tabindex="<?= $first ? '0' : '-1' ?>" data-basic-school="<?= $schoolKey ?>"><span<?= $basicTextMark('school_label_' . $schoolKey) ?>><?= $basicH($school['label']) ?></span></button>
                     <?php endforeach; ?>
                 </div>
                 <?php foreach ($basicSchools as $schoolKey => $school): ?>

@@ -99,6 +99,37 @@ body {
     outline: none;
 }
 
+.login-password-field {
+    position: relative;
+}
+
+.login-password-field .form-control {
+    padding-right: 3.25rem;
+}
+
+.login-password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--gnc-green);
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.login-password-toggle:focus-visible {
+    outline: 2px solid var(--gnc-green);
+    outline-offset: -2px;
+}
+
 .form-check {
     margin-top: 1rem;
     display: flex;

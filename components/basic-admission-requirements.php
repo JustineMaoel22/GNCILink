@@ -36,6 +36,18 @@ function basicAdmissionRequirements(): array
 }
 
 /** Seed content for the existing section-based editor; page layout stays in PHP/CSS. */
+function basicAdmissionPresentationDefaults(): array
+{
+    $fields = [
+        'hero_title' => ['title' => 'Page heading', 'content' => 'Basic Education Admission Requirements'],
+        'hero_intro' => ['title' => 'Page description', 'content' => 'Find the enrollment requirements for CASA and Grade School Montessori, Junior and Senior High School Montessori, and the Junior and Senior High School Regular programs.'],
+    ];
+    foreach (basicAdmissionRequirements() as $key => $school) {
+        $fields['school_label_' . $key] = ['title' => $school['label'] . ' tab label', 'content' => $school['label']];
+    }
+    return $fields;
+}
+
 function basicAdmissionSectionDefaults(): array
 {
     $sections = [];
@@ -49,5 +61,25 @@ function basicAdmissionSectionDefaults(): array
             ];
         }
     }
-    return $sections;
+    return $sections + basicAdmissionPresentationDefaults();
+}
+
+/** Register missing header fields when an authorized user opens the editor. */
+function ensureBasicAdmissionHeaderSections(): void
+{
+    $db = getDB();
+    $page = $db->prepare("SELECT page_id FROM pages WHERE slug = ? AND status = 'active'");
+    $page->execute(['basic-education-admission-requirements']);
+    $pageId = $page->fetchColumn();
+    if (!$pageId) return;
+
+    $check = $db->prepare('SELECT section_id FROM page_sections WHERE page_id = ? AND section_key = ?');
+    $insert = $db->prepare("INSERT INTO page_sections (page_id, section_key, title, content, status, display_order) VALUES (?, ?, ?, ?, 'published', ?)");
+    $defaults = basicAdmissionPresentationDefaults();
+    foreach (['hero_title', 'hero_intro'] as $order => $key) {
+        $check->execute([$pageId, $key]);
+        if (!$check->fetchColumn()) {
+            $insert->execute([$pageId, $key, $defaults[$key]['title'], $defaults[$key]['content'], $order]);
+        }
+    }
 }

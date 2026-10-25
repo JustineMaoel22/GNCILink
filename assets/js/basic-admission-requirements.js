@@ -24,6 +24,7 @@
             if (tab && scope.contains(tab)) activate(tab, false);
         });
         scope.addEventListener('keydown', event => {
+                if (event.target.closest('[data-ve-admission-label][contenteditable]:not([contenteditable="false"])')) return;
                 const tab = event.target.closest('[' + buttonAttribute + ']');
                 if (!tab || !scope.contains(tab)) return;
                 const tabs = Array.from(scope.querySelectorAll('[' + buttonAttribute + ']'));

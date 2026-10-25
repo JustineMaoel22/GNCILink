@@ -1,5 +1,10 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/facebook-post-url.php';
+require_once __DIR__ . '/../admin/admin-functions.php';
+require_once __DIR__ . '/../components/calendar-filters.php';
+// Resume an authorized Visual Editor session before the document sends output.
+cePreviewActive();
 
 // ---------------------------------------------------------------
 // Search helpers
@@ -38,7 +43,7 @@ if (!function_exists('gncSearchText')) {
 // ---------------------------------------------------------------
 // Read filter/search/pagination params from the query string
 // ---------------------------------------------------------------
-$activeType   = $_GET['type'] ?? 'all';                 // all | announcement | news
+$activeType   = $_GET['type'] ?? 'all';
 $activeType   = in_array($activeType, ['all', 'announcement', 'news'], true) ? $activeType : 'all';
 $searchTerm   = trim($_GET['q'] ?? '');
 
@@ -48,25 +53,13 @@ $searchTerm   = trim($_GET['q'] ?? '');
 // (see getProgramCategories() in admin-functions.php). 'ALL' / '' both
 // mean "no restriction" — show every item regardless of program.
 // ---------------------------------------------------------------
-$programOptions = [
-    'ALL'     => 'All Programs',
-    'BEEd'    => 'Bachelor of Elementary Education',
-    'BSEd'    => 'Bachelor of Secondary Education',
-    'BAEL'    => 'Bachelor of Arts in English Language',
-    'BSCE'    => 'Bachelor of Science in Civil Engineering',
-    'BSAIS'   => 'Bachelor of Science in Accounting Information Systems',
-    'BSA'     => 'Bachelor of Science in Accountancy',
-    'BSBA-FM' => 'Bachelor of Science in Business Administration major in Financial Management',
-    'BSCS'    => 'Bachelor of Science in Computer Science',
-    'BSIT'    => 'Bachelor of Science in Information Technology',
-    'BSHM'    => 'Bachelor of Science in Hospitality Management',
-    'BSTM'    => 'Bachelor of Science in Tourism Management',
-    'BSMLS'   => 'Bachelor of Science in Medical Laboratory Science',
-    'BSPh'    => 'Bachelor of Science in Pharmacy',
-    'BSN'     => 'Bachelor of Science in Nursing',
-];
-$programFilter = $_GET['program'] ?? 'ALL';
-$programFilter = isset($programOptions[$programFilter]) ? $programFilter : 'ALL';
+$newsFilters = publicCalendarFilters($_GET);
+$programOptions = $newsFilters['programs'];
+$programFullNames = $programOptions;
+$calendarDepartments = $newsFilters['departments'];
+$selectedDepartment = $newsFilters['department'];
+$calendarFilterLabel = $newsFilters['label'];
+$programFilter = $newsFilters['program'] ?? 'ALL';
 
 // ---------------------------------------------------------------
 // Sort order (newest-first is the default)
@@ -88,7 +81,7 @@ try {
 // ---------------------------------------------------------------
 try {
     $homePrograms = $db ? $db->query("
-        SELECT p.program_id, p.program_code, d.slug AS dept_slug
+        SELECT p.program_id, p.program_code, p.dept_id, d.slug AS dept_slug
         FROM programs p
         LEFT JOIN departments d ON d.dept_id = p.dept_id
         ORDER BY p.program_code ASC
@@ -97,6 +90,13 @@ try {
     $homePrograms = [];
 }
 $selectedProgram = ($programFilter !== 'ALL') ? $programFilter : null;
+$programDepartmentIds = array_column($homePrograms, 'dept_id', 'program_code');
+$departmentPrograms = [];
+if ($selectedDepartment !== null) {
+    foreach ($homePrograms as $program) {
+        if ($program['dept_slug'] === $selectedDepartment) $departmentPrograms[] = $program['program_code'];
+    }
+}
 
 // ---------------------------------------------------------------
 // Categories for the sidebar (Emergency, Holiday, Reminder, School Event…)
@@ -112,7 +112,27 @@ try {
 }
 $selectedCategory = null;
 $selectedCategoryName = '';
-if (isset($_GET['category']) && ctype_digit((string)$_GET['category'])) {
+$newsCategoryLabels = getNewsCategories();
+$newsSidebarCategories = array_diff_key($newsCategoryLabels, array_flip(['Updates', 'Job Opportunities', 'Scholarship']));
+$categoryColors = [
+    'Holiday'=>'#C99114', 'Job Opportunities'=>'#2878A5', 'Reminder'=>'#D46B28',
+    'Scholarship'=>'#8851AD', 'School Event'=>'#26713A', 'Suspension'=>'#BC3030',
+    'School News'=>'#236C91', 'Academic'=>'#6452A3', 'Achievements'=>'#B88616',
+    'Student Life'=>'#B34880', 'Community Extension'=>'#28856F',
+    'Athletics and Sports'=>'#D0652B', 'Others'=>'#657681',
+];
+foreach ($sidebarCategories as &$category) {
+    $category['category_color'] = $categoryColors[$category['category_name']] ?? $category['category_color'];
+}
+unset($category);
+$categoryGroups = [
+    'announcement' => ['label'=>'Announcements', 'categories'=>$sidebarCategories],
+    'news' => ['label'=>'News', 'categories'=>array_map(static fn($code,$label)=>['category_id'=>$code,'category_name'=>$label,'category_color'=>$categoryColors[$code] ?? '#657681'], array_keys($newsSidebarCategories), array_values($newsSidebarCategories))],
+];
+if ($activeType === 'news' && is_string($_GET['category'] ?? null) && isset($newsCategoryLabels[$_GET['category']])) {
+    $selectedCategory = $_GET['category'];
+    $selectedCategoryName = $newsCategoryLabels[$selectedCategory];
+} elseif (isset($_GET['category']) && is_scalar($_GET['category']) && ctype_digit((string)$_GET['category'])) {
     foreach ($sidebarCategories as $cat) {
         if ((int)$cat['category_id'] === (int)$_GET['category']) {
             $selectedCategory = (int)$cat['category_id'];
@@ -120,25 +140,6 @@ if (isset($_GET['category']) && ctype_digit((string)$_GET['category'])) {
             break;
         }
     }
-}
-
-// Upcoming events for the sidebar (next 3 published; narrowed to the
-// selected program when one is chosen, same as the homepage)
-try {
-    $evSql = "SELECT e.event_id, e.title, e.start_date, e.end_date
-              FROM events e
-              WHERE e.status = 'published' AND e.start_date >= ?";
-    $evParams = [date('Y-m-d 00:00:00')];
-    if ($selectedProgram !== null) {
-        $evSql .= " AND e.program = ?";
-        $evParams[] = $selectedProgram;
-    }
-    $evSql .= " ORDER BY e.start_date ASC LIMIT 3";
-    $evStmt = $db->prepare($evSql);
-    $evStmt->execute($evParams);
-    $sidebarEvents = $evStmt->fetchAll();
-} catch (Exception $e) {
-    $sidebarEvents = [];
 }
 
 // ---------------------------------------------------------------
@@ -185,7 +186,7 @@ if ($db) {
     try {
         $stmt = $db->query("
             SELECT n.news_id, n.title, n.slug, n.content, n.author, n.published_at, n.created_at,
-                n.category_id, c.category_name, m.file_path as image_path
+                n.category_id, n.category AS news_category, c.category_name, m.file_path as image_path
             FROM news n
             LEFT JOIN categories c ON n.category_id = c.category_id
             LEFT JOIN media_library m ON n.featured_image = m.media_id
@@ -200,12 +201,13 @@ if ($db) {
                 'type_label'    => 'News',
                 'title'         => $item['title'],
                 'excerpt'       => $excerpt,
-                'search_text'   => gncSearchText([$item['title'], $item['content'], $item['category_name'], $item['author'] ?? '']),
+                'search_text'   => gncSearchText([$item['title'], $item['content'], $newsCategoryLabels[$item['news_category']] ?? $item['news_category'], $item['author'] ?? '']),
                 'image_path'    => $item['image_path'],
                 'date'          => $item['published_at'] ?? $item['created_at'],
                 'link'          => '/news-article.php?slug=' . urlencode($item['slug']),
                 'category_id'   => $item['category_id'],
-                'category_name' => $item['category_name'],
+                'category_name' => $newsCategoryLabels[$item['news_category']] ?? $item['news_category'],
+                'news_category' => $item['news_category'],
                 'program'       => null, // news isn't tagged to a specific program
                 'author'        => $item['author'] ?? null,
             ];
@@ -219,7 +221,7 @@ if ($db) {
     // -----------------------------------------------------------
     try {
         $rows = $db->query("
-            SELECT f.message, f.permalink_url, f.created_time, f.category_id, c.category_name, m.file_path
+            SELECT f.fb_post_id, f.message, f.permalink_url, f.created_time, f.category_id, c.category_name, m.file_path
             FROM fb_posts_cache f
             LEFT JOIN media_library m ON f.image_media_id = m.media_id
             LEFT JOIN categories c ON f.category_id = c.category_id
@@ -236,7 +238,7 @@ if ($db) {
                 'search_text'   => gncSearchText([$row['message']]),
                 'image_path'    => $row['file_path'],
                 'date'          => $row['created_time'],
-                'link'          => $row['permalink_url'] ?? ('https://facebook.com/' . ($_ENV['FB_PAGE_ID'] ?? '')),
+                'link'          => gncFacebookPostUrl($row['permalink_url'], $row['fb_post_id'], FB_PAGE_ID),
                 'category_id'   => $row['category_id'],
                 'category_name' => $row['category_name'],
                 'program'       => null, // Facebook posts aren't tagged to a specific program
@@ -328,7 +330,7 @@ if ($db) {
         }
 
         $stmt = $db->query("
-            SELECT f.message, f.permalink_url, f.created_time, f.pinned_at, m.file_path AS image_path
+            SELECT f.fb_post_id, f.message, f.permalink_url, f.created_time, f.pinned_at, m.file_path AS image_path
             FROM fb_posts_cache f
             LEFT JOIN media_library m ON f.image_media_id = m.media_id
             WHERE f.is_pinned = 1
@@ -345,7 +347,7 @@ if ($db) {
                 'image_path' => $row['image_path'],
                 'date'       => $row['created_time'],
                 'pinned_at'  => $row['pinned_at'],
-                'link'       => $row['permalink_url'] ?? ('https://facebook.com/' . ($_ENV['FB_PAGE_ID'] ?? '')),
+                'link'       => gncFacebookPostUrl($row['permalink_url'], $row['fb_post_id'], FB_PAGE_ID),
             ];
         }
 
@@ -371,14 +373,20 @@ usort($feedItems, function ($a, $b) use ($sortOrder) {
 // Apply filters: type tab, search box, program dropdown
 // ---------------------------------------------------------------
 $searchWords = $searchTerm === '' ? [] : array_values(array_filter(preg_split('/\s+/u', gncNormalizeForSearch($searchTerm)), 'strlen'));
-$matchesFilters = function ($item, $skipCategory = false) use ($activeType, $searchWords, $programFilter, $selectedCategory) {
-    if ($activeType !== 'all' && $item['type_key'] !== $activeType) {
+$matchesFilters = function ($item, $skipCategory = false, $skipType = false) use ($activeType, $searchWords, $programFilter, $selectedCategory, $selectedDepartment, $departmentPrograms, $calendarDepartments, $programDepartmentIds) {
+    if (!$skipType && $activeType !== 'all' && $item['type_key'] !== $activeType) {
         return false;
     }
-    if (!$skipCategory && $selectedCategory !== null && (int)($item['category_id'] ?? 0) !== $selectedCategory) {
-        return false;
+    if (!$skipCategory && $selectedCategory !== null) {
+        $itemCategory = is_string($selectedCategory) ? ($item['news_category'] ?? null) : (int)($item['category_id'] ?? 0);
+        if ($itemCategory !== $selectedCategory) return false;
     }
-    if ($programFilter !== '' && $programFilter !== 'ALL') {
+    if ($selectedDepartment !== null) {
+        if (!empty($item['dept_id']) && (int)$item['dept_id'] !== (int)$calendarDepartments[$selectedDepartment]['dept_id']) return false;
+        $itemProgram = $item['program'] ?? null;
+        if ($itemProgram !== 'ALL' && !in_array($itemProgram, $departmentPrograms, true)) return false;
+    } elseif ($programFilter !== '' && $programFilter !== 'ALL') {
+        if (!empty($item['dept_id']) && (int)$item['dept_id'] !== (int)($programDepartmentIds[$programFilter] ?? 0)) return false;
         // Show items tagged with this exact program, or tagged 'ALL'
         // (applies to every program). Items with no program (news,
         // Facebook posts) are excluded once a specific program is chosen.
@@ -398,13 +406,13 @@ $matchesFilters = function ($item, $skipCategory = false) use ($activeType, $sea
 };
 $filteredItems = array_values(array_filter($feedItems, fn($it) => $matchesFilters($it)));
 
-// Category counts in the sidebar follow the other active filters (type, search, program),
-// so the numbers match what the visitor will actually see after clicking.
+// Each group's counts match its destination type, keeping search/audience filters.
 $catCounts = [];
 foreach ($feedItems as $fi) {
-    if (!$matchesFilters($fi, true)) continue;
-    $cid = (int)($fi['category_id'] ?? 0);
-    if ($cid) $catCounts[$cid] = ($catCounts[$cid] ?? 0) + 1;
+    if (!$matchesFilters($fi, true, true)) continue;
+    $group = $fi['type_key'];
+    $cid = $group === 'news' ? ($fi['news_category'] ?? '') : (string)($fi['category_id'] ?? '');
+    if ($cid !== '') $catCounts[$group][$cid] = ($catCounts[$group][$cid] ?? 0) + 1;
 }
 
 // ---------------------------------------------------------------
@@ -417,10 +425,11 @@ $pageItems = array_slice($filteredItems, ($currentPage - 1) * ITEMS_PER_PAGE, IT
 
 // Helper to rebuild querystring while overriding a param
 function na_url(array $overrides = []): string {
-    global $programFilter, $selectedCategory;
+    global $programFilter, $selectedCategory, $selectedDepartment;
     $params = array_merge([
         'type'     => $_GET['type'] ?? 'all',
         'q'        => $_GET['q'] ?? '',
+        'department' => $selectedDepartment ?? '',
         'program'  => $programFilter !== 'ALL' ? $programFilter : '',
         'category' => $selectedCategory ?? '',
         'sort'     => $_GET['sort'] ?? 'newest',
@@ -443,6 +452,7 @@ function na_url(array $overrides = []): string {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link href="/assets/css/news-announcement-style.css?v=2" rel="stylesheet">
     <link href="/assets/css/skeleton-style.css?v=2" rel="stylesheet">
+    <link href="/assets/css/calendar-program-widget.css?v=<?= filemtime(__DIR__ . '/../assets/css/calendar-program-widget.css') ?>" rel="stylesheet">
     <style>
         /* Programs sidebar (same look as the homepage card) */
         .na-side-stack{display:flex;flex-direction:column;gap:1.25rem}
@@ -604,15 +614,15 @@ function na_url(array $overrides = []): string {
 
             <div class="na-toolbar" id="na-results">
                 <div class="na-tabs" role="tablist">
-                    <a href="<?= htmlspecialchars(na_url(['type' => 'all', 'page' => 1])) ?>"
+                    <a href="<?= htmlspecialchars(na_url(['type' => 'all', 'category'=>'', 'page' => 1])) ?>"
                        class="na-tab <?= $activeType === 'all' ? 'active' : '' ?>">
                         <i class="bi bi-grid-fill"></i> All
                     </a>
-                    <a href="<?= htmlspecialchars(na_url(['type' => 'announcement', 'page' => 1])) ?>"
+                    <a href="<?= htmlspecialchars(na_url(['type' => 'announcement', 'category'=>'', 'page' => 1])) ?>"
                        class="na-tab <?= $activeType === 'announcement' ? 'active' : '' ?>">
                         <i class="bi bi-megaphone"></i> Announcement
                     </a>
-                    <a href="<?= htmlspecialchars(na_url(['type' => 'news', 'page' => 1])) ?>"
+                    <a href="<?= htmlspecialchars(na_url(['type' => 'news', 'category'=>'', 'page' => 1])) ?>"
                        class="na-tab <?= $activeType === 'news' ? 'active' : '' ?>">
                         <i class="bi bi-file-earmark-text"></i> News
                     </a>
@@ -620,6 +630,9 @@ function na_url(array $overrides = []): string {
 
                 <form class="na-filters" method="get" action="news-and-announcement.php#na-results">
                     <input type="hidden" name="type" value="<?= htmlspecialchars($activeType) ?>">
+                    <?php if ($selectedDepartment !== null): ?>
+                    <input type="hidden" name="department" value="<?= htmlspecialchars($selectedDepartment) ?>">
+                    <?php endif; ?>
 
                     <div class="na-search">
                         <i class="bi bi-search"></i>
@@ -632,7 +645,7 @@ function na_url(array $overrides = []): string {
                     <?php endif; ?>
 
                     <?php if ($selectedCategory !== null): ?>
-                    <input type="hidden" name="category" value="<?= (int)$selectedCategory ?>">
+                    <input type="hidden" name="category" value="<?= htmlspecialchars((string)$selectedCategory) ?>">
                     <?php endif; ?>
 
                     <input type="hidden" name="sort" value="<?= htmlspecialchars($sortOrder) ?>">
@@ -673,7 +686,8 @@ function na_url(array $overrides = []): string {
                 if ($searchTerm !== '')          $activeChips[] = ['Search: “' . $searchTerm . '”', na_url(['q' => '', 'page' => 1])];
                 if ($selectedProgram !== null)   $activeChips[] = ['Program: ' . $selectedProgram, na_url(['program' => '', 'page' => 1])];
                 if ($selectedCategory !== null)  $activeChips[] = ['Category: ' . $selectedCategoryName, na_url(['category' => '', 'page' => 1])];
-                $clearAllUrl = na_url(['type' => 'all', 'q' => '', 'program' => '', 'category' => '', 'page' => 1]);
+                if ($selectedDepartment !== null) $activeChips[] = ['Department: ' . $calendarFilterLabel, na_url(['department' => '', 'page' => 1])];
+                $clearAllUrl = na_url(['department' => '', 'type' => 'all', 'q' => '', 'program' => '', 'category' => '', 'page' => 1]);
             ?>
             <?php if ($totalItems > 0 || $activeChips): ?>
             <div class="na-summary" aria-live="polite">
@@ -690,8 +704,8 @@ function na_url(array $overrides = []): string {
                 <?php endif; ?>
             </div>
             <?php endif; ?>
-            <?php if ($selectedProgram !== null): ?>
-            <div class="na-note"><i class="bi bi-info-circle"></i> Showing posts for <?= htmlspecialchars($selectedProgram) ?> and posts for all programs. News articles and Facebook posts are not tied to a program, so they are hidden while a program is selected.</div>
+            <?php if ($calendarFilterLabel !== null): ?>
+            <div class="na-note"><i class="bi bi-info-circle"></i> Showing posts for <?= htmlspecialchars($calendarFilterLabel) ?> and posts for all programs. News articles and Facebook posts are not tied to a program, so they are hidden while a department or program is selected.</div>
             <?php endif; ?>
 
             <?php if (empty($pageItems)): ?>
@@ -815,40 +829,16 @@ function na_url(array $overrides = []): string {
             <?php endif; ?>
             </div>
 
-            <aside class="col-lg-4 na-sidebar">
+            <aside class="col-lg-4 na-sidebar gnc-program-filter-scope">
               <div class="na-side-stack">
-                <div class="gnc-upcoming-card">
-                    <div class="gnc-upcoming-header d-flex align-items-center justify-content-between">
-                        <span><i class="bi bi-mortarboard-fill"></i> Programs</span>
-                        <?php if ($selectedProgram !== null): ?>
-                            <a href="<?= htmlspecialchars(na_url(['program' => '', 'page' => 1])) ?>" class="gnc-programs-count text-decoration-none">
-                                <?= htmlspecialchars($selectedProgram) ?> &times;
-                            </a>
-                        <?php elseif (!empty($homePrograms)): ?>
-                            <span class="gnc-programs-count"><?= count($homePrograms) ?></span>
-                        <?php endif; ?>
-                    </div>
-                    <div class="gnc-programs-list">
-                        <?php if (empty($homePrograms)): ?>
-                            <p class="text-muted px-3 py-4 mb-0">No programs available at this time.</p>
-                        <?php else: foreach ($homePrograms as $prog):
-                            $code     = $prog['program_code'];
-                            $full     = $programOptions[$code] ?? null;
-                            $isActive = ($selectedProgram === $code);
-                            // Clicking a program filters the feed; clicking the active one clears it.
-                            $progUrl  = na_url(['program' => $isActive ? '' : $code, 'page' => 1]);
-                        ?>
-                            <a href="<?= htmlspecialchars($progUrl) ?>" class="gnc-programs-list-item text-decoration-none<?= $isActive ? ' gnc-programs-list-item-active' : '' ?>">
-                                <span class="gnc-programs-code"><?= htmlspecialchars($code) ?></span>
-                                <?php if ($full): ?>
-                                    <span class="gnc-programs-list-fullname"><?= htmlspecialchars($full) ?></span>
-                                <?php endif; ?>
-                            </a>
-                        <?php endforeach; endif; ?>
-                    </div>
-                </div>
+                <?php
+                $calendarFilterSection = 'na-results';
+                $calendarFilterTitle = 'News Categories';
+                $calendarFilterUrl = static fn(array $filter) => na_url(array_merge(['department' => '', 'program' => '', 'page' => 1], $filter));
+                include __DIR__ . '/../components/calendar-program-filter.php';
+                ?>
 
-                <?php if (!empty($sidebarCategories)): ?>
+                <?php if (!empty($categoryGroups)): ?>
                 <div class="gnc-upcoming-card">
                     <div class="gnc-upcoming-header d-flex align-items-center justify-content-between">
                         <span><i class="bi bi-tags-fill"></i> Categories</span>
@@ -858,43 +848,26 @@ function na_url(array $overrides = []): string {
                             </a>
                         <?php endif; ?>
                     </div>
-                    <div class="gnc-cat-list">
-                        <?php foreach ($sidebarCategories as $cat):
-                            $cid      = (int)$cat['category_id'];
-                            $isActive = ($selectedCategory === $cid);
+                    <?php foreach ($categoryGroups as $groupType=>$group): ?>
+                    <h3 class="gnc-calendar-filter-heading mb-0" id="na-category-<?= $groupType ?>"><?= htmlspecialchars($group['label']) ?></h3>
+                    <div class="gnc-cat-list" role="group" aria-labelledby="na-category-<?= $groupType ?>">
+                        <?php foreach ($group['categories'] as $cat):
+                            $cid      = $cat['category_id'];
+                            $isActive = ($activeType === $groupType && $selectedCategory === $cid);
                             // Clicking a category filters the feed; clicking the active one clears it.
-                            $catUrl   = na_url(['category' => $isActive ? '' : $cid, 'page' => 1]);
+                            $catUrl   = na_url(['type'=>$groupType, 'category' => $isActive ? '' : $cid, 'page' => 1]);
                         ?>
                         <a href="<?= htmlspecialchars($catUrl) ?>" class="gnc-cat-item text-decoration-none<?= $isActive ? ' gnc-cat-item-active' : '' ?>">
                             <span class="gnc-cat-dot" style="background:<?= htmlspecialchars($cat['category_color'] ?: '#094024') ?>"></span>
                             <span class="gnc-cat-name"><?= htmlspecialchars($cat['category_name']) ?></span>
-                            <span class="gnc-cat-count"><?= (int)($catCounts[$cid] ?? 0) ?></span>
+                            <span class="gnc-cat-count"><?= (int)($catCounts[$groupType][$cid] ?? 0) ?></span>
                         </a>
                         <?php endforeach; ?>
                     </div>
+                    <?php endforeach; ?>
                 </div>
                 <?php endif; ?>
 
-                <div class="na-events-card">
-                    <h3 class="na-events-title">Upcoming Events</h3>
-                    <?php if (empty($sidebarEvents)): ?>
-                        <p class="text-muted mb-3">
-                            <?= $selectedProgram !== null ? 'No upcoming events for ' . htmlspecialchars($selectedProgram) . '.' : 'No upcoming events at this time.' ?>
-                        </p>
-                    <?php else: foreach ($sidebarEvents as $ev): $ts = strtotime($ev['start_date']); ?>
-                        <div class="na-event-item">
-                            <div class="na-event-badge">
-                                <span class="na-event-month"><?= strtoupper(date('M', $ts)) ?></span>
-                                <span class="na-event-day"><?= date('d', $ts) ?></span>
-                            </div>
-                            <div class="na-event-info">
-                                <div class="na-event-name"><?= htmlspecialchars($ev['title']) ?></div>
-                                <div class="na-event-date"><?= date('F j, Y', $ts) ?></div>
-                            </div>
-                        </div>
-                    <?php endforeach; endif; ?>
-                    <a href="/index.php#events" class="na-events-link">View Calendar <i class="bi bi-arrow-right"></i></a>
-                </div>
             </div>
             </aside>
             </div>
@@ -907,6 +880,7 @@ function na_url(array $overrides = []): string {
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
     <script src="/assets/js/skeleton-loader.js"></script>
+    <script src="/assets/js/calendar-program-widget.js?v=<?= filemtime(__DIR__ . '/../assets/js/calendar-program-widget.js') ?>" defer></script>
     <script>
     // Live search: results update a moment after the visitor stops typing (Enter still works too).
     (function () {

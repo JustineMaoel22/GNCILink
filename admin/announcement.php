@@ -8,25 +8,38 @@
  * the modal form and the per-row delete forms POST to directly.
  */
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/facebook-post-url.php';
 require_once __DIR__ . '/admin-functions.php';
+require_once __DIR__ . '/../includes/facebook-publishing.php';
 
 initSession();
 requireLogin();
 
+$facebookPostsPage = ($facebookPostsPage ?? false) === true;
+// Keep bookmarks to the former Facebook filter working.
+if (!$facebookPostsPage && ($_GET['source'] ?? '') === 'facebook') {
+    $query = [];
+    if (is_string($_GET['search'] ?? null)) $query['search'] = $_GET['search'];
+    if (($_GET['embed'] ?? '') === '1') $query['embed'] = '1';
+    header('Location: /admin/facebook-posts.php' . ($query ? '?' . http_build_query($query) : ''));
+    exit;
+}
+
 // Flash from a failed submit (set by the action handler)
 $flashErrors = $_SESSION['flash_errors'] ?? [];
 $flashOld    = $_SESSION['flash_old'] ?? [];
+require_once __DIR__.'/../includes/content-submissions.php';
+if (isset($_GET['revise'])) $flashOld=rbacRevisionFormData('/admin/action/create-announcement.php');
 $flashSuccess = $_SESSION['flash_success'] ?? '';
 unset($_SESSION['flash_errors'], $_SESSION['flash_old'], $_SESSION['flash_success']);
 
 // ============================================================
 // LIST DATA
 // ============================================================
-$statusFilter  = $_GET['status'] ?? '';
-$programFilter = $_GET['program'] ?? '';
+$statusFilter  = $facebookPostsPage ? '' : ($_GET['status'] ?? '');
+$programFilter = $facebookPostsPage ? '' : ($_GET['program'] ?? '');
 $search        = trim($_GET['search'] ?? '');
-$sourceFilter  = $_GET['source'] ?? '';   // '' = all, 'website', 'facebook'
-if (!in_array($sourceFilter, ['', 'website', 'facebook'], true)) $sourceFilter = '';
+$sourceFilter = $facebookPostsPage ? 'facebook' : 'website';
 $filters       = [];
 if ($statusFilter !== '') $filters['status'] = $statusFilter;
 if ($programFilter !== '') $filters['program'] = $programFilter;
@@ -36,13 +49,9 @@ if ($search !== '') $filters['search'] = $search;
 $announcements = ($sourceFilter === 'facebook') ? [] : getAnnouncements($filters, 50, 0);
 $pinnedCount   = countPinnedItems();
 
-// Cached Facebook posts are listed alongside announcements so they can be
-// pinned too. They have no status/program, so hide them when either filter
-// is active; the text search still applies.
+// Facebook posts have their own sidebar page; both lists retain search.
 $fbPosts = [];
-// "website" source hides Facebook posts; "facebook" source always shows them
-// (status/program don't apply to Facebook posts, so they're ignored there).
-if ($sourceFilter === 'facebook' || ($sourceFilter === '' && $statusFilter === '' && $programFilter === '')) {
+if ($facebookPostsPage) {
     $fbPosts = getFacebookPostsAdminList(50, $search);
 }
 
@@ -53,6 +62,7 @@ try {
 }
 
 $programCategories = getProgramCategories();
+$announcementProgramChoices = getAnnouncementProgramCategories();
 
 try {
     $departments = getDB()->query("SELECT dept_id, dept_name FROM departments ORDER BY dept_id ASC")->fetchAll();
@@ -61,7 +71,7 @@ try {
 }
 
 // Which modal (if any) should auto-open on load
-$modalMode    = $_GET['modal'] ?? '';   // '', 'create', or 'edit'
+$modalMode    = $facebookPostsPage ? '' : ($_GET['modal'] ?? '');   // '', 'create', or 'edit'
 $modalEditing = null;
 if ($modalMode === 'edit') {
     $modalEditing = getAnnouncementById((int)($_GET['id'] ?? 0));
@@ -91,21 +101,30 @@ if (!function_exists('ann_url')) {
     }
 }
 $baseQuery = ['search' => $search, 'source' => $sourceFilter, 'status' => $statusFilter, 'program' => $programFilter];
-$filtersActive = ($search !== '' || $sourceFilter !== '' || $statusFilter !== '' || $programFilter !== '');
+$filtersActive = ($search !== '' || $statusFilter !== '' || $programFilter !== '');
 $canPublish    = hasPermission('publish_announcement');
+$facebookPublishingReady = facebookPublishingReady();
+$facebookConnection = facebookPublishingConnection();
+$facebookDeliveries = [];
+if ($facebookPublishingReady && $announcements) {
+    $deliveryIds = array_column($announcements, 'announcement_id');
+    $stmt = getDB()->prepare('SELECT * FROM announcement_facebook_deliveries WHERE announcement_id IN (' . implode(',', array_fill(0, count($deliveryIds), '?')) . ')');
+    $stmt->execute($deliveryIds);
+    foreach ($stmt->fetchAll() as $delivery) $facebookDeliveries[$delivery['announcement_id']] = $delivery;
+}
 // Super admins are the approvers, so they never need "Send for approval".
 $isSuperAdmin  = (($_SESSION['user_role'] ?? '') === 'Super Admin');
 
-$pageTitle = 'Announcements';
+$pageTitle = $facebookPostsPage ? 'Facebook Posts' : 'Announcements';
 include __DIR__ . '/../components/header-admin.php';
 ?>
 
 <div class="page-header">
     <div>
-        <h1>Announcements</h1>
-        <p>Share news with students and parents. Write a new announcement, or manage the ones you already posted.</p>
+        <h1><?= $pageTitle ?></h1>
+        <p><?= $facebookPostsPage ? 'Manage posts retrieved from the school Facebook Page. Update their categories or pin them to the homepage slideshow.' : 'Share news with students and parents. Write a new announcement, or manage the ones you already posted.' ?></p>
     </div>
-    <?php if (hasPermission('create_announcement')): ?>
+    <?php if (!$facebookPostsPage && hasPermission('create_announcement')): ?>
     <button type="button" class="btn btn-gnc-gold" id="btn-new-announcement">
         <i class="bi bi-plus-lg"></i> New Announcement
     </button>
@@ -128,7 +147,7 @@ include __DIR__ . '/../components/header-admin.php';
     <div class="ann-pin-banner-icon"><i class="bi bi-pin-angle-fill"></i></div>
     <div class="flex-grow-1">
         <div class="fw-semibold">Homepage slideshow: <?= (int)$pinnedCount ?> of <?= MAX_PINNED_ITEMS ?> spots used</div>
-        <div class="ann-sub">Pin an announcement or news item to show it in the big slideshow on the homepage.<?= $pinnedCount >= MAX_PINNED_ITEMS ? ' All spots are taken — unpin one to pin another.' : '' ?></div>
+        <div class="ann-sub">Pin an announcement, news item, or Facebook post to show it in the big slideshow on the homepage.<?= $pinnedCount >= MAX_PINNED_ITEMS ? ' All spots are taken — unpin one to pin another.' : '' ?></div>
     </div>
     <div class="ann-pin-dots" aria-hidden="true">
         <?php for ($i = 1; $i <= MAX_PINNED_ITEMS; $i++): ?><span class="<?= $i <= $pinnedCount ? 'on' : '' ?>"></span><?php endfor; ?>
@@ -138,7 +157,7 @@ include __DIR__ . '/../components/header-admin.php';
 
 <div class="data-card">
     <div class="data-card-header flex-wrap gap-2">
-        <span class="data-card-title"><i class="bi bi-megaphone-fill me-1"></i> All Announcements</span>
+        <span class="data-card-title"><i class="bi bi-<?= $facebookPostsPage ? 'facebook' : 'megaphone-fill' ?> me-1"></i> <?= $facebookPostsPage ? 'Facebook Posts' : 'All Announcements' ?></span>
         <form method="GET" class="ann-search ms-auto">
             <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
             <input type="hidden" name="source" value="<?= htmlspecialchars($sourceFilter) ?>">
@@ -147,42 +166,41 @@ include __DIR__ . '/../components/header-admin.php';
                 <input type="search" name="search" id="announcement-search" class="form-control form-control-sm"
                        placeholder="Search by title or content…" value="<?= htmlspecialchars($search) ?>" autocomplete="off">
             </div>
+            <?php if (!$facebookPostsPage): ?>
             <select name="program" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Filter by program">
                 <option value="">All programs</option>
                 <?php foreach ($programCategories as $code => $label): ?>
                 <option value="<?= htmlspecialchars($code) ?>" <?= $programFilter === $code ? 'selected' : '' ?>><?= htmlspecialchars($code === 'ALL' ? 'For everyone' : $code) ?></option>
                 <?php endforeach; ?>
             </select>
+            <?php endif; ?>
         </form>
     </div>
 
+    <?php if (!$facebookPostsPage || $filtersActive): ?>
     <div class="ann-filters">
+        <?php if (!$facebookPostsPage): ?>
         <div class="ann-chip-row">
             <a class="ann-chip<?= $statusFilter === '' ? ' active' : '' ?>" href="<?= ann_url($baseQuery, ['status' => '']) ?>">All</a>
             <?php foreach ($statusLabels as $key => $label): ?>
             <a class="ann-chip<?= $statusFilter === $key ? ' active' : '' ?>" href="<?= ann_url($baseQuery, ['status' => $key]) ?>"><?= $key === 'pending' ? 'Waiting' : ($key === 'published' ? 'Live' : ($key === 'draft' ? 'Drafts' : $label)) ?></a>
             <?php endforeach; ?>
         </div>
+        <?php endif; ?>
         <div class="ann-chip-row">
-            <span class="ann-chip-label">Show:</span>
-            <a class="ann-chip ann-chip-sm<?= $sourceFilter === '' ? ' active' : '' ?>" href="<?= ann_url($baseQuery, ['source' => '']) ?>">Everything</a>
-            <a class="ann-chip ann-chip-sm<?= $sourceFilter === 'website' ? ' active' : '' ?>" href="<?= ann_url($baseQuery, ['source' => 'website']) ?>"><i class="bi bi-globe2"></i> Website posts</a>
-            <a class="ann-chip ann-chip-sm<?= $sourceFilter === 'facebook' ? ' active' : '' ?>" href="<?= ann_url($baseQuery, ['source' => 'facebook']) ?>"><i class="bi bi-facebook"></i> Facebook posts</a>
             <?php if ($filtersActive): ?>
             <a class="ann-clear" href="?"><i class="bi bi-x-circle"></i> Clear filters</a>
             <?php endif; ?>
         </div>
-        <?php if ($sourceFilter === '' && ($statusFilter !== '' || $programFilter !== '')): ?>
-        <div class="ann-sub"><i class="bi bi-info-circle"></i> Facebook posts have no status or program, so they are hidden while these filters are on.</div>
-        <?php endif; ?>
     </div>
+    <?php endif; ?>
 
     <div class="table-responsive">
         <table class="table table-hover mb-0 ann-table" id="announcements-table">
             <thead>
                 <tr>
                     <th style="width:72px"></th>
-                    <th>Announcement</th>
+                    <th><?= $facebookPostsPage ? 'Facebook post' : 'Announcement' ?></th>
                     <th>Category</th>
                     <th>For</th>
                     <th>Status</th>
@@ -195,11 +213,11 @@ include __DIR__ . '/../components/header-admin.php';
                     <div class="ann-empty">
                         <i class="bi bi-megaphone"></i>
                         <?php if ($filtersActive): ?>
-                            <p class="mb-2">No announcements match your search or filters.</p>
+                            <p class="mb-2"><?= $facebookPostsPage ? 'No Facebook posts match your search.' : 'No announcements match your search or filters.' ?></p>
                             <a href="?" class="btn btn-sm btn-outline-secondary">Clear filters</a>
                         <?php else: ?>
-                            <p class="mb-2">No announcements yet.</p>
-                            <?php if (hasPermission('create_announcement')): ?>
+                            <p class="mb-2"><?= $facebookPostsPage ? 'No Facebook posts have been retrieved yet.' : 'No announcements yet.' ?></p>
+                            <?php if (!$facebookPostsPage && hasPermission('create_announcement')): ?>
                             <button type="button" class="btn btn-sm btn-gnc-gold js-new-announcement"><i class="bi bi-plus-lg"></i> Write your first announcement</button>
                             <?php endif; ?>
                         <?php endif; ?>
@@ -234,7 +252,13 @@ include __DIR__ . '/../components/header-admin.php';
                             <span class="program-badge<?= $progCode === 'ALL' ? ' program-badge-all' : '' ?>"><?= $progCode === 'ALL' ? 'All programs' : htmlspecialchars($progCode) ?></span>
                         </div>
                     </td>
-                    <td data-label="Status"><span class="status-badge <?= htmlspecialchars($a['status']) ?>"><?= htmlspecialchars($statusLabels[$a['status']] ?? ucfirst($a['status'])) ?></span></td>
+                    <td data-label="Status"><span class="status-badge <?= htmlspecialchars($a['status']) ?>"><?= htmlspecialchars($statusLabels[$a['status']] ?? ucfirst($a['status'])) ?></span>
+                        <?php if (isset($facebookDeliveries[$a['announcement_id']])): $delivery = $facebookDeliveries[$a['announcement_id']]; ?>
+                        <div class="small mt-1">Facebook: <?= htmlspecialchars($delivery['state']) ?> · Page <?= htmlspecialchars($delivery['page_id']) ?></div>
+                        <?php if ($delivery['post_url']): ?><a class="small" target="_blank" rel="noopener noreferrer" href="<?= htmlspecialchars(facebookPublishingViewPostUrl($delivery['post_url'], $delivery['post_id'] ?? '')) ?>">View Facebook post</a><?php endif; ?>
+                        <?php if ($delivery['last_error']): ?><div class="small text-danger"><?= htmlspecialchars($delivery['last_error']) ?></div><?php endif; ?>
+                        <?php endif; ?>
+                    </td>
                     <td class="ann-actions-cell">
                         <?php if ($canPublish): ?>
                         <form method="POST" action="/admin/action/create-announcement.php" class="ann-inline-form">
@@ -255,7 +279,7 @@ include __DIR__ . '/../components/header-admin.php';
                             </button>
                         </form>
                         <?php endif; ?>
-                        <?php if ($canPublish || hasPermission('edit_announcement') || (hasPermission('edit_own_announcement') && $isOwner)): ?>
+                        <?php if (rbacRole() !== 'The Mirror' && ($canPublish || hasPermission('edit_announcement') || (hasPermission('edit_own_announcement') && $isOwner))): ?>
                         <form method="POST" action="/admin/action/create-announcement.php" class="ann-inline-form">
                             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                             <input type="hidden" name="action" value="<?= $a['status'] === 'archived' ? 'unarchive' : 'archive' ?>">
@@ -348,7 +372,7 @@ include __DIR__ . '/../components/header-admin.php';
                         </button>
                         <?php endif; ?>
                         <?php if (!empty($fb['permalink_url'])): ?>
-                        <a href="<?= htmlspecialchars($fb['permalink_url']) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Open the post on Facebook">
+                        <a href="<?= htmlspecialchars(gncFacebookPostUrl($fb['permalink_url'], $fb['fb_post_id'], FB_PAGE_ID), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Open the post on Facebook">
                             <i class="bi bi-box-arrow-up-right"></i><span class="visually-hidden">Open on Facebook</span>
                         </a>
                         <?php endif; ?>
@@ -358,8 +382,8 @@ include __DIR__ . '/../components/header-admin.php';
             </tbody>
         </table>
     </div>
-    <?php if (count($announcements) >= 50): ?>
-    <div class="ann-sub p-3" style="border-top:1px solid rgba(128,128,128,.2)">Showing the 50 most recent announcements. Use the search box to find older ones.</div>
+    <?php if (count($announcements) >= 50 || count($fbPosts) >= 50): ?>
+    <div class="ann-sub p-3" style="border-top:1px solid rgba(128,128,128,.2)">Showing the 50 most recent <?= $facebookPostsPage ? 'Facebook posts' : 'announcements' ?>. Use the search box to find older ones.</div>
     <?php endif; ?>
 </div>
 
@@ -390,6 +414,7 @@ include __DIR__ . '/../components/header-admin.php';
           <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
           <input type="hidden" name="action" id="modal-action" value="create">
           <input type="hidden" name="announcement_id" id="modal-announcement-id" value="">
+          <input type="hidden" name="_review_id" value="<?= (int)($_GET['revise'] ?? 0) ?>">
 
           <div class="mb-3">
             <label class="form-label" for="modal-title">Headline <span class="text-danger">*</span></label>
@@ -414,14 +439,14 @@ include __DIR__ . '/../components/header-admin.php';
             </div>
             <div class="flex-grow-1">
               <input type="file" name="image" id="modal-image-input" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp">
-              <div class="form-text">Optional. JPG, PNG, GIF or WEBP, up to 10 MB. A wide (landscape) picture looks best.</div>
+              <div class="form-text">Optional. JPG, PNG, GIF or WEBP, up to 5 MB. A wide (landscape) picture looks best.</div>
             </div>
           </div>
 
           <div class="ann-section-label">More pictures (gallery)</div>
           <div class="mb-3">
             <input type="file" name="gallery_images[]" id="modal-gallery-input" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" multiple>
-            <div class="form-text">Optional. You can pick several photos at once — up to 10 at a time, 10 MB each.</div>
+            <div class="form-text">Optional. You can pick several photos at once — up to 10 at a time, 5 MB each.</div>
 
             <div id="modal-gallery-existing-wrap" class="mt-3" style="display:none">
               <div class="fw-semibold" style="font-size:.85rem">Pictures already in the gallery</div>
@@ -458,7 +483,7 @@ include __DIR__ . '/../components/header-admin.php';
             <div class="col-12 col-sm-4">
               <label class="form-label" for="modal-program">Program <span class="text-muted fw-normal">(optional)</span></label>
               <select name="program" id="modal-program" class="form-select" aria-describedby="modal-audience-help">
-                <?php foreach ($programCategories as $code => $label): ?>
+                <?php foreach ($announcementProgramChoices as $code => $label): ?>
                 <option value="<?= htmlspecialchars($code) ?>"><?= $code === 'ALL' ? 'Everyone (all programs)' : htmlspecialchars($code . ' — ' . $label) ?></option>
                 <?php endforeach; ?>
               </select>
@@ -468,12 +493,30 @@ include __DIR__ . '/../components/header-admin.php';
 
           <div class="ann-section-label">Visibility</div>
           <?php if ($canPublish): ?>
+          <div class="mb-3">
+            <label class="form-label" for="publish-destination">Publish destination</label>
+            <select name="publish_destination" id="publish-destination" class="form-select">
+              <option value="website">Publish to Website Only</option>
+              <option value="facebook" <?= !$facebookConnection || !$facebookConnection['enabled'] ? 'disabled' : '' ?>>Publish to Facebook Only</option>
+              <option value="both" <?= !$facebookConnection || !$facebookConnection['enabled'] ? 'disabled' : '' ?>>Publish to Both Website and Facebook</option>
+            </select>
+            <div class="form-text">Facebook is sent only with Publish now and your confirmation. Facebook Only hides this record from the website. Editing a delivered announcement does not update or duplicate its Facebook post.</div>
+            <div class="form-text">Facebook destination: <?= htmlspecialchars($facebookConnection && $facebookConnection['enabled'] ? $facebookConnection['page_name'] . ' · ' . $facebookConnection['page_id'] . ' (' . $facebookConnection['environment'] . ')' : 'No Page connected. Ask a Super Admin to open Settings → Facebook Integration.') ?></div>
+          </div>
+          <div class="mb-3">
+            <label for="facebook-link" class="form-label">Facebook attachment link (optional)</label>
+            <input type="url" class="form-control" id="facebook-link" name="facebook_link" maxlength="2000" placeholder="https://example.com/announcement">
+            <div class="form-text">With photos, the link is added to the message. Otherwise Facebook receives a link attachment. Main picture and gallery photos are included, up to 10 total.</div>
+          </div>
+          <input type="hidden" name="facebook_request_key" id="facebook-request-key" value="<?= bin2hex(random_bytes(32)) ?>">
+          <input type="hidden" name="facebook_confirmed" id="facebook-confirmed" value="0">
+          <input type="hidden" name="facebook_page_id" value="<?= htmlspecialchars($facebookConnection['page_id'] ?? '') ?>">
           <select name="status" id="modal-status" class="form-select">
             <option value="draft">Save as draft — still working on it</option>
             <?php if (!$isSuperAdmin): ?>
             <option value="pending">Send for approval</option>
             <?php endif; ?>
-            <option value="published">Publish now — show on website</option>
+            <option value="published">Publish now — use selected destination</option>
             <option value="archived">Archive — hide from website</option>
           </select>
           <div class="ann-status-help" id="modal-status-help"></div>
@@ -576,10 +619,6 @@ include __DIR__ . '/../components/header-admin.php';
 }
 .program-badge-all { background: rgba(31,138,59,.14); color: #2FA84F; border-color: rgba(31,138,59,.4); }
 
-.ann-table .status-badge.published { background: #1F8A3B; color: #fff; }
-.ann-table .status-badge.pending   { background: #F2B705; color: #3d2c00; }
-.ann-table .status-badge.draft     { background: #6c757d; color: #fff; }
-.ann-table .status-badge.archived  { background: #8a929a; color: #fff; }
 .ann-table .ann-fb-badge { background: #1877F2; color: #fff; }
 
 .btn-pin-toggle.is-pinned { background: #EABA3B; border-color: #EABA3B; color: #1F5E2C; }
@@ -606,7 +645,7 @@ include __DIR__ . '/../components/header-admin.php';
 .ann-chip-label { font-size: .8rem; color: #8a8f8c; }
 .ann-chip {
     border: 1px solid rgba(128,128,128,.35); color: inherit; text-decoration: none;
-    border-radius: 999px; padding: .3rem .9rem; font-size: .82rem; transition: all .15s; white-space: nowrap;
+    border-radius: 999px; padding: .3rem .9rem; font-size: .82rem; transition: background var(--transition), border-color var(--transition), color var(--transition); white-space: nowrap;
 }
 .ann-chip-sm { padding: .2rem .7rem; font-size: .78rem; }
 .ann-chip:hover { background: rgba(128,128,128,.15); color: inherit; }
@@ -666,14 +705,11 @@ include __DIR__ . '/../components/header-admin.php';
 
 /* Toast */
 .ann-toast {
-    position: fixed; right: 20px; bottom: 24px; z-index: 2000; max-width: 380px; width: calc(100% - 40px);
-    background: #1F5E2C; color: #fff; padding: .75rem 1.1rem; border-radius: 10px;
-    box-shadow: 0 6px 20px rgba(0,0,0,.35); font-size: .9rem;
-    display: flex; align-items: center; gap: .5rem;
-    transform: translateY(20px); opacity: 0; transition: all .3s;
+    position: fixed; right: 20px; bottom: 24px; z-index: 2000; width: min(380px, calc(100vw - 2rem));
+    transform: translateY(20px); opacity: 0;
+    transition: transform var(--transition), opacity var(--transition);
 }
 .ann-toast.show { transform: none; opacity: 1; }
-.ann-toast.error { background: #B3312D; }
 
 /* ---------- Responsive Breakpoints ---------- */
 
@@ -783,6 +819,7 @@ const modalQuill = initQuill('modal-content-editor', 'modal-content-input', { pl
 
 // ---- Friendly toast message ----
 function annToast(msg, type) {
+    if (window.ContentEditorNotice && window.ContentEditorNotice(msg, type === 'error')) return;
     const t = document.createElement('div');
     t.className = 'ann-toast' + (type === 'error' ? ' error' : '');
     t.innerHTML = '<i class="bi bi-' + (type === 'error' ? 'exclamation-circle' : 'check-circle') + '"></i><span></span>';
@@ -802,6 +839,20 @@ const modalTitleInput   = document.getElementById('modal-title');
 const modalCategory     = document.getElementById('modal-category');
 const modalProgram      = document.getElementById('modal-program');
 const modalDept         = document.getElementById('modal-dept');
+// Only an existing announcement may retain its previously saved Basic Education tag.
+const savedProgramLabels = <?= json_encode($programCategories, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+function selectAnnouncementProgram(code = 'ALL', preserveExisting = false) {
+    if (!modalProgram) return;
+    modalProgram.querySelectorAll('[data-legacy-program]').forEach(option => option.remove());
+    if (preserveExisting && savedProgramLabels[code] && !Array.from(modalProgram.options).some(option => option.value === code)) {
+        const option = new Option(code + ' \u2014 ' + savedProgramLabels[code] + ' (existing selection)', code);
+        option.dataset.legacyProgram = '1';
+        modalProgram.add(option);
+    }
+    modalProgram.value = code;
+    if (!modalProgram.value) modalProgram.value = 'ALL';
+}
+
 function updateAudienceHelp() {
     const hasDepartment = Boolean(modalDept?.value);
     const allPrograms = modalProgram?.querySelector('option[value="ALL"]');
@@ -814,7 +865,7 @@ function updateAudienceHelp() {
         : 'Program is optional. Select a department to include all its programs, or leave both on "Everyone" for a school-wide announcement.';
 }
 modalDept?.addEventListener('change', () => {
-    if (modalProgram) modalProgram.value = 'ALL';
+    selectAnnouncementProgram();
     updateAudienceHelp();
 });
 modalProgram?.addEventListener('change', updateAudienceHelp);
@@ -860,10 +911,16 @@ function resetGalleryUI() {
 
 function resetModalForm() {
     document.getElementById('announcement-form').reset();
+    const facebookConfirmed = document.getElementById('facebook-confirmed');
+    if (facebookConfirmed) facebookConfirmed.value = '0';
+    const facebookRequestKey = document.getElementById('facebook-request-key');
+    if (facebookRequestKey && window.crypto?.getRandomValues) {
+        facebookRequestKey.value = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
+    }
     modalQuill.setContents([]);
     modalActionInput.value = 'create';
     modalIdInput.value = '';
-    if (modalProgram) modalProgram.value = 'ALL';
+    selectAnnouncementProgram();
     if (modalDept) modalDept.value = '';
     updateAudienceHelp();
     modalLabel.textContent = 'New Announcement';
@@ -959,7 +1016,7 @@ function openEditModal(btn) {
 
     modalTitleInput.value = btn.dataset.title || '';
     if (modalCategory) modalCategory.value = btn.dataset.category || '';
-    if (modalProgram) modalProgram.value = btn.dataset.program || 'ALL';
+    selectAnnouncementProgram(btn.dataset.program || 'ALL', true);
     if (modalDept) modalDept.value = (btn.dataset.dept && btn.dataset.dept !== '0') ? btn.dataset.dept : '';
     updateAudienceHelp();
     if (modalStatus) modalStatus.value = btn.dataset.status || 'draft';
@@ -1031,8 +1088,8 @@ document.getElementById('delete-announcement-form')?.addEventListener('submit', 
 modalImageInput?.addEventListener('change', () => {
     const file = modalImageInput.files[0];
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-        annToast('That picture is larger than 10 MB. Please choose a smaller one.', 'error');
+    if (file.size > 5 * 1024 * 1024) {
+        annToast('That picture is larger than 5 MB. Please choose a smaller one.', 'error');
         modalImageInput.value = '';
         return;
     }
@@ -1053,8 +1110,8 @@ modalGalleryInput?.addEventListener('change', () => {
         renderNewGalleryPreview();
         return;
     }
-    if (files.some(f => f.size > 10 * 1024 * 1024)) {
-        annToast('One of the pictures is larger than 10 MB. Please choose smaller ones.', 'error');
+    if (files.some(f => f.size > 5 * 1024 * 1024)) {
+        annToast('One of the pictures is larger than 5 MB. Please choose smaller ones.', 'error');
         modalGalleryInput.value = '';
         renderNewGalleryPreview();
         return;
@@ -1062,11 +1119,33 @@ modalGalleryInput?.addEventListener('change', () => {
     renderNewGalleryPreview();
 });
 
-document.getElementById('announcement-form').addEventListener('submit', (e) => {
+document.getElementById('announcement-form').addEventListener('submit', async (e) => {
     document.getElementById('modal-content-input').value = modalQuill.root.innerHTML;
     if (!modalQuill.getText().trim() && !e.target.querySelector('[name="allow_incomplete"][value="1"]')) {
         e.preventDefault();
         annToast('Please write a message for the announcement.', 'error');
+        return;
+    }
+    const destination = document.getElementById('publish-destination')?.value || 'website';
+    const sendingFacebook = destination !== 'website';
+    if (sendingFacebook && modalStatus?.value !== 'published') {
+        e.preventDefault();
+        annToast('Select Publish now to publish to Facebook. Choose Website Only to save a draft or send for approval.', 'error');
+        return;
+    }
+    if (modalStatus?.value === 'published') {
+        e.preventDefault();
+        const page = <?= json_encode($facebookConnection ? $facebookConnection['page_name'] . ' · ' . $facebookConnection['page_id'] . ' (' . $facebookConnection['environment'] . ')' : 'No Page connected', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const message = destination === 'website' ? 'Publish this announcement to the website?'
+            : 'Publish this announcement to ' + page + (destination === 'both' ? ' and the website?' : '? It will be hidden from the website.')
+              + ' Any previous successful Facebook delivery will be kept without creating another post.';
+        if (!await window.AdminDialogs.confirm(message, {title: 'Confirm publishing destination', confirmText: 'Publish'})) return;
+        const confirmed = document.getElementById('facebook-confirmed');
+        if (confirmed) confirmed.value = sendingFacebook ? '1' : '0';
+        modalSaveBtn.disabled = true;
+        modalSaveLabel.textContent = 'Publishing…';
+        // The shared completeness/approval checks already ran before this listener.
+        HTMLFormElement.prototype.submit.call(e.target);
         return;
     }
     // Show progress so people don't click twice while the picture uploads
@@ -1110,7 +1189,7 @@ openCreateModal();
 modalTitleInput.value = <?= json_encode($flashOld['title'] ?? '') ?>;
 modalQuill.root.innerHTML = <?= json_encode($flashOld['content'] ?? '') ?>;
 if (modalCategory) modalCategory.value = <?= json_encode($flashOld['category_id'] ?? '') ?>;
-if (modalProgram) modalProgram.value = <?= json_encode($flashOld['program'] ?? 'ALL') ?>;
+selectAnnouncementProgram(<?= json_encode($flashOld['program'] ?? 'ALL') ?>);
 if (modalDept) modalDept.value = <?= json_encode($flashOld['dept_id'] ?? '') ?>;
 if (modalStatus) modalStatus.value = <?= json_encode($flashOld['status'] ?? 'draft') ?>;
 updateStatusHelp();
@@ -1124,7 +1203,7 @@ modalSaveLabel.textContent = 'Save Changes';
 modalTitleInput.value = <?= json_encode($modalEditing['title'] ?? '') ?>;
 modalQuill.root.innerHTML = <?= json_encode($modalEditing['content'] ?? '') ?>;
 if (modalCategory) modalCategory.value = <?= json_encode($modalEditing['category_id'] ?? '') ?>;
-if (modalProgram) modalProgram.value = <?= json_encode($modalEditing['program'] ?? 'ALL') ?>;
+selectAnnouncementProgram(<?= json_encode($modalEditing['program'] ?? 'ALL') ?>, true);
 if (modalDept) modalDept.value = <?= json_encode($modalEditing['dept_id'] ?? '') ?>;
 if (modalStatus) modalStatus.value = <?= json_encode($modalEditing['status'] ?? 'draft') ?>;
 updateStatusHelp();

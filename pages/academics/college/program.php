@@ -153,14 +153,16 @@ $para = function ($v) use ($e): string { return nl2br($e($v)); };
 $pt = function ($v): string { return renderSectionContent((string)$v); };
 /** Editing marker for one stored text of this program (empty for visitors). */
 $pf = function (string $key, string $label, bool $multi = false, string $ph = '') use ($cePreview): string {
-    if (!$cePreview) return '';
     $max = (int)(programPageContentFields()[$key]['max'] ?? 0);
     return ceField('prog-text', ['key' => $key, 'max' => $max, 'label' => $label, 'multiline' => $multi || (programPageContentFields()[$key]['type'] ?? '') === 'long', 'rich'=>(programPageContentFields()[$key]['type'] ?? '') === 'long', 'ph' => $ph !== '' ? $ph : $label,
         'optional' => empty(programPageContentFields()[$key]['warning_required'])]);
 };
 /** Editing marker for one card of a list (badge, core value, why, career). */
 $pi = function (string $type, int $index, string $prop, string $label, bool $multi = false) use ($cePreview): string {
-    return $cePreview ? ceField('prog-item', ['key' => $type . ':' . $index . ':' . $prop, 'label' => $label, 'multiline' => $multi, 'rich'=>$prop==='body', 'ph' => $label]) : '';
+    global $items;
+    $id = (int)($items[$type][$index]['item_id'] ?? 0);
+    $mark = ceField('prog-item', ['key' => $type . ':' . $index . ':' . $prop, 'label' => $label, 'multiline' => $multi, 'rich'=>$prop==='body', 'ph' => $label]);
+    return preg_replace('/data-gnc-text="[^"]*"/', 'data-gnc-text="'.substr(hash('sha256','program-item:'.$id.':'.$prop),0,24).'"', $mark);
 };
 $pcard = function (string $type, int $index) use ($cePreview): string {
     return $cePreview ? ' data-ve-item="' . $type . ':' . $index . '"' : '';
@@ -192,10 +194,13 @@ if ($program !== null) {
     $fullName   = (string)$program['program_name'];
     $shortName  = preg_replace('/^Bachelor of (?:Science|Arts)?\s*(?:in\s+)?/i', '', $fullName);
     $shortName  = $shortName !== '' ? $shortName : $fullName;
-    $heroDesc   = trim($c['hero_desc']) !== '' ? trim($c['hero_desc']) : trim((string)($program['description'] ?? ''));
+    $heroDesc   = trim($c['hero_desc']);
     $deptName   = (string)($program['dept_name'] ?? '');
     $isGraduateProgram = ($program['dept_slug'] ?? '') === 'graduate-school';
     $programDepartment = !empty($program['dept_id']) ? getDepartmentById((int)$program['dept_id']) : null;
+    // Programs without a custom seal inherit their department's current logo.
+    $sealUrl = $program['seal_url'] ?: ($programDepartment['logo_url'] ?? null);
+    $sealAlt = $program['seal_url'] ? $fullName . ' seal' : $deptName . ' logo';
     $isBasicProgram = ($programDepartment['department_type'] ?? '') === 'basic-education';
     $departmentIndexTitle = $isBasicProgram ? 'Basic Education Departments' : ($isGraduateProgram ? 'Graduate School' : 'College Departments');
     $departmentIndexUrl = $isBasicProgram ? '/pages/academics/basic-edu/basic-edu-dept.php' : ($isGraduateProgram ? '/pages/academics/graduate-school/graduate-school.php' : '/pages/academics/college/college-dept.php');
@@ -211,7 +216,7 @@ if ($program !== null) {
 
     $showVision  = trim($c['vision_text'])  !== '' || $cePreview;
     $showMission = trim($c['mission_text']) !== '' || $cePreview;
-    $showAbout   = trim($c['about_text']) !== '' || $showVision || $showMission;
+    $showAbout   = $sealUrl !== null || trim($c['about_text']) !== '' || $showVision || $showMission;
     $showCore    = $program['core_enabled'] && (!empty($items['core_value']) || $cePreview);
 
     $ctaLink = trim($c['cta_link']) !== '' ? trim($c['cta_link']) : $defaults['cta_link'];
@@ -257,6 +262,7 @@ if ($program !== null) {
     <?php if ($cePreview): ?>
     <style>
         /* Content Editor preview only: slide controls on the Facilities carousel */
+        .career-rail > .ve-add-tile:only-child { margin-inline: auto; }
         .ve-hero-hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 3; display: inline-flex; align-items: center; gap: .5rem; padding: .55rem 1rem; border: 1.5px dashed var(--gnc-template, #307056); border-radius: 999px; background: rgba(255, 255, 255, .92); color: var(--gnc-template-text, #307056); font: 500 .85rem/1.2 'Inter', sans-serif; white-space: nowrap; }
         @media (max-width: 767px) { .ve-hero-hint { white-space: normal; text-align: center; width: calc(100% - 2rem); border-radius: 14px; } }
         .ve-fac-bar { display: flex; justify-content: center; align-items: center; gap: .6rem; flex-wrap: wrap; margin: .35rem 0 0; }
@@ -339,7 +345,7 @@ if ($program !== null) {
                 </nav>
 
                 <div class="template-hero-content">
-                    <h1 class="template-title"<?= ceManageMark('data-ve-pick="prog-name" data-ve-label="Program name"') ?>><?= $e(mb_strtoupper($shortName)) ?></h1>
+                    <h1 class="template-title"<?= ceManageMark('data-ve-pick="prog-name" data-ve-field="prog-name" data-ve-key="short-name" data-ve-label="Program heading" data-ve-max="255" style="text-transform:uppercase"') ?>><?= $e($cePreview ? $shortName : mb_strtoupper($shortName)) ?></h1>
                     <?php if (trim($c['subtitle']) !== '' || $cePreview): ?>
                     <p class="template-subtitle"<?= $pf('subtitle', 'Subtitle') ?>><?= $e($c['subtitle']) ?></p>
                     <?php endif; ?>
@@ -372,12 +378,12 @@ if ($program !== null) {
         <div class="container">
 
             <?php if ($showAbout): ?>
-            <?php if (trim($c['about_text']) !== '' || $cePreview): ?>
+            <?php if ($sealUrl !== null || trim($c['about_text']) !== '' || $cePreview): ?>
             <div class="about-feature" id="about-program">
-                <?php if ($program['seal_url']): ?>
+                <?php if ($sealUrl): ?>
                 <div class="about-feature-seal">
                     <div class="about-feature-seal-wrap">
-                        <img src="<?= $e($program['seal_url']) ?>" alt="<?= $e($fullName) ?> seal" loading="lazy">
+                        <img src="<?= $e($sealUrl) ?>" alt="<?= $e($sealAlt) ?>" loading="lazy">
                         <span class="about-seal-ring" aria-hidden="true">
                             <svg viewBox="0 0 500 500" focusable="false">
                                 <defs><path id="sealRingPath" d="M250,250 m-212,0 a212,212 0 1,1 424,0 a212,212 0 1,1 -424,0"/></defs>
@@ -389,8 +395,14 @@ if ($program !== null) {
                 <?php endif; ?>
                 <div class="about-feature-text">
                     <span class="about-eyebrow"<?= $pf('about_title', 'Small heading above the name') ?><?= $cePreview ? ' style="text-transform:uppercase"' : '' ?>><?= $e($cePreview ? $text('about_title') : mb_strtoupper($text('about_title'))) ?></span>
-                    <h2 class="about-heading"<?= ceManageMark('data-ve-pick="prog-name" data-ve-label="Program name"') ?>><?= $e($fullName) ?></h2>
+                    <h2 class="about-heading"<?= ceManageMark('data-ve-pick="prog-name" data-ve-field="prog-name" data-ve-key="full-name" data-ve-label="Full program name" data-ve-max="255"') ?>><?= $e($fullName) ?></h2>
+                    <?php if ($cePreview): ?>
+                    <small class="text-muted">Department card description</small>
+                    <p class="text-muted" data-ve-field="prog-description" data-ve-key="description" data-ve-label="Department card description" data-ve-max="5000" data-ve-multiline data-ve-ph="Write a short description for department cards"><?= $e((string)($program['description'] ?? '')) ?></p>
+                    <?php endif; ?>
+                    <?php if (trim($c['about_text']) !== '' || $cePreview): ?>
                     <div class="about-body cms-rich"<?= $pf('about_text', 'About this program', true, 'Write about this program') ?>><?= $pt($c['about_text']) ?></div>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
@@ -401,7 +413,7 @@ if ($program !== null) {
                 <?php if ($showVision): ?>
                 <div class="template-vm-card">
                     <div class="template-vm-head">
-                        <div class="template-vm-icon"><?= programPageIcon($text('vision_icon'), 'template-vm-icon-glyph') ?></div>
+                        <div class="template-vm-icon"<?= ceManageMark('data-ve-icon="program-statement" data-ve-key="vision_icon" data-ve-value="' . $e($text('vision_icon')) . '" role="button" tabindex="0" aria-label="Change vision icon"') ?>><?= programPageIcon($text('vision_icon'), 'template-vm-icon-glyph') ?></div>
                         <h5 class="template-vm-card-title"<?= $pf('vision_title', 'Vision heading') ?>><?= $e($text('vision_title')) ?></h5>
                     </div>
                     <div class="template-vm-card-text cms-rich"<?= $pf('vision_text', 'Vision', true, 'Write the vision') ?>><?= $pt($c['vision_text']) ?></div>
@@ -410,7 +422,7 @@ if ($program !== null) {
                 <?php if ($showMission): ?>
                 <div class="template-vm-card">
                     <div class="template-vm-head">
-                        <div class="template-vm-icon"><?= programPageIcon($text('mission_icon'), 'template-vm-icon-glyph') ?></div>
+                        <div class="template-vm-icon"<?= ceManageMark('data-ve-icon="program-statement" data-ve-key="mission_icon" data-ve-value="' . $e($text('mission_icon')) . '" role="button" tabindex="0" aria-label="Change mission icon"') ?>><?= programPageIcon($text('mission_icon'), 'template-vm-icon-glyph') ?></div>
                         <h5 class="template-vm-card-title"<?= $pf('mission_title', 'Mission heading') ?>><?= $e($text('mission_title')) ?></h5>
                     </div>
                     <div class="template-vm-card-text cms-rich"<?= $pf('mission_text', 'Mission', true, 'Write the mission') ?>><?= $pt($c['mission_text']) ?></div>
@@ -484,11 +496,18 @@ if ($program !== null) {
 
     <?php /* Program Curriculum: only when the admin has uploaded a PDF for THIS program
              (pdf_url is empty when no PDF is attached or the file is missing). */ ?>
-    <?php if (!empty($program['pdf_url'])): ?>
-    <section class="template-curriculum py-5" id="curriculum">
+    <?php if (!empty($program['pdf_url']) || $cePreview): ?>
+    <section class="template-curriculum py-5" id="curriculum"<?= ceManageMark('data-warning-field data-warning-label="Curriculum PDF" data-warning-value="' . $e($program['pdf_url'] ?? '') . '"') ?>>
         <div class="container">
             <h2 class="template-section-title template-section-title--gold"<?= $pf('curriculum_title', 'Curriculum heading') ?>><?= $e($text('curriculum_title')) ?></h2>
+            <?php if (!empty($program['pdf_url'])): ?>
             <?php renderPdfViewer($program['pdf_url'], ['title' => $text('curriculum_title'), 'download_name' => $program['pdf_name']]); ?>
+            <?php endif; ?>
+            <?php if ($cePreview): ?>
+            <div class="text-center mt-3">
+                <button type="button" class="ve-fac-btn" data-ve-program-section="curriculum"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> <?= !empty($program['pdf_url']) ? 'Manage curriculum PDF' : 'Upload curriculum PDF' ?></button>
+            </div>
+            <?php endif; ?>
         </div>
     </section>
     <?php endif; ?>
@@ -558,12 +577,17 @@ if ($program !== null) {
     <?php endif; ?>
 
     <?php $uniforms = array_values(array_filter($items['uniform'], function ($u) { return !empty($u['image_url']); })); ?>
-    <?php if (!empty($uniforms)): ?>
-    <section class="template-uniform py-5" id="template-uniform">
+    <?php if (!empty($uniforms) || $cePreview): ?>
+    <section class="template-uniform py-5" id="template-uniform"<?= ceManageMark('data-warning-field data-warning-label="Uniform photos" data-warning-value="' . ($uniforms ? 'uploaded' : '') . '"') ?>>
         <div class="container">
             <h2 class="template-section-title template-section-title--gold"<?= $pf('uniform_title', 'Uniform heading') ?>><?= $e($text('uniform_title')) ?></h2>
+            <?php if ($cePreview): ?>
+            <div class="text-center my-3">
+                <button type="button" class="ve-fac-btn" data-ve-program-section="uniform"><i class="bi bi-person-badge" aria-hidden="true"></i> <?= $uniforms ? 'Manage uniform photos' : 'Add uniform photos' ?></button>
+            </div>
+            <?php endif; ?>
             <?php if (trim($c['uniform_text']) !== '' || $cePreview): ?>
-            <div class="cms-rich"<?= $pf('uniform_text', 'Uniform text', true) ?>><?= $pt($c['uniform_text']) ?></div>
+            <div class="cms-rich text-center"<?= $pf('uniform_text', 'Uniform text', true) ?>><?= $pt($c['uniform_text']) ?></div>
             <?php endif; ?>
 
             <div class="row g-4 justify-content-center mt-2">
@@ -799,6 +823,8 @@ if ($program !== null) {
         'program_id'  => (int)$program['program_id'],
         'slug'        => (string)($program['slug'] ?? ''),
         'name'        => (string)$program['program_name'],
+        'hero_upload' => !empty($program['has_hero_upload']),
+        'seal_upload' => !empty($program['has_seal_upload']),
         'pdf_url'     => !empty($program['pdf_url']) ? (string)$program['pdf_url'] : null,
         'pdf_name'    => !empty($program['pdf_name']) ? (string)$program['pdf_name'] : null,
         'description' => (string)($program['description'] ?? ''),

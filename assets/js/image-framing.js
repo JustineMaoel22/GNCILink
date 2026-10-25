@@ -20,8 +20,9 @@
             return url.origin === location.origin && /^\/(uploads|assets\/images)\//.test(url.pathname) ? url.pathname : null;
         } catch (_) { return null; }
     }
+    function activeDocument(doc) { try { return !!(doc && doc.defaultView && !doc.defaultView.closed && doc.defaultView.document === doc); } catch (_) { return false; } }
     function sourceOf(el) {
-        if (!el || el.nodeType !== 1) return '';
+        if (!el || el.nodeType !== 1 || !activeDocument(el.ownerDocument)) return '';
         if (el.tagName === 'IMG') return el.currentSrc || el.src;
         const bg = el.ownerDocument.defaultView.getComputedStyle(el).backgroundImage;
         const match = /url\(["']?([^"')]+)["']?\)/.exec(bg);
@@ -29,7 +30,7 @@
     }
     function usable(src) { return !!pathOf(src) || sources.has(src); }
     function cropped(el) {
-        if (!el || !usable(sourceOf(el))) return false;
+        if (!el || !activeDocument(el.ownerDocument) || !usable(sourceOf(el))) return false;
         // The editor and its iframe have separate API instances. A framed
         // background uses pixel sizes, so the other instance cannot rely on
         // background-size: cover to recognize it as an editable crop.
@@ -41,6 +42,26 @@
         if (!el) return null;
         if (cropped(el)) return el;
         for (const child of el.querySelectorAll('img,[data-bg],[data-ve-bg]')) if (cropped(child)) return child;
+        return null;
+    }
+    /** Resolve the visible crop even when text or a link overlay receives the hover. */
+    function findTargetAt(el, x, y) {
+        if (!el || !activeDocument(el.ownerDocument)) return null;
+        const doc = el.ownerDocument;
+        const ancestors = node => {
+            for (; node && node !== doc.body; node = node.parentElement) {
+                if (cropped(node)) return node;
+            }
+            return null;
+        };
+        const direct = ancestors(el);
+        if (direct) return direct;
+        if (Number.isFinite(x) && Number.isFinite(y) && doc.elementsFromPoint) {
+            for (const layer of doc.elementsFromPoint(x, y)) {
+                const target = ancestors(layer);
+                if (target) return target;
+            }
+        }
         return null;
     }
     function position(value, fallback) {
@@ -57,7 +78,7 @@
         if (file && files.has(file)) return copy(files.get(file));
         const saved = settings[pathOf(src)];
         if (saved) return copy(saved);
-        if (!el) return {x:50,y:50,zoom:1};
+        if (!el || !activeDocument(el.ownerDocument)) return {x:50,y:50,zoom:1};
         const css = el.ownerDocument.defaultView.getComputedStyle(el);
         return position(el.tagName === 'IMG' ? css.objectPosition : css.backgroundPosition, [50,50]);
     }
@@ -77,7 +98,7 @@
         return naturalImages.get(src);
     }
     function apply(el, value) {
-        if (!el || !el.isConnected) return;
+        if (!el || !el.isConnected || !activeDocument(el.ownerDocument)) return;
         const frame = copy(value), src = sourceOf(el);
         if (!originalStyles.has(el)) {
             const saved={};['object-position','transform','transform-origin','clip-path','background-size','background-position'].forEach(key=>saved[key]=[el.style.getPropertyValue(key),el.style.getPropertyPriority(key)]);originalStyles.set(el,saved);
@@ -108,7 +129,7 @@
             const observer=backgroundObservers.get(el.ownerDocument);
             if(observer&&!observedBackgrounds.has(el)){observedBackgrounds.add(el);observer.observe(el);}
             natural(src).then(img => {
-                if (!el.isConnected || sourceOf(el) !== src || framed.get(el) !== frame) return;
+                if (!el.isConnected || !activeDocument(el.ownerDocument) || sourceOf(el) !== src || framed.get(el) !== frame) return;
                 const w=el.clientWidth, h=el.clientHeight;
                 if (!w || !h) return;
                 const scale=Math.max(w/img.naturalWidth,h/img.naturalHeight)*frame.zoom;
@@ -137,24 +158,27 @@
         if (value && cropped(el)) apply(el,value);
     }
     function scan(doc) {
+        if (!activeDocument(doc)) { documents.delete(doc); const observer=backgroundObservers.get(doc); if(observer)observer.disconnect(); return; }
         doc.querySelectorAll('img,[data-bg],[data-ve-bg],[style*="background"]').forEach(applyKnown);
         // CSS backgrounds without inline attributes are candidates only if their file has saved framing.
         if (Object.keys(settings).length || Object.keys(hashedSettings).length) doc.querySelectorAll('section,header,article,div,a').forEach(el=>{ if (el.tagName!=='IMG' && cropped(el)) applyKnown(el); });
     }
     function schedule(doc) {
-        if (scheduled.has(doc)) return;
-        scheduled.add(doc); requestAnimationFrame(()=>{scheduled.delete(doc);scan(doc);});
+        if (!activeDocument(doc) || scheduled.has(doc)) return;
+        scheduled.add(doc); requestAnimationFrame(()=>{scheduled.delete(doc);if(documents.has(doc))scan(doc);});
     }
     function set(path,value) { settings[path]=copy(value); documents.forEach(schedule); }
     function watch(doc) {
-        if (!doc || documents.has(doc)) return;
+        if (!activeDocument(doc) || !doc.documentElement || documents.has(doc)) return;
         documents.add(doc); schedule(doc);
         doc.addEventListener('load',e=>{if(e.target.tagName==='IMG')applyKnown(e.target);},true);
-        new MutationObserver(records=>{
+        const observer=new MutationObserver(records=>{
             if (records.some(r=>r.type==='childList' || r.attributeName!=='style' || !framed.has(r.target))) schedule(doc);
-        }).observe(doc.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src','srcset','data-bg','class','style']});
+        });
+        observer.observe(doc.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src','srcset','data-bg','class','style']});
         const ro=new ResizeObserver(entries=>{entries.forEach(entry=>{if(framed.has(entry.target))apply(entry.target,framed.get(entry.target));});});
         backgroundObservers.set(doc,ro);
+        doc.defaultView.addEventListener('pagehide',event=>{if(event.persisted)return;observer.disconnect();ro.disconnect();documents.delete(doc);scheduled.delete(doc);});
         doc.querySelectorAll('[data-bg],[data-ve-bg]').forEach(el=>ro.observe(el));
         doc.defaultView.addEventListener('resize',()=>{doc.querySelectorAll('img,[data-bg],[data-ve-bg]').forEach(el=>{if(framed.has(el))apply(el,framed.get(el));});});
         if (config.admin && doc===document) installHover(doc);
@@ -264,22 +288,50 @@
     }
     function installHover(doc){
         if(hoverButton)return;
+        let pointer=null, pending=0;
+        function hide(){if(hoverButton)hoverButton.hidden=true;hoverTarget=null;}
         function ensure(){if(!document.body)return false;hoverButton=element('button',{type:'button',class:'image-frame-trigger',hidden:'','aria-label':'Reposition image'},'↔ Reposition');document.body.append(hoverButton);hoverButton.addEventListener('click',()=>{if(hoverTarget)edit(hoverTarget);});return true;}
-        doc.addEventListener('pointerover',e=>{
-            if(modalOpen||doc.documentElement.classList.contains('ve-previewing')||document.body.classList.contains('ve-previewing')||e.target===hoverButton||e.target.closest('.image-frame-dialog'))return;
+        function update(){
+            pending=0;
+            if(modalOpen||doc.documentElement.classList.contains('ve-previewing')||document.body.classList.contains('ve-previewing')){hide();return;}
+            if(!pointer)return;
+            const hit=doc.elementFromPoint(pointer.x,pointer.y);
+            // The control is outside the image DOM subtree; entering it must retain its target.
+            if(hoverButton&&(hoverButton.contains(hit)||doc.activeElement===hoverButton))return;
+            if(!hit||hit.closest('.image-frame-dialog')){hide();return;}
             if(!hoverButton&&!ensure())return;
-            const target=cropped(e.target)?e.target:null;
-            if(!target){hoverButton.hidden=true;return;}
-            const rect=target.getBoundingClientRect();if(rect.width<45||rect.height<40)return;
+            const target=findTargetAt(hit,pointer.x,pointer.y);
+            if(!target){hide();return;}
+            const rect=target.getBoundingClientRect();if(rect.width<45||rect.height<40){hide();return;}
+            let top=6;
+            // A fixed/sticky navbar can cover the top of a hero after scrolling.
+            const navbar=doc.getElementById('mainNavbar');
+            if(navbar){const nav=navbar.getBoundingClientRect(),position=doc.defaultView.getComputedStyle(navbar).position;if((position==='fixed'||position==='sticky')&&nav.top<=6&&nav.bottom>0)top=Math.max(top,nav.bottom+6);}
+            const bottom=Math.min(innerHeight-6,rect.bottom-6);
+            top=Math.max(top,rect.top+6);
+            if(bottom-top<34){hide();return;}
+            hoverTarget=target;hoverButton.hidden=false;
+            const width=hoverButton.offsetWidth,height=hoverButton.offsetHeight;
+            if(bottom-top<height){hide();return;}
+            let left=rect.right-width-6;
             if(target.hasAttribute('data-ve-sports-background-area')){
-                if(target.classList.contains('ve-selected')){hoverButton.hidden=true;return;}
-                hoverTarget=target;hoverButton.hidden=false;
-                hoverButton.style.top=Math.max(6,Math.min(innerHeight-44,rect.bottom-48))+'px';
-                hoverButton.style.left=Math.max(6,Math.min(innerWidth-hoverButton.offsetWidth-6,rect.left+(rect.width-hoverButton.offsetWidth)/2))+'px';return;
+                if(target.classList.contains('ve-selected')){hide();return;}
+                top=bottom-height;left=rect.left+(rect.width-width)/2;
             }
-            hoverTarget=target;hoverButton.hidden=false;hoverButton.style.top=Math.max(6,rect.top+6)+'px';hoverButton.style.left=Math.max(6,Math.min(innerWidth-125,rect.right-120))+'px';
+            hoverButton.style.top=top+'px';
+            hoverButton.style.left=Math.max(6,Math.min(doc.documentElement.clientWidth-width-6,left))+'px';
+        }
+        function scheduleHover(){if(!pending)pending=requestAnimationFrame(update);}
+        function moved(e){pointer={x:e.clientX,y:e.clientY};scheduleHover();}
+        doc.addEventListener('pointerover',moved);
+        doc.addEventListener('pointermove',moved);
+        doc.addEventListener('scroll',scheduleHover,true);
+        doc.defaultView.addEventListener('resize',scheduleHover);
+        doc.addEventListener('pointerout',e=>{if(!e.relatedTarget){pointer=null;if(!hoverButton||doc.activeElement!==hoverButton)hide();}});
+        doc.defaultView.addEventListener('blur',()=>{pointer=null;hide();});
+        doc.addEventListener('focusout',e=>{
+            if(e.target===hoverButton)scheduleHover();
         });
-        doc.addEventListener('scroll',()=>{if(hoverButton)hoverButton.hidden=true;},true);
     }
     if(config.admin){
         // Associate all existing preview mechanisms with the original File, without changing its bytes.
@@ -323,7 +375,7 @@
             if(Object.keys(values).length){if(!hidden){hidden=element('input',{type:'hidden',name:'image_framing'});form.append(hidden);}hidden.value=JSON.stringify(values);}else if(hidden)hidden.remove();
         },true);
     }
-    window.GNCImageFraming={findTarget,edit,watch,set,apply,sourceOf,settings,cacheUpload,
+    window.GNCImageFraming={findTarget,findTargetAt,edit,watch,set,apply,sourceOf,settings,cacheUpload,
         setUploadTarget:(input,target)=>{if(target)uploadTargets.set(input,target);else uploadTargets.delete(input);},
         fileSettings:file=>files.get(file),
         ready:Promise.resolve()

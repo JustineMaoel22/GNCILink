@@ -145,7 +145,7 @@ if ($postAction === 'create' || $postAction === 'update') {
     $author  = trim($_POST['author'] ?? '');
 
     if (empty($errors)) {
-        if ($title === '') $errors[] = 'Please type a headline for the article.';
+        if ($title === '' && !contentPublishAllowsIncomplete()) $errors[] = 'Please type a headline for the article.';
         if (($content === '' || strip_tags($content) === '') && ($_POST['allow_incomplete'] ?? '') !== '1') $errors[] = 'Please write the story before saving.';
     }
 

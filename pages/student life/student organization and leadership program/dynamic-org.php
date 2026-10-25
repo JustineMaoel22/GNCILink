@@ -45,6 +45,7 @@ $settingMark=static fn($key)=>ceField('org-setting',['key'=>$key,'max'=>$setting
 <div class="org-gallery"><?php foreach ($gallery as $image): ?><a href="<?= $orgH($image['image_url']) ?>" target="_blank" rel="noopener" aria-label="View gallery photo"<?= ceManageMark('data-ve-org-gallery="'.(int)$image['image_id'].'"') ?>><img src="<?= $orgH($image['image_url']) ?>" alt="<?= $orgH($org['name']) ?> gallery photo" loading="lazy"></a><?php endforeach; ?>
 <?php if ($orgPreview): ?><button type="button" class="org-gallery-add" data-ve-org-gallery-add data-warning-placeholder="true">+ Add gallery image</button><?php endif; ?></div></section><?php endif; ?>
 <?php if ($facebook||$orgPreview): ?><section class="org-facebook" data-warning-optional="true"><span class="org-eyebrow">Stay Updated</span><h2<?= $settingMark('facebook_title') ?>><?= $orgH($settings['facebook_title']['value']) ?></h2>
+<p<?= $settingMark('facebook_description') ?>><?= $orgH($settings['facebook_description']['value']) ?></p>
 <?php if ($facebook): ?><iframe title="<?= $orgH($org['name']) ?> Facebook page" src="<?= $orgH($facebook) ?>" width="500" height="130" loading="lazy" allow="encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe><?php endif; ?>
 <?php if ($orgPreview): ?><p<?= $mark('facebook_url') ?>><?= $orgH($org['facebook_url']) ?></p><?php endif; ?></section><?php endif; ?>
 <?php endif; ?>

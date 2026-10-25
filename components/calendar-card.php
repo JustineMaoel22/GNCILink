@@ -65,7 +65,7 @@ $calendarMonthUrl = static fn($month, $year) => '?' . http_build_query(array_mer
         <?php endif; ?>
         <span><span class="gnc-cal-dot" style="background:#1F5E2C;"></span> School Event</span>
         <?php if (!isset($calendarCategory)): ?>
-        <span><span class="gnc-cal-dot" style="background:#B3312D;"></span> Emergency</span>
+        <span><span class="gnc-cal-dot" style="background:#B3312D;"></span> Suspension</span>
         <?php endif; ?>
     </div>
 </div>

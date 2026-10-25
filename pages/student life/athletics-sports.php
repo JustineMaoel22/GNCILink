@@ -7,6 +7,7 @@ $activeSection = 'student-life';
 $sportsContent=athleticsSportsContent();
 $sportsPreview=cePreviewCanManage();
 $sportsPrograms=$sportsContent['sports'];
+$sportsFacebookEmbed=athleticsSportsFacebookEmbedUrl($sportsContent['facebook_url']);
 $sportsText=static fn($key)=>htmlspecialchars($sportsContent['texts'][$key],ENT_QUOTES,'UTF-8');
 $sportsField=static fn($key,$label)=>ceField('sports-text',['key'=>$key,'label'=>$label,'max'=>str_ends_with($key,'title')?255:3000]);
 $sportsH = static fn($value) => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
@@ -20,7 +21,7 @@ $highlightsUrl=static fn($page)=>'?'.http_build_query(array_merge(['highlights_p
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Celebrate GNC's athletic spirit. Explore basketball, indoor volleyball, and beach volleyball at Guagua National Colleges.">
-    <title>Athletics and Sports | Guagua National Colleges</title>
+    <title>Athletics and Sports</title>
     <link rel="icon" type="image/svg+xml" href="/assets/images/logos/gnc-logo-v1.svg">
     <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="/assets/css/base-style.css" rel="stylesheet">
@@ -169,6 +170,14 @@ $highlightsUrl=static fn($page)=>'?'.http_build_query(array_merge(['highlights_p
             <span class="athletics-facebook-kicker"<?= $sportsField('facebook_kicker','Facebook section label') ?>><?= $sportsText('facebook_kicker') ?></span>
             <h2 id="sportsFacebookTitle"<?= $sportsField('facebook_title','Facebook section heading') ?>><?= $sportsText('facebook_title') ?></h2>
             <p<?= $sportsField('facebook_description','Facebook section introduction') ?>><?= $sportsText('facebook_description') ?></p>
+            <div class="athletics-facebook-box"<?= $sportsPreview?' data-ve-sports-facebook data-ve-pick="sports-facebook" data-ve-link="'.$sportsH($sportsContent['facebook_url']).'"':'' ?>>
+                <?php if($sportsFacebookEmbed!==null): ?>
+                <iframe src="<?= $sportsH($sportsFacebookEmbed) ?>" width="500" height="130" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen loading="lazy" title="GNC Sports Club Facebook page"></iframe>
+                <?php endif; ?>
+                <?php if($sportsPreview): ?>
+                <button type="button" class="athletics-facebook-edit" data-ve-sports-facebook-edit><i class="bi bi-facebook" aria-hidden="true"></i> <?= $sportsFacebookEmbed!==null?'Change Facebook page link':'Add the Facebook page link' ?></button>
+                <?php endif; ?>
+            </div>
         </section>
     </main>
 
@@ -179,5 +188,51 @@ $highlightsUrl=static fn($page)=>'?'.http_build_query(array_merge(['highlights_p
     <script src="/assets/js/bootstrap.bundle.min.js"></script>
     <script src="/assets/js/facility-coverflow.js?v=<?= filemtime(__DIR__.'/../../assets/js/facility-coverflow.js') ?>" defer></script>
     <script src="/assets/js/athletics-sports.js?v=<?= filemtime(__DIR__.'/../../assets/js/athletics-sports.js') ?>" defer></script>
+    <?php if (!$sportsPreview): ?>
+    <script>
+    // Scroll-reveal: classes are added here (not in the markup), so everything stays visible without JS
+    // and inside the editor preview, which is excluded by the PHP check above.
+    (function () {
+        if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+        var groups = [
+            { sel: '.athletics-programs-intro > h2',        type: 'up' },
+            { sel: '.athletics-programs-intro > p',         type: 'up',   base: 0.1 },
+            { sel: '.athletics-programs-showcase .athletics-slideshow', type: 'fade' },
+            { sel: '.athletics-teams > h2',                 type: 'up' },
+            { sel: '.athletics-team',                       type: 'pop',  stagger: 0.12 },
+            { sel: '.athletics-facilities > h2',            type: 'up' },
+            { sel: '.athletics-facilities-carousel',        type: 'up',   base: 0.1 },
+            { sel: '.athletics-highlights > h2',            type: 'up' },
+            { sel: '.athletics-highlight',                  type: 'up',   stagger: 0.1, perRow: 3 },
+            { sel: '.athletics-highlights-empty',           type: 'fade' },
+            { sel: '.athletics-highlights-pagination',      type: 'fade' },
+            { sel: '.athletics-facebook-kicker',            type: 'fade' },
+            { sel: '.athletics-facebook > h2',              type: 'up',   base: 0.08 },
+            { sel: '.athletics-facebook > p',               type: 'up',   base: 0.16 },
+            { sel: '.athletics-facebook-box',               type: 'pop',  base: 0.24 }
+        ];
+
+        var io = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add('is-visible');
+                io.unobserve(entry.target);
+            });
+        }, { threshold: 0.12, rootMargin: '0px 0px -5% 0px' });
+
+        groups.forEach(function (g) {
+            document.querySelectorAll(g.sel).forEach(function (el, i) {
+                var step = g.perRow ? i % g.perRow : i;
+                var delay = (g.base || 0) + (g.stagger ? step * g.stagger : 0);
+                el.classList.add('ath-reveal');
+                el.setAttribute('data-reveal', g.type);
+                if (delay) el.style.setProperty('--reveal-delay', delay.toFixed(2) + 's');
+                io.observe(el);
+            });
+        });
+    })();
+    </script>
+    <?php endif; ?>
 </body>
 </html>

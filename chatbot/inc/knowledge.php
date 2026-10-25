@@ -54,7 +54,7 @@ function gncbot_page_urls(): array
         'home'                => ['label' => 'GNCILink Home',                'url' => gncbot_url('/')],
         'events'              => ['label' => 'Calendar of Events',           'url' => gncbot_url('/#events')],
         'news_announcements'  => ['label' => 'News & Announcements',         'url' => gncbot_url('/pages/news-and-announcement.php')],
-        'college_departments' => ['label' => 'College Departments',          'url' => gncbot_url('/pages/academics/college/college-departments.php')],
+        'college_departments' => ['label' => 'College Departments',          'url' => gncbot_url('/pages/academics/college/college-dept.php')],
         'basic_education'     => ['label' => 'Basic Education',              'url' => gncbot_url('/pages/academics/basic-edu/basic-edu-dept.php')],
         'graduate_school'     => ['label' => 'Graduate School',              'url' => gncbot_url('/pages/academics/graduate-school/graduate-school.php')],
         'campus_navigator'    => ['label' => 'Campus Navigator',             'url' => gncbot_url('/campus_navigator.html')],
@@ -72,6 +72,11 @@ function gncbot_page_urls(): array
 function gncbot_announcement_url(string $slug): string { return gncbot_url('/announcement.php?slug=' . rawurlencode($slug)); }
 function gncbot_news_url(string $slug): string         { return gncbot_url('/news.php?slug=' . rawurlencode($slug)); }
 function gncbot_program_events_url(string $code): string { return gncbot_url('/?program=' . rawurlencode($code) . '#events'); }
+
+/** These suffixes distinguish CMS records; visitors use the strand abbreviation. */
+function gncbot_program_display_code(string $code): string {
+    return ['ABE2' => 'ABE', 'AE2' => 'AE', 'EHSS2' => 'EHSS', 'HAS2' => 'HAS', 'IDT2' => 'IDT'][$code] ?? $code;
+}
 
 /**
  * Program code => full name. The names are not in MySQL (programs only stores

@@ -18,10 +18,19 @@ try {
             $saved->execute([$id, 'leadership_intro']);
             pageCheck($original['leadership_intro']['value'] === (string)$saved->fetchColumn(), 'Basic Education introduction uses the shared content table');
         }
-        saveDepartmentPageContent($id, ['leadership_title' => 'New <heading>', 'contacts_label' => '']);
+        saveDepartmentPageContent($id, ['leadership_title' => 'New <heading>', 'contacts_label' => '', 'vision_title' => 'Our vision', 'vision_text' => '<p>Learning &amp; service</p>', 'mission_text' => '<p>Educate future leaders.</p><script>alert(1)</script>']);
         pageCheck(departmentPageText($dept, 'leadership_title') === 'New &lt;heading&gt;', 'Saved text is safely rendered');
         pageCheck(departmentPageText($dept, 'contacts_label') === '', 'Cleared labels stay empty');
-        foreach ([['unknown_key' => 'x'], ['phone_label' => str_repeat('a', 101)], ['leadership_title' => []]] as $invalid) {
+        saveDepartmentPageContent($id, ['vision_icon' => 'bi:bullseye', 'mission_icon' => 'material:school']);
+        pageCheck(departmentPageContent($dept, true)['vision_icon']['value'] === 'bi:bullseye', 'Vision icon persists');
+        pageCheck(str_contains(departmentStatementIcon($dept, 'vision_icon'), 'bi-bullseye'), 'Public vision renderer uses saved Bootstrap icon');
+        pageCheck(str_contains(departmentStatementIcon($dept, 'mission_icon'), '>school</span>'), 'Public mission renderer uses saved Material icon');
+        pageCheck(departmentPageText($dept, 'vision_title') === 'Our vision', 'Vision heading persists');
+        pageCheck(str_contains(departmentPageText($dept, 'vision_text'), 'Learning &amp; service'), 'Vision rich text persists');
+        pageCheck(str_contains(departmentPageText($dept, 'mission_text'), 'Educate future leaders.') && !str_contains(departmentPageText($dept, 'mission_text'), '<script'), 'Mission persists and unsafe HTML is removed');
+        saveDepartmentPageContent($id, ['vision_text' => '', 'mission_text' => '']);
+        pageCheck(departmentPageText($dept, 'vision_text') === '' && departmentPageText($dept, 'mission_text') === '', 'Optional vision and mission can be cleared');
+        foreach ([['unknown_key' => 'x'], ['phone_label' => str_repeat('a', 101)], ['leadership_title' => []], ['vision_icon' => '<script>bad()</script>'], ['mission_icon' => 'bi:not-a-real-icon'], ['vision_icon' => 'svg:grad-hat-white']] as $invalid) {
             try { saveDepartmentPageContent($id, $invalid); throw new RuntimeException('Invalid field was accepted'); }
             catch (InvalidArgumentException $expected) {}
         }

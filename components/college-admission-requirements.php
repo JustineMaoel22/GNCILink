@@ -29,5 +29,22 @@ function collegeAdmissionSectionDefaults(): array
         $sections[$key] = ['title' => $title, 'content' => '<h2>' . $h($title) . '</h2><p>' . $h($intro) . '</p><ol>'
             . implode('', array_map(static fn($item) => '<li>' . $h($item) . '</li>', $items)) . '</ol>'];
     }
+    $sections['hero_title'] = ['title' => 'Page heading', 'content' => 'College Admission Requirements'];
     return $sections;
+}
+
+/** Add the editable heading to existing installations without replacing content. */
+function ensureCollegeAdmissionHeadingSection(): void
+{
+    $db = getDB();
+    $page = $db->prepare("SELECT page_id FROM pages WHERE slug = ? AND status = 'active'");
+    $page->execute(['college-admission-requirements']);
+    $pageId = $page->fetchColumn();
+    if (!$pageId) return;
+    $check = $db->prepare('SELECT section_id FROM page_sections WHERE page_id = ? AND section_key = ?');
+    $check->execute([$pageId, 'hero_title']);
+    if ($check->fetchColumn()) return;
+    $field = collegeAdmissionSectionDefaults()['hero_title'];
+    $db->prepare("INSERT INTO page_sections (page_id, section_key, title, content, status, display_order) VALUES (?, 'hero_title', ?, ?, 'published', 0)")
+        ->execute([$pageId, $field['title'], $field['content']]);
 }

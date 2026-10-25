@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/image-framing.php';
+require_once __DIR__ . '/content-publish-policy.php';
 function normalizeAchievementAcademicYear($value): ?string {
     if ($value === null || $value === '') return null;
     if (!is_string($value) || !preg_match('/^([1-9][0-9]{3})-([1-9][0-9]{3})$/D', $value, $matches)
@@ -75,11 +76,11 @@ function saveStudentAchievement(PDO $db, int $id, array $data, ?string $imagePat
         if (!is_string($value) || mb_strlen(trim($value)) > $limit) throw new InvalidArgumentException('Check the ' . str_replace('_', ' ', $key) . ' field.');
         $fields[$key] = trim($value);
     }
-    if ($fields['title'] === '') throw new InvalidArgumentException('Enter an achievement title.');
+    if ($fields['title'] === '' && !contentPublishAllowsIncomplete()) throw new InvalidArgumentException('Enter an achievement title.');
     $status = $data['status'] ?? 'draft';
     if (!in_array($status, ['draft','published'], true)) throw new InvalidArgumentException('Choose draft or published.');
     $year = normalizeAchievementAcademicYear($data['academic_year'] ?? null);
-    if ($status === 'published' && (!$year || (!$thumbnailPath && !$imagePath))) throw new InvalidArgumentException('Choose an academic year and add a card cover photo before publishing.');
+    if ($status === 'published' && (!$year || (!$thumbnailPath && !$imagePath)) && !contentPublishAllowsIncomplete()) throw new InvalidArgumentException('Choose an academic year and add a card cover photo before publishing.');
     $order = filter_var($data['sort_order'] ?? 0, FILTER_VALIDATE_INT);
     if ($order === false || $order < 0 || $order > 100000) throw new InvalidArgumentException('Display order must be between 0 and 100000.');
     $values = [$fields['title'],$fields['description'],$fields['program_organization'],$fields['category_label'],$year,$imagePath,$status,empty($data['is_featured'])?0:1,$order,$fields['achievers'],$thumbnailPath];
@@ -93,11 +94,12 @@ function saveStudentAchievement(PDO $db, int $id, array $data, ?string $imagePat
 }
 
 function uploadStudentAchievementImage(array $file): string {
+    $file = imageUploadPrepare($file);
     if (!isset($file['error'],$file['tmp_name']) || !is_int($file['error']) || $file['error'] !== UPLOAD_ERR_OK || !is_string($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) throw new InvalidArgumentException('The picture upload failed. Please try again.');
     $size = filesize($file['tmp_name']);
     $types = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','image/gif'=>'gif'];
     $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
-    if (!$size || $size > 8*1024*1024 || !isset($types[$mime]) || !getimagesize($file['tmp_name'])) throw new InvalidArgumentException('Upload a JPG, PNG, WebP or GIF picture of up to 8 MB.');
+    if (!$size || $size > 5*1024*1024 || !isset($types[$mime]) || !getimagesize($file['tmp_name'])) throw new InvalidArgumentException('Upload a JPG, PNG, WebP or GIF picture of up to 5 MB.');
     $folder = dirname(__DIR__) . '/uploads/student-achievements';
     if (!is_dir($folder) && !mkdir($folder,0755,true) && !is_dir($folder)) throw new RuntimeException('Could not create the achievement upload folder.');
     $path = '/uploads/student-achievements/' . bin2hex(random_bytes(16)) . '.' . $types[$mime];

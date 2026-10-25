@@ -17,7 +17,7 @@ try {
         $field = $fields[$key];
         if ($field['type'] === 'url') {
             $value = trim($value);
-            if (!paymentGuideValidUrl($value)) throw new InvalidArgumentException('Enter an HTTP or HTTPS URL, or a local path starting with /.');
+            if ($value !== '' && !paymentGuideValidUrl($value)) throw new InvalidArgumentException('Enter an HTTP or HTTPS URL, or a local path starting with /.');
         } else {
             $value = $field['type'] === 'rich' ? richTextNormalize($value) : trim(strip_tags($value));
         }
@@ -38,6 +38,7 @@ try {
             continue;
         }
         $file = $_FILES['image_' . $key] ?? null;
+        $file = imageUploadPrepare($file);
         if (!$file || is_array($file['error']) || $file['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) throw new InvalidArgumentException('Choose an illustration to upload.');
         $size = filesize($file['tmp_name']);
         if (!$size || $size > 5 * 1024 * 1024) throw new InvalidArgumentException('Choose an image of up to 5 MB.');

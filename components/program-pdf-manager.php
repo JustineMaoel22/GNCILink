@@ -248,6 +248,7 @@ $programCategoryOptions = getProgramCategories();
         });
     }
     function showAlert(el, msg, isError) {
+        if (window.ContentEditorNotice && window.ContentEditorNotice(msg, isError)) { el.classList.add('d-none'); return; }
         el.className = 'alert mt-3 mb-0 ' + (isError ? 'alert-danger' : 'alert-success');
         el.textContent = msg;
         if (!isError) setTimeout(function () { el.classList.add('d-none'); }, 5000);

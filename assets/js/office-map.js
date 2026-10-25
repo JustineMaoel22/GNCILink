@@ -8,13 +8,13 @@
     function highlight() {
         if (!location) return;
         var map = frame.contentWindow;
-        if (!map || !map.B || typeof map.go !== 'function') return;
+        if (!map || !map.B || typeof map.setOfficeBuilding !== 'function') return;
         clearTimeout(loading);
         if (location.building_id && Object.prototype.hasOwnProperty.call(map.B, location.building_id)) {
-            map.go(location.building_id);
+            map.setOfficeBuilding(location.building_id);
             help.textContent = location.building + ' is highlighted. Zoom or drag to explore the map.';
         } else {
-            map.clear(true);
+            map.setOfficeBuilding(null);
             help.textContent = 'A mapped building has not been assigned to this office. Please use the location details above.';
         }
     }
@@ -48,7 +48,7 @@
         requestAnimationFrame(function () { modal.classList.add('is-open'); });
         if (!frame.getAttribute('src')) {
             loading = setTimeout(function () { help.textContent = 'The map is taking longer to load. The office location is listed above.'; }, 12000);
-            frame.src = '/campus_navigator.html?view=office';
+            frame.src = frame.getAttribute('data-map-src') || '/campus_navigator.html?view=office&v=office-lock-1';
         } else highlight();
     });
     modal.querySelector('.office-map-close').addEventListener('click', close);

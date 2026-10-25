@@ -1,52 +1,34 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../admin/admin-functions.php';
+require_once __DIR__ . '/../components/contact-page-content.php';
 
-session_start();
-
-// ---------------------------------------------------------------
-// Contact details shown on the page (same as the site footer).
-// The contact form emails $contact['email'].
-// ---------------------------------------------------------------
-$contact = [
-    'address'  => 'Rep. Eligio Lagman St, Sta. Filomena Rd, Guagua, Pampanga',
-    'phone'    => '(045) 123-4567',
-    'email'    => 'justinemaoel.gnc@gmail.com',
-    'hours'    => 'Monday - Friday, 8:00 AM - 5:00 PM',
-    'facebook' => 'https://www.facebook.com/gnc.edu.ph',
-];
+if (session_status() === PHP_SESSION_NONE) session_start();
+$contactPreview = cePreviewActive();
+$contactFields = contactPageContent($contactPreview);
+$contactText = static fn(string $key): string => $contactFields[$key]['content'];
+$contactMark = static function (string $key) use ($contactFields): string {
+    return ceMark('data-ve-section="' . ceAttr($key) . '" data-ve-field="contact-text" data-ve-plain-section data-ve-max="' . $contactFields[$key]['max'] . '" data-ve-label="' . ceAttr($contactFields[$key]['title']) . '"');
+};
 
 // ---------------------------------------------------------------
-// School directory (from the official GNC directory sheet).
-// Edit / add rows here; the page and the search box pick them up.
+// Contact details are managed in the Contact Us Content Editor.
+// The contact form always emails the published contact address.
 // ---------------------------------------------------------------
-$directDirectory = [
-    ['900-4473', "President's Office"],
-    ['900-0341', 'College Registrar Office'],
-    ['900-2207', 'Accounting Office'],
-];
+$contact = [];
+foreach (['address', 'phone', 'email', 'hours', 'facebook'] as $key) $contact[$key] = $contactText('contact_' . $key);
+// Deliver messages only to the published address, including while previewing a draft.
+$contactLiveEmail = getSectionContent('contact-us', 'contact_email') ?? contactPageDefaults()['contact_email']['content'];
+$contactLiveEmail = contactPageValidate('contact_email', (string)$contactLiveEmail);
 
-$localDirectory = [
-    ['101', "President's Office/Operator/Boardroom"],
-    ['105', 'Human Resources Office'],
-    ['106', 'College Registrar'],
-    ['107', 'Accounting Office'],
-    ['108', 'College Guidance'],
-    ['109', 'Medical Clinic/Dental Clinic'],
-    ['109', 'Office of the Student Affairs'],
-    ['113', 'College Library'],
-    ['115', 'Elementary Principal Office/Printing'],
-    ['116', 'High School Library'],
-    ['117', 'High School Principal Office'],
-    ['119', 'School Electrician'],
-    ['120', 'CASEd Office (Education/Arts and Sciences)'],
-    ['121', 'Montessori Office'],
-    ['122', 'Guardhouse (Main Gate)'],
-    ['123', 'Purchasing Office'],
-    ['124', 'Computer Technician Office'],
-    ['125', 'College of Engineering Office'],
-    ['137', 'CAMP Office'],
-    ['138', 'Head, Instruction Cluster (HIC) Office'],
-];
+// ---------------------------------------------------------------
+// School directory, with numbers and office names managed in the editor.
+// ---------------------------------------------------------------
+$directDirectory = [];
+for ($i = 0; $i < 3; $i++) $directDirectory[] = [$contactText('direct_' . $i . '_number'), $contactText('direct_' . $i . '_office')];
+
+$localDirectory = [];
+for ($i = 0; $i < 20; $i++) $localDirectory[] = [$contactText('local_' . $i . '_number'), $contactText('local_' . $i . '_office')];
 
 function e($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
@@ -151,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      . 'Reply-To: ' . str_replace(["\r", "\n"], '', $old['email']) . "\r\n"
                      . "Content-Type: text/plain; charset=UTF-8\r\n";
 
-            if (gncSendContactMail($contact['email'], $old['name'], $old['email'], '[GNC Website] ' . $subject, $body, $headers)) {
+            if (gncSendContactMail($contactLiveEmail, $old['name'], $old['email'], '[GNC Website] ' . $subject, $body, $headers)) {
                 $success = 'Thank you! Your message has been sent. We will get back to you soon.';
                 $old = array_map(fn() => '', $old);
             } else {
@@ -180,7 +162,7 @@ $showOpen = ($success === '' && !$errors);
     <link href="../assets/css/base-style.css" rel="stylesheet">
     <link href="../assets/css/navbar-style.css" rel="stylesheet">
     <link href="../assets/css/footer-style.css" rel="stylesheet">
-    <link href="../assets/css/contact-us-style.css" rel="stylesheet">
+    <link href="../assets/css/contact-us-style.css?v=<?= filemtime(__DIR__ . '/../assets/css/contact-us-style.css') ?>" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="icon" type="image/x-icon" href="../assets/images/logos/gnc-logo-v1.svg">
     <script>
@@ -194,7 +176,7 @@ $showOpen = ($success === '' && !$errors);
         })();
     </script>
 </head>
-<body>
+<body<?= $contactPreview ? ' class="gnc-contact-editing"' : '' ?>>
     <?php $activeSection = 'contact-us'; ?>
     <?php include __DIR__ . '/../components/navbar.php'; ?>
 
@@ -210,9 +192,9 @@ $showOpen = ($success === '' && !$errors);
     </div>
     <?php endif; ?>
     <header class="gnc-contact-hero">
-        <span class="gnc-contact-kicker"><i class="bi bi-chat-dots-fill"></i> Get in touch</span>
-        <h1 class="gnc-contact-title">Contact <span>Us</span></h1>
-        <p class="gnc-contact-lead">Questions about admissions, programs, or campus life? Send us a message and the GNC team will get back to you.</p>
+        <span class="gnc-contact-kicker"><i class="bi bi-chat-dots-fill"></i> <span<?= $contactMark('hero_kicker') ?>><?= e($contactText('hero_kicker')) ?></span></span>
+        <h1 class="gnc-contact-title"><span class="gnc-contact-title-main"<?= $contactMark('hero_title') ?>><?= e($contactText('hero_title')) ?></span> <span<?= $contactMark('hero_accent') ?>><?= e($contactText('hero_accent')) ?></span></h1>
+        <p class="gnc-contact-lead"<?= $contactMark('hero_description') ?>><?= e($contactText('hero_description')) ?></p>
     </header>
 
     <section class="gnc-contact-sec">
@@ -222,57 +204,58 @@ $showOpen = ($success === '' && !$errors);
                 <!-- Contact details -->
                 <div class="col-lg-5">
                     <div class="gnc-contact-info">
-                        <h2>Reach Out to GNC</h2>
-                        <p>We're happy to help. Use any of the channels below or send us a message.</p>
+                        <h2<?= $contactMark('info_title') ?>><?= e($contactText('info_title')) ?></h2>
+                        <p<?= $contactMark('info_description') ?>><?= e($contactText('info_description')) ?></p>
 
                         <div class="gnc-contact-item">
                             <span class="gnc-contact-icon"><i class="bi bi-geo-alt-fill"></i></span>
                             <div>
-                                <h3>Address</h3>
-                                <p><?= e($contact['address']) ?></p>
+                                <h3<?= $contactMark('address_label') ?>><?= e($contactText('address_label')) ?></h3>
+                                <p><span<?= $contactMark('contact_address') ?>><?= e($contactText('contact_address')) ?></span></p>
                             </div>
                         </div>
 
                         <div class="gnc-contact-item">
                             <span class="gnc-contact-icon"><i class="bi bi-telephone-fill"></i></span>
                             <div>
-                                <h3>Phone</h3>
-                                <a href="tel:<?= e(preg_replace('/[^+\d]/', '', $contact['phone'])) ?>"><?= e($contact['phone']) ?></a>
+                                <h3<?= $contactMark('phone_label') ?>><?= e($contactText('phone_label')) ?></h3>
+                                <a data-contact-channel="phone" href="tel:<?= e(preg_replace('/[^+\d]/', '', $contact['phone'])) ?>"><span<?= $contactMark('contact_phone') ?>><?= e($contactText('contact_phone')) ?></span></a>
                             </div>
                         </div>
 
                         <div class="gnc-contact-item">
                             <span class="gnc-contact-icon"><i class="bi bi-envelope-fill"></i></span>
                             <div>
-                                <h3>Email</h3>
-                                <a href="mailto:<?= e($contact['email']) ?>"><?= e($contact['email']) ?></a>
+                                <h3<?= $contactMark('email_label') ?>><?= e($contactText('email_label')) ?></h3>
+                                <a data-contact-channel="email" href="mailto:<?= e($contact['email']) ?>"><span<?= $contactMark('contact_email') ?>><?= e($contactText('contact_email')) ?></span></a>
                             </div>
                         </div>
 
                         <div class="gnc-contact-item">
                             <span class="gnc-contact-icon"><i class="bi bi-clock-fill"></i></span>
                             <div>
-                                <h3>Office Hours</h3>
-                                <p><?= e($contact['hours']) ?></p>
+                                <h3<?= $contactMark('hours_label') ?>><?= e($contactText('hours_label')) ?></h3>
+                                <p><span<?= $contactMark('contact_hours') ?>><?= e($contactText('contact_hours')) ?></span></p>
                             </div>
                         </div>
 
                         <div class="gnc-contact-links">
                             <a class="gnc-contact-pill gnc-contact-pill--gold" href="../index.php#campus-map">
-                                <i class="bi bi-map-fill"></i> Campus Map
+                                <i class="bi bi-map-fill"></i> <span<?= $contactMark('map_label') ?>><?= e($contactText('map_label')) ?></span>
                             </a>
-                            <a class="gnc-contact-pill gnc-contact-pill--line" href="<?= e($contact['facebook']) ?>" target="_blank" rel="noopener">
-                                <i class="bi bi-facebook"></i> Facebook
+                            <a class="gnc-contact-pill gnc-contact-pill--line" data-contact-channel="facebook" href="<?= e($contact['facebook']) ?>" target="_blank" rel="noopener">
+                                <i class="bi bi-facebook"></i> <span<?= $contactMark('facebook_label') ?>><?= e($contactText('facebook_label')) ?></span>
                             </a>
                         </div>
+                        <?php if ($contactPreview): ?><p class="small mt-3 mb-0">Facebook page URL: <span<?= $contactMark('contact_facebook') ?>><?= e($contactText('contact_facebook')) ?></span></p><?php endif; ?>
                     </div>
                 </div>
 
                 <!-- Form -->
                 <div class="col-lg-7">
                     <div class="gnc-contact-card">
-                        <h2>Send a Message</h2>
-                        <p>Fields marked with <span style="color:#b3261e;">*</span> are required.</p>
+                        <h2<?= $contactMark('form_title') ?>><?= e($contactText('form_title')) ?></h2>
+                        <p><span<?= $contactMark('form_description') ?>><?= str_replace('*', '<span style="color:#b3261e;">*</span>', e($contactText('form_description'))) ?></span></p>
 
                         <?php if ($success): ?>
                             <div class="gnc-alert gnc-alert--ok" role="status"><i class="bi bi-check-circle-fill"></i> <?= e($success) ?></div>
@@ -291,27 +274,27 @@ $showOpen = ($success === '' && !$errors);
 
                             <div class="row">
                                 <div class="col-md-6 gnc-field">
-                                    <label for="name">Full Name <span class="req">*</span></label>
+                                    <label for="name"><span<?= $contactMark('name_label') ?>><?= e($contactText('name_label')) ?></span> <span class="req">*</span></label>
                                     <input type="text" id="name" name="name" placeholder="Juan Dela Cruz" value="<?= e($old['name']) ?>" maxlength="100" required>
                                 </div>
                                 <div class="col-md-6 gnc-field">
-                                    <label for="email">Email Address <span class="req">*</span></label>
+                                    <label for="email"><span<?= $contactMark('form_email_label') ?>><?= e($contactText('form_email_label')) ?></span> <span class="req">*</span></label>
                                     <input type="email" id="email" name="email" placeholder="you@example.com" value="<?= e($old['email']) ?>" required>
                                 </div>
                             </div>
 
                             <div class="gnc-field">
-                                <label for="subject">Subject</label>
+                                <label for="subject"><span<?= $contactMark('subject_label') ?>><?= e($contactText('subject_label')) ?></span></label>
                                 <input type="text" id="subject" name="subject" placeholder="How can we help?" value="<?= e($old['subject']) ?>" maxlength="150">
                             </div>
 
                             <div class="gnc-field">
-                                <label for="message">Message <span class="req">*</span></label>
+                                <label for="message"><span<?= $contactMark('message_label') ?>><?= e($contactText('message_label')) ?></span> <span class="req">*</span></label>
                                 <textarea id="message" name="message" placeholder="Tell us what's on your mind…" maxlength="5000" required><?= e($old['message']) ?></textarea>
                             </div>
 
                             <button type="submit" class="gnc-contact-submit">
-                                Send Message <i class="bi bi-send-fill"></i>
+                                <span<?= $contactMark('submit_label') ?>><?= e($contactText('submit_label')) ?></span> <i class="bi bi-send-fill"></i>
                             </button>
                         </form>
                     </div>
@@ -321,19 +304,19 @@ $showOpen = ($success === '' && !$errors);
             <!-- School directory -->
             <section class="gnc-dir" id="school-directory" aria-labelledby="gncDirTitle">
                 <div class="gnc-dir-head" data-ct-reveal>
-                    <h2 id="gncDirTitle">School Directory</h2>
-                    <p>Find the right office and its phone line.</p>
+                    <h2 id="gncDirTitle"<?= $contactMark('directory_title') ?>><?= e($contactText('directory_title')) ?></h2>
+                    <p<?= $contactMark('directory_description') ?>><?= e($contactText('directory_description')) ?></p>
                 </div>
 
                 <div class="row g-4">
                     <div class="col-lg-4">
                         <div class="gnc-dir-card gnc-dir-card--direct" data-ct-reveal>
-                            <h3><i class="bi bi-telephone-fill"></i> Direct Lines</h3>
+                            <h3><i class="bi bi-telephone-fill"></i> <span<?= $contactMark('direct_title') ?>><?= e($contactText('direct_title')) ?></span></h3>
                             <ul class="gnc-dir-list">
                                 <?php foreach ($directDirectory as $i => [$num, $office]): ?>
                                 <li class="gnc-dir-item" style="--i:<?= (int)$i ?>">
-                                    <span class="gnc-dir-num"><?= e($num) ?></span>
-                                    <span class="gnc-dir-name"><?= e($office) ?></span>
+                                    <span class="gnc-dir-num"<?= $contactMark('direct_' . $i . '_number') ?>><?= e($num) ?></span>
+                                    <span class="gnc-dir-name"<?= $contactMark('direct_' . $i . '_office') ?>><?= e($office) ?></span>
                                 </li>
                                 <?php endforeach; ?>
                             </ul>
@@ -342,12 +325,12 @@ $showOpen = ($success === '' && !$errors);
 
                     <div class="col-lg-8">
                         <div class="gnc-dir-card" data-ct-reveal style="--rd:.15s">
-                            <h3><i class="bi bi-building"></i> Local Lines</h3>
+                            <h3><i class="bi bi-building"></i> <span<?= $contactMark('local_title') ?>><?= e($contactText('local_title')) ?></span></h3>
                             <ul class="gnc-dir-list gnc-dir-list--cols">
                                 <?php foreach ($localDirectory as $i => [$num, $office]): ?>
                                 <li class="gnc-dir-item" style="--i:<?= (int)$i ?>">
-                                    <span class="gnc-dir-num"><?= e($num) ?></span>
-                                    <span class="gnc-dir-name"><?= e($office) ?></span>
+                                    <span class="gnc-dir-num"<?= $contactMark('local_' . $i . '_number') ?>><?= e($num) ?></span>
+                                    <span class="gnc-dir-name"<?= $contactMark('local_' . $i . '_office') ?>><?= e($office) ?></span>
                                 </li>
                                 <?php endforeach; ?>
                             </ul>
@@ -366,6 +349,19 @@ $showOpen = ($success === '' && !$errors);
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
     <script>
+    <?php if ($contactPreview): ?>
+    // Keep the link destinations in step with inline preview text.
+    document.addEventListener('input', function (event) {
+        var field = event.target.closest('[data-ve-section]');
+        if (!field) return;
+        var key = field.getAttribute('data-ve-section');
+        var channel = { contact_phone: 'phone', contact_email: 'email', contact_facebook: 'facebook' }[key];
+        if (!channel) return;
+        var link = document.querySelector('[data-contact-channel="' + channel + '"]');
+        var value = field.textContent.trim();
+        if (link) link.setAttribute('href', channel === 'phone' ? 'tel:' + value.replace(/[^+\d]/g, '') : (channel === 'email' ? 'mailto:' + value : value));
+    });
+    <?php endif; ?>
     // Reveal directory blocks as they scroll into view.
     (function () {
         var els = document.querySelectorAll('[data-ct-reveal]');

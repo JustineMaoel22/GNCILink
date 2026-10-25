@@ -1,0 +1,14 @@
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawn}=require('node:child_process');
+const profile=fs.mkdtempSync(path.join(os.tmpdir(),'gnci-video-reference-'));
+const browser=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
+const delay=ms=>new Promise(r=>setTimeout(r,ms));let socket;
+(async()=>{for(let i=0;i<200&&!fs.existsSync(path.join(profile,'DevToolsActivePort'));i++)await delay(50);
+const port=fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0],tabs=await(await fetch('http://127.0.0.1:'+port+'/json/list')).json();
+socket=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);await new Promise(r=>socket.addEventListener('open',r,{once:true}));
+let serial=0;const pending=new Map();socket.addEventListener('message',e=>{const p=JSON.parse(e.data);if(p.id&&pending.has(p.id)){pending.get(p.id)(p.result);pending.delete(p.id);}});
+const send=(method,params={})=>new Promise(r=>{const id=++serial;pending.set(id,r);socket.send(JSON.stringify({id,method,params}));});
+await send('Page.enable');await send('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
+await send('Page.navigate',{url:'file:///C:/Users/justi/Videos/Screen%20Recordings/Screen%20Recording%202026-10-23%20210521.mp4'});await delay(1800);
+console.log(JSON.stringify(await send('Runtime.evaluate',{expression:"(()=>{const v=document.querySelector('video');if(v){v.pause();v.currentTime=Math.min(8,v.duration/2);return {duration:v.duration}}return document.body.textContent})()",returnByValue:true})));
+await delay(700);const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync('cache/positioning-reference.png',Buffer.from(shot.data,'base64'));
+})().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{if(socket)socket.close();browser.kill();await delay(700);if(path.dirname(profile)===os.tmpdir()&&path.basename(profile).startsWith('gnci-video-reference-'))try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:3,retryDelay:200})}catch{}});

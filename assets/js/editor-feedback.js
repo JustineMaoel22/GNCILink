@@ -23,10 +23,11 @@
         const images = [el,...el.querySelectorAll('img,video,source,[data-bg]')].filter(node => node.matches('img,video,source,[data-bg]') || node === el);
         return images.map(node => {
             const style = node.style || {}, src = node.getAttribute('src') || '';
-            return [node.tagName,src,node.getAttribute('srcset'),node.getAttribute('poster'),node.getAttribute('data-bg') || style.backgroundImage || '',style.objectPosition || '',node.hasAttribute('data-image-framed') ? style.transform || '' : '',node.matches(MEDIA) ? style.opacity || '' : ''];
+            return [node.tagName,src,node.getAttribute('srcset'),node.getAttribute('poster'),node.getAttribute('data-ve-background-value') || node.getAttribute('data-bg') || style.backgroundImage || '',style.objectPosition || '',node.hasAttribute('data-image-framed') ? style.transform || '' : '',node.matches(MEDIA) ? style.opacity || '' : ''];
         });
     }
     function signature(el, serializeText) {
+        if (el.matches('[data-ve-sports-facebook]')) return el.getAttribute('data-ve-link') || '';
         if (el.matches(TEXT)) return JSON.stringify([serializeText(el),el.getAttribute('href')]);
         if (el.matches('[data-ve-payment-link],[data-ve-linkkey]')) return el.getAttribute('href') || '';
         if (el.matches('[data-ve-fee-pdf],[data-ve-fee-manage]')) {
@@ -112,7 +113,7 @@
             if (mutations.some(m=>m.type!=='attributes' || m.attributeName!=='class' || classes(m.oldValue)!==classes(m.target.getAttribute('class')))) schedule();
         }) : null;
         refresh(true);
-        if (observer) observer.observe(doc.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeOldValue:true,attributeFilter:['src','srcset','poster','href','data-bg','style','class']});
+        if (observer) observer.observe(doc.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeOldValue:true,attributeFilter:['src','srcset','poster','href','data-bg','data-ve-background-value','data-ve-link','style','class']});
         return {
             refresh:()=>refresh(false),hide,
             dispose() {

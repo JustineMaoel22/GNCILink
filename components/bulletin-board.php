@@ -150,17 +150,20 @@ function gnc_get_global_announcements(string $program, int $limit): array
 function gnc_get_global_events(string $program, int $limit): array
 {
     $pdo = gnc_bulletin_get_verified_pdo();
+    require_once __DIR__ . '/../includes/event-audience.php';
+    $departmentScope = eventDepartmentsReady() ? " AND (dept_id IS NULL OR dept_id = (SELECT dept_id FROM programs WHERE program_code = :department_program LIMIT 1))" : '';
 
     $sql = "SELECT event_id, title, location, start_date, end_date
             FROM events
             WHERE status = 'published'
               AND start_date >= NOW()
-              AND (program = :program OR program = 'ALL')
+              AND (program = :program OR (program = 'ALL' {$departmentScope}))
             ORDER BY start_date ASC
             LIMIT :limit";
 
     $stmt = $pdo->prepare($sql);
     $stmt->bindValue(':program', $program, PDO::PARAM_STR);
+    if ($departmentScope !== '') $stmt->bindValue(':department_program', $program, PDO::PARAM_STR);
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
     $stmt->execute();
 

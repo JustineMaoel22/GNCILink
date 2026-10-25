@@ -90,20 +90,20 @@
     font-family: 'Inter', sans-serif;
     font-size: 0.85rem;
     font-weight: 600;
-    padding: 12px 22px;
-    border-radius: 999px;
-    background-color: #ffffff;
-    color: #202020;
+    padding: 10px 20px;
+    border-radius: 4px;
+    background-color: transparent;
+    color: #0b4228;
     text-decoration: none;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-    border: 1px solid #e6e1d8;
+    box-shadow: none;
+    border: 1px solid #0b4228;
     white-space: nowrap;
     transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
 }
 
 .admin-tab:hover {
-    background-color: #f9f6f1;
-    color: #1F5E2C;
+    background-color: rgba(11, 66, 40, 0.07);
+    color: #0b4228;
     transform: translateY(-1px);
 }
 
@@ -112,6 +112,7 @@
     background-color: #0b4228;
     color: #ffffff;
     border-color: #0b4228;
+    box-shadow: 0 6px 14px rgba(11, 66, 40, 0.3);
 }
 
 @media (max-width: 576px) {
@@ -120,7 +121,7 @@
     }
     .admin-tab {
         font-size: 0.78rem;
-        padding: 10px 16px;
+        padding: 9px 14px;
     }
 }
 
@@ -650,4 +651,252 @@
 @media (prefers-reduced-motion: reduce) {
     .admin-open { display: none; }
     .admin-hero .reveal-up, .admin-tabs-wrap.reveal-up { transition-delay: 0s !important; }
+}
+
+/* =============================================================
+   EXTRA ANIMATIONS
+   All pure CSS. They hook into the existing .is-visible class
+   that administration.js already adds to .reveal-up / .reveal-scale.
+   ============================================================= */
+
+/* ---------- Page scroll progress bar (modern browsers only) ---------- */
+@supports (animation-timeline: scroll()) {
+    body::before {
+        content: "";
+        position: fixed; top: 0; left: 0; right: 0;
+        height: 3px; z-index: 1900;
+        background: linear-gradient(90deg, #d3a63a, #8f1230, #1F5E2C);
+        transform: scaleX(0); transform-origin: left;
+        pointer-events: none;
+        animation: adProgress linear both;
+        animation-timeline: scroll(root);
+    }
+}
+@keyframes adProgress { to { transform: scaleX(1); } }
+
+/* ---------- Hero ---------- */
+.admin-breadcrumb i {
+    display: inline-block;
+    animation: adChevron 2.4s ease-in-out 2.2s infinite;
+}
+@keyframes adChevron {
+    0%, 100% { transform: translateX(0); }
+    50%      { transform: translateX(4px); }
+}
+
+/* Gold accent bar draws itself under the page title once the wipe is done */
+.admin-hero h1::after {
+    content: "";
+    display: block;
+    height: 4px; width: 0;
+    margin-top: 12px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #d3a63a, #e9b93c);
+    animation: adBarGrow .9s cubic-bezier(.22, 1, .36, 1) 1.55s forwards;
+}
+@keyframes adBarGrow { to { width: 72px; } }
+
+/* ---------- Tabs ---------- */
+.admin-tab {
+    animation: adTabIn .55s cubic-bezier(.22, 1, .36, 1) backwards;
+    animation-delay: calc(1.35s + var(--k, 0) * .07s);
+}
+.admin-tab:nth-child(1) { --k: 0; }
+.admin-tab:nth-child(2) { --k: 1; }
+.admin-tab:nth-child(3) { --k: 2; }
+.admin-tab:nth-child(4) { --k: 3; }
+.admin-tab:nth-child(5) { --k: 4; }
+.admin-tab:nth-child(6) { --k: 5; }
+.admin-tab:active { transform: scale(.96); }
+
+@keyframes adTabIn {
+    from { opacity: 0; transform: translateY(14px) scale(.92); }
+    to   { opacity: 1; transform: none; }
+}
+/* ---------- Section intro ---------- */
+.admin-section-intro.reveal-up .admin-eyebrow {
+    letter-spacing: .3em;
+    transition: letter-spacing 1.1s cubic-bezier(.22, 1, .36, 1) .15s;
+}
+.admin-section-intro.reveal-up.is-visible .admin-eyebrow { letter-spacing: .08em; }
+
+.admin-section-intro h2::after {
+    content: "";
+    display: block;
+    height: 3px; width: 0;
+    margin-top: 10px;
+    border-radius: 3px;
+    background: #d3a63a;
+    transition: width .9s cubic-bezier(.22, 1, .36, 1) .4s;
+}
+.admin-section-intro.is-visible h2::after { width: 56px; }
+
+/* ---------- Trustee / officer photo cards ---------- */
+
+/* Gold squares slide into place behind the photo */
+.reveal-scale.is-visible .admin-square-top {
+    animation: adSquareTop .9s cubic-bezier(.22, 1, .36, 1) .2s backwards;
+}
+.reveal-scale.is-visible .admin-square-bottom {
+    animation: adSquareBottom .9s cubic-bezier(.22, 1, .36, 1) .3s backwards;
+}
+@keyframes adSquareTop    { from { opacity: 0; transform: translate(26px, 26px); } to { opacity: 1; transform: none; } }
+@keyframes adSquareBottom { from { opacity: 0; transform: translate(-26px, -26px); } to { opacity: 1; transform: none; } }
+
+.admin-square-top,
+.admin-square-bottom { transition: transform .45s cubic-bezier(.22, 1, .36, 1); }
+
+.admin-photo-card {
+    transition: transform .45s cubic-bezier(.22, 1, .36, 1), box-shadow .45s ease;
+}
+.admin-photo-card img {
+    transition: transform .8s cubic-bezier(.22, 1, .36, 1);
+}
+.admin-badge {
+    transition: transform .4s cubic-bezier(.22, 1, .36, 1), background-color .3s ease;
+}
+
+/* Photo settles in, wave rises, nameplate slides up */
+.reveal-scale.is-visible .admin-photo-card img {
+    animation: adImgSettle 1.3s cubic-bezier(.22, 1, .36, 1) backwards;
+}
+.reveal-scale.is-visible .admin-wave {
+    animation: adWaveRise .9s cubic-bezier(.22, 1, .36, 1) .35s backwards;
+}
+.reveal-scale.is-visible .admin-badge {
+    animation: adBadgeIn .7s cubic-bezier(.22, 1, .36, 1) .6s backwards;
+}
+@keyframes adImgSettle { from { transform: scale(1.15); } to { transform: scale(1); } }
+@keyframes adWaveRise  { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes adBadgeIn   { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+
+/* Waves gently sway (only ever move downward so no gap shows at the bottom edge) */
+.reveal-scale.is-visible .admin-wave path {
+    animation: adWaveBob 5s ease-in-out infinite;
+}
+.reveal-scale.is-visible .admin-wave .wave-maroon { animation-delay: -1.4s; animation-duration: 6s; }
+.reveal-scale.is-visible .admin-wave .wave-green  { animation-delay: -2.8s; animation-duration: 7s; }
+@keyframes adWaveBob {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(9px); }
+}
+
+/* Hover: shine sweep, gold glow, growing squares, nameplate accent */
+.admin-square-top    { transform-origin: top left; }
+.admin-square-bottom { transform-origin: bottom right; }
+
+/* diagonal light streak (sits above photo + waves, never blocks clicks) */
+.admin-photo-card::after {
+    content: "";
+    position: absolute; top: 0; bottom: 0; left: 0;
+    width: 55%;
+    z-index: 5;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 20%, rgba(255, 255, 255, .45) 50%, transparent 80%);
+    transform: translateX(-130%) skewX(-12deg);
+    transition: none;
+}
+
+/* gold accent bar on the nameplate */
+.admin-badge::before {
+    content: "";
+    position: absolute; left: 0; top: 8px; bottom: 8px;
+    width: 3px; border-radius: 3px;
+    background: #e9b93c;
+    transform: scaleY(0);
+    transition: transform .4s cubic-bezier(.22, 1, .36, 1);
+}
+.admin-badge-title,
+.admin-badge-sub { transition: transform .4s cubic-bezier(.22, 1, .36, 1); }
+
+@media (hover: hover) {
+    .admin-card-wrap:hover .admin-photo-card {
+        box-shadow: 0 0 22px 4px rgba(233, 185, 60, .6), 0 0 48px 10px rgba(211, 166, 58, .35), 0 14px 30px rgba(0, 0, 0, .15);
+    }
+    .admin-card-wrap:hover .admin-photo-card::after {
+        transform: translateX(300%) skewX(-12deg);
+        transition: transform 1s cubic-bezier(.22, 1, .36, 1);
+    }
+    .admin-card-wrap:hover .admin-square-top     { transform: scale(1.14); }
+    .admin-card-wrap:hover .admin-square-bottom  { transform: scale(1.14); }
+    .admin-card-wrap:hover .admin-badge          { background: rgba(11, 66, 40, .9); }
+    .admin-card-wrap:hover .admin-badge::before  { transform: scaleY(1); }
+    .admin-card-wrap:hover .admin-badge-title,
+    .admin-card-wrap:hover .admin-badge-sub      { transform: translateX(7px); }
+}
+
+/* ---------- Heads of Student Services flip cards ---------- */
+.hss-face { transition: box-shadow .35s ease, border-color .35s ease; }
+
+.hss-flip-hint i {
+    display: inline-block;
+    transition: transform .6s cubic-bezier(.22, 1, .36, 1);
+}
+
+/* Front: details slide in one after another, nameplate rises */
+.reveal-scale.is-visible .hss-contact-list li {
+    animation: adItemIn .6s cubic-bezier(.22, 1, .36, 1) backwards;
+    animation-delay: calc(.4s + var(--k, 0) * .09s);
+}
+.reveal-scale.is-visible .hss-photo {
+    animation: adPhotoIn .8s cubic-bezier(.22, 1, .36, 1) .25s backwards;
+}
+.reveal-scale.is-visible .hss-badge {
+    animation: adBadgeIn .7s cubic-bezier(.22, 1, .36, 1) .65s backwards;
+}
+.hss-contact-list li:nth-child(1) { --k: 0; }
+.hss-contact-list li:nth-child(2) { --k: 1; }
+.hss-contact-list li:nth-child(3) { --k: 2; }
+.hss-contact-list li:nth-child(4) { --k: 3; }
+
+/* Back: services cascade in each time the card is flipped */
+.hss-flip-card.is-flipped .hss-services-list li {
+    animation: adItemIn .5s cubic-bezier(.22, 1, .36, 1) backwards;
+    animation-delay: calc(.3s + var(--k, 0) * .07s);
+}
+.hss-services-list li:nth-child(1) { --k: 0; }
+.hss-services-list li:nth-child(2) { --k: 1; }
+.hss-services-list li:nth-child(3) { --k: 2; }
+.hss-services-list li:nth-child(4) { --k: 3; }
+.hss-services-list li:nth-child(5) { --k: 4; }
+.hss-services-list li:nth-child(6) { --k: 5; }
+.hss-services-list li:nth-child(7) { --k: 6; }
+.hss-services-list li:nth-child(8) { --k: 7; }
+.hss-flip-card.is-flipped .hss-services-title {
+    animation: adItemIn .5s cubic-bezier(.22, 1, .36, 1) .25s backwards;
+}
+
+@keyframes adItemIn  { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+@keyframes adPhotoIn { from { opacity: 0; transform: scale(.85) rotate(-3deg); } to { opacity: 1; transform: none; } }
+
+@media (hover: hover) {
+    .hss-flip-card:hover .hss-face {
+        box-shadow: 0 14px 30px rgba(0, 0, 0, .13);
+        border-color: #d3a63a;
+    }
+    .hss-flip-card:hover .hss-flip-hint i { transform: rotate(180deg); }
+    .hss-flip-card:hover .hss-watermark   { animation: adWatermark 6s ease-in-out infinite alternate; }
+}
+@keyframes adWatermark {
+    from { transform: translateY(-50%) rotate(0deg); }
+    to   { transform: translateY(-52%) rotate(4deg); }
+}
+
+/* ---------- Respect "reduce motion" ---------- */
+@media (prefers-reduced-motion: reduce) {
+    body::before,
+    .admin-breadcrumb i,
+    .admin-tab, .admin-tab.active,
+    .reveal-scale.is-visible *,
+    .hss-flip-card.is-flipped * {
+        animation: none !important;
+    }
+    .admin-hero h1::after { animation: none; width: 72px; }
+    .admin-section-intro h2::after { transition: none; width: 56px; }
+    .admin-section-intro.reveal-up .admin-eyebrow { letter-spacing: .08em; transition: none; }
+    .admin-photo-card, .admin-photo-card img, .admin-badge,
+    .admin-square-top, .admin-square-bottom,
+    .admin-badge::before, .admin-badge-title, .admin-badge-sub,
+    .admin-photo-card::after,
+    .hss-flip-hint i { transition: none !important; }
 }

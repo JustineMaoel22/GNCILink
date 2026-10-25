@@ -1554,13 +1554,17 @@ a.gnc-programs-count:hover {
    window onto it, so the background appears to move as you scroll.
    (clip-path keeps it visible only inside this section; this also works
    on iOS, where background-attachment: fixed does not.) */
+.home-background-tools { display: flex; justify-content: flex-end; margin-bottom: 1.5rem; }
+.home-background-tools button { display: inline-flex; align-items: center; gap: .5rem; padding: .65rem 1rem; border: 1px solid #eaba3b; border-radius: 999px; background: #eaba3b; color: #094024; font: 600 .9rem system-ui, sans-serif; cursor: pointer; }
+.home-background-tools button:hover, .home-background-tools button:focus-visible { background: #f8d56e; outline: 2px solid white; outline-offset: 3px; }
+html.ve-previewing .home-background-tools { display: none; }
 .gnc-programs { clip-path: inset(0); }
 .gnc-programs::before {
     content: '';
     position: fixed;
     inset: -12px;
     z-index: -2;
-    background: url('/assets/images/classroom.jpg') center / cover no-repeat;
+    background: var(--home-section-background, url('/assets/images/classroom.JPG')) center / cover no-repeat;
     filter: blur(3px);
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1691,7 +1695,7 @@ a.gnc-programs-count:hover {
     position: fixed;
     inset: -12px;
     z-index: -2;
-    background: url('/assets/images/DSC_2965.jpg') center / cover no-repeat;
+    background: var(--home-section-background, url('/assets/images/DSC_2965.JPG')) center / cover no-repeat;
     filter: blur(3px);
 }
 @media (prefers-reduced-motion: reduce) {

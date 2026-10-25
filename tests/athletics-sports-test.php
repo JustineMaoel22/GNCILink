@@ -65,4 +65,11 @@ $saved['sports']=[];saveAthleticsSports($saved,[],athleticsSportsRevision(athlet
 $legacy=$saved;unset($legacy['images'],$legacy['speed']);getDB()->prepare("UPDATE basic_education_content SET content=? WHERE page_key='athletics-sports'")->execute([json_encode($legacy)]);
 $legacyRead=athleticsSportsContent();check($legacyRead['images']===athleticsSportsDefaults()['images'],'Older content receives default backgrounds');saveAthleticsSports($legacyRead,[],athleticsSportsRevision($legacyRead));
 check($legacyRead['speed']===1,'Older pages keep the original slideshow speed');
-echo "PASS: defaults, published additions, images, edits, ordering, empty list, stale-editor protection, validation and upload rollback.\n";
+$fb=athleticsSportsContent();$fb['facebook_url']='https://www.facebook.com/example-sports';
+$fb=saveAthleticsSports($fb,[],athleticsSportsRevision(athleticsSportsContent()));
+check(athleticsSportsContent()['facebook_url']===$fb['facebook_url'],'Facebook page link persists after publishing');
+$embed=athleticsSportsFacebookEmbedUrl($fb['facebook_url']);
+check(str_contains($embed,'href=https%3A%2F%2Fwww.facebook.com%2Fexample-sports')&&str_contains($embed,'height=130'),'Compact Facebook embed matches department design');
+foreach(['javascript:alert(1)','https://facebook.com.evil.example/page','https://www.facebook.com@evil.example/page','https://example.com/page'] as $url){$bad=$fb;$bad['facebook_url']=$url;rejected(fn()=>saveAthleticsSports($bad,[],athleticsSportsRevision(athleticsSportsContent())));}
+$fb['facebook_url']='';saveAthleticsSports($fb,[],athleticsSportsRevision(athleticsSportsContent()));check(athleticsSportsContent()['facebook_url']==='','Admin can remove the Facebook page link');
+echo "PASS: defaults, published additions, images, edits, ordering, empty list, stale-editor protection, validation, Facebook links and upload rollback.\n";

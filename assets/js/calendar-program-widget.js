@@ -2,7 +2,8 @@
     'use strict';
     if (window.top!==window.self || new URLSearchParams(location.search).has('ce_preview')) return;
     function init() {
-        const section=document.getElementById('events'), widget=document.getElementById('calendarProgramWidget');
+        const widget=document.getElementById('calendarProgramWidget');
+        const section=document.getElementById(widget?.dataset.filterSection || 'events');
         const toggle=document.getElementById('calendarProgramToggle'), panel=document.getElementById('calendarProgramPanel');
         if (!section || !widget || !toggle || !panel) return;
         widget.hidden=false;

@@ -68,12 +68,7 @@ $academicsMenu = [
     [
         'label' => 'Graduate School Department',
         'href' => '/pages/academics/graduate-school/graduate-school.php',
-        'children' => [
-            ['label' => 'Doctor of Philosophy in Educational Management', 'href' => '/pages/academics/graduate-school/graduate-school.php'],
-            ['label' => 'Master of Arts in Education major in Educational Management', 'href' => '/pages/academics/graduate-school/graduate-school.php'],
-            ['label' => 'Master in Business Administration', 'href' => '/pages/academics/graduate-school/graduate-school.php'],
-            ['label' => 'Master in Public Administration', 'href' => '/pages/academics/graduate-school/graduate-school.php'],
-        ],
+        'children' => [], // Published graduate programs are attached from the database below.
     ],
 ];
 
@@ -96,8 +91,9 @@ $gncProgramPage = '/pages/academics/college/program.php';
 
 // Reason the dynamic menu fell back (printed in the HTML comment below).
 $gncFallbackReason = '';
+$gncGraduateItems = [];
 
-$gncLoadCollegeMenu = function () use ($gncDeptPage, $gncProgramPage, &$gncFallbackReason) {
+$gncLoadCollegeMenu = function () use ($gncDeptPage, $gncProgramPage, &$gncFallbackReason, &$gncGraduateItems) {
     // Use the app's DB helper if the page already loaded it; otherwise try to load it.
     if (!function_exists('getDB')) {
         foreach ([
@@ -144,10 +140,8 @@ $gncLoadCollegeMenu = function () use ($gncDeptPage, $gncProgramPage, &$gncFallb
             $deptName = trim((string) ($d['dept_name'] ?? ''));
             $normalizedName = strtolower(preg_replace('/[^a-z0-9]+/i', ' ', $deptName));
             $normalizedSlug = strtolower(preg_replace('/[^a-z0-9]+/i', ' ', $deptSlug));
-            if (preg_match('/\bgraduate\s+school\b/', $normalizedName) ||
-                preg_match('/\bgraduate\s+school\b/', $normalizedSlug)) {
-                continue;
-            }
+            $isGraduateSchool = preg_match('/\bgraduate\s+school\b/', $normalizedName) ||
+                preg_match('/\bgraduate\s+school\b/', $normalizedSlug);
 
             $item = [
                 'label' => (string) $d['dept_name'],
@@ -166,6 +160,10 @@ $gncLoadCollegeMenu = function () use ($gncDeptPage, $gncProgramPage, &$gncFallb
                     'href'  => $gncProgramPage . '?slug=' . rawurlencode($pslug),
                 ];
             }
+            if ($isGraduateSchool) {
+                $gncGraduateItems = array_merge($gncGraduateItems, $kids);
+                continue;
+            }
             if ($kids) $item['children'] = $kids;
             $items[] = $item;
         }
@@ -182,6 +180,7 @@ $gncLoadCollegeMenu = function () use ($gncDeptPage, $gncProgramPage, &$gncFallb
 };
 
 $gncCollegeItems = $gncLoadCollegeMenu();
+$academicsMenu[2]['children'] = $gncGraduateItems;
 
 echo '<!-- gnc-nav: college menu from '
     . ($gncCollegeItems
@@ -213,6 +212,9 @@ $aboutGroups = [
         ['label' => 'Board of Administration', 'href' => '/pages/about/administration.php?section=board-of-administration'],
         ['label' => 'Heads of Student Services', 'href' => '/pages/about/administration.php?section=heads-of-student-services'],
     ], 'overview' => '/pages/about/administration.php'],
+    ['heading' => 'GNCI Developers Corner', 'items' => [
+        ['label' => 'Meet the Developers', 'href' => '/pages/about/gnci-developers-corner-2/the-devs.php'],
+    ], 'overview' => '/pages/about/gnci-developers-corner-2/the-devs.php'],
 ];
 $academicsGroups = [
     ['heading' => 'Basic Education Department', 'items' => $academicsMenu[0]['children'], 'overview' => $academicsMenu[0]['href']],
@@ -239,13 +241,13 @@ $studentLifeGroups = [
     ]],
     ['heading' => 'Campus Life & Activities', 'items' => [
         ['label' => 'Campus Events', 'href' => '/pages/student%20life/campus-event.php'],
-        ['label' => 'Community Extension Activities', 'href' => '/coming-soon.php'],
-        ['label' => 'Sports and Athletics', 'href' => '/pages/student%20life/athletics-sports.php'],
+        ['label' => 'Community Extension Activities', 'href' => '/pages/student%20life/community-activity.php'],
+        ['label' => 'Athletics and Sports', 'href' => '/pages/student%20life/athletics-sports.php'],
     ]],
     ['heading' => 'Student Resources', 'items' => [
         ['label' => 'OSA Student Grievance', 'href' => 'https://osaportal.infinityfreeapp.com/', 'target' => '_blank'],
         ['label' => 'GNCI Library', 'href' => 'https://gnci-libraries.thsite.top/', 'target' => '_blank'],
-        ['label' => 'Frequently Asked Questions', 'href' => '/coming-soon.php'],
+        ['label' => 'Frequently Asked Questions', 'href' => '/pages/faq.php'],
     ]],
     ['heading' => 'Our Community', 'items' => [
         ['label' => 'Student Achievements', 'href' => '/pages/student%20life/student-achievement.php'],

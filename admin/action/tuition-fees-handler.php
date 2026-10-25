@@ -42,7 +42,7 @@ try {
             continue;
         }
         $title=$change['title'] ?? '';
-        if (!is_string($title) || trim($title)==='' || mb_strlen($title)>255) throw new InvalidArgumentException('Enter a document title of up to 255 characters.');
+        if (!is_string($title) || (trim($title)==='' && !contentPublishAllowsIncomplete()) || mb_strlen($title)>255) throw new InvalidArgumentException('Enter a document title of up to 255 characters.');
         $path=$old['file_path'] ?? null; $size=$old['file_size'] ?? 0;
         $upload=$_FILES['pdf_'.$index] ?? null;
         if ($upload) {

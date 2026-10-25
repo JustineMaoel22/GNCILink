@@ -1,6 +1,7 @@
 <?php
+require_once __DIR__.'/../includes/content-publish-policy.php';
 function athleticsSportsDefaults(): array {
-    return ['speed'=>1,'images'=>['hero'=>'/assets/images/athletics-and-sports-header.png','showcase'=>'/assets/images/athletic_scholar.png'],'texts'=>[
+    return ['speed'=>1,'facebook_url'=>'','images'=>['hero'=>'/assets/images/athletics-and-sports-header.png','showcase'=>'/assets/images/athletic_scholar.png'],'texts'=>[
         'hero_title'=>'Athletics and Sports',
         'hero_description'=>"Celebrate GNC's athletic spirit through sports, teamwork, and school pride. Building character on and off the field.",
         'programs_title'=>'Our Sports Programs',
@@ -9,8 +10,8 @@ function athleticsSportsDefaults(): array {
         'highlights_title'=>'Competition Highlights',
         'facilities_title'=>'Facilities',
         'facebook_kicker'=>'Stay Updated',
-        'facebook_title'=>'Follow Us on Facebook',
-        'facebook_description'=>'Get the latest announcements, events, and news from GNC Sports Club.',
+        'facebook_title'=>'Connect with Us',
+        'facebook_description'=>'If you have concerns or need assistance feel free to message our page.',
     ],'sports'=>[
         ['id'=>'basketball','name'=>'Basketball','type'=>'','image'=>''],
         ['id'=>'indoor-volleyball','name'=>'Volleyball','type'=>'Indoor','image'=>''],
@@ -41,6 +42,7 @@ function athleticsSportsContent(): array {
 }
 
 function athleticsSportsWithImages(array $content): array {
+    $content['facebook_url']=$content['facebook_url']??'';
     $content['texts']=array_replace(athleticsSportsDefaults()['texts'],$content['texts']);
     $content['teams']=$content['teams']??athleticsSportsDefaults()['teams'];
     $content['facilities']=$content['facilities']??athleticsSportsDefaults()['facilities'];
@@ -57,13 +59,17 @@ function athleticsSportsWithImages(array $content): array {
 function athleticsSportsRevision(array $content): string { return hash('sha256',json_encode(athleticsSportsWithImages($content),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)); }
 
 function validateAthleticsSports(array $input,array $current): array {
+    $facebookUrl=$input['facebook_url']??$current['facebook_url']??'';
+    if (!is_string($facebookUrl) || strlen($facebookUrl)>255) throw new InvalidArgumentException('Use a Facebook page address of up to 255 characters.');
+    $facebookUrl=trim($facebookUrl);
+    if ($facebookUrl!=='' && athleticsSportsFacebookEmbedUrl($facebookUrl)===null) throw new InvalidArgumentException('Use a Facebook page address starting with https://www.facebook.com/');
     $speed=$input['speed']??$current['speed']??1;
     if ((!is_int($speed)&&!is_float($speed)) || !is_finite((float)$speed) || $speed<0.25 || $speed>3) throw new InvalidArgumentException('Choose a slideshow speed between 0.25 and 3.');
     if (!isset($input['sports'],$input['texts']) || !is_array($input['sports']) || !array_is_list($input['sports']) || count($input['sports'])>30 || !is_array($input['texts'])) throw new InvalidArgumentException('Use up to 30 sports programs.');
     $texts=[];
     foreach (athleticsSportsDefaults()['texts'] as $key=>$default) {
         $value=$input['texts'][$key]??$current['texts'][$key]??$default;
-        if (!is_string($value) || strlen($value)> (str_ends_with($key,'title')?255:3000) || !trim($value)) throw new InvalidArgumentException('Add a heading and description for each section.');
+        if (!is_string($value) || strlen($value)> (str_ends_with($key,'title')?255:3000) || (!trim($value)&&!contentPublishAllowsIncomplete())) throw new InvalidArgumentException('Add a heading and description for each section.');
         $texts[$key]=trim($value);
     }
     $known=array_column($current['sports'],null,'id');$sports=[];$seen=[];
@@ -71,7 +77,7 @@ function validateAthleticsSports(array $input,array $current): array {
         if (!is_array($row)) throw new InvalidArgumentException('Invalid sports program.');
         $id=$row['id']??'';$name=$row['name']??'';$type=$row['type']??'';
         if (!is_string($id)||!preg_match('/^[a-z][a-z0-9_-]{0,63}$/D',$id)||isset($seen[$id])) throw new InvalidArgumentException('Invalid or repeated sports program.');
-        if (!is_string($name)||!trim($name)||strlen($name)>120||!is_string($type)||strlen($type)>80) throw new InvalidArgumentException('Give each sport a name of up to 120 characters and an optional label of up to 80 characters.');
+        if (!is_string($name)||(!trim($name)&&!contentPublishAllowsIncomplete())||strlen($name)>120||!is_string($type)||strlen($type)>80) throw new InvalidArgumentException('Give each sport a name of up to 120 characters and an optional label of up to 80 characters.');
         $seen[$id]=true;
         // Uploaded paths come from the server; clients cannot substitute arbitrary image URLs.
         $sports[]=['id'=>$id,'name'=>trim($name),'type'=>trim($type),'image'=>$known[$id]['image']??''];
@@ -82,7 +88,7 @@ function validateAthleticsSports(array $input,array $current): array {
     foreach($teamInput as $team){
         if(!is_array($team))throw new InvalidArgumentException('Invalid varsity team.');
         $id=$team['id']??'';$name=$team['name']??'';
-        if(!is_string($id)||!preg_match('/^[a-z][a-z0-9_-]{0,63}$/D',$id)||isset($seen[$id])||!is_string($name)||!trim($name)||strlen($name)>120)throw new InvalidArgumentException('Give each team a unique logo slot and a name of up to 120 characters.');
+        if(!is_string($id)||!preg_match('/^[a-z][a-z0-9_-]{0,63}$/D',$id)||isset($seen[$id])||!is_string($name)||(!trim($name)&&!contentPublishAllowsIncomplete())||strlen($name)>120)throw new InvalidArgumentException('Give each team a unique logo slot and a name of up to 120 characters.');
         $seen[$id]=true;$teams[]=['id'=>$id,'name'=>trim($name),'image'=>$knownTeams[$id]['image']??''];
     }
     $facilityInput=$input['facilities']??athleticsSportsWithImages($current)['facilities'];
@@ -91,10 +97,18 @@ function validateAthleticsSports(array $input,array $current): array {
     foreach($facilityInput as $facility){
         if(!is_array($facility))throw new InvalidArgumentException('Invalid facility.');
         $id=$facility['id']??'';$name=$facility['name']??'';
-        if(!is_string($id)||!preg_match('/^[a-z][a-z0-9_-]{0,63}$/D',$id)||isset($seen[$id])||!is_string($name)||!trim($name)||strlen($name)>120)throw new InvalidArgumentException('Give each facility a name of up to 120 characters.');
+        if(!is_string($id)||!preg_match('/^[a-z][a-z0-9_-]{0,63}$/D',$id)||isset($seen[$id])||!is_string($name)||(!trim($name)&&!contentPublishAllowsIncomplete())||strlen($name)>120)throw new InvalidArgumentException('Give each facility a name of up to 120 characters.');
         $seen[$id]=true;$facilities[]=['id'=>$id,'name'=>trim($name),'image'=>$knownFacilities[$id]['image']??''];
     }
-    return ['texts'=>$texts,'sports'=>$sports,'teams'=>$teams,'facilities'=>$facilities,'images'=>athleticsSportsWithImages($current)['images'],'speed'=>$speed];
+    return ['texts'=>$texts,'sports'=>$sports,'teams'=>$teams,'facilities'=>$facilities,'images'=>athleticsSportsWithImages($current)['images'],'speed'=>$speed,'facebook_url'=>$facebookUrl];
+}
+
+/** Match the compact page header shown on department pages. */
+function athleticsSportsFacebookEmbedUrl(string $url): ?string {
+    $url=trim($url);
+    if (!preg_match('~^https?://(?:www\.)?facebook\.com/[^\s]*$~iD',$url)) return null;
+    return 'https://www.facebook.com/plugins/page.php?href='.rawurlencode($url)
+        .'&tabs=&width=500&height=130&small_header=false&adapt_container_width=true&hide_cover=true&show_facepile=false&show_posts=false';
 }
 
 function saveAthleticsSports(array $input,array $files,string $revision): array {

@@ -8,7 +8,7 @@ initSession();
 
 // Redirect if already fully logged in
 if (isLoggedIn()) {
-    header('Location: /admin/admin-dash.php');
+    header('Location: ' . rbacHome());
     exit;
 }
 
@@ -28,75 +28,26 @@ if (isset($_SESSION['flash_success'])) {
     unset($_SESSION['flash_success']);
 }
 
-// Resend OTP via GET param
-if (isset($_GET['resend']) && $_GET['resend'] === '1') {
-    $db  = getDB();
-    $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-
-    $stmt = $db->prepare("UPDATE users SET otp_code = ?, otp_expires_at = TIMESTAMPADD(SECOND, ?, NOW()) WHERE user_id = ?");
-    $stmt->execute([$otp, OTP_EXPIRY, $_SESSION['temp_user_id']]);
-
-    sendOTPEmailPHPMailer($email, $name, $otp);
-
-    $_SESSION['flash_success'] = 'A new OTP has been sent to your email.';
-    header('Location: /admin/auth/verify-otp.php');
-    exit;
-}
-
-// Handle POST — OTP submission
+// All OTP mutations require POST, CSRF, and the shared account attempt limit.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-        $error = 'Invalid request.';
-    } else {
-        $otp = implode('', array_map(fn($i) => trim($_POST["otp_$i"] ?? ''), range(1, 6)));
-
-        if (strlen($otp) !== 6 || !ctype_digit($otp)) {
-            $error = 'Please enter a valid 6-digit code.';
-        } else {
-            $db   = getDB();
-            $stmt = $db->prepare("SELECT * FROM users WHERE user_id = ? AND otp_code = ? AND otp_expires_at > NOW()");
-            $stmt->execute([$_SESSION['temp_user_id'], $otp]);
-            $user = $stmt->fetch();
-
-            if (!$user) {
-                $error = 'Invalid or expired OTP. Please try again or request a new code.';
+    if (!authCsrfValid()) $error='Your session token expired. Reload and try again.';
+    elseif (!authSecurityReady()) $error='Authentication is temporarily unavailable. Contact your administrator.';
+    else {
+        try {
+            if (($_POST['action']??'')==='resend_otp') {
+                if(resendLoginOtp()) $success='A new OTP has been sent to your email.';
+                else $error='Unable to resend. Wait before trying again or sign in again.';
             } else {
-                // OTP verified — clear it and create full session
-                $db->prepare("UPDATE users SET otp_verified = 1, otp_code = NULL, otp_expires_at = NULL, last_login = NOW() WHERE user_id = ?")
-                   ->execute([$user['user_id']]);
-
-                $_SESSION['user_id']       = $user['user_id'];
-                $_SESSION['user_email']    = $user['email'];
-                $_SESSION['user_role']     = $user['role'];
-                $_SESSION['user_name']     = $user['first_name'] . ' ' . $user['last_name'];
-                $_SESSION['otp_verified']  = true;
-                $_SESSION['last_activity'] = time();
-                // Keep currentUser structure that admin-dash.php expects
-                $_SESSION['user'] = [
-                    'user_id'    => $user['user_id'],
-                    'first_name' => $user['first_name'],
-                    'last_name'  => $user['last_name'],
-                    'email'      => $user['email'],
-                    'role'       => $user['role'],
-                ];
-
-                unset($_SESSION['temp_user_id'], $_SESSION['temp_email'], $_SESSION['temp_name']);
-
-                logActivity($user['user_id'], 'LOGIN', null, null, 'Successful login via OTP');
-
-                // Remember me — use the shared helper (from auth_handler.php) so this
-                // stays in sync with the AJAX login path: it hashes + stores the token,
-                // sets remember_token_expires_at (30 days), and sets the cookie with the
-                // correct 'secure' flag for the current environment.
-                if (!empty($_SESSION['remember_me'])) {
-                    generateRememberToken((int) $user['user_id']);
-                    unset($_SESSION['remember_me']);
+                $otp='';foreach(range(1,6) as $i)$otp.=is_string($_POST["otp_$i"]??null)?trim($_POST["otp_$i"]):'';
+                $user=authConsumeOtp($otp);
+                if(!$user)$error='Invalid or expired OTP. After five attempts, wait 15 minutes and sign in again.';
+                else {
+                    $remember=!empty($_SESSION['remember_me']);loginUser($user);
+                    if($remember&&empty($user['must_change_password']))generateRememberToken((int)$user['user_id']);
+                    header('Location: '.rbacHome());exit;
                 }
-
-                header('Location: /admin/admin-dash.php');
-                exit;
             }
-        }
+        } catch(Throwable $e) { $error='Authentication is temporarily unavailable. Please try again later.';error_log('OTP form request failed.'); }
     }
 }
 
@@ -361,7 +312,7 @@ $csrf = generateCSRFToken();
         }, 1000);
 
         resendBtn.addEventListener('click', () => {
-            window.location.href = '/admin/auth/verify-otp.php?resend=1';
+            const form=document.createElement('form');form.method='post';form.action='/admin/auth/verify-otp.php';for(const [name,value] of Object.entries({action:'resend_otp',csrf_token:document.querySelector('input[name=csrf_token]').value})){const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.append(input);}document.body.append(form);resendBtn.disabled=true;form.submit();
         });
 
         document.getElementById('otpForm').addEventListener('submit', function () {

@@ -11,7 +11,13 @@
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
     />
+    <!-- The optional font must not block map parsing, rendering or controls. -->
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" />
+    </noscript>
     <title>Campus Navigator</title>
     <script>
       if (new URLSearchParams(window.location.search).get("view") === "office")
@@ -1160,6 +1166,21 @@
         parking2: ["P2", "#7b3fa0"],
       };
       var current = null;
+      var officeMap = document.documentElement.classList.contains('office-location-map');
+      var officeBuilding = null;
+      function setOfficeBuilding(id) {
+        if (!officeMap) return;
+        officeBuilding = Object.prototype.hasOwnProperty.call(B, id) ? id : null;
+        document.querySelectorAll('.bld').forEach(function (building) {
+          var allowed = building.dataset.id === officeBuilding;
+          building.style.pointerEvents = allowed ? '' : 'none';
+          building.setAttribute('tabindex', allowed ? '0' : '-1');
+          building.setAttribute('aria-disabled', allowed ? 'false' : 'true');
+        });
+        if (officeBuilding) go(officeBuilding);
+        else clear(true);
+      }
+      if (officeMap) setOfficeBuilding(null);
       Object.keys(B).forEach(function (id) {
         var c = document.createElement("button");
         c.type = "button";
@@ -1188,6 +1209,7 @@
         if (!keepView && window.fitView) fitView(true);
       }
       function go(id) {
+        if (!Object.prototype.hasOwnProperty.call(B, id) || (officeMap && id !== officeBuilding)) return;
         clear(true);
         current = id;
         void svg.getBoundingClientRect(); // restart animations
@@ -1251,7 +1273,10 @@
           moved = false,
           drag = null,
           pinch = null,
-          ptrs = new Map();
+          ptrs = new Map(),
+          lastTap = null,
+          dtAt = 0,
+          gz = null;
         var reduce =
           window.matchMedia &&
           matchMedia("(prefers-reduced-motion:reduce)").matches;
@@ -1487,8 +1512,32 @@
           }
         });
         function end(e) {
+          var wasPinch = !!pinch;
           ptrs.delete(e.pointerId);
           pinch = null;
+          // double-tap to zoom (touch). iOS never fires dblclick for touch, so do it here
+          if (
+            e.type === "pointerup" &&
+            e.pointerType === "touch" &&
+            ptrs.size === 0 &&
+            !moved &&
+            !wasPinch &&
+            !(e.target.closest && e.target.closest(".bld"))
+          ) {
+            var now = performance.now();
+            if (
+              lastTap &&
+              now - lastTap.t < 320 &&
+              Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30
+            ) {
+              dtAt = now;
+              lastTap = null;
+              if (view.z >= MAXZ - 0.1) fitView(true);
+              else zoomAt(e.clientX, e.clientY, view.z * 1.8, true);
+            } else {
+              lastTap = { t: now, x: e.clientX, y: e.clientY };
+            }
+          }
           if (ptrs.size === 0) {
             drag = null;
             svg.classList.remove("dragging");
@@ -1499,6 +1548,33 @@
         }
         svg.addEventListener("pointerup", end);
         svg.addEventListener("pointercancel", end);
+        // Two-finger pinch must work even when fully zoomed out (touch-action is
+        // pan-y there so one finger can still scroll the page). Without this the
+        // browser grabs the gesture as a scroll, fires pointercancel and the pinch dies.
+        svg.addEventListener(
+          "touchmove",
+          function (e) {
+            if (e.touches.length > 1 && e.cancelable) e.preventDefault();
+          },
+          { passive: false },
+        );
+        // Safari (desktop trackpad pinch, and iOS page-zoom) uses gesture events.
+        // When the pointer-based pinch is already running, leave it alone.
+        svg.addEventListener("gesturestart", function (e) {
+          e.preventDefault();
+          gz = { z: view.z };
+        });
+        svg.addEventListener("gesturechange", function (e) {
+          e.preventDefault();
+          if (!gz || pinch) return;
+          cancelAnimationFrame(raf);
+          zoomAt(e.clientX, e.clientY, gz.z * e.scale, false);
+        });
+        svg.addEventListener("gestureend", function (e) {
+          e.preventDefault();
+          gz = null;
+        });
+
         // a drag must not count as a tap on a building
         svg.addEventListener(
           "click",
@@ -1543,6 +1619,7 @@
         );
         svg.addEventListener("dblclick", function (e) {
           e.preventDefault();
+          if (performance.now() - dtAt < 600) return; // already handled as a double-tap
           zoomAt(e.clientX, e.clientY, view.z * 1.8, true);
         });
 

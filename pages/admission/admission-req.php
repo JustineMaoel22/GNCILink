@@ -19,13 +19,14 @@ foreach (getPageSections('college-admission-requirements') as $section) {
 }
 uksort($collegeGroups,static fn($a,$b) => ($collegeOrder[$a] ?? 999) <=> ($collegeOrder[$b] ?? 999));
 $collegeText = static fn($key) => renderSectionContent($collegeContent[$key] ?? $collegeDefaults[$key]['content']);
+$collegeHeading = htmlspecialchars(trim(html_entity_decode(strip_tags($collegeContent['hero_title'] ?? $collegeDefaults['hero_title']['content']), ENT_QUOTES | ENT_HTML5, 'UTF-8')), ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>College Admission Requirements</title>
+    <title><?= $collegeHeading ?></title>
     <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
     <link href="/assets/css/footer-style.css" rel="stylesheet">
@@ -45,9 +46,9 @@ $collegeText = static fn($key) => renderSectionContent($collegeContent[$key] ?? 
                 <nav class="admission-breadcrumb" aria-label="breadcrumb">
                     <span>Admissions</span>
                     <i class="bi bi-chevron-right"></i>
-                    <span class="admission-current">College Admission Requirements</span>
+                    <span class="admission-current"><?= $collegeHeading ?></span>
                 </nav>
-                <h1>College Admission Requirements</h1>
+                <h1<?= ceMark('data-ve-section="hero_title" data-ve-admission-label data-ve-label="Page heading"') ?>><?= $collegeHeading ?></h1>
                 <div<?= ceMark('data-ve-section="hero_intro" data-ve-label="Page introduction"') ?>><?= $collegeText('hero_intro') ?></div>
             </div>
         </div>

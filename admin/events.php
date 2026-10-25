@@ -6,6 +6,7 @@
  */
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../admin/admin-functions.php';
+require_once __DIR__ . '/../includes/event-audience.php';
 
 initSession();
 requireLogin();
@@ -38,6 +39,9 @@ function evt_verifyCsrfToken(PDO $db, int $userId, ?string $token): bool {
 }
 
 $db = getDB();
+$eventDepartmentsReady = eventDepartmentsReady();
+$eventDepartments = $db->query('SELECT dept_id, dept_name FROM departments ORDER BY dept_name')->fetchAll(PDO::FETCH_ASSOC);
+$eventDepartmentNames = array_column($eventDepartments, 'dept_name', 'dept_id');
 
 // ---------------------------------------------------------------
 // Category colors
@@ -67,6 +71,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
     }
 
     try {
+        $existingEvent = null;
+        if (in_array($action, ['update', 'delete', 'fetch_one'], true)) {
+            $stmt = $db->prepare('SELECT * FROM events WHERE event_id = ?');
+            $stmt->execute([(int)($_POST['event_id'] ?? 0)]);
+            $existingEvent = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$existingEvent) throw new InvalidArgumentException('Event not found.');
+            $permission = $action === 'delete' ? 'delete' : 'edit';
+            if (!hasPermission($permission . '_event') && !(hasPermission($permission . '_own_event') && (int)$existingEvent['user_id'] === (int)$userId)) {
+                http_response_code(403);
+                throw new InvalidArgumentException('You do not have permission to manage this event.');
+            }
+        }
+        if ($action === 'create' && !hasPermission('create_event')) {
+            http_response_code(403);
+            throw new InvalidArgumentException('You do not have permission to create events.');
+        }
         if ($action === 'create' || $action === 'update') {
             $title       = trim($_POST['title'] ?? '');
             $location    = trim($_POST['location'] ?? '');
@@ -79,11 +99,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             $endDate     = null;
             $categoryId  = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
             $program     = normalizeProgramCategory($_POST['program'] ?? null);
+            $department = normalizeEventDepartment($_POST['dept_id'] ?? ($existingEvent['dept_id'] ?? null));
+            validateEventProgramDepartment($department, $program);
             $status      = in_array($_POST['status'] ?? '', ['draft','pending','published','archived'])
                             ? $_POST['status'] : $evtDefaultStatus;
             // Super Admins can't send content to themselves for approval
             if ($isSuperAdmin && $status === 'pending') {
                 $status = 'draft';
+            }
+            if ($status === 'published' && !hasPermission('publish_event')) {
+                http_response_code(403);
+                throw new InvalidArgumentException('You do not have permission to publish events.');
             }
 
             if ($title === '' || $startD === '') {
@@ -107,14 +133,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
 
             if ($action === 'create') {
                 $stmt = $db->prepare("
-                    INSERT INTO events (category_id, program, user_id, title, location, start_date, end_date, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO events (category_id, program, user_id, title, location, start_date, end_date, status" . ($eventDepartmentsReady ? ', dept_id' : '') . ")
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?" . ($eventDepartmentsReady ? ', ?' : '') . ")
                 ");
-                $stmt->execute([$categoryId, $program, $userId, $title, $location, $startDate, $endDate, $status]);
+                $values = [$categoryId, $program, $userId, $title, $location, $startDate, $endDate, $status];
+                if ($eventDepartmentsReady) $values[] = $department;
+                $stmt->execute($values);
                 $newId = $db->lastInsertId();
+                rbacCreatedRecord('event',(int)$newId);
+                if (rbacContentOwnerId() !== (int)$userId) $db->prepare('UPDATE events SET user_id=? WHERE event_id=?')->execute([rbacContentOwnerId(),$newId]);
 
                 if (function_exists('logActivity')) {
-                    logActivity($userId, 'CREATE', "Created event: {$title}");
+                    logActivity($userId, 'CREATE', 'events', (int)$newId, "Created event: {$title}");
+                    if($status==='published')logActivity((int)$userId,'PUBLISH','events',(int)$newId,'Published event.');
                 }
                 echo json_encode(['success' => true, 'message' => 'Event created.', 'event_id' => $newId]);
             } else {
@@ -126,13 +157,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 $stmt = $db->prepare("
                     UPDATE events
                     SET category_id = ?, program = ?, title = ?, location = ?,
-                        start_date = ?, end_date = ?, status = ?
+                        start_date = ?, end_date = ?, status = ?" . ($eventDepartmentsReady ? ', dept_id = ?' : '') . "
                     WHERE event_id = ?
                 ");
-                $stmt->execute([$categoryId, $program, $title, $location, $startDate, $endDate, $status, $eventId]);
+                $values = [$categoryId, $program, $title, $location, $startDate, $endDate, $status];
+                if ($eventDepartmentsReady) $values[] = $department;
+                $values[] = $eventId;
+                $stmt->execute($values);
 
                 if (function_exists('logActivity')) {
-                    logActivity($userId, 'UPDATE', "Updated event: {$title}");
+                    logActivity($userId, 'UPDATE', 'events', $eventId, "Updated event: {$title}");
+                    if($status==='published'){
+                        if(($existingEvent['status']??'')==='pending')logActivity((int)$userId,'APPROVE','events',$eventId,'Approved pending event.');
+                        logActivity((int)$userId,'PUBLISH','events',$eventId,'Published event changes.');
+                    }
                 }
                 echo json_encode(['success' => true, 'message' => 'Event updated.']);
             }
@@ -146,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 exit;
             }
             $stmt = $db->prepare("
-                SELECT event_id, category_id, program, title, location, start_date, end_date, status
+                SELECT event_id, category_id, program, title, location, start_date, end_date, status" . ($eventDepartmentsReady ? ', dept_id' : '') . "
                 FROM events WHERE event_id = ?
             ");
             $stmt->execute([$eventId]);
@@ -173,7 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             $del->execute([$eventId]);
 
             if ($ev && function_exists('logActivity')) {
-                logActivity($userId, 'DELETE', "Deleted event: {$ev['title']}");
+                logActivity($userId, 'DELETE', 'events', $eventId, "Deleted event: {$ev['title']}");
             }
             echo json_encode(['success' => true, 'message' => 'Event deleted.']);
             exit;
@@ -184,7 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
 
     } catch (Exception $e) {
         error_log('Events AJAX error: ' . $e->getMessage());
-        echo json_encode(['success' => false, 'message' => 'A server error occurred. Please try again.']);
+        echo json_encode(['success' => false, 'message' => $e instanceof InvalidArgumentException ? $e->getMessage() : 'A server error occurred. Please try again.']);
         exit;
     }
 }
@@ -248,7 +286,7 @@ foreach ($monthEvents as $ev) {
 // All events list (most recent first) for the management table below
 try {
     $allEvents = $db->query("
-        SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, e.category_id, e.program,
+        SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, e.category_id, e.program," . ($eventDepartmentsReady ? 'e.dept_id,' : 'NULL AS dept_id,') . "
                c.category_name, c.category_color,
                CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,'')) AS author
         FROM events e
@@ -263,13 +301,13 @@ try {
 }
 
 // Only categories that make sense for an Event go in this dropdown.
-// "Reminder" belongs to Announcements only, so it's excluded here —
-// the category row itself isn't touched/deleted, just left out of this list.
+// Announcement/news categories stay available elsewhere; only this dropdown
+// excludes them. Existing category records and event assignments are preserved.
 try {
     $categories = $db->query("
         SELECT category_id, category_name, category_color
         FROM categories
-        WHERE category_name NOT IN ('Reminder')
+        WHERE category_name NOT IN ('Reminder', 'Job Opportunities', 'Scholarship')
         ORDER BY category_name ASC
     ")->fetchAll();
 } catch (Exception $e) {
@@ -307,7 +345,7 @@ include __DIR__ . '/../components/header-admin.php';
         <h1>Events &amp; Calendar</h1>
         <p>Plan school events, holidays and class suspensions. Click a date on the calendar to add something on that day.</p>
     </div>
-    <button type="button" class="btn btn-success" id="addEventBtnTop">
+    <button type="button" class="btn btn-gnc-gold" id="addEventBtnTop">
         <i class="bi bi-plus-lg"></i> Add Event
     </button>
 </div>
@@ -329,7 +367,7 @@ include __DIR__ . '/../components/header-admin.php';
                         <i class="bi bi-calendar-check"></i> Back to today
                     </a>
                 <?php endif; ?>
-                <button type="button" class="btn btn-sm btn-success ms-auto" id="addEventBtn">
+                <button type="button" class="btn btn-sm btn-gnc-gold ms-auto" id="addEventBtn">
                     <i class="bi bi-plus-lg"></i> Add Event
                 </button>
             </div>
@@ -379,7 +417,7 @@ include __DIR__ . '/../components/header-admin.php';
                     <div class="evt-empty">
                         <i class="bi bi-calendar-plus"></i>
                         <p class="mb-2">Nothing scheduled in <?= htmlspecialchars($monthLabel) ?> yet.</p>
-                        <button type="button" class="btn btn-sm btn-success js-add-event"><i class="bi bi-plus-lg"></i> Add an event</button>
+                        <button type="button" class="btn btn-sm btn-gnc-gold js-add-event"><i class="bi bi-plus-lg"></i> Add an event</button>
                     </div>
                 <?php else: foreach ($monthEvents as $ev):
                     $evStart = strtotime($ev['start_date']);
@@ -457,7 +495,7 @@ include __DIR__ . '/../components/header-admin.php';
                         <tr><td colspan="6"><div class="evt-empty">
                             <i class="bi bi-calendar-plus"></i>
                             <p class="mb-2">You haven't added any events yet.</p>
-                            <button type="button" class="btn btn-sm btn-success js-add-event"><i class="bi bi-plus-lg"></i> Add your first event</button>
+                            <button type="button" class="btn btn-sm btn-gnc-gold js-add-event"><i class="bi bi-plus-lg"></i> Add your first event</button>
                         </div></td></tr>
                         <?php else: foreach ($allEvents as $ev):
                             $evStart = strtotime($ev['start_date']);
@@ -503,7 +541,9 @@ include __DIR__ . '/../components/header-admin.php';
                                 <?php endif; ?>
                             </td>
                             <td data-label="For" style="font-size:.82rem">
-                                <?= ($ev['program'] ?? 'ALL') !== 'ALL' ? htmlspecialchars($ev['program']) : 'All programs' ?>
+                                <?= htmlspecialchars($eventDepartmentNames[$ev['dept_id'] ?? ''] ?? '') ?>
+                                <?= !empty($ev['dept_id']) ? ' · ' : '' ?>
+                                <?= ($ev['program'] ?? 'ALL') !== 'ALL' ? htmlspecialchars($ev['program']) : (!empty($ev['dept_id']) ? 'All programs in department' : 'All programs') ?>
                             </td>
                             <td data-label="Status"><span class="status-badge <?= htmlspecialchars($ev['status']) ?>"><?= htmlspecialchars($evtStatusLabels[$ev['status']] ?? ucfirst($ev['status'])) ?></span></td>
                             <td class="evt-actions-cell">
@@ -597,14 +637,25 @@ include __DIR__ . '/../components/header-admin.php';
                             </div>
                         </div>
                         <div class="col-12 col-sm-6 mb-3">
-                            <label class="form-label" for="eventProgram">Who is it for?</label>
+                            <label class="form-label" for="eventDepartment">Department (optional)</label>
+                            <select class="form-select" name="dept_id" id="eventDepartment"<?= !$eventDepartmentsReady ? ' disabled' : '' ?>>
+                                <option value="">All departments</option>
+                                <?php foreach ($eventDepartments as $department): ?>
+                                <option value="<?= (int)$department['dept_id'] ?>"><?= htmlspecialchars($department['dept_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <?php if (!$eventDepartmentsReady): ?><div class="form-text">Run the Events department migration to enable this option.</div><?php endif; ?>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="form-label" for="eventProgram">Program (optional)</label>
                             <select class="form-select" name="program" id="eventProgram">
-                                <?php foreach (getProgramCategories() as $code => $label):
+                                <?php foreach (getAnnouncementProgramCategories() as $code => $label):
                                     $optionText = $code === 'ALL' ? 'Everyone (all programs)' : "{$code} - {$label}";
                                 ?>
                                     <option value="<?= htmlspecialchars($code) ?>"<?= $code === 'ALL' ? ' selected' : '' ?>><?= htmlspecialchars($optionText) ?></option>
                                 <?php endforeach; ?>
                             </select>
+                            <div class="form-text" id="eventAudienceHelp">Leave Program on all programs to include the whole department.</div>
                         </div>
                     </div>
 
@@ -621,7 +672,7 @@ include __DIR__ . '/../components/header-admin.php';
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success" id="eventSubmitBtn"><i class="bi bi-check-lg"></i> Save Event</button>
+                    <button type="submit" class="btn btn-gnc-gold" id="eventSubmitBtn"><i class="bi bi-check-lg"></i> Save Event</button>
                 </div>
             </form>
         </div>
@@ -789,7 +840,7 @@ include __DIR__ . '/../components/header-admin.php';
 .evt-filters { display: flex; flex-wrap: wrap; gap: .5rem; padding: .75rem 1.25rem; }
 .evt-chip {
     border: 1px solid rgba(128,128,128,.35); background: transparent; color: inherit;
-    border-radius: 999px; padding: .3rem .8rem; font-size: .8rem; cursor: pointer; transition: all .15s;
+    border-radius: 999px; padding: .3rem .8rem; font-size: .8rem; cursor: pointer; transition: background var(--transition), border-color var(--transition), color var(--transition);
 }
 .evt-chip span { opacity: .65; margin-left: 4px; }
 .evt-chip:hover { background: rgba(128,128,128,.15); }
@@ -800,10 +851,6 @@ include __DIR__ . '/../components/header-admin.php';
 .evt-past .evt-row-title,
 .evt-past .evt-when:not(.evt-when-now) { opacity: .75; }
 .evt-table .evt-cat-badge { box-shadow: none; }
-.evt-table .status-badge.published { background: #1F8A3B; color: #fff; }
-.evt-table .status-badge.pending   { background: #F2B705; color: #3d2c00; }
-.evt-table .status-badge.draft     { background: #6c757d; color: #fff; }
-.evt-table .status-badge.archived  { background: #8a929a; color: #fff; }
 .evt-row-sub { color: #8a8f8c; }
 .evt-when { background: rgba(128,128,128,.22); color: inherit; }
 .evt-title-cell { max-width: 280px; }
@@ -821,14 +868,11 @@ include __DIR__ . '/../components/header-admin.php';
 .evt-status-help { font-size: .8rem; color: #8a8f8c; margin-top: .4rem; }
 
 .evt-toast {
-    position: fixed; right: 20px; bottom: 24px; z-index: 2000;
-    background: #1F5E2C; color: #fff; padding: .75rem 1.1rem; border-radius: 10px;
-    box-shadow: 0 6px 20px rgba(0,0,0,.35); font-size: .9rem;
-    display: flex; align-items: center; gap: .5rem;
-    transform: translateY(20px); opacity: 0; transition: all .3s;
+    position: fixed; right: 20px; bottom: 24px; z-index: 2000; width: min(380px, calc(100vw - 2rem));
+    transform: translateY(20px); opacity: 0;
+    transition: transform var(--transition), opacity var(--transition);
 }
 .evt-toast.show { transform: none; opacity: 1; }
-.evt-toast.error { background: #B3312D; }
 
 /* ================= Responsive ================= */
 .page-header { flex-wrap: wrap; gap: .75rem; }
@@ -964,6 +1008,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ---- Friendly success message that survives the page reload ----
     function showToast(msg, isError) {
+        if (window.ContentEditorNotice && window.ContentEditorNotice(msg, isError)) return;
         const t = document.createElement('div');
         t.className = 'evt-toast' + (isError ? ' error' : '');
         t.innerHTML = '<i class="bi bi-' + (isError ? 'exclamation-circle' : 'check-circle') + '"></i><span></span>';
@@ -981,12 +1026,48 @@ document.addEventListener('DOMContentLoaded', function () {
         if (pending) { sessionStorage.removeItem('evtToast'); showToast(pending); }
     } catch (e) {}
 
+    // Older events may already target a Basic Education track. Keep that
+    // saved selection when editing, without offering it for new events.
+    const eventProgramLabels = <?= json_encode(getProgramCategories(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    const eventProgramDepartments = <?= json_encode(array_column($db->query('SELECT program_code, dept_id FROM programs')->fetchAll(PDO::FETCH_ASSOC), 'dept_id', 'program_code'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    function updateEventAudience() {
+        const department = document.getElementById('eventDepartment').value;
+        const select = document.getElementById('eventProgram');
+        for (const option of select.options) {
+            const mismatch = option.value !== 'ALL' && department && String(eventProgramDepartments[option.value] || '') !== department;
+            option.hidden = Boolean(mismatch);
+            option.disabled = Boolean(mismatch);
+        }
+        select.querySelector('option[value="ALL"]').textContent = department ? 'All programs in this department' : 'Everyone (all programs)';
+        if (select.selectedOptions[0]?.disabled) select.value = 'ALL';
+        document.getElementById('eventAudienceHelp').textContent = department
+            ? 'Program is optional. Leave it on all programs to include the whole department.'
+            : 'Choose a department, a program, or leave both on everyone.';
+    }
+    document.getElementById('eventDepartment').addEventListener('change', () => {
+        document.getElementById('eventProgram').value = 'ALL';
+        updateEventAudience();
+    });
+    function selectEventProgram(code = 'ALL', preserveExisting = false) {
+        const select = document.getElementById('eventProgram');
+        select.querySelectorAll('[data-existing-program]').forEach(option => option.remove());
+        if (preserveExisting && eventProgramLabels[code] && !Array.from(select.options).some(option => option.value === code)) {
+            const option = new Option(code + ' - ' + eventProgramLabels[code] + ' (existing selection)', code);
+            option.dataset.existingProgram = '1';
+            select.add(option);
+        }
+        select.value = code;
+        if (!select.value) select.value = 'ALL';
+    }
+
     function resetForm() {
         form.reset();
         document.getElementById('eventId').value = '';
         document.getElementById('eventFormAction').value = 'create';
         document.getElementById('eventStatus').value = DEFAULT_STATUS;
-        document.getElementById('eventProgram').value = 'ALL';
+        document.getElementById('eventDepartment').value = '';
+        selectEventProgram();
+        updateEventAudience();
         alertBox.classList.add('d-none');
         alertBox.textContent = '';
         modalLabel.textContent = 'Add Event';
@@ -1117,7 +1198,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('eventEndDate').value = ed;
                 document.getElementById('eventEndTime').value = et;
                 document.getElementById('eventCategory').value = ev.category_id || '';
-                document.getElementById('eventProgram').value = ev.program || 'ALL';
+                selectEventProgram(ev.program || 'ALL', true);
+                document.getElementById('eventDepartment').value = ev.dept_id || '';
+                updateEventAudience();
                 // If this role has no such option (e.g. an old "pending" event opened by a
                 // Super Admin), the select would go blank, so fall back to the default.
                 const statusEl = document.getElementById('eventStatus');

@@ -1,0 +1,66 @@
+/* Recent Events card treatment from campus-event-style.css, scoped to the
+   Community Impact feed so the existing hero and activity list stay intact. */
+.community-impact{padding:0 0 4rem;background:#F9F6F1;font-family:'Inter',sans-serif;scroll-margin-top:100px}
+.community-impact h2{margin:0 0 2rem;color:#1F5E2C;text-align:center;font:700 clamp(1.5rem,3vw,2rem)/1.3 'Noto Serif',serif}
+.community-impact h2::after{content:'';display:block;width:52px;height:3px;margin:.6rem auto 0;background:#EABA3B;animation:cev-line-grow .6s .25s ease-out backwards}
+.community-impact .campus-recent-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.25rem}
+.community-impact .campus-recent-grid>*{min-width:0}
+.community-impact .campus-recent-card{position:relative;display:flex;align-items:flex-end;min-height:250px;min-width:0;width:100%;overflow:hidden;border-radius:0;color:#fff;background:#0b4228;text-decoration:none;isolation:isolate;animation:cev-fade-up .7s cubic-bezier(.22,.61,.36,1) backwards;transition:transform .3s cubic-bezier(.22,.61,.36,1),box-shadow .3s ease}
+.community-impact .campus-recent-image,.community-impact .campus-recent-placeholder{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
+.community-impact .campus-recent-image{transition:transform .6s cubic-bezier(.22,.61,.36,1)}
+.community-impact .campus-recent-placeholder{display:grid;place-items:center;background:linear-gradient(135deg,#37764a,#0b4228);font-size:5rem;color:#ffffff45}
+.community-impact .campus-recent-placeholder i{display:inline-block;animation:cev-float 3.6s ease-in-out infinite}
+.community-impact .campus-recent-card::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,#001b0d12 10%,#003c2670 45%,#003c26fa 100%);z-index:-1}
+.community-impact .campus-recent-card:hover{color:#fff;transform:translateY(-4px);box-shadow:0 12px 24px #09402430}
+.community-impact .campus-recent-card:hover .campus-recent-image{transform:scale(1.08)}
+.community-impact .campus-recent-card:hover .campus-recent-content{transform:translateY(-5px)}
+.community-impact .campus-recent-card:focus-visible{outline:3px solid #d3a63a;outline-offset:4px}
+.community-impact .campus-recent-card:active{transform:translateY(-1px) scale(.99)}
+.community-impact .campus-recent-content{width:100%;padding:1.1rem;transition:transform .35s cubic-bezier(.22,.61,.36,1)}
+.community-impact .campus-recent-type{display:block;margin-bottom:.25rem;color:#e0eadd;font-size:.7rem}
+.community-impact .campus-recent-content h3{margin:0 0 .5rem;font-size:1rem;font-weight:700;line-height:1.35;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden}
+.community-impact .campus-recent-meta{display:flex;align-items:center;gap:.4rem;color:#dce7df;font-size:.7rem}
+.community-impact .campus-recent-meta i{transition:transform .3s ease}
+.community-impact .campus-recent-card:hover .campus-recent-meta i{transform:scale(1.25) rotate(-8deg)}
+.community-impact .campus-recent-empty{margin:0;text-align:center;color:#5d6b62}
+.community-impact .campus-recent-pagination{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.5rem;margin-top:2rem;animation:cev-fade-in .5s ease backwards}
+.community-impact .campus-recent-pagination a{display:grid;place-items:center;min-width:32px;min-height:32px;padding:.25rem;border-radius:0;color:#1F5E2C;background:#fff;text-decoration:none;font-size:.85rem;transition:background .2s ease,color .2s ease,transform .2s ease,box-shadow .2s ease}
+.community-impact .campus-recent-pagination a:hover,.community-impact .campus-recent-pagination a[aria-current=page]{background:#1F5E2C;color:#fff}
+.community-impact .campus-recent-pagination a:hover{transform:translateY(-2px);box-shadow:0 6px 12px rgba(9,64,36,.18)}
+.community-impact .campus-recent-pagination a:active{transform:scale(.94)}
+@keyframes cev-fade-up{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+@keyframes cev-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes cev-line-grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes cev-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes cev-reveal{from{opacity:0;transform:translateY(34px)}to{opacity:1;transform:translateY(0)}}
+@supports not (animation-timeline:view()){
+    .community-impact .campus-recent-card:nth-child(3n+1){animation-delay:.1s}
+    .community-impact .campus-recent-card:nth-child(3n+2){animation-delay:.22s}
+    .community-impact .campus-recent-card:nth-child(3n){animation-delay:.34s}
+}
+@supports (animation-timeline:view()){
+    .community-impact h2,.community-impact .campus-recent-card,.community-impact .campus-recent-pagination,.community-impact .campus-recent-empty{animation:cev-reveal linear backwards;animation-timeline:view();animation-range:entry 0% entry 60%}
+    .community-impact h2::after{animation:cev-line-grow linear backwards;animation-timeline:view();animation-range:entry 10% entry 70%}
+    .community-impact .campus-recent-card:nth-child(3n+2){animation-range:entry 6% entry 66%}
+    .community-impact .campus-recent-card:nth-child(3n){animation-range:entry 12% entry 72%}
+}
+@media(max-width:991px){.community-impact .campus-recent-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:767px){.community-impact{padding-bottom:3rem}.community-impact h2{margin-bottom:1.5rem}.community-impact .campus-recent-grid{gap:1rem}}
+@media(max-width:575px){
+    .community-impact .campus-recent-grid{grid-template-columns:minmax(0,1fr)}
+    .community-impact .campus-recent-card{min-height:230px}
+    .community-impact .campus-recent-content{padding:.9rem;text-align:center}
+    .community-impact .campus-recent-content h3{font-size:.95rem}
+    .community-impact .campus-recent-meta{justify-content:center}
+    .community-impact .campus-recent-pagination{gap:.35rem;margin-top:1.5rem}
+}
+@media(pointer:coarse){.community-impact .campus-recent-pagination a{min-width:44px;min-height:44px}}
+@media(hover:none){
+    .community-impact .campus-recent-card:hover{transform:none;box-shadow:none}
+    .community-impact .campus-recent-card:hover .campus-recent-image,.community-impact .campus-recent-card:hover .campus-recent-content,.community-impact .campus-recent-card:hover .campus-recent-meta i{transform:none}
+    .community-impact .campus-recent-pagination a:hover:not([aria-current=page]){background:#fff;color:#1F5E2C;box-shadow:none;transform:none}
+}
+@media(prefers-reduced-motion:reduce){
+    .community-impact,.community-impact *,.community-impact *::before,.community-impact *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+    .community-impact .campus-recent-card:hover,.community-impact .campus-recent-card:hover .campus-recent-image,.community-impact .campus-recent-card:hover .campus-recent-content,.community-impact .campus-recent-card:hover .campus-recent-meta i,.community-impact .campus-recent-pagination a:hover{transform:none}
+}
