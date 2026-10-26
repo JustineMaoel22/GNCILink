@@ -92,7 +92,7 @@ define('FB_ACCESS_TOKEN', $_ENV['FB_ACCESS_TOKEN']);
 // ------------------------------------------------------------
 define('UPLOAD_PATH', __DIR__ . '/../uploads/');
 define('UPLOAD_URL', APP_URL . '/uploads/');
-define('MAX_FILE_SIZE', 5 * 1024 * 1024); // 5 MB per saved image
+define('MAX_FILE_SIZE', 5 * 1024 * 1024);// 5 MB per saved image
 require_once __DIR__ . '/../includes/image-upload.php';
 define('ALLOWED_IMAGE_TYPES', ['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 

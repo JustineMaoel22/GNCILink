@@ -1,5 +1,49 @@
-RewriteEngine On
-<FilesMatch "^\.env(?:\..*)?$">
-    Require all denied
-</FilesMatch>
-RewriteRule ^college/([a-z0-9-]+)/?$ /pages/academics/college/college-dept.php?slug=$1 [L,QSA]
+
+# Disable directory listing for the main website and subfolders
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # ==========================================
+    # GNCILink - Main Domain Only
+    # ==========================================
+
+    # Prevent main domain access to subdomain folders
+    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteRule ^(cba|clinic|library|osa)\.gncipampanga\.com(/|$) - [F,L,NC]
+
+    # Block private directories
+    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteRule (^|/)(app|config|storage|vendor|\.git)(/|$) - [F,L,NC]
+
+    # Block sensitive files
+    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteRule (^|/)(\.env[^/]*|secrets\.php|config\.php|composer\.(json|lock)|package(-lock)?\.json|README\.md|[^/]+\.(sql|bak|log))$ - [F,L,NC]
+
+    # ==========================================
+    # GNCILink Website Routing
+    # ==========================================
+
+    # Allow existing files and directories
+    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Route main homepage
+    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteRule ^$ public/index.php [L]
+
+    # Route existing public files and folders
+    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteCond %{DOCUMENT_ROOT}/public/$1 -f [OR]
+    RewriteCond %{DOCUMENT_ROOT}/public/$1 -d
+    RewriteRule ^(.+)$ public/$1 [L]
+
+    # Front controller fallback
+    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteRule ^ public/index.php [L]
+
+</IfModule>
