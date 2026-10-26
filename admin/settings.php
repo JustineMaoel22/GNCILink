@@ -3,12 +3,10 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/admin-functions.php';
 initSession();
 requireLogin();
-if (!hasPermission('manage_settings')) {
-    http_response_code(403);
-    exit('Only Super Admin can access settings.');
-}
+$canManageWebsiteSettings = hasPermission('manage_settings');
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!$canManageWebsiteSettings) rbacFail('Your role cannot change website settings.',403);
     try {
         saveAiImageCheckerSetting($_POST);
         $_SESSION['settings_saved'] = true;
@@ -23,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Could not save settings. Please try again.';
     }
 }
-$enabled = aiImageCheckerEnabled();
+$enabled = $canManageWebsiteSettings ? aiImageCheckerEnabled() : true;
 $saved = !empty($_SESSION['settings_saved']);
 unset($_SESSION['settings_saved']);
 $pageTitle = 'Settings';
@@ -35,6 +33,8 @@ require __DIR__ . '/../components/header-admin.php';
         <p>Manage preferences for the admin panel.</p>
     </div>
 </div>
+<section class="data-card p-4 mb-4"><h2 class="data-card-title">Account Security</h2><p>Update your own password using your current password. Other sessions and remembered devices will be revoked after the change.</p><a href="/admin/account-password.php" class="btn btn-outline-secondary">Change Password</a></section>
+<?php if ($canManageWebsiteSettings): ?>
 <section class="data-card p-4 mb-4">
     <h2 class="data-card-title">Facebook Integration</h2>
     <p>Connect the test Facebook Page and review announcement publishing deliveries.</p>
@@ -57,4 +57,5 @@ require __DIR__ . '/../components/header-admin.php';
         <button type="submit" class="btn-gnc-primary">Save settings</button>
     </form>
 </section>
+<?php endif; ?>
 <?php require __DIR__ . '/../components/footer-admin.php'; ?>

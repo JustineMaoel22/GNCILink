@@ -34,5 +34,4 @@ $faqField=static fn($key,$label)=>ceField('faq-text',['key'=>$key,'label'=>$labe
 <?php else: ?><div class="faq-empty"><h1>FAQs are temporarily unavailable</h1><p>Please check back later.</p></div><?php endif; ?>
 </div></main>
 <?php include __DIR__.'/../components/footer.php'; ?>
-<script src="/assets/js/bootstrap.bundle.min.js"></script>
 </body></html>

@@ -245,8 +245,9 @@ $studentLifeGroups = [
         ['label' => 'Athletics and Sports', 'href' => '/pages/student%20life/athletics-sports.php'],
     ]],
     ['heading' => 'Student Resources', 'items' => [
-        ['label' => 'OSA Student Grievance', 'href' => 'https://osaportal.infinityfreeapp.com/', 'target' => '_blank'],
-        ['label' => 'GNCI Library', 'href' => 'https://gnci-libraries.thsite.top/', 'target' => '_blank'],
+        ['label' => 'Access Student Email', 'href' => 'https://login.microsoftonline.com/', 'target' => '_blank'],
+        ['label' => 'OSA Student Grievance', 'href' => 'https://osa.gncipampanga.com/', 'target' => '_blank'],
+        ['label' => 'GNCI Library', 'href' => 'http://library.gncipampanga.com/', 'target' => '_blank'],
         ['label' => 'Frequently Asked Questions', 'href' => '/pages/faq.php'],
     ]],
     ['heading' => 'Our Community', 'items' => [
@@ -505,10 +506,6 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
         </ul>
 
         <div class="gnc-mobile-portal d-grid gap-2">
-            <a class="btn-portal w-100 justify-content-center" href="https://gnci-libraries.thsite.top/?fbclid=IwY2xjawVC_A5leHRuA2FlbQIxMABwZG9mAWJyaWQRMTNlekFRazQzZkY2ZWNyQXVzcnRjBmFwcF9pZBAyMjIwMzkxNzg4MjAwODkyAAEeyOb2EKxW0Q443KZcj0zm2_x6VkKVkfV1gMkucZ5BGPwP3f2AOGBadXzhc1A_aem__oMGqHHwxj1twlM5m37f_g&amp;i=1#home" target="_blank" rel="noopener noreferrer">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 6c-3-2-6-2-10-1v14c4-1 7-1 10 1 3-2 6-2 10-1V5c-4-1-7-1-10 1Z"/><path d="M12 6v14"/></svg>
-                Library
-            </a>
             <a class="btn-portal w-100 justify-content-center" href="/coming-soon.php" target="_blank">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill" viewBox="0 0 16 16">
                     <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
@@ -519,6 +516,9 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
     </div>
 </div>
 
+<!-- Shared navigation requires Offcanvas, Collapse and Dropdown (including Popper). -->
+<script src="/assets/js/bootstrap.bundle.min.js"></script>
+
 <!-- Nested Academics submenus (desktop flyouts + mobile placeholder-link handling) -->
 <script>
 (function () {
@@ -527,6 +527,16 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
     /* ---------- Desktop: Academics flyouts ---------- */
     document.querySelectorAll('#mainNavbar .nav-item.dropdown').forEach(function (academicsItem) {
         var canHover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+        var rootMenu = academicsItem.querySelector(':scope > .gnc-dropdown-menu');
+        var fitRootMenu = function () {
+            if (!rootMenu) return;
+            var top = Math.max(0, academicsItem.getBoundingClientRect().bottom);
+            rootMenu.style.setProperty('--gnc-menu-top', top + 'px');
+        };
+        fitRootMenu();
+        academicsItem.addEventListener('mouseenter', fitRootMenu);
+        academicsItem.addEventListener('show.bs.dropdown', fitRootMenu);
+        window.addEventListener('resize', function () { fitRootMenu(); resetAll(); });
 
         var toggleOf = function (li) {
             return li.querySelector(':scope > .gnc-submenu-row > .gnc-submenu-toggle');
@@ -539,17 +549,17 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
         var position = function (li) {
             var menu = menuOf(li);
             if (!menu) return;
-            window.requestAnimationFrame(function () {
-                menu.classList.remove('open-left');
-                if (li.parentElement.classList.contains('open-left')) {
-                    menu.classList.add('open-left');
-                    return;
-                }
-                var r = menu.getBoundingClientRect();
-                if (r.width && r.right > window.innerWidth - 8) {
-                    menu.classList.add('open-left');
-                }
-            });
+            if (window.innerWidth < 1200) return;
+            var row = li.getBoundingClientRect();
+            var width = menu.getBoundingClientRect().width;
+            var left = row.right;
+            if (li.parentElement.classList.contains('open-left') || left + width > window.innerWidth - 8) left = row.left - width;
+            menu.classList.toggle('open-left', left < row.left);
+            var top = Math.max(8, Math.min(row.top, window.innerHeight - Math.min(menu.scrollHeight, 200) - 12));
+            menu.style.left = Math.max(8, Math.min(left, window.innerWidth - width - 8)) + 'px';
+            menu.style.right = 'auto';
+            menu.style.top = top + 'px';
+            menu.style.setProperty('--gnc-menu-top', top + 'px');
         };
 
         var setOpen = function (li, open) {
@@ -576,6 +586,12 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
                 setOpen(li, false);
             });
         };
+
+        academicsItem.querySelectorAll('.gnc-dropdown-menu').forEach(function (menu) {
+            menu.addEventListener('scroll', function () {
+                menu.querySelectorAll('.gnc-dropdown-submenu.show').forEach(function (li) { setOpen(li, false); });
+            }, { passive: true });
+        });
 
         academicsItem.querySelectorAll('.gnc-dropdown-submenu').forEach(function (li) {
             var btn = toggleOf(li);

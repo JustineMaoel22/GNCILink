@@ -25,6 +25,13 @@ module.exports=async function({base,superCookie,forcedCookie,resetToken}){
    const picture=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(recoveryFolder,name+'-mobile.png'),Buffer.from(picture.data,'base64'));
   }
   await cookie(superCookie);
+  await send('Page.navigate',{url:base+'/admin/account-password.php'});
+  await until(()=>evaluate("document.readyState==='complete' && !!document.getElementById('show-passwords')"),'Account password page unavailable');
+  for(const width of [1440,390]){
+   await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<600});
+   assert(await evaluate('document.documentElement.scrollWidth<=innerWidth'),'Account password form fits '+width+'px');
+   await evaluate("document.getElementById('show-passwords').click()");assert.equal(await evaluate("document.getElementById('current_password').type"),'text');await evaluate("document.getElementById('show-passwords').click()");assert.equal(await evaluate("document.getElementById('current_password').type"),'password');
+  }
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   await send('Page.navigate',{url:base+'/admin/submissions.php'});await until(()=>evaluate("document.readyState==='complete' && !!document.getElementById('approval-search')"),'Approvals queue unavailable');
   assert(await evaluate("document.querySelectorAll('.approval-card').length>0"),'Submission cards visible');
@@ -45,7 +52,7 @@ module.exports=async function({base,superCookie,forcedCookie,resetToken}){
   await send('Page.navigate',{url:base+'/admin/users.php'});await until(()=>evaluate("!!document.getElementById('new-role') && !!window.AdminDialogs"),'Users form unavailable');
   assert(!await evaluate("!!document.querySelector('input[name=password]')"),'No manual initial password field');
   await evaluate("document.getElementById('user-first_name').value='Browser';document.getElementById('user-last_name').value='Fixture';document.getElementById('user-email').value='browser-fixture@example.invalid';document.getElementById('new-role').value='Content Editor';document.querySelector('form[data-user-confirm]').requestSubmit()");
-  await until(()=>evaluate("!!document.querySelector('.gnc-dialog-accept')"),'Create confirmation unavailable');await evaluate("document.querySelector('.gnc-dialog-accept').click()");
+  await until(()=>evaluate("!!document.querySelector('.gnc-dialog[open] .gnc-dialog-accept')"),'Create confirmation unavailable');await evaluate("document.querySelector('.gnc-dialog[open] .gnc-dialog-accept').click()");
   await until(()=>evaluate("!!document.querySelector('#temporary-password-dialog[open]')"),'One-time password modal unavailable');assert.equal(await evaluate("document.getElementById('temporary-password').value.length"),12);
   await evaluate("Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.copyMatches=value===document.getElementById('temporary-password').value}}});document.getElementById('copy-temporary-password').click()");await until(()=>evaluate('window.copyMatches===true'),'Copy Password did not copy generated value');
   await evaluate("document.getElementById('close-temporary-password').click()");await until(()=>evaluate("!document.getElementById('temporary-password')"),'Temporary password was not scrubbed after closing');

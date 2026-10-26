@@ -52,6 +52,7 @@ function gncbot_page_urls(): array
 {
     return [
         'home'                => ['label' => 'GNCILink Home',                'url' => gncbot_url('/')],
+        'developers'          => ['label' => 'Developers Corner',            'url' => gncbot_url('/pages/about/gnci-developers-corner-2/the-devs.php')],
         'events'              => ['label' => 'Calendar of Events',           'url' => gncbot_url('/#events')],
         'news_announcements'  => ['label' => 'News & Announcements',         'url' => gncbot_url('/pages/news-and-announcement.php')],
         'college_departments' => ['label' => 'College Departments',          'url' => gncbot_url('/pages/academics/college/college-dept.php')],

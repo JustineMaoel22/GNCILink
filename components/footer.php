@@ -163,7 +163,7 @@ try {
 
                     <h6 class="gnc-footer-heading gnc-footer-heading-spaced">Student Resources</h6>
                     <ul class="gnc-footer-links">
-                        <li><a href="https://gnci-libraries.thsite.top/?fbclid=IwY2xjawVC_A5leHRuA2FlbQIxMABwZG9mAWJyaWQRMTNlekFRazQzZkY2ZWNyQXVzcnRjBmFwcF9pZBAyMjIwMzkxNzg4MjAwODkyAAEeyOb2EKxW0Q443KZcj0zm2_x6VkKVkfV1gMkucZ5BGPwP3f2AOGBadXzhc1A_aem__oMGqHHwxj1twlM5m37f_g&amp;i=1#home" target="_blank" rel="noopener noreferrer">Libraries <i class="bi bi-chevron-right"></i></a></li>
+                        <li><a href="http://library.gncipampanga.com/" target="_blank" rel="noopener noreferrer">Libraries <i class="bi bi-chevron-right"></i></a></li>
                         <li><a href="/index.php#events">Calendar <i class="bi bi-chevron-right"></i></a></li>
                         <li><a href="https://login.microsoftonline.com/" target="_blank" rel="noopener noreferrer">Access Student Email <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
                     </ul>
@@ -201,6 +201,8 @@ try {
         </div>
     </div>
 </footer>
+
+<?php include_once __DIR__ . '/../chatbot/widget.php'; ?>
 
 <script>
 (function () {

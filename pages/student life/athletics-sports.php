@@ -185,7 +185,6 @@ $highlightsUrl=static fn($page)=>'?'.http_build_query(array_merge(['highlights_p
 
     <?php include __DIR__ . '/../../components/footer.php'; ?>
     <?php include_once __DIR__ . '/../../chatbot/widget.php'; ?>
-    <script src="/assets/js/bootstrap.bundle.min.js"></script>
     <script src="/assets/js/facility-coverflow.js?v=<?= filemtime(__DIR__.'/../../assets/js/facility-coverflow.js') ?>" defer></script>
     <script src="/assets/js/athletics-sports.js?v=<?= filemtime(__DIR__.'/../../assets/js/athletics-sports.js') ?>" defer></script>
     <?php if (!$sportsPreview): ?>

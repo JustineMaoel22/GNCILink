@@ -122,7 +122,7 @@ include __DIR__ . '/../components/header-admin.php';
 <div class="page-header">
     <div>
         <h1><?= $pageTitle ?></h1>
-        <p><?= $facebookPostsPage ? 'Manage posts retrieved from the school Facebook Page. Update their categories or pin them to the homepage slideshow.' : 'Share news with students and parents. Write a new announcement, or manage the ones you already posted.' ?></p>
+        <p><?= rbacRole() === 'The Mirror' ? ($facebookPostsPage ? 'Browse posts retrieved from the school Facebook Page. Open a post to read it on Facebook.' : 'Browse announcements from all users. Create your own announcements and submit changes for approval.') : ($facebookPostsPage ? 'Manage posts retrieved from the school Facebook Page. Update their categories or pin them to the homepage slideshow.' : 'Share news with students and parents. Write a new announcement, or manage the ones you already posted.') ?></p>
     </div>
     <?php if (!$facebookPostsPage && hasPermission('create_announcement')): ?>
     <button type="button" class="btn btn-gnc-gold" id="btn-new-announcement">
@@ -183,7 +183,7 @@ include __DIR__ . '/../components/header-admin.php';
         <div class="ann-chip-row">
             <a class="ann-chip<?= $statusFilter === '' ? ' active' : '' ?>" href="<?= ann_url($baseQuery, ['status' => '']) ?>">All</a>
             <?php foreach ($statusLabels as $key => $label): ?>
-            <a class="ann-chip<?= $statusFilter === $key ? ' active' : '' ?>" href="<?= ann_url($baseQuery, ['status' => $key]) ?>"><?= $key === 'pending' ? 'Waiting' : ($key === 'published' ? 'Live' : ($key === 'draft' ? 'Drafts' : $label)) ?></a>
+            <a class="ann-chip<?= $statusFilter === $key ? ' active' : '' ?>" href="<?= ann_url($baseQuery, ['status' => $key]) ?>"><?= $key === 'pending' ? 'Pending' : ($key === 'published' ? 'Live' : ($key === 'draft' ? 'Drafts' : $label)) ?></a>
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
@@ -260,6 +260,7 @@ include __DIR__ . '/../components/header-admin.php';
                         <?php endif; ?>
                     </td>
                     <td class="ann-actions-cell">
+                        <?php if (rbacRole() === 'The Mirror' && !$isOwner): ?><span class="text-muted small">Read only</span><?php endif; ?>
                         <?php if ($canPublish): ?>
                         <form method="POST" action="/admin/action/create-announcement.php" class="ann-inline-form">
                             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">

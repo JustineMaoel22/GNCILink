@@ -78,6 +78,29 @@ let socket;
         await evaluate("document.querySelector('.gnc-dialog-accept').click()");
         await until(()=>evaluate('result===true'),'Confirm failed');
     }
+    const header=fs.readFileSync('components/header-admin.php','utf8');
+    const logoutScript=header.slice(header.indexOf('// CSRF token for AJAX')).split('</script>')[0].replace(/<\?=[\s\S]*?\?>/g,'test-csrf');
+    await evaluate(`(() => {
+        const link=document.createElement('a');link.href='/admin/auth/logout.php';link.id='logoutTest';document.body.appendChild(link);
+        HTMLFormElement.prototype.submit=function(){window.logoutSubmission={method:this.method,action:new URL(this.action).pathname,fields:Object.fromEntries(new FormData(this))};};
+        ${logoutScript}
+        window.logoutPending=()=>logoutConfirmationPending;
+    })()`);
+    for(const action of ['cancel','logout','forget']) {
+        await evaluate("logoutSubmission=null;document.getElementById('logoutTest').click();void 0");
+        await until(()=>evaluate("Boolean(document.querySelector('.gnc-dialog[open]'))"),'Logout confirmation unavailable: '+action);
+        assert.equal(await evaluate("document.querySelectorAll('.gnc-dialog[open]').length"),1,'Only one logout confirmation');
+        if(action==='forget')await evaluate("document.querySelector('.gnc-dialog input[type=checkbox]').checked=true");
+        await evaluate(`document.querySelector(${JSON.stringify(action==='cancel'?'.gnc-dialog-cancel':'.gnc-dialog-accept')}).click()`);
+        await until(()=>evaluate("!document.querySelector('.gnc-dialog[open]')"),'Logout dialog did not close');
+        await until(()=>evaluate("!logoutPending()"),'Logout handler did not finish: '+action);
+        const submitted=await evaluate('logoutSubmission');
+        if(action==='cancel')assert.equal(submitted,null,'Cancel must not sign out');
+        else {
+            assert.equal(submitted.method,'post');assert.equal(submitted.action,'/admin/auth/logout.php');assert.equal(submitted.fields.csrf_token,'test-csrf');
+            assert.equal(submitted.fields.forget_device,action==='forget'?'1':undefined,'Device revocation stays optional');
+        }
+    }
     await evaluate("result=null;AdminDialogs.alert('<img src=x onerror=bad()>').then(()=>result=true);AdminDialogs.alert('Second notice');void 0");
     await until(()=>evaluate("Boolean(document.querySelector('.gnc-dialog[open]'))"),'Notice unavailable');
     assert.equal(await evaluate("document.querySelector('.gnc-dialog-message img')!==null"),false);
@@ -87,7 +110,7 @@ let socket;
     await until(()=>evaluate("document.getElementById('gncDialogMessage')?.textContent==='Second notice'"),'Notices must queue');
     await evaluate("document.querySelector('.gnc-dialog-accept').click()");
     await until(()=>evaluate("!document.querySelector('.gnc-dialog')"),'Final notice did not close');
-    console.log('PASS: destructive and ordinary popup styling, explicit decisions, Cancel, Escape, backdrop, focus restoration, mobile layout, safe messages and queued notices');
+    console.log('PASS: popup styling, Cancel/Escape/backdrop, focus restoration, mobile layout, safe queued notices, and one-step CSRF-protected logout with optional device revocation');
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
     if (socket) socket.close(); browser.kill();
     // Only remove this test-created, uniquely named directory under the OS temp root.

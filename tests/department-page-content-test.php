@@ -13,6 +13,17 @@ try {
         $id = (int)$dept['dept_id'];
         $original = departmentPageContent($dept);
         pageCheck(isset($original['leadership_title'], $original['profile_label'], $original['contacts_label']), 'Common editable fields are available');
+        saveDepartmentPageContent($id, ['header_logo_hidden' => '1', 'header_text_hidden' => '1']);
+        $header = departmentPageContent($dept, true);
+        pageCheck($header['header_logo_hidden']['value'] === '1' && $header['header_text_hidden']['value'] === '1', 'Header removals persist independently');
+        $unchanged = getDepartmentById($id);
+        pageCheck(($unchanged['logo_media_id'] ?? null) === ($dept['logo_media_id'] ?? null) && $unchanged['dept_name'] === $dept['dept_name'], 'Header removal preserves shared logo and department name');
+        saveDepartmentPageContent($id, ['header_logo_hidden' => '0', 'header_text_hidden' => '0']);
+        pageCheck(departmentPageContent($dept, true)['header_logo_hidden']['value'] === '0', 'Header logo can be restored');
+        foreach (['yes', '', '2'] as $invalidVisibility) {
+            try { saveDepartmentPageContent($id, ['header_logo_hidden' => $invalidVisibility]); throw new RuntimeException('Invalid visibility accepted'); }
+            catch (InvalidArgumentException $expected) {}
+        }
         if ($dept['slug'] === 'casa-gradeschool') {
             $saved = $db->prepare('SELECT content FROM department_page_content WHERE dept_id = ? AND field_key = ?');
             $saved->execute([$id, 'leadership_intro']);

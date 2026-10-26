@@ -45,5 +45,6 @@
             </a>
         </footer>
     </div>
+    <?php include_once __DIR__ . '/chatbot/widget.php'; ?>
 </body>
 </html>

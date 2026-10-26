@@ -591,11 +591,6 @@ function getAnnouncements(array $filters = [], int $limit = 20, int $offset = 0)
             }
         }
         
-        if (rbacRole() === 'The Mirror') {
-            $query .= " AND a.user_id = ?";
-            $params[] = $_SESSION['user_id'];
-        }
-        
         $query .= " ORDER BY a.created_at DESC LIMIT ? OFFSET ?";
         $params[] = $limit;
         $params[] = $offset;
@@ -1389,7 +1384,7 @@ function getFacebookPostsAdminList(int $limit = 50, string $search = ''): array 
         $db = getDB();
         // Keep auto-categories current (manually edited/locked posts are skipped).
         require_once __DIR__ . '/../config/fb-categorizer.php';
-        gncAutoCategorizeFbPosts($db);
+        if (rbacRole() !== 'The Mirror') gncAutoCategorizeFbPosts($db);
         $searching = $search !== '';
 
         // When searching, scan a much larger window (not just the newest $limit)
@@ -2610,7 +2605,6 @@ function sanitizeSvgFile(string $path): bool {
  */
 function storeDepartmentUpload(array $file, string $kind): array {
     if (!function_exists('mb_substr')) throw new RuntimeException('Uploads require the PHP mbstring extension. Enable mbstring in your hosting PHP settings.');
-    if (!function_exists('finfo_open')) throw new RuntimeException('Uploads require the PHP Fileinfo extension. Enable fileinfo in your hosting PHP settings.');
     $file = imageUploadPrepare($file);
     $configs = [
         'department_banner' => [
@@ -2719,9 +2713,7 @@ function storeDepartmentUpload(array $file, string $kind): array {
         $ext = 'svg';
     } else {
         // Trust the file's real content, never the browser-supplied type/extension.
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mime  = finfo_file($finfo, $file['tmp_name']);
-        finfo_close($finfo);
+        $mime = imageUploadMime($file['tmp_name']);
         if (!isset($cfg['mimes'][$mime])) {
             throw new Exception($cfg['bad']);
         }

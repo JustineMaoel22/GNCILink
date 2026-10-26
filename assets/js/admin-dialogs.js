@@ -19,6 +19,14 @@
                 icon.setAttribute('aria-hidden', 'true'); content.appendChild(icon);
                 var title = element('h2', '', options.title); title.id = 'gncDialogTitle'; content.appendChild(title);
                 var message = element('p', '', options.message); message.id = 'gncDialogMessage'; content.appendChild(message);
+                var checkbox = null;
+                if (options.checkboxLabel) {
+                    var choice = element('label', 'form-check mb-3 text-start');
+                    checkbox = element('input', 'form-check-input'); checkbox.type = 'checkbox';
+                    choice.appendChild(checkbox);
+                    choice.appendChild(element('span', 'form-check-label', options.checkboxLabel));
+                    content.appendChild(choice);
+                }
                 var actions = element('div', 'gnc-dialog-actions');
                 function button(text, className, value) {
                     var el = element('button', className, text); el.type = 'button';
@@ -37,7 +45,7 @@
                 dialog.addEventListener('close', function () {
                     var accepted = dialog.returnValue === 'confirm'; dialog.remove();
                     if (previous && previous.isConnected) previous.focus({ preventScroll: true });
-                    resolve(accepted);
+                    resolve(checkbox ? { confirmed: accepted, checked: accepted && checkbox.checked } : accepted);
                 }, { once: true });
                 document.body.appendChild(dialog); dialog.showModal();
             });
@@ -54,6 +62,9 @@
     }
     window.AdminDialogs = {
         confirm: confirm,
+        confirmWithCheckbox: function (message, options) {
+            return confirm(message, Object.assign({ checkboxLabel: 'Forget this device' }, options || {}));
+        },
         alert: function (message, options) { return show(Object.assign({ title: 'Notice', message: String(message), confirmText: 'OK', notice: true }, options || {})); }
     };
 })();

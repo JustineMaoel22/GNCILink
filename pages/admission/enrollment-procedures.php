@@ -232,7 +232,6 @@ unset($field);
     <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>
     
 
-    <script src="/assets/js/bootstrap.bundle.min.js"></script>
     <script src="/assets/js/skeleton-loader.js"></script>
 
     <script>

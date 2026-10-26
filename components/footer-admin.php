@@ -72,5 +72,6 @@ function initTableSearch(inputId, tableId) {
 </script>
 
 <?php if (isset($extraScripts)) echo $extraScripts; ?>
+<?php include __DIR__ . '/admin-onboarding.php'; ?>
 </body>
 </html>

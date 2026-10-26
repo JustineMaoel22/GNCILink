@@ -58,8 +58,7 @@
                 <!-- Left Side: Header & Paragraph -->
                 <div class="col-lg-6 text-ivory pe-lg-5">
                     <h1 class="serif-font display-4 fw-bold mb-4 text-ivory">
-                        Meet the creators<br>
-                        <span class="text-accent fst-italic">behind the website.</span>
+                        Meet the <span class="text-accent fst-italic">developers</span>
                     </h1>
                     <p class="fs-5 lh-lg text-ivory">
                         A team united by creativity, dedication, and a shared vision. Meet the people who brought our ideas to life and turned our final-year capstone project into something meaningful.
@@ -113,54 +112,18 @@
             <!-- Team Grid -->
             <div class="row g-4 mt-5">
                 
-                <!-- Team Member 1 -->
-                <div class="col-sm-6 col-lg-3">
+                <?php require_once __DIR__ . '/../../../includes/website-developers.php'; ?>
+                <?php foreach (gncWebsiteDevelopers() as $index => $member): ?>
+                <div class="col-sm-6 col-lg-3<?= $index % 2 ? ' mt-lg-5' : '' ?>">
                     <div class="team-card">
-                        <img src="/assets/images/KCCN.png" alt="Kimberly Claire C. Nanquil" class="img-fluid w-100 team-img"> 
-                        <!-- ADD MEMBER 1 IMAGE ASSET PATH ABOVE -->
+                        <img src="<?= htmlspecialchars($member['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($member['name'], ENT_QUOTES, 'UTF-8') ?>" class="img-fluid w-100 team-img">
                         <div class="text-start mt-3">
-                            <p class="team-role mb-1">Project Manager | UI/UX Designer | QA</p>
-                            <h5 class="team-name serif-font">Kimberly Claire C. Nanquil</h5>
+                            <p class="team-role mb-1"><?= htmlspecialchars($member['role'], ENT_QUOTES, 'UTF-8') ?></p>
+                            <h5 class="team-name serif-font"><?= htmlspecialchars($member['name'], ENT_QUOTES, 'UTF-8') ?></h5>
                         </div>
                     </div>
                 </div>
-
-                <!-- Team Member 2 (Staggered Down) -->
-                <div class="col-sm-6 col-lg-3 mt-lg-5">
-                    <div class="team-card">
-                        <img src="/assets/images/JMDF.png" alt="Justine Maoel D. Figura" class="img-fluid w-100 team-img"> 
-                        <!-- ADD MEMBER 2 IMAGE ASSET PATH ABOVE -->
-                        <div class="text-start mt-3">
-                            <p class="team-role mb-1">Full Stack Developer | UI/UX Designer</p>
-                            <h5 class="team-name serif-font">Justine Maoel D. Figura</h5>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Team Member 3 -->
-                <div class="col-sm-6 col-lg-3">
-                    <div class="team-card">
-                        <img src="/assets/images/AMQF.png" alt="Alyssa Mae Q. Fernandez" class="img-fluid w-100 team-img"> 
-                        <!-- ADD MEMBER 3 IMAGE ASSET PATH ABOVE -->
-                        <div class="text-start mt-3">
-                            <p class="team-role mb-1">Documentation</p>
-                            <h5 class="team-name serif-font">Alyssa Mae Q. Fernandez</h5>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Team Member 4 (Staggered Down) -->
-                <div class="col-sm-6 col-lg-3 mt-lg-5">
-                    <div class="team-card">
-                        <img src="/assets/images/PNRD.png" alt="Patricia Nicole R. De Guzman" class="img-fluid w-100 team-img"> 
-                        <!-- ADD MEMBER 4 IMAGE ASSET PATH ABOVE -->
-                        <div class="text-start mt-3">
-                            <p class="team-role mb-1">Documentation</p>
-                            <h5 class="team-name serif-font">Patricia Nicole R. De Guzman</h5>
-                        </div>
-                    </div>
-                </div>
-
+                <?php endforeach; ?>
             </div>
         </div>
     </section>
@@ -264,6 +227,5 @@
     <?php include_once __DIR__ . '/../../../components/footer.php'; ?>
 
     <!-- Bootstrap 5 JS -->
-    <script src="/assets/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -49,10 +49,14 @@ function authRateAllowed(string $scope,string $key,int $limit,int $seconds): boo
     return (int)$q->fetchColumn()<=$limit;
 }
 function authCsrfValid(): bool {return is_string($_POST['csrf_token']??null)&&verifyCSRFToken($_POST['csrf_token']);}
-function authClearSession(): void {
+/** End the login session without forgetting a separately trusted browser. */
+function authClearSession(bool $forgetDevice = false): void {
     $_SESSION=[];
     if(session_status()===PHP_SESSION_ACTIVE){$p=session_get_cookie_params();setcookie(session_name(),'', ['expires'=>time()-3600,'path'=>$p['path'],'domain'=>$p['domain'],'secure'=>$p['secure'],'httponly'=>true,'samesite'=>'Lax']);session_destroy();}
-    setcookie('gnc_remember_me','',['expires'=>time()-3600,'path'=>'/','secure'=>authIsHttps(),'httponly'=>true,'samesite'=>'Strict']);
+    if ($forgetDevice) {
+        setcookie('gnc_remember_me','',['expires'=>time()-3600,'path'=>'/','secure'=>authIsHttps()||!authLocalDevelopment(),'httponly'=>true,'samesite'=>'Strict']);
+        unset($_COOKIE['gnc_remember_me']);
+    }
 }
 function authCheckCredentials(string $email,string $password): ?array {
     if(!authRateAllowed('login-ip',authIp(),30,900)){authAudit(null,'LOGIN_RATE_LIMIT','Login rate limit reached.');return null;}

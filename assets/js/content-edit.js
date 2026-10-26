@@ -3048,6 +3048,10 @@
         function itemRef(ref) { var m = /^(\w+):(\d+)/.exec(ref || ''); return m && PD && PD.items[m[1]] ? { type: m[1], i: +m[2] } : null; }
 
         function bindEditing(doc) {
+            if (TD) ['text', 'logo'].forEach(function (part) {
+                var element = doc.querySelector('[data-dept-header-' + part + ']');
+                if (element) element.classList.toggle('dept-header-hidden', headerHidden('header_' + part + '_hidden'));
+            });
             if (PD) {
                 $$('.template-hero.has-banner,.fcar-slide img,.template-uniform-card img,.about-feature-seal-wrap', doc).forEach(function (el) {
                     el.setAttribute('data-ve-img', 'program-picture');
@@ -3340,6 +3344,17 @@
                 });
             });
         }
+        function headerHidden(key) {
+            return TD && TD.fields[key] && (own(textChanges, key) ? textChanges[key] : TD.fields[key].value) === '1';
+        }
+        function toggleHeaderPart(part) {
+            var key = 'header_' + part + '_hidden', value = headerHidden(key) ? '0' : '1';
+            if (!TD || !TD.fields[key]) return;
+            if (value === TD.fields[key].value) delete textChanges[key]; else textChanges[key] = value;
+            var el = S.doc.querySelector('[data-dept-header-' + part + ']');
+            if (el) el.classList.toggle('dept-header-hidden', value === '1');
+            select(null); closePop(); chrome();
+        }
         function deptOptions(x, y) {
             if (!DD || (DD.kind !== 'college' && DD.kind !== 'graduate')) return;
             var hidden = !!DD.archived;
@@ -3363,8 +3378,17 @@
                     });
                 });
             } } }, [icon('trash'), ' Delete this department']);
+            var headerControls = [];
+            if (DD.kind === 'college' && TD) {
+                headerControls.push(h('small', { class: 've-pop-hint', text: 'Header changes apply only here. Publish to save them.' }));
+                ['text', 'logo'].forEach(function (part) {
+                    headerControls.push(h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary',
+                        text: (headerHidden('header_' + part + '_hidden') ? 'Restore' : 'Remove') + ' header ' + part,
+                        on: { click: function () { toggleHeaderPart(part); } } }));
+                });
+            }
             openPop(h('div', { class: 've-pop-form' }, [h('div', { class: 've-pop-label', text: 'Department options' }),
-                h('small', { class: 've-pop-hint', text: hidden ? 'This department is hidden from visitors.' : 'This department is showing on the website.' }), toggle, del]), x, y);
+                h('small', { class: 've-pop-hint', text: hidden ? 'This department is hidden from visitors.' : 'This department is showing on the website.' })].concat(headerControls, [toggle, del])), x, y);
         }
         function saveDept() {
             var errs = [], did = 0, p = Promise.resolve();
@@ -3784,6 +3808,7 @@
                 } else if (sel.kind === 'field') {
                     var v = sel.el.__ve || {}, len = readField(sel.el).length;
                     it.push({ type: 'chip', icon: 'pencil', text: (v.label || 'Text') + (v.max ? '  ·  ' + len + ' / ' + v.max : '') });
+                    if (TD && sel.el.closest('[data-dept-header-text]')) it.push({ icon: 'trash', label: 'Remove header text', danger: true, run: function () { toggleHeaderPart('text'); } });
                     if (v.overview) return richTextTools().concat(it);
                     if (sel.item) itemActions(it, sel.item);
                     if (/^dept-program-(name|description)$/.test(sel.el.getAttribute('data-ve-field') || '')) departmentProgramActions(it, sel.el.getAttribute('data-ve-key'));
@@ -3842,7 +3867,8 @@
                             renderToolbar(); chrome();
                         }, !logo && !banner, banner ? sel.el.ownerDocument.querySelector('[data-dept-banner-image]') : sel.el);
                     } });
-                    if (has) it.push({ icon: 'trash', title: 'Remove the picture', danger: true, run: function () {
+                    if (logo && sel.el.closest('[data-dept-header-logo]')) it.push({ icon: 'trash', label: 'Remove header logo', danger: true, run: function () { toggleHeaderPart('logo'); } });
+                    else if (has) it.push({ icon: 'trash', title: 'Remove the picture', danger: true, run: function () {
                         dRemove[key] = true; delete dFiles[key];
                         if (banner) {
                             var image = sel.el.ownerDocument.querySelector('[data-dept-banner-image] img');

@@ -7,7 +7,7 @@ function rbacRole(?string $role = null): string {
 function rbacIsSuper(): bool { return rbacRole() === 'Super Admin'; }
 function rbacHome(): string {
     if(!empty($_SESSION['must_change_password']))return '/admin/change-password.php';
-    return rbacRole()==='The Mirror' ? '/admin/announcement.php' : '/admin/admin-dash.php';
+    return '/admin/admin-dash.php';
 }
 function rbacFail(string $message, int $status = 403): void {
     http_response_code($status);
@@ -19,9 +19,10 @@ function rbacRouteAllowed(string $role, string $route): bool {
     $role=rbacRole($role);
     if ($role==='Super Admin' || $role==='Content Editor') return true;
     if ($role!=='The Mirror') return false;
-    return in_array($route, ['/admin/announcement.php','/admin/news.php','/admin/submissions.php',
+    return in_array($route, ['/admin/admin-dash.php','/admin/settings.php','/admin/account-password.php','/admin/announcement.php','/admin/news.php','/admin/submissions.php','/admin/facebook-posts.php',
         '/admin/action/create-announcement.php','/admin/action/create-news.php','/admin/auth/logout.php',
-        '/admin/action/content-completeness-handler.php','/admin/change-password.php'],true);
+        '/admin/action/content-completeness-handler.php','/admin/change-password.php',
+        '/admin/help.php','/admin/action/onboarding-handler.php'],true);
 }
 function rbacRequestRoute(): string {
     $file=realpath($_SERVER['SCRIPT_FILENAME'] ?? '');
@@ -66,6 +67,7 @@ function rbacRequestBoundary(): void {
         $_SESSION['_rbac_worker']['used']=true;
     }
     if (!rbacRouteAllowed(rbacRole(),$route)) rbacFail('Your role cannot access this admin feature.');
+    if($route==='/admin/settings.php'&&rbacRole()==='The Mirror'&&($_SERVER['REQUEST_METHOD']??'GET')==='POST')rbacFail('Your role cannot change website settings.');
     if (!rbacIsSuper() && (str_contains($route,'/users') || str_contains($route,'/logs') || $route==='/admin/backfill-fb-categorizer.php')) rbacFail('Only Super Admin can access this feature.');
     require_once __DIR__.'/content-submissions.php';
     if(!rbacIsSuper()&&($_SERVER['REQUEST_METHOD']??'GET')!=='POST'&&in_array($route,rbacContentRoutes(),true)&&isset($_GET['action'])&&!in_array($_GET['action'],['get','list','load','fetch_one','upload_environment','categories','get_content'],true))rbacFail('Content changes must be submitted by POST with a valid request token.',405);

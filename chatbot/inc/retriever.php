@@ -15,6 +15,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/knowledge.php';
+require_once __DIR__ . '/../../includes/website-developers.php';
 
 final class GncbotRetriever
 {
@@ -127,6 +128,7 @@ final class GncbotRetriever
         }
 
         // ---- run the retrievers in priority order
+        if (isset($i['developers']))       { $this->developers(); }
         if ($program !== null)              { $this->programDetail($program); }
         if (isset($i['programs']) && $program === null) { $this->programList($dept); }
         if (isset($i['departments']))       { $this->departmentBlock($dept); }
@@ -166,16 +168,19 @@ final class GncbotRetriever
     {
         try {
             $st = $this->db->query(
-                "SELECT p.program_code, p.dept_id, m.file_path AS pdf_path
+                "SELECT p.program_code, p.program_name, p.dept_id, m.file_path AS pdf_path
                    FROM programs p LEFT JOIN media_library m ON m.media_id = p.pdf_media_id
+                   LEFT JOIN departments d ON d.dept_id = p.dept_id
+                  WHERE p.is_published = 1 AND (p.dept_id IS NULL OR d.archived_at IS NULL)
                ORDER BY p.program_code"
             );
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 $this->programRows[$r['program_code']] = ['dept_id' => $r['dept_id'], 'pdf_path' => $r['pdf_path']];
+                if (trim((string)($r['program_name'] ?? '')) !== '') $this->programNames[$r['program_code']] = trim($r['program_name']);
             }
             $st = $this->db->query(
-                "SELECT dept_id, dept_name, slug, dean_name, dean_title, dean_phone, dean_email, dean_office, dean_hours
-                   FROM departments ORDER BY dept_id"
+                "SELECT dept_id, dept_name, slug, department_type, dean_name, dean_title, dean_phone, dean_email, dean_office, dean_hours
+                   FROM departments WHERE archived_at IS NULL ORDER BY dept_id"
             );
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) { $this->departments[(int)$r['dept_id']] = $r; }
         } catch (Throwable $e) {
@@ -288,11 +293,16 @@ final class GncbotRetriever
         foreach ($rules as $k => $re) {
             if (preg_match($re, $q)) { $out[$k] = true; }
         }
+        // Website credits are in scope; general coding/developer questions remain unrelated.
+        $site = '(?:this (?:web)?site|the (?:web)?site|our (?:web)?site|gncilink|gnc ?link|gnc (?:web)?site)';
+        if (preg_match('/\b(?:developers? corner|devs? corner|(?:website|site) (?:developers?|creators?|team)|(?:developers?|creators?|devs?) (?:of |behind |for )?(?:' . $site . ')|(?:who|sino)\b.*\b(?:built|created|developed|made|designed|gumawa|nag develop)\b.*\b' . $site . ')\b/u', $q)) {
+            $out['developers'] = true;
+        }
         // "where is the registrar" is an office question, not a campus-location one
         if (isset($out['offices']) && isset($out['location']) && !preg_match('/\b(gnc|school|college|campus)\b/u', $q)) { unset($out['location']); }
         if (isset($out['location']) && isset($out['offices'])) { /* keep both */ }
         // a program scope with no other topic -> program overview + its announcements/events
-        if ($hasProgram && !array_intersect_key($out, array_flip(['announcements', 'events', 'news', 'gaps', 'contact', 'offices', 'people']))) {
+        if ($hasProgram && !array_intersect_key($out, array_flip(['announcements', 'events', 'news', 'gaps', 'contact', 'offices', 'people', 'developers']))) {
             $out['announcements'] = true; $out['events'] = true;
         }
         // "latest/recent" alone -> announcements
@@ -304,9 +314,25 @@ final class GncbotRetriever
 
     // ------------------------------------------------------------- retrievers
 
+    private function developers(): void
+    {
+        $lines = ['The GNCILink website capstone team, as credited in the Developers Corner:'];
+        foreach (gncWebsiteDevelopers() as $member) {
+            $lines[] = $member['name'] . ' - ' . $member['role'];
+        }
+        $lines[] = 'Page: ' . $this->pages['developers']['url'];
+        $this->addBlock('GNCILink website developers', implode("\n", $lines));
+        $this->link('developers');
+    }
+
     private function programList(?int $dept): void
     {
         $by = [];
+        foreach ($this->departments as $id => $department) {
+            if ($dept !== null && $id !== $dept) continue;
+            if ($dept === null && ($department['department_type'] ?? 'college') === 'basic-education') continue;
+            $by[$id] = [];
+        }
         foreach ($this->programRows as $code => $r) {
             $d = (int)($r['dept_id'] ?? 0);
             if ($dept !== null && $d !== $dept) { continue; }
@@ -318,6 +344,7 @@ final class GncbotRetriever
             $dn = $this->departments[$d]['dept_name'] ?? 'Unassigned';
             $lines[] = $dn . ':';
             foreach ($codes as $c) { $lines[] = '  - ' . gncbot_program_display_code($c) . ' - ' . $this->programNames[$c]; }
+            if (!$codes) $lines[] = '  - This department is listed on GNCILink, but no published program details are listed yet. Do not infer a degree name.';
         }
         $this->addBlock('College programs offered (' . count($this->programRows) . ' programs in total on GNCILink' . ($dept !== null ? '; filtered to one department' : '') . ')', implode("\n", $lines));
         $this->link('college_departments');

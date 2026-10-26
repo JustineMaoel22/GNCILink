@@ -54,6 +54,18 @@ let socket;
     assert.equal(await evaluate("current === 'beta' && document.getElementById('path').classList.contains('go')"), true, 'Building routes work without the external font');
     await send('Fetch.disable');
     await send('Network.setBlockedURLs', { urls: ['*fonts.googleapis.com*', '*fonts.gstatic.com*', '*cdn.jsdelivr.net*', '*facebook.com*', '*cloudflareinsights.com*', '*cdnjs.cloudflare.com*'] });
+    const interruptedDrag = await evaluate(`(() => {
+        fitView(false);
+        const map=document.getElementById('map'),r=map.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;
+        map.dispatchEvent(new WheelEvent('wheel',{clientX:x,clientY:y,deltaY:-70,ctrlKey:true,cancelable:true}));
+        const before=map.viewBox.baseVal.width;
+        const pointer=(type,id,dx=0)=>map.dispatchEvent(new PointerEvent(type,{pointerId:id,pointerType:'touch',clientX:x+dx,clientY:y,bubbles:true}));
+        pointer('pointerdown',101);
+        window.dispatchEvent(new Event('blur'));
+        pointer('pointerdown',102);pointer('pointermove',102,40);pointer('pointerup',102,40);
+        return {before,after:map.viewBox.baseVal.width};
+    })()`);
+    assert.ok(Math.abs(interruptedDrag.before-interruptedDrag.after)<1,'An interrupted drag must not turn the next touch into an unintended pinch');
     for (const [width, height] of [[1440, 900], [390, 844]]) {
         await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
         await send('Page.navigate', { url: base + '/' });
@@ -66,8 +78,12 @@ let socket;
         await delay(200);
         await evaluate("document.querySelector('.gnc-map-frame').scrollIntoView({block:'start',behavior:'instant'})");
         assert.equal(await evaluate("document.querySelector('.gnc-map-frame').contentWindow.current"), 'banzali', 'Scrolling back preserves the map and route');
+        await evaluate("(() => {const frame=document.querySelector('.gnc-map-frame');frame.contentWindow.fitView(false);frame.style.width='75%';})()");
+        await until(() => evaluate("(() => {const frame=document.querySelector('.gnc-map-frame'),map=frame.contentDocument.getElementById('map'),r=map.getBoundingClientRect(),v=map.viewBox.baseVal;return r.width>0&&r.height>0&&Math.abs(v.width/v.height-r.width/r.height)<.001;})()"), 'Camera must fit resized frame without refreshing at '+width);
+        assert.equal(await evaluate("document.querySelector('.gnc-map-frame').contentWindow.current"), 'banzali', 'Resizing preserves the selected building');
+        await evaluate("document.querySelector('.gnc-map-frame').style.width=''");
     }
-    console.log('PASS: map initializes with a stalled font stylesheet; first-scroll visibility, building selection and scroll-away/return work on desktop and mobile.');
+    console.log('PASS: stalled-font startup, interrupted-touch recovery, first-scroll visibility, building selection, resize and scroll-away/return work without refreshing on desktop and mobile.');
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
     if (socket) socket.close(); browser.kill();
     // Only remove this test-created, uniquely named directory under the OS temp root.

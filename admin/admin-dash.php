@@ -12,8 +12,10 @@ requireLogin();
 $currentUser = getCurrentUser();
 
 $pageTitle = 'Dashboard';
-$stats     = getDashboardStats();
-$logs      = getActivityLogs(10);
+$isSuperDashboard = rbacIsSuper();
+$stats     = $isSuperDashboard ? getDashboardStats() : [];
+$logs      = hasPermission('view_logs') ? getActivityLogs(10) : [];
+$mySubmissions = [];
 
 // Website analytics (page visits) - only for roles with the view_analytics permission
 $analytics     = null;
@@ -34,6 +36,7 @@ if (hasPermission('view_analytics')) {
 }
 
 // Recent content across all types
+if ($isSuperDashboard) {
 try {
     $db = getDB();
     
@@ -91,6 +94,11 @@ try {
     error_log('Recent content error: ' . $e->getMessage());
     $recentContent = [];
 }
+} else {
+    require_once __DIR__ . '/../includes/role-dashboard.php';
+    $roleDashboard = roleDashboardData();
+    $stats = $roleDashboard['stats']; $recentContent = $roleDashboard['recent']; $mySubmissions = $roleDashboard['submissions'];
+}
 
 // ── Plain-language helpers for the dashboard ─────────────────────
 // Current time in the Philippines (Asia/Manila, UTC+8), regardless of server timezone
@@ -129,19 +137,21 @@ $actionLabels = [
     'DELETE' => 'Deleted', 'PUBLISH' => 'Published', 'APPROVE' => 'Approved', 'REJECT' => 'Rejected',
     'OTP-SENT' => 'Code sent',
 ];
-$pendingCount = (int) ($stats['pending_approvals'] ?? 0);
+$dashboardPendingCount = (int) ($stats['pending_approvals'] ?? 0);
 
 // Shortcut buttons. Edit the URLs here if your pages live somewhere else.
-$quickActions = [
-    ['Post an Announcement', 'Share a notice with students and staff', '/admin/announcement.php', 'bi-megaphone-fill'],
-    ['Write a News Article', 'Publish a story on the website',        '/admin/news.php',         'bi-newspaper'],
-    ['Add an Event',         'Put a date on the school calendar',      '/admin/events.php',       'bi-calendar-event-fill'],
-];
+$quickActions = [];
+if (hasPermission('create_announcement')) $quickActions[] = ['Post an Announcement', 'Write a notice for students and staff', '/admin/announcement.php', 'bi-megaphone-fill'];
+if (hasPermission('create_news')) $quickActions[] = ['Write a News Article', $isSuperDashboard ? 'Publish a story on the website' : 'Write a story and submit it for approval', '/admin/news.php', 'bi-newspaper'];
+if (hasPermission('create_event')) $quickActions[] = ['Add an Event', 'Put a date on the school calendar', '/admin/events.php', 'bi-calendar-event-fill'];
+if (hasPermission('view_own_submissions')) $quickActions[] = ['My Submissions', 'Track your drafts, pending changes and review feedback', '/admin/submissions.php', 'bi-send'];
+$quickActions[] = ['Facebook Posts', 'Browse posts from the school Facebook Page', '/admin/facebook-posts.php', 'bi-facebook'];
+$quickActions[] = ['Help / User Guide', 'Read instructions or restart the walkthrough', '/admin/help.php', 'bi-question-circle'];
 if (hasPermission('manage_page_content')) {
     $quickActions[] = ['Edit Website Pages', 'Change words and pictures on pages', '/admin/content-edit.php', 'bi-window-desktop'];
 }
 if (hasPermission('manage_approvals')) {
-    $quickActions[] = ['Review Approvals', $pendingCount > 0 ? $pendingCount . ' waiting for you' : 'Nothing waiting right now', '/admin/approvals/', 'bi-check2-circle'];
+    $quickActions[] = ['Review Approvals', $dashboardPendingCount > 0 ? $dashboardPendingCount . ' waiting for you' : 'Nothing waiting right now', '/admin/submissions.php', 'bi-check2-circle'];
 }
 
 include __DIR__ . '/../components/header-admin.php';
@@ -297,16 +307,16 @@ include __DIR__ . '/../components/header-admin.php';
 })();
 </script>
 
-<?php if ($pendingCount > 0): ?>
+<?php if ($dashboardPendingCount > 0): ?>
 <!-- ── Needs attention ─────────────────────────────────────────── -->
 <div class="dash-attention" role="alert">
     <i class="bi bi-bell-fill" aria-hidden="true"></i>
     <div class="dash-attention-text">
-        <strong><?= number_format($pendingCount) ?> <?= $pendingCount === 1 ? 'item is' : 'items are' ?> waiting for approval.</strong>
+        <strong><?= number_format($dashboardPendingCount) ?> <?= $dashboardPendingCount === 1 ? 'item is' : 'items are' ?> waiting for approval.</strong>
         Nothing goes live on the website until it is approved.
     </div>
     <?php if (hasPermission('manage_approvals')): ?>
-    <a href="/admin/approvals/" class="btn-gnc-gold text-decoration-none d-inline-flex align-items-center gap-2" style="min-height:44px;padding:.5rem 1.1rem">
+    <a href="/admin/submissions.php" class="btn-gnc-gold text-decoration-none d-inline-flex align-items-center gap-2" style="min-height:44px;padding:.5rem 1.1rem">
         <i class="bi bi-arrow-right-circle"></i> Review now
     </a>
     <?php endif; ?>
@@ -325,7 +335,7 @@ include __DIR__ . '/../components/header-admin.php';
     <?php endforeach; ?>
 </div>
 
-<h2 class="dash-section-title"><i class="bi bi-grid-fill" aria-hidden="true"></i> Your content at a glance</h2>
+<h2 class="dash-section-title"><i class="bi bi-grid-fill" aria-hidden="true"></i> <?= rbacRole() === 'The Mirror' ? 'Your own content at a glance' : 'Website content at a glance' ?></h2>
 
 <!-- ── Stats Row ───────────────────────────────────────────────── -->
 <div class="row g-3 mb-4">
@@ -354,6 +364,7 @@ include __DIR__ . '/../components/header-admin.php';
     </div>
 
     <!-- Events -->
+    <?php if (hasPermission('manage_events')): ?>
     <div class="col-6 col-md-4 col-xl-2">
         <div class="stat-card h-100">
             <div class="d-flex align-items-start justify-content-between mb-2">
@@ -365,6 +376,7 @@ include __DIR__ . '/../components/header-admin.php';
         </div>
     </div>
 
+    <?php endif; ?>
     <!-- Pending -->
     <div class="col-6 col-md-4 col-xl-2">
         <div class="stat-card h-100">
@@ -372,10 +384,10 @@ include __DIR__ . '/../components/header-admin.php';
                 <div class="stat-icon gold"><i class="bi bi-hourglass-split"></i></div>
             </div>
             <div class="stat-value"><?= number_format($stats['pending_approvals'] ?? 0) ?></div>
-            <div class="stat-label">Waiting for Approval</div>
+            <div class="stat-label"><?= $isSuperDashboard ? 'Pending Approval' : 'My Pending Submissions' ?></div>
             <div class="dash-hint">Not live yet</div>
             <?php if (($stats['pending_approvals'] ?? 0) > 0 && hasPermission('manage_approvals')): ?>
-            <a href="/admin/approvals/" class="stat-delta up text-decoration-none">
+            <a href="/admin/submissions.php" class="stat-delta up text-decoration-none">
                 <i class="bi bi-arrow-right-circle"></i> Review now
             </a>
             <?php endif; ?>
@@ -616,7 +628,7 @@ include __DIR__ . '/../components/header-admin.php';
                     </thead>
                     <tbody>
                         <?php if (empty($recentContent)): ?>
-                        <tr><td colspan="5" class="dash-empty text-center py-4 text-muted">Nothing has been posted yet. Use the buttons at the top to post your first announcement, news article or event.</td></tr>
+                        <tr><td colspan="5" class="dash-empty text-center py-4 text-muted">No posts to show yet. Use the shortcuts above to create content and follow its progress in your submissions.</td></tr>
                         <?php else: foreach ($recentContent as $item): ?>
                         <tr>
                             <td class="dash-post-title">
@@ -644,6 +656,12 @@ include __DIR__ . '/../components/header-admin.php';
         </div>
     </div>
 
+    <?php if (!$isSuperDashboard): ?>
+    <div class="col-lg-5"><div class="data-card h-100"><div class="data-card-header"><span class="data-card-title"><i class="bi bi-send me-1"></i> My Submissions</span><a href="/admin/submissions.php" class="btn btn-sm btn-outline-secondary ms-auto">View All</a></div>
+    <?php if (!$mySubmissions): ?><div class="empty-state"><p>No submissions yet. Create content or save a draft to get started.</p></div><?php else: foreach ($mySubmissions as $submission): ?>
+    <div class="dash-log-row"><div class="dash-log-text"><a class="dash-log-desc d-block" href="/admin/submissions.php?id=<?= (int)$submission['submission_id'] ?>"><?= htmlspecialchars($submission['title']) ?></a><div class="dash-log-meta"><?= htmlspecialchars($statusLabels[$submission['status']] ?? ucfirst($submission['status'])) ?> &middot; <?= htmlspecialchars(dashTimeAgo($submission['created_at'])) ?></div></div></div>
+    <?php endforeach; endif; ?></div></div>
+    <?php else: ?>
     <!-- Activity Log -->
     <div class="col-lg-5">
         <div class="data-card h-100">
@@ -683,6 +701,7 @@ include __DIR__ . '/../components/header-admin.php';
             </div>
         </div>
     </div>
+    <?php endif; ?>
 </div>
 
 <?php include __DIR__ . '/../components/footer-admin.php'; ?>

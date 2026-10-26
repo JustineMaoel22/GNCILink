@@ -20,7 +20,7 @@ The existing login and OTP flow remains. After authentication (including remembe
 
 The new password must contain at least 12 Unicode characters, fit within 72 bytes, and contain no control characters. Unique passphrases and special characters are supported. Common and compromised passwords are rejected. Confirmation must match and the password must differ from the temporary password. Incorrect current-password attempts use the account lockout settings.
 
-After a successful change, the user sees a success message and a Continue link to the role's home: The Mirror goes to Announcements, other roles to Dashboard. Future authenticated logins go to the normal role home.
+After a successful change, the user sees a success message and a Continue link to the role's home: all roles go to their Dashboard. Future authenticated logins go to the normal role home.
 
 ## Backend enforcement
 

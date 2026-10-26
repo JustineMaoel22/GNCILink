@@ -178,7 +178,6 @@ $campusPageUrl = static fn($page) => '?' . http_build_query(array_merge($calenda
         </div>
     </section>
     <?php include_once __DIR__ . '/../../components/footer.php'; ?>
-    <script src="/assets/js/bootstrap.bundle.min.js"></script>
     <script src="/assets/js/campus-events.js?v=<?= filemtime(__DIR__ . '/../../assets/js/campus-events.js') ?>"
         defer></script>
     <script

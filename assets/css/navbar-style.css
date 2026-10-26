@@ -14,6 +14,12 @@
 /* =============================================================
    NAVBAR
    ============================================================= */
+/* Clip horizontal overflow without making the body a scroll container,
+   which prevents the shared navbar from sticking to the viewport. */
+body:has(> .gnc-navbar) {
+    overflow-x: clip;
+}
+
 .gnc-navbar {
     background-color: var(--gnc-nav-bg) !important;
     padding-top: 0;
@@ -196,6 +202,12 @@ html:not(.gnc-editor-preview) .gnc-navbar .gnc-dropdown-menu .dropdown-item:hove
 .gnc-offcanvas .offcanvas-header {
     padding: 0.75rem 1rem 0;
     border-bottom: none;
+}
+
+.gnc-offcanvas .offcanvas-body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
 }
 
 .gnc-offcanvas .btn-close {
@@ -454,9 +466,10 @@ html:not(.gnc-editor-preview) .gnc-mobile-subtoggle:hover,
     .gnc-navbar .nav-item.dropdown > .gnc-dropdown-menu {
         width: clamp(290px, 29vw, 460px);
         max-width: min(460px, calc(100vw - 24px));
-        max-height: min(76vh, 720px);
+        max-height: calc(100vh - var(--gnc-menu-top, 80px) - 12px);
+        max-height: calc(100dvh - var(--gnc-menu-top, 80px) - 12px);
         overflow-y: auto;
-        overflow-x: visible;
+        overflow-x: hidden;
         overscroll-behavior: contain;
         scrollbar-width: thin;
         scrollbar-color: rgba(234,186,59,.55) transparent;
@@ -467,11 +480,6 @@ html:not(.gnc-editor-preview) .gnc-mobile-subtoggle:hover,
         border-radius: 0 0 9px 9px;
         box-shadow: 0 15px 35px rgba(0,0,0,.28);
     }
-    /* Academics needs flyouts: do not clip the nested menus. */
-    .gnc-navbar #academicsDropdown + .gnc-dropdown-menu {
-        overflow: visible;
-        max-height: none;
-    }
     .gnc-navbar .gnc-nested-menu {
         max-height: min(74vh, 680px);
         overflow-y: auto;
@@ -479,6 +487,23 @@ html:not(.gnc-editor-preview) .gnc-mobile-subtoggle:hover,
         padding-block: 9px;
         scrollbar-width: thin;
         scrollbar-color: rgba(234,186,59,.55) transparent;
+    }
+
+    .gnc-navbar .gnc-dropdown-menu {
+        /* Fixed flyouts must escape their parent's scrolling panel. */
+        transform: none !important;
+        max-height: calc(100vh - var(--gnc-menu-top, 80px) - 12px);
+        max-height: calc(100dvh - var(--gnc-menu-top, 80px) - 12px);
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior-y: contain;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(234,186,59,.55) transparent;
+    }
+
+    .gnc-navbar .gnc-nested-menu {
+        position: fixed;
+        margin: 0;
     }
 }
 .gnc-navbar .gnc-menu-heading {

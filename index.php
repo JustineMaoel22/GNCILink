@@ -1089,7 +1089,7 @@ try {
                 <div class="text-muted mb-0 cms-rich"<?= homeTextMark('campus_intro') ?>><?= renderSectionContent(homeText('campus_intro')) ?></div>
             </div>
 
-            <iframe src="campus_navigator.html"
+            <iframe src="/campus_navigator.html?v=<?= substr(hash_file('sha256', __DIR__ . '/campus_navigator.html'), 0, 12) ?>"
                     class="gnc-map-frame gnc-reveal"
                     title="GNC Campus Navigator"
                     loading="lazy">
@@ -1100,7 +1100,6 @@ try {
     <?php include __DIR__ . '/chatbot/widget.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
     <?php if (cePreviewActive()): ?>
     <script>
         /* Content Editor preview: stop the slideshow auto-advancing so the slide being edited stays put. */

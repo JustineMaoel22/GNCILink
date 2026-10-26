@@ -1,6 +1,18 @@
 <?php
 const IMAGE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 
+/** Inspect bytes server-side; raster uploads can work on hosts without Fileinfo. */
+function imageUploadMime(string $path): string {
+    if (class_exists('finfo') && function_exists('finfo_open')) {
+        return (string)(new finfo(FILEINFO_MIME_TYPE))->file($path);
+    }
+    $info = @getimagesize($path);
+    $types = [IMAGETYPE_JPEG => 'image/jpeg', IMAGETYPE_PNG => 'image/png',
+        IMAGETYPE_WEBP => 'image/webp', IMAGETYPE_GIF => 'image/gif'];
+    if ($info && $info[0] > 0 && $info[1] > 0 && isset($types[$info[2]])) return $types[$info[2]];
+    throw new RuntimeException('Choose a valid JPG, PNG, WebP or GIF image. Other upload types require the PHP Fileinfo extension in your hosting PHP settings.');
+}
+
 /** Admin-only diagnostics: no credentials, paths, or uploaded content. */
 function imageUploadEnvironment(): array {
     $folder = dirname(__DIR__) . '/uploads/administration';
@@ -83,8 +95,7 @@ function imageUploadPrepare(?array $file): ?array {
     if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) return $file;
     $path = $file['tmp_name'] ?? '';
     if (!is_string($path) || !is_uploaded_file($path)) return $file;
-    if (!class_exists('finfo')) throw new RuntimeException('Photo uploads require the PHP Fileinfo extension. Enable fileinfo in your hosting PHP settings.');
-    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($path);
+    $mime = imageUploadMime($path);
     $file['size'] = filesize($path);
     $file['type'] = $mime;
     if (!str_starts_with($mime, 'image/')) return $file;

@@ -127,6 +127,5 @@ $impactUrl=static fn($page)=>'?'.http_build_query(array_merge($communityPreview?
     <?php else: ?><section class="community-activity-about"><div class="community-activity-content community-activity-empty"><h1>Activities are temporarily unavailable</h1><p>Please check back later.</p></div></section><?php endif; ?>
     <script src="/assets/js/community-activities.js?v=<?= filemtime(__DIR__.'/../../assets/js/community-activities.js') ?>"></script>
     <script src="/assets/js/community-impact.js?v=<?= filemtime(__DIR__.'/../../assets/js/community-impact.js') ?>"></script>
-    <script src="/assets/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

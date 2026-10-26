@@ -1,0 +1,24 @@
+.gnc-tour {
+    position: fixed; inset: 0; margin: 0; padding: 0; border: 0;
+    width: 100%; max-width: none; height: 100%; max-height: none;
+    background: transparent; overflow: hidden; color: #24352b;
+    font-family: inherit;
+}
+.gnc-tour::backdrop { background: transparent; }
+.gnc-tour-ring {
+    position: fixed; pointer-events: none; border: 3px solid #eaba3b;
+    border-radius: 8px; box-shadow: 0 0 0 9999px rgba(0,0,0,.62);
+}
+.gnc-tour-card {
+    position: fixed; width: min(420px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+    overflow-y: auto; padding: 22px; border-radius: 14px; background: #fff;
+    box-shadow: 0 12px 36px rgba(0,0,0,.3); border-top: 4px solid #eaba3b;
+}
+.gnc-tour-card h2 { font-size: 1.25rem; color: #094024; margin: 8px 0 12px; }
+.gnc-tour-card p { line-height: 1.6; font-size: .95rem; }
+.gnc-tour-progress { color: #68736c; font-size: .8rem; }
+.gnc-tour-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.gnc-tour-actions button { min-height: 42px; }
+.gnc-tour-error { color: #a42828; }
+.gnc-tour-actions button:focus-visible { outline: 3px solid #094024; outline-offset: 3px; }
+@media (max-width: 575px) { .gnc-tour-card { padding: 16px; } }

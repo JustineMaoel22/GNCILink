@@ -39,6 +39,8 @@ function departmentPageContent(array $dept, bool $refresh = false): array {
     if (!$refresh && isset($cache[$id])) return $cache[$id];
     $name = (string)$dept['dept_name'];
     $defaults = [
+        'header_text_hidden' => ['0', 'Header text visibility', 1],
+        'header_logo_hidden' => ['0', 'Header logo visibility', 1],
         'hero_title' => [$name, 'Page heading', 255],
         'overview_label' => ['Overview', 'Overview label', 100],
         'overview_title' => ['About the ' . $name, 'Overview heading', 255],
@@ -111,6 +113,9 @@ function saveDepartmentPageContent(int $id, array $changes): array {
     $fields = departmentPageContent($dept);
     foreach ($changes as $key => &$text) {
         if (!isset($fields[$key]) || !is_string($text)) throw new InvalidArgumentException('Unknown department text field.');
+        if (in_array($key, ['header_text_hidden', 'header_logo_hidden'], true) && !in_array($text, ['0', '1'], true)) {
+            throw new InvalidArgumentException('Invalid header visibility.');
+        }
         if (in_array($key, ['vision_icon', 'mission_icon'], true)) {
             $choice = academicFeatureIconChoices()[$text] ?? null;
             if (!$choice || isset($choice['path'])) throw new InvalidArgumentException('Choose an icon from the icon library.');

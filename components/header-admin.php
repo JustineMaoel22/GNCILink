@@ -66,7 +66,6 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
         </div>
     </a>
 
-    <?php if (rbacRole() !== 'The Mirror'): ?>
     <!-- Main Navigation -->
     <div class="sidebar-section-label">Main</div>
     <ul class="sidebar-nav">
@@ -76,8 +75,6 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
             </a>
         </li>
     </ul>
-    <?php endif; ?>
-
     <!-- Content -->
     <div class="sidebar-section-label">Content</div>
     <ul class="sidebar-nav">
@@ -86,12 +83,11 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
                 <i class="bi bi-megaphone-fill"></i> Announcements
             </a>
         </li>
-        <?php if (rbacRole() !== 'The Mirror'): ?><li>
+        <li>
             <a href="/admin/facebook-posts.php" class="sidebar-link <?= $currentPage === 'facebook-posts' ? 'active' : '' ?>">
                 <i class="bi bi-facebook"></i> Facebook Posts
             </a>
         </li>
-        <?php endif; ?>
         <li>
             <a href="/admin/news.php" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/news') !== false ? 'active' : '' ?>">
                 <i class="bi bi-newspaper"></i> News
@@ -167,6 +163,9 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
     </ul>
     <?php endif; ?>
 
+    <div class="sidebar-section-label">Support</div>
+    <ul class="sidebar-nav"><li><a href="/admin/help.php" data-onboarding-help class="sidebar-link <?= $currentPage === 'help' ? 'active' : '' ?>"><i class="bi bi-question-circle"></i> Help / User Guide</a></li></ul>
+
     <!-- User Footer -->
     <div class="sidebar-footer">
         <div class="sidebar-user">
@@ -210,11 +209,9 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
         <a href="/" target="_blank" class="topbar-icon-btn" title="View Public Site" style="text-decoration:none">
             <i class="bi bi-box-arrow-up-right"></i>
         </a>
-        <?php if (hasPermission('manage_settings')): ?>
         <a href="/admin/settings.php" class="topbar-icon-btn" title="Settings" aria-label="Settings" style="text-decoration:none"<?= $currentPage === 'settings' ? ' aria-current="page"' : '' ?>>
             <i class="bi bi-gear-fill"></i>
         </a>
-        <?php endif; ?>
     </div>
 </header>
 
@@ -265,11 +262,22 @@ document.querySelectorAll('a[href="/admin/auth/logout.php"]').forEach(link => {
         if (logoutConfirmationPending) return;
         logoutConfirmationPending = true;
         try {
-            const confirmed = await window.AdminDialogs.confirm(
+            const result = await window.AdminDialogs.confirmWithCheckbox(
                 'Are you sure you want to log out of the admin panel?',
-                { title: 'Log out?', confirmText: 'Log out', cancelText: 'Cancel' }
+                { title: 'Log out?', confirmText: 'Log out', cancelText: 'Cancel', checkboxLabel: 'Forget this device and require a verification code next time' }
             );
-            if (confirmed) window.location.assign(link.href);
+            if (result.confirmed) {
+                const form = document.createElement('form');
+                form.method = 'post'; form.action = link.href; form.hidden = true;
+                const fields = { csrf_token: CSRF_TOKEN };
+                if (result.checked) fields.forget_device = '1';
+                Object.entries(fields).forEach(([name, value]) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden'; input.name = name; input.value = value;
+                    form.appendChild(input);
+                });
+                document.body.appendChild(form); form.submit();
+            }
         } finally {
             logoutConfirmationPending = false;
         }

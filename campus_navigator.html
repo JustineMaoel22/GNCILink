@@ -1304,6 +1304,10 @@
           return { w: w / z, h: h / z };
         }
         function apply(v) {
+          // Lazy/hidden frames can initialize before they have a usable size.
+          // Keep the camera unchanged until layout supplies real dimensions.
+          var bounds = svg.getBoundingClientRect();
+          if (bounds.width <= 0 || bounds.height <= 0) return;
           var d = dims(v.z);
           v.cx =
             d.w >= MW
@@ -1447,10 +1451,22 @@
         function pts() {
           return Array.from(ptrs.values());
         }
+        function resetGesture() {
+          var captured = Array.from(ptrs.keys());
+          ptrs.clear();
+          drag = pinch = gz = lastTap = null;
+          moved = false;
+          svg.classList.remove("dragging");
+          captured.forEach(function (id) {
+            try { if (svg.hasPointerCapture(id)) svg.releasePointerCapture(id); } catch (_) {}
+          });
+        }
         svg.addEventListener("pointerdown", function (e) {
+          if (e.pointerType === "mouse" && e.button !== 0) return;
           cancelAnimationFrame(raf); // user takes over from the route-follow camera
           ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-          cancelAnimationFrame(raf);
+          // Receive release/cancel even if a finger or mouse leaves the SVG.
+          try { svg.setPointerCapture(e.pointerId); } catch (_) {}
           if (ptrs.size === 1) {
             drag = {
               x: e.clientX,
@@ -1512,6 +1528,7 @@
           }
         });
         function end(e) {
+          if (!ptrs.has(e.pointerId)) return;
           var wasPinch = !!pinch;
           ptrs.delete(e.pointerId);
           pinch = null;
@@ -1548,6 +1565,16 @@
         }
         svg.addEventListener("pointerup", end);
         svg.addEventListener("pointercancel", end);
+        svg.addEventListener("lostpointercapture", end);
+        window.addEventListener("blur", resetGesture);
+        document.addEventListener("visibilitychange", function () {
+          resetGesture();
+          if (!document.hidden) apply(view);
+        });
+        window.addEventListener("pageshow", function () {
+          resetGesture();
+          apply(view);
+        });
         // Two-finger pinch must work even when fully zoomed out (touch-action is
         // pan-y there so one finger can still scroll the page). Without this the
         // browser grabs the gesture as a scroll, fires pointercancel and the pinch dies.
@@ -1623,15 +1650,15 @@
           zoomAt(e.clientX, e.clientY, view.z * 1.8, true);
         });
 
+        function resizeView() {
+          resetGesture();
+          apply(view);
+        }
         apply(view);
         if (window.ResizeObserver)
-          new ResizeObserver(function () {
-            apply(view);
-          }).observe(wrap);
+          new ResizeObserver(resizeView).observe(wrap);
         else
-          window.addEventListener("resize", function () {
-            apply(view);
-          });
+          window.addEventListener("resize", resizeView);
       })();
     </script>
   </body>

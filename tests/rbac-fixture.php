@@ -15,6 +15,7 @@ if($action==='create'){
  $db->exec('ALTER TABLE users AUTO_INCREMENT=4');
  $db->exec("INSERT INTO announcements(announcement_id,user_id,title,slug,content,status,program) VALUES(1,1,'Published original','published-original','<p>Live original</p>','published','ALL')");
  $db->exec("INSERT INTO pages(page_id,slug,title,page_type) VALUES(1,'history','History','sections')");
+ $db->exec("INSERT INTO fb_posts_cache(fb_post_id,message,permalink_url,created_time) VALUES('999_123','Synthetic cached Facebook announcement','https://www.facebook.com/999/posts/123',NOW())");
  $db->exec("INSERT INTO page_sections(section_id,page_id,section_key,title,content,status) VALUES(1,1,'history_intro','History','<p>Live history</p>','published')");
  echo json_encode(['database'=>$name]);
 }elseif($action==='session'||$action==='session-user'){
@@ -25,12 +26,26 @@ if($action==='create'){
  $id=(int)($argv[3]??0);$mode=$argv[4]??'trusted';$q=$db->prepare("SELECT user_id,email,role,credential_version FROM `$name`.users WHERE user_id=?");$q->execute([$id]);$user=$q->fetch();if(!$user)throw new RuntimeException('Synthetic test user missing');
  session_id('rbac-test-'.bin2hex(random_bytes(16)));session_start();$csrf=bin2hex(random_bytes(32));$_SESSION=['_initiated'=>true,'csrf_token'=>$csrf,'last_activity'=>time()];
  $result=['cookie'=>session_name().'='.session_id(),'csrf'=>$csrf,'session'=>session_id()];
- if($mode==='otp'){
-  $_SESSION['temp_user_id']=$id;$_SESSION['temp_email']=$user['email'];$_SESSION['temp_name']='Test account';$_SESSION['remember_me']=false;
+ if(in_array($mode,['otp','otp-remember'],true)){
+  $_SESSION['temp_user_id']=$id;$_SESSION['temp_email']=$user['email'];$_SESSION['temp_name']='Test account';$_SESSION['remember_me']=$mode==='otp-remember';
   $_SESSION['temp_credential_version']=(int)$user['credential_version'];
   $db->prepare("UPDATE `$name`.users SET otp_code='123456',otp_expires_at=DATE_ADD(NOW(),INTERVAL 5 MINUTE) WHERE user_id=?")->execute([$id]);
  }else{$token=bin2hex(random_bytes(32));$db->prepare("UPDATE `$name`.users SET remember_token=?,remember_token_expires_at=DATE_ADD(NOW(),INTERVAL 1 DAY) WHERE user_id=?")->execute([hash('sha256',$token),$id]);$result['cookie'].='; gnc_remember_me='.$token;}
  session_write_close();echo json_encode($result);
+}elseif($action==='trusted-state'){
+ $db->exec("USE `$name`");$mode=$argv[3]??'';
+ if($mode==='setup'){
+  $db->prepare("UPDATE users SET password=?,must_change_password=0,login_attempts=0,locked_until=NULL WHERE user_id=1")->execute([password_hash('Synthetic-trusted-password-2026!',PASSWORD_DEFAULT)]);
+ }elseif($mode==='expire')$db->exec('UPDATE users SET remember_token_expires_at=DATE_SUB(NOW(),INTERVAL 1 SECOND) WHERE user_id=1');
+ elseif($mode==='revoke')$db->exec('UPDATE users SET remember_token=NULL,remember_token_expires_at=NULL WHERE user_id=1');
+ elseif($mode==='clear-otp'){$db->exec('DELETE FROM auth_rate_limits');$db->exec('UPDATE users SET otp_code=NULL,otp_expires_at=NULL WHERE user_id=1');}
+ elseif($mode==='inactive')$db->exec("UPDATE users SET status='inactive' WHERE user_id=1");
+ elseif($mode==='expire-session'){
+  $session=$argv[4]??'';if(!preg_match('/^[a-zA-Z0-9,-]{16,128}$/D',$session))throw new RuntimeException('Invalid fixture session');
+  session_id($session);session_start();$_SESSION['last_activity']=1;session_write_close();
+ }elseif($mode!=='inspect')throw new RuntimeException('Unknown trusted-device fixture action');
+ $u=$db->query('SELECT remember_token IS NOT NULL AS remembered,remember_token_expires_at,otp_code IS NOT NULL AS has_otp FROM users WHERE user_id=1')->fetch();
+ echo json_encode($u);
 }elseif($action==='reset-token'){
  $id=(int)($argv[3]??0);$token=bin2hex(random_bytes(32));$db->prepare("INSERT INTO `$name`.auth_password_resets(user_id,token_hash,expires_at) VALUES(?,?,DATE_ADD(NOW(),INTERVAL 15 MINUTE)) ON DUPLICATE KEY UPDATE token_hash=VALUES(token_hash),expires_at=VALUES(expires_at)")->execute([$id,hash('sha256',$token)]);echo json_encode(['token'=>$token]);
 }elseif($action==='inspect'){

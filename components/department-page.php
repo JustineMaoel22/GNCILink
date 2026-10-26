@@ -168,6 +168,7 @@ $cdText = function (?string $v) use ($cePreview): string {
             background: #f1ede6; color: var(--gnc-green-light, #1F5E2C);
         }
         .dept-logo-empty { border-radius: 8px; font-size: 4rem; }
+        .dept-header-hidden { display: none !important; }
         .dept-dean-empty { width: 100%; height: 100%; font-size: 5rem; }
         .dept-program-img .dept-program-avatar { width: 100%; height: 100%; background: #f1ede6; }
         .dept-program-empty {
@@ -235,9 +236,9 @@ $cdText = function (?string $v) use ($cePreview): string {
                     </nav>
                     <div class="dept-hero-content">
                     <?php if ($isCollegeHeader && ($logoUrl || $cePreview)): ?>
-                    <?= basicEducationMedia($logoUrl, $pageTitle . ' logo', 'dept-hero-logo', ' data-gnc-text="' . substr(hash('sha256', 'department-header-logo:' . $dept['dept_id']), 0, 24) . '" data-gnc-layout-media' . ceManageMark('data-ve-img="dept-logo"')) ?>
+                    <?= basicEducationMedia($logoUrl, $pageTitle . ' logo', 'dept-hero-logo' . ($pageContent['header_logo_hidden']['value'] === '1' ? ' dept-header-hidden' : ''), ' data-dept-header-logo data-gnc-text="' . substr(hash('sha256', 'department-header-logo:' . $dept['dept_id']), 0, 24) . '" data-gnc-layout-media' . ceManageMark('data-ve-img="dept-logo"')) ?>
                     <?php endif; ?>
-                    <div class="dept-hero-copy">
+                    <div class="dept-hero-copy<?= $isCollegeHeader && $pageContent['header_text_hidden']['value'] === '1' ? ' dept-header-hidden' : '' ?>"<?= $isCollegeHeader ? ' data-dept-header-text' : '' ?>>
                     <h1 class="dept-hero-title"<?= $dept ? ($isBasicEducation ? departmentPageField($dept, 'hero_title') : ceField('dept-name', ['max' => 255, 'label' => 'Department name'])) : '' ?>><?= $heroTitleHtml ?></h1>
                     <?php if ((!$isCollegeHeader || strcasecmp(trim($heroBlurb), trim($heroTitle)) !== 0) && ($heroBlurb !== '' || ($cePreview && $dept))): ?>
                     <p class="dept-hero-blurb"<?= $dept ? ceField('dept-hero', ['max' => 255, 'label' => 'Line under the title', 'ph' => 'Add a line under the title']) : '' ?>><?= cd_h($heroBlurb) ?></p>
@@ -494,7 +495,6 @@ $cdText = function (?string $v) use ($cePreview): string {
     <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y" crossorigin="anonymous"></script>
     <script src="/assets/js/college-department.js"></script>
 </body>
 </html>

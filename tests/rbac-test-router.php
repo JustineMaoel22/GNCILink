@@ -3,6 +3,8 @@
 $name=getenv('GNC_RBAC_TEST_DB');
 if(PHP_SAPI!=='cli-server'||!is_string($name)||!preg_match('/^gnci_rbac_test_[a-f0-9]{12}$/D',$name)){http_response_code(404);exit;}
 ini_set('display_errors','0');
+// Exercise HTTPS cookie flags only in this isolated CLI test server.
+if(getenv('GNC_RBAC_TEST_HTTPS')==='1')$_SERVER['HTTPS']='on';
 define('DB_NAME',$name); // config.php's later define cannot overwrite this isolated name.
 // Never contact real mail providers from the isolated HTTP suite.
 define('MAIL_HOST','127.0.0.1');define('MAIL_PORT',2528);define('MAIL_USERNAME','fixture@example.invalid');define('MAIL_PASSWORD','synthetic-only');define('MAIL_ENCRYPTION','');

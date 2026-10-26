@@ -12,7 +12,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         if(!authCsrfValid())throw new InvalidArgumentException('Your session token expired. Reload and try again.');
         if(!$valid)throw new InvalidArgumentException('This reset link is invalid or expired. Request a new link.');
         if(!is_string($_POST['new_password']??null)||!is_string($_POST['confirm_password']??null))throw new InvalidArgumentException('Complete both password fields.');
-        authResetPassword($token,$_POST['new_password'],$_POST['confirm_password']);authClearSession();header('Location: /admin/login.php?password_reset=1',true,303);exit;
+        authResetPassword($token,$_POST['new_password'],$_POST['confirm_password']);authClearSession(true);header('Location: /admin/login.php?password_reset=1',true,303);exit;
     }catch(InvalidArgumentException|RuntimeException $e){$error=$e instanceof PDOException?'Password reset is temporarily unavailable. Try again later.':$e->getMessage();}
     catch(Throwable $e){$error='Password reset is temporarily unavailable. Try again later.';error_log('Password reset failed.');}
 }

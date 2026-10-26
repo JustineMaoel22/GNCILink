@@ -22,7 +22,9 @@ function handleLogin(): void {
     if(!$user)rbacFail('Invalid username/email or password',401);
     $remember=($_POST['remember_me']??'')==='1';$token=$_COOKIE['gnc_remember_me']??'';
     if(is_string($token)&&$token!==''&&verifyRememberToken((int)$user['user_id'],$token)){
-        loginUser($user);if($remember&&empty($user['must_change_password']))generateRememberToken((int)$user['user_id']);
+        // Existing trust lasts until its original expiry, independently of this session.
+        loginUser($user);
+        authAudit((int)$user['user_id'], 'TRUSTED_DEVICE_LOGIN', 'Login verification satisfied by a valid remembered browser.');
         echo json_encode(['success'=>true,'message'=>'Logged in successfully','redirect'=>rbacHome()]);return;
     }
     if(!authRateAllowed('otp-send',(string)$user['user_id'],3,900))rbacFail('Please wait 15 minutes before requesting another verification code.',429);
@@ -73,6 +75,6 @@ function generateRememberToken(int $id): bool {
 }
 function verifyRememberToken(int $id,string $token): bool {
     if(!preg_match('/^[a-f0-9]{64}$/D',$token))return false;
-    $q=getDB()->prepare('SELECT remember_token FROM users WHERE user_id=? AND remember_token_expires_at>NOW()');$q->execute([$id]);$hash=$q->fetchColumn();return is_string($hash)&&hash_equals($hash,hash('sha256',$token));
+    $q=getDB()->prepare("SELECT remember_token FROM users WHERE user_id=? AND status='active' AND remember_token_expires_at>NOW()");$q->execute([$id]);$hash=$q->fetchColumn();return is_string($hash)&&hash_equals($hash,hash('sha256',$token));
 }
 function isHttpsRequest(): bool {return authIsHttps();}

@@ -214,7 +214,6 @@ foreach (array_merge($achievements,$achievementListing['items'],$achievementDeta
 
     <?php include_once __DIR__ . '/../../components/footer.php'; ?>
     <?php include_once __DIR__ . '/../../chatbot/widget.php'; ?>
-    <script src="/assets/js/bootstrap.bundle.min.js"></script>
     <script src="/assets/js/student-achievements.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../../assets/js/student-achievements.js'),0,12) ?>" defer></script>
 </body>
 </html>

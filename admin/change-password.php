@@ -10,10 +10,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   changeFirstLoginPassword((int)$_SESSION['user_id'],$_POST['current_password'],$_POST['new_password'],$_POST['confirm_password']);$changed=true;
  }catch(Throwable $e){$error=$e instanceof PDOException?'The password could not be changed. Please try again.':$e->getMessage();}
 }
-$authTitle=$changed?'Password changed':'Change Password';$authIntro=$changed?'Your account is ready.':'Choose your own password before using the admin panel. This step is required for your new account.';
+$authTitle=$changed?'Password changed':'Welcome to GNC Admin Panel';$authIntro=$changed?'Your account is ready. Continue for a guided introduction to your workspace.':'Choose your own password before using the admin panel. This step is required for your new account.';
 require __DIR__.'/../components/auth-page-start.php';
 ?>
-<?php if($changed):?><div class="alert alert-success" role="status">Your new password is saved. Your temporary password no longer works.</div><a class="btn-login d-block text-center" href="<?= $e(rbacHome()) ?>">Continue to <?= rbacRole()==='The Mirror'?'News and Announcements':'Dashboard' ?></a>
+<?php if($changed):?><div class="alert alert-success" role="status">Your new password is saved. Your temporary password no longer works.</div><a class="btn-login d-block text-center" href="<?= $e(rbacHome()) ?>">Continue to Dashboard</a>
 <?php else:?>
 <?php if($error):?><div class="alert alert-danger" role="alert"><?= $e($error) ?></div><?php endif;?>
 <form method="post" action="/admin/change-password.php" data-auth-form><input type="hidden" name="csrf_token" value="<?= $e(generateCSRFToken()) ?>">
