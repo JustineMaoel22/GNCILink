@@ -28,7 +28,28 @@ function loadEnv(string $path): void {
     }
 }
 
+/** Optional hosted credentials override values loaded from the fallback .env. */
+function loadSecretsArray(string $path): void {
+    if (!is_file($path)) return;
+    $secrets = require $path;
+    if (!is_array($secrets)) {
+        throw new RuntimeException('config/secrets.php must return an array.');
+    }
+    // Validate everything before applying any values; never include secrets in errors.
+    foreach ($secrets as $key => $value) {
+        if (!is_string($key) || !preg_match('/^[A-Z_][A-Z0-9_]*$/D', $key)
+            || (!is_string($value) && !is_int($value) && !is_bool($value) && !is_float($value))) {
+            throw new RuntimeException('config/secrets.php contains an invalid configuration entry.');
+        }
+    }
+    foreach ($secrets as $key => $value) {
+        $_ENV[$key] = (string)$value;
+        putenv($key . '=' . (string)$value);
+    }
+}
+
 loadEnv(__DIR__ . '/../.env');
+loadSecretsArray(__DIR__ . '/secrets.php');
 
 /**
  * Small helper: fetch an env var, with an optional default and the
