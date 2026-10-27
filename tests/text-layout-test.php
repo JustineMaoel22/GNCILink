@@ -19,6 +19,11 @@ foreach (['Arial','',null,[], 'url(https://evil.example/font)', 'inter; color:re
     catch(InvalidArgumentException $e) {}
 }
 $box['fontFamily']='lora';
+$box['centerX']=true;
+foreach (['true', 1, null, []] as $badCenter) {
+    try {textLayoutNormalize([$id=>['desktop'=>array_merge($box,['centerX'=>$badCenter])]]);throw new RuntimeException('Invalid centering accepted');}
+    catch(InvalidArgumentException $e) {}
+}
 tlCheck(!isset(textLayoutNormalize([$id=>['desktop'=>$legacy]])[$id]['desktop']['fontSize']),'Existing placements remain compatible');
 foreach ([[$id=>['phone'=>$box]],[$id=>['desktop'=>array_merge($box,['w'=>101])]],[$id=>['desktop'=>array_merge($box,['x'=>'4'])]],['bad selector'=>['desktop'=>$box]],[$id=>['desktop'=>array_merge($box,['css'=>'color:red'])]]] as $bad){try{textLayoutNormalize($bad);throw new RuntimeException('Accepted invalid layout');}catch(InvalidArgumentException $e){}}
 $db=getDB();$route='/pages/academics/college/program.php?slug=__layout-test-'.bin2hex(random_bytes(8));
@@ -28,6 +33,7 @@ try {
     $saved=textLayoutLoad($db,$route);tlCheck(count($saved[$id])===2,'Device updates merge');tlCheck($saved[$id]['desktop']['w']===40.0,'Stored round trip');
     tlCheck($saved[$id]['desktop']['fontSize']===36.0&&!isset($saved[$id]['mobile']['fontSize']),'Text size persists for its selected device');
     tlCheck($saved[$id]['desktop']['fontFamily']==='lora','Font family persists with layout');
+    tlCheck($saved[$id]['desktop']['centerX']===true,'Centered placement round trips');
     textLayoutSave($db,$route,[$id=>['tablet'=>['fontFamily'=>'inter']]],1);
     tlCheck(textLayoutLoad($db,$route)[$id]['tablet']===['fontFamily'=>'inter'],'Font-only settings round trip');
     textLayoutSave($db,$route,[$id=>['desktop'=>null]],1);tlCheck(!isset(textLayoutLoad($db,$route)[$id]['desktop']),'Reset removes one breakpoint');

@@ -34,7 +34,7 @@ function textLayoutNormalize(array $entries): array {
         foreach ($devices as $device => $box) {
             if (!in_array($device, ['desktop','tablet','mobile'], true)) throw new InvalidArgumentException('Invalid device.');
             if ($box === null) { $out[$key][$device] = null; continue; }
-            if (!is_array($box) || !$box || array_diff(array_keys($box), ['x','y','w','h','fontSize','fontFamily'])) throw new InvalidArgumentException('Invalid text box.');
+            if (!is_array($box) || !$box || array_diff(array_keys($box), ['x','y','w','h','fontSize','fontFamily','centerX'])) throw new InvalidArgumentException('Invalid text box.');
             $positioned = (bool)array_intersect(array_keys($box), ['x','y','w','h']);
             if (!$positioned && !array_key_exists('fontFamily', $box)) throw new InvalidArgumentException('Invalid text box.');
             foreach ($positioned ? ['x'=>[-100,100], 'y'=>[-100,100], 'w'=>[1,100], 'h'=>[0,3000]] : [] as $prop => [$min,$max]) {
@@ -45,6 +45,10 @@ function textLayoutNormalize(array $entries): array {
             if (array_key_exists('fontFamily', $box)) {
                 if (!is_string($box['fontFamily']) || !isset(textLayoutFonts()[$box['fontFamily']])) throw new InvalidArgumentException('Choose a font from the Google Fonts list.');
                 $out[$key][$device]['fontFamily'] = $box['fontFamily'];
+            }
+            if (array_key_exists('centerX', $box)) {
+                if (!is_bool($box['centerX']) || !$positioned) throw new InvalidArgumentException('Invalid centering option.');
+                $out[$key][$device]['centerX'] = $box['centerX'];
             }
             if (array_key_exists('fontSize', $box)) {
                 $size = $box['fontSize'];

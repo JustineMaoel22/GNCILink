@@ -71,7 +71,7 @@
             placed.set(el,{style,wrap});
             const origin=wrap.getBoundingClientRect(), w=Math.min(b.width,Math.max(24,b.width*box.w/100));
             const naturalHeight=isMedia(el)?box.h:Math.max(r.height,box.h);
-            const left=clamp(origin.left+box.x*b.width/100,b.left,Math.max(b.left,b.right-w));
+            const left=clamp(box.centerX?b.left+(b.width-w)/2:origin.left+box.x*b.width/100,b.left,Math.max(b.left,b.right-w));
             const top=clamp(origin.top+box.y*b.height/100,b.top,Math.max(b.top,b.bottom-naturalHeight));
             Object.assign(el.style,{position:'absolute',display:'block',boxSizing:'border-box',margin:'0',left:(left-origin.left)+'px',top:(top-origin.top)+'px',width:w+'px',maxWidth:'none',height:'auto',minHeight:box.h+'px',overflow:'visible',overflowWrap:'anywhere',animation:'none',transition:'none'});
             if(isMedia(el))Object.assign(el.style,{height:box.h+'px',minHeight:'0',maxHeight:'none',objectFit:'contain'});
@@ -139,6 +139,15 @@
             if(key)box.fontFamily=key;else delete box.fontFamily;
             commit(Object.keys(box).length?box:null,false);
         }
+        function snapToCenter(){
+            if(!selected||!controller.eligible(selected)||options.state().busy||options.state().preview)return;
+            const r=selected.getBoundingClientRect(),b=section(placed.get(selected)?.wrap||selected).getBoundingClientRect();
+            if(!b.width||!r.width)return;
+            const slot=placed.get(selected)?.wrap?.getBoundingClientRect()||r;
+            const current=settings[identify(selected)]?.[mode()]||{};
+            const width=Math.min(r.width,b.width),left=b.left+(b.width-width)/2;
+            commit(Object.assign({y:0,w:clamp(width/b.width*100,1,100),h:r.height},current,{x:clamp((left-slot.left)/b.width*100,-100,100),centerX:true}));
+        }
         function changeFontSize(delta){
             if(!selected||isMedia(selected)||options.state().busy||options.state().preview)return;
             const id=identify(selected);if(!id)return;
@@ -205,6 +214,7 @@
         controller={refresh,eligible:el=>!!el&&!!identify(el)&&!el.closest('[data-gnc-layout-ignore]')&&!el.querySelector('[data-gnc-text]'),
             changeFontSize,fontSize:()=>selected&&!isMedia(selected)?parseFloat(getComputedStyle(selected).fontSize):null,
             changeFontFamily,fontFamily:()=>settings[identify(selected)]?.[mode()]?.fontFamily||'',
+            snapToCenter,
             fonts:()=>Object.entries(fonts).map(([key,font])=>[key,font.label]),
             select(el){if(selected!==el){selected=el;enabled=false;}refresh();},
             toggle(){enabled=!enabled;refresh();},active:()=>enabled,

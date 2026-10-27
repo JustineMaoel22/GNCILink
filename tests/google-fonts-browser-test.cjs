@@ -48,10 +48,28 @@ try {
     layout.changeFontSize(2);checks.sizePreservesFont=target.style.fontFamily.includes('Inter')&&Number.isFinite(api.snapshot()['aaaaaaaaaaaaaaaaaaaaaaaa'].desktop.fontSize);
     layout.toggle();document.querySelector('.text-layout-move').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
     checks.movePreservesFont=api.snapshot()['aaaaaaaaaaaaaaaaaaaaaaaa'].desktop.fontFamily==='inter';
+    staged['aaaaaaaaaaaaaaaaaaaaaaaa'].desktop.value.w=40;api.setChanges(staged);
+    const beforeCenter=target.getBoundingClientRect();
+    Array.from(document.querySelectorAll('#toolbar button')).find(button=>button.textContent==='Snap to center').click();
+    const centered=target.getBoundingClientRect(),boundary=document.querySelector('section').getBoundingClientRect();
+    checks.centerText=Math.abs(centered.left+centered.width/2-boundary.left-boundary.width/2)<1;
+    checks.centerPreservesGeometry=Math.abs(centered.top-beforeCenter.top)<1&&Math.abs(centered.width-beforeCenter.width)<1;
+    checks.centerPreservesFont=target.style.fontFamily.includes('Inter');
+    document.querySelector('section').style.width='70%';api.apply();
+    const resizedCenter=target.getBoundingClientRect(),resizedSection=document.querySelector('section').getBoundingClientRect();
+    checks.centerAfterResize=Math.abs(resizedCenter.left+resizedCenter.width/2-resizedSection.left-resizedSection.width/2)<1;
+    document.querySelector('section').style.width='';api.apply();
+    Object.defineProperty(window,'innerWidth',{value:390,configurable:true});api.apply();checks.centerDeviceIsolation=target.style.position==='';
+    Object.defineProperty(window,'innerWidth',{value:1440,configurable:true});api.apply();
+    document.querySelector('.text-layout-move').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
+    checks.manualMoveClearsCenter=!api.snapshot()['aaaaaaaaaaaaaaaaaaaaaaaa'].desktop.centerX;
     choose('');checks.defaultKeepsSize=!target.style.fontFamily&&!!target.style.fontSize;
     choose('poppins');const snapshot=JSON.stringify(api.snapshot());layout.changeFontFamily('bad; color:red');checks.invalidRejected=JSON.stringify(api.snapshot())===snapshot;
     api.acceptChanges(staged);api.setChanges({});checks.published=target.style.fontFamily.includes('Poppins');
     layout.select(document.querySelector('img'));layout.changeFontFamily('lora');checks.mediaExcluded=JSON.stringify(api.snapshot())===snapshot;
+    const logo=document.querySelector('img'),logoBefore=logo.getBoundingClientRect();layout.snapToCenter();const logoAfter=logo.getBoundingClientRect();
+    checks.centerLogo=Math.abs(logoAfter.left+logoAfter.width/2-boundary.left-boundary.width/2)<1;
+    checks.centerLogoSize=Math.abs(logoAfter.width-logoBefore.width)<1&&Math.abs(logoAfter.height-logoBefore.height)<1;
     layout.select(document.getElementById('rich'));layout.changeFontFamily('rubik');
     checks.richHeading=getComputedStyle(document.querySelector('#rich h2')).fontFamily.includes('Rubik');
     checks.iconPreserved=getComputedStyle(document.querySelector('#rich span')).fontFamily.includes('Material Symbols Outlined');
@@ -65,7 +83,7 @@ try {
     if(run.error)throw run.error;
     const result=run.stdout.match(/<pre id="test-result">([^<]+)<\/pre>/);assert.ok(result,'Browser did not return results: '+run.stderr);
     for(const [name,value] of Object.entries(JSON.parse(result[1])))assert.equal(value,true,name);
-    console.log('PASS: real font toolbar, on-demand Google CSS, normal flow, draft/publish state, responsive fonts, resize/move preservation, default reset and invalid/media guards.');
+    console.log('PASS: text/logo centering, responsive recentering, manual override, font/size preservation, device isolation, draft/publish state and font controls.');
 }finally{
     if(path.dirname(folder)===os.tmpdir()&&path.basename(folder).startsWith('gnci-google-fonts-'))fs.rmSync(folder,{recursive:true,force:true});
 }

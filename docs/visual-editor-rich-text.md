@@ -45,6 +45,13 @@ visible, and tablet/desktop views keep the image. The editor device preview
 reflects the setting immediately; Save draft or Publish persists it. The
 existing department content table stores this option without a migration.
 
+**Snap to center** in the text/logo toolbar centers the selected box horizontally
+within its section, preserving its size, vertical position and typography. Like
+placement edits, it applies to the current device view and is saved through the
+existing draft/publish workflow. Exact centering takes precedence over the 8px grid.
+The box remains centered when the section width changes within that device view;
+dragging or resizing it returns to manual placement.
+
 Rich fields declare `rich => true` in `ceField()` metadata and use a block
 container with class `cms-rich`. Render stored text with `renderSectionContent()`
 and normalize incoming content with `richTextNormalize()`. Shared formatting
