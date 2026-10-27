@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../admin-functions.php';
+require_once __DIR__ . '/../../includes/image-upload.php';
 require_once __DIR__ . '/../../components/tuition-fee-documents.php';
 initSession();
 header('Content-Type: application/json; charset=utf-8');
@@ -50,12 +51,11 @@ try {
         $path=$old['file_path'] ?? null; $size=$old['file_size'] ?? 0;
         $upload=$_FILES['pdf_'.$index] ?? null;
         if ($upload) {
-            if (!class_exists('finfo')) throw new InvalidArgumentException('PDF uploads require the PHP Fileinfo extension. Enable fileinfo in your hosting PHP settings, then publish again.');
             if (is_array($upload['error']) || $upload['error']!==UPLOAD_ERR_OK || !is_uploaded_file($upload['tmp_name'])) throw new InvalidArgumentException('The PDF upload failed. Try again.');
             $size=filesize($upload['tmp_name']);
             if ($size>20*1024*1024 || !$size || strtolower(pathinfo($upload['name'],PATHINFO_EXTENSION))!=='pdf'
-                || (new finfo(FILEINFO_MIME_TYPE))->file($upload['tmp_name'])!=='application/pdf'
-                || file_get_contents($upload['tmp_name'],false,null,0,5)!=='%PDF-') throw new InvalidArgumentException('Upload a valid PDF of up to 20 MB.');
+                || !uploadPdfSignatureValid($upload['tmp_name'])
+                || imageUploadMime($upload['tmp_name'])!=='application/pdf') throw new InvalidArgumentException('Upload a valid PDF of up to 20 MB.');
             $folder=dirname(__DIR__,2).'/uploads/tuition-fees/'.$change['category'];
             if (!is_dir($folder) && !@mkdir($folder,0755,true) && !is_dir($folder)) throw new InvalidArgumentException('The tuition PDF folder could not be created. Ask your hosting provider to make uploads/tuition-fees writable by PHP.');
             if (!is_writable($folder)) throw new InvalidArgumentException('The tuition PDF folder is not writable. Ask your hosting provider to check ownership and permissions for uploads/tuition-fees and its category folders.');

@@ -115,7 +115,7 @@ if ($canManagePages && !in_array('graduate-school', array_column($customPages, '
 $titleOf = [];
 foreach ($editablePages as $p) $titleOf[$p['slug']] = $p['title'];
 // Pages of the Visual Editor that are not rows of the page tables (their content lives in the departments / posts tables)
-$titleOf['basic-education'] = 'Basic Education';
+$titleOf['basic-education'] = 'Basic Education Departments';
 $titleOf['graduate-school'] = 'Graduate School';
 $titleOf['updates']         = 'News, announcements & events';
 $titleOf['student-organizations'] = 'Student Organizations Management';
@@ -220,7 +220,7 @@ if ($editorMode) {
     foreach ($textPages as $p)   $pickerPages[] = ['slug' => $p['slug'], 'title' => $p['title'], 'group' => 'Pages', 'icon' => 'file-earmark-text'];
     foreach ($customPages as $p) $pickerPages[] = ['slug' => $p['slug'], 'title' => $p['title'], 'group' => 'Academics & people',
         'icon' => $p['slug'] === 'administration' ? 'people' : ($p['slug'] === 'programs' ? 'mortarboard' : 'building')];
-    if ($canManagePages) $pickerPages[] = ['slug' => 'basic-education', 'title' => 'Basic Education', 'group' => 'Academics & people', 'icon' => 'backpack'];
+    if ($canManagePages) $pickerPages[] = ['slug' => 'basic-education', 'title' => $titleOf['basic-education'], 'group' => 'Academics & people', 'icon' => 'backpack'];
     if ($canManagePages) $pickerPages[] = ['slug'=>'student-organizations','title'=>'Student Organizations Management','group'=>'Student life','icon'=>'people'];
     if ($canManagePages) $pickerPages[] = ['slug'=>'student-achievements','title'=>'Student Achievements','group'=>'Student life','icon'=>'trophy'];
     if ($canManagePages) $pickerPages[] = ['slug'=>'athletics-sports','title'=>'Athletics and Sports','group'=>'Student life','icon'=>'dribbble'];
@@ -666,9 +666,12 @@ include __DIR__ . '/../components/header-admin.php';
         </div>
         <?php endif; ?>
 
-        <?php if ($customPages): ?>
+        <?php if ($customPages || $canManagePages): ?>
         <div class="ce-nav-group">
             <div class="ce-nav-label">Academics &amp; people</div>
+            <?php if ($canManagePages): ?>
+            <a class="ce-nav-link" href="?page=basic-education" data-panel="basic-education"><i class="bi bi-backpack"></i><span><?= ce_e($titleOf['basic-education']) ?></span></a>
+            <?php endif; ?>
             <?php foreach ($customPages as $p):
                 $icon = $p['slug'] === 'administration' ? 'bi-people' : ($p['slug'] === 'programs' ? 'bi-mortarboard' : 'bi-building'); ?>
             <a class="ce-nav-link" href="?page=<?= ce_e(rawurlencode($p['slug'])) ?>" data-panel="<?= ce_e($p['slug']) ?>">
