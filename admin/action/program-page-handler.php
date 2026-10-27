@@ -19,6 +19,7 @@ require_once __DIR__ . '/../../components/program-page-public.php';
 initSession();
 
 header('Content-Type: application/json; charset=utf-8');
+ini_set('display_errors', '0');
 
 function programHandlerFail(string $message, int $status = 200): void {
     http_response_code($status);
@@ -34,6 +35,11 @@ if (!isLoggedIn()) {
 }
 if (!hasPermission('manage_page_content')) {
     programHandlerFail('You do not have permission to edit program pages.', 403);
+}
+// PHP discards the complete multipart body when post_max_size is exceeded.
+// Report the real limit before treating the missing CSRF field as an expired session.
+if (empty($_POST) && empty($_FILES) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+    programHandlerFail('The upload exceeds the hosting request limit (post_max_size: ' . ini_get('post_max_size') . '). Images must be at most 5 MB each. Upload fewer images at once or ask your hosting provider to increase this limit.', 413);
 }
 if (!verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) {
     programHandlerFail('Your session has expired. Please refresh the page and try again.', 403);

@@ -7,8 +7,10 @@ $sessionId = 'gnc-upload-test-' . bin2hex(random_bytes(12));
 $token = bin2hex(random_bytes(32));
 session_id($sessionId);
 session_start();
-// This isolated session exercises only the optimizer; no real account or content is changed.
-$_SESSION = ['user_id' => 0, 'user_role' => 'Super Admin', '_initiated' => true, 'csrf_token' => $token];
+// This isolated session exercises upload validation; no account or content is changed.
+$admin = getDB()->query("SELECT user_id,credential_version FROM users WHERE role='Super Admin' AND status='active' LIMIT 1")->fetch();
+if (!$admin) throw new RuntimeException('An active local Super Admin is required.');
+$_SESSION = ['user_id' => (int)$admin['user_id'], 'credential_version'=>(int)$admin['credential_version'], 'user_role' => 'Super Admin', '_initiated' => true, 'last_activity'=>time(), 'csrf_token' => $token];
 $cookie = session_name() . '=' . $sessionId;
 session_write_close();
 function uploadHttpCheck(bool $condition, string $message): void {
@@ -38,7 +40,11 @@ try {
     uploadHttpCheck($status === 403, 'Invalid CSRF token refused: HTTP ' . $status . ' ' . $errorBody);
     [$status, $type, $bytes] = uploadHttpRequest($path, $cookie, $token);
     uploadHttpCheck($status === 200 && $type === 'image/jpeg', 'Authenticated multipart photo optimized');
-    uploadHttpCheck(strlen($bytes) <= IMAGE_UPLOAD_MAX_BYTES && getimagesizefromstring($bytes) !== false, 'HTTP result is a valid image under 5 MB');
+    uploadHttpCheck(strlen($bytes) <= IMAGE_UPLOAD_MAX_BYTES && getimagesizefromstring($bytes) !== false, 'Optimized result is a valid image under 5 MB');
+    $small = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=');
+    file_put_contents($path,$small);
+    [$status,$type,$bytes] = uploadHttpRequest($path,$cookie,$token);
+    uploadHttpCheck($status===200 && $type==='image/png' && $bytes===$small, 'Valid image retains original bytes');
     file_put_contents($path, 'not an image');
     [$status] = uploadHttpRequest($path, $cookie, $token);
     uploadHttpCheck($status === 422, 'Renamed non-image refused');
@@ -46,4 +52,4 @@ try {
     if (dirname($path) === sys_get_temp_dir() && str_starts_with(basename($path), 'gnc-upload-http-')) @unlink($path);
     session_id($sessionId); session_start(); $_SESSION = []; session_destroy();
 }
-echo "PASS: real multipart photo optimized below 5 MB; anonymous requests, invalid CSRF tokens and renamed non-images rejected.\n";
+echo "PASS: oversized original optimized to 5 MB; small image bytes preserved; anonymous requests, invalid CSRF tokens and renamed non-images rejected.\n";

@@ -1798,9 +1798,7 @@ function uploadHeroMedia(?array $file, bool $imageOnly = false): ?array {
         'video/quicktime' => 'mov',
     ];
 
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mime  = finfo_file($finfo, $file['tmp_name']);
-    finfo_close($finfo);
+    $mime = imageUploadMime($file['tmp_name']);
 
     if (isset($allowedImages[$mime])) {
         $type = 'image';
@@ -2506,7 +2504,7 @@ function departmentUploadErrorMessage(int $code, string $label): string {
     switch ($code) {
         case UPLOAD_ERR_INI_SIZE:
         case UPLOAD_ERR_FORM_SIZE:
-            return "The {$label} is larger than the server allows.";
+            return "The {$label} exceeds the hosting upload limit (upload_max_filesize: " . ini_get('upload_max_filesize') . "). Images must be at most 5 MB. Ask your hosting provider to allow 5 MB image uploads.";
         case UPLOAD_ERR_PARTIAL:
             return "The {$label} was only partly uploaded. Please try again.";
         case UPLOAD_ERR_NO_TMP_DIR:
@@ -2744,6 +2742,9 @@ function storeDepartmentUpload(array $file, string $kind): array {
     $uploadDir = __DIR__ . '/../uploads/' . $cfg['dir'] . '/';
     if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
         throw new Exception("The server could not create the upload folder for the {$cfg['label']}.");
+    }
+    if (!is_writable($uploadDir)) {
+        throw new Exception("The upload folder for the {$cfg['label']} is not writable. Ask your hosting provider to check its ownership and permissions.");
     }
 
     $destination = $uploadDir . $filename;
@@ -4642,9 +4643,7 @@ function storeProgramImageUpload(array $file): array {
     }
 
     $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mime  = finfo_file($finfo, $file['tmp_name']);
-    finfo_close($finfo);
+    $mime = imageUploadMime($file['tmp_name']);
     if (!isset($allowed[$mime]) || @getimagesize($file['tmp_name']) === false) {
         throw new Exception('Invalid image type. Allowed: JPG, PNG, WEBP.');
     }
@@ -5141,9 +5140,7 @@ function programPageStoreBannerMedia(array $f): array {
     $videos = ['video/mp4' => 'mp4', 'video/webm' => 'webm'];
 
     // Trust the file's real content, never the browser-supplied type or extension.
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mime  = finfo_file($finfo, $tmp);
-    finfo_close($finfo);
+    $mime = imageUploadMime($tmp);
 
     if (isset($images[$mime])) {
         $type = 'image'; $ext = $images[$mime]; $max = 5 * 1024 * 1024;
@@ -5403,7 +5400,7 @@ function saveProgramPageItems(int $programId, string $type, array $rows): array 
                 'letter' => $letter !== '' ? $letter : null, 'media' => $mediaId, 'path' => $path,
             ];
         }
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         foreach ($stored as $s) discardStoredDepartmentUpload($s);
         foreach ($storedBanner as $abs) { if (is_file($abs)) @unlink($abs); }
         throw $e;
@@ -5440,7 +5437,7 @@ function saveProgramPageItems(int $programId, string $type, array $rows): array 
             }
         }
         $db->commit();
-    } catch (PDOException $e) {
+    } catch (Throwable $e) {
         if ($db->inTransaction()) $db->rollBack();
         foreach ($stored as $s) discardStoredDepartmentUpload($s);
         foreach ($storedBanner as $abs) { if (is_file($abs)) @unlink($abs); }

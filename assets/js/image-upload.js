@@ -34,7 +34,7 @@
                 const response = await nativeFetch('/admin/action/optimize-image.php', { method: 'POST', body: form, credentials: 'same-origin', signal: controller.signal });
                 if (!response.ok) {
                     const result = await response.json().catch(() => ({}));
-                    throw new Error(result.error || 'Could not optimize this photo. Please try a smaller image.');
+                    throw new Error(result.error || 'Could not optimize this photo. The maximum saved image size is 5 MB. Please choose a smaller image.');
                 }
                 const blob = await response.blob();
                 if (!blob.size || blob.size > maxBytes || !/^image\//.test(blob.type)) throw new Error('The photo could not be optimized to 5 MB.');
@@ -53,8 +53,9 @@
         return result;
     }
     function report(error) {
-        if (window.AdminDialogs) window.AdminDialogs.alert(error.message, { title: 'Photo upload' });
-        else window.alert(error.message);
+        const message = /5\s*MB/i.test(error.message) ? error.message : error.message + ' The maximum saved image size is 5 MB. Please choose a smaller image.';
+        if (window.AdminDialogs) window.AdminDialogs.alert(message, { title: 'Photo upload' });
+        else window.alert(message);
     }
     // Run before framing, photo checks and each form's existing size validation.
     document.addEventListener('change', async event => {

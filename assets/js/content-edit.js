@@ -157,6 +157,7 @@
         Object.keys(files || {}).forEach(function (k) { if (files[k]) fd.append(k, files[k], files[k].name); });
         return fetch(url, { method: 'POST', credentials: 'same-origin', body: fd }).then(function (res) {
             return res.json().catch(function () {
+                if (res.status === 413) return { error: 'The upload exceeds the hosting request limit. Images must be at most 5 MB each. Upload fewer images at once or ask your hosting provider to increase the request limit.' };
                 return { error: 'The server sent an unexpected reply (code ' + res.status + '). Please reload the page and try again.' };
             }).then(function (j) {
                 if(j.submitted){j.success=false;j.error=j.message;}
@@ -2709,11 +2710,11 @@
                 accept: 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,.jpg,.jpeg,.png,.webp,.gif,.mp4,.webm'
             },
             facility: {
-                label: 'Facility slides', icon: 'images', itemType: 'facility', data: null, sequential: false,
+                label: 'Facility slides', icon: 'images', itemType: 'facility', data: null, sequential: true,
                 accept: 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp'
             },
             uniform: {
-                label: 'Uniform photos', icon: 'person-badge', itemType: 'uniform', data: null, sequential: false,
+                label: 'Uniform photos', icon: 'person-badge', itemType: 'uniform', data: null, sequential: true,
                 accept: 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp'
             }
         };

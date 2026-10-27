@@ -34,7 +34,7 @@ function imageUploadEnvironment(): array {
 function imageUploadOptimizePath(string $path): void {
     clearstatcache(true, $path);
     if (filesize($path) <= IMAGE_UPLOAD_MAX_BYTES) return;
-    if (!class_exists('Imagick')) throw new RuntimeException('Automatic image optimization is unavailable. Please use an image up to 5 MB.');
+    if (!class_exists('Imagick') || !method_exists('Imagick', 'pingImage')) throw new RuntimeException('Automatic image optimization is unavailable. Please use an image up to 5 MB.');
     $info = @getimagesize($path);
     if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP, IMAGETYPE_GIF], true)) {
         throw new InvalidArgumentException('Use a JPG, PNG, WebP or GIF photo for automatic optimization. Other images must be up to 5 MB.');
@@ -90,7 +90,7 @@ function imageUploadOptimizePath(string $path): void {
     }
 }
 
-/** All storage handlers call this before enforcing the common saved-image cap. */
+/** Optimize oversized originals before enforcing the common saved-image cap. */
 function imageUploadPrepare(?array $file): ?array {
     if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) return $file;
     $path = $file['tmp_name'] ?? '';

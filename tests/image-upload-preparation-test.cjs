@@ -24,8 +24,10 @@ vm.runInContext(framing.slice(framing.indexOf('    function baseRatio(target,inp
     await assert.rejects(()=>context.payload(broken),error=>error.code==='IMAGE_UPLOAD_PREPARATION');
     unreadable.arrayBuffer=()=>new File(['recovered'],'image.png').arrayBuffer();await context.hash(unreadable);
     const engine=fs.readFileSync('assets/js/content-edit.js','utf8');
-    const sendContext=vm.createContext({FormData,C:{csrf:'test'},console:{error(){}},fetch:()=>Promise.reject(Object.assign(new Error('Choose basketball.png again.'),{code:'IMAGE_UPLOAD_PREPARATION'}))});
+    const sendContext=vm.createContext({FormData,C:{csrf:'test'},S:{},console:{error(){}},fetch:()=>Promise.reject(Object.assign(new Error('Choose basketball.png again.'),{code:'IMAGE_UPLOAD_PREPARATION'}))});
     vm.runInContext(engine.slice(engine.indexOf('    function send(url, fields, files)'),engine.indexOf('    function sendContent(')),sendContext);
     const result=await sendContext.send('/test',{},{});assert.equal(result.error,'Choose basketball.png again.');assert.equal(result.ok,false);
+    sendContext.fetch=async()=>({status:413,ok:false,json:async()=>{throw Error('HTML hosting error');}});
+    const tooLarge=await sendContext.send('/test',{},{});assert.equal(tooLarge.ok,false);assert.ok(tooLarge.error.includes('hosting request limit'));assert.ok(tooLarge.error.includes('5 MB'));
     console.log('PASS: stable staged image bytes, preserved crop metadata, readable file errors, hash retry and accurate upload error reporting.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
