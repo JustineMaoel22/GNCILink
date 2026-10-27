@@ -1,7 +1,28 @@
 <?php
 const IMAGE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 
-/** Inspect bytes server-side; raster uploads can work on hosts without Fileinfo. */
+/** Check PDF header, final cross-reference pointer and EOF without trusting the filename. */
+function uploadPdfSignatureValid(string $path): bool {
+    $stream = @fopen($path, 'rb');
+    if ($stream === false) return false;
+    try {
+        $size = fstat($stream)['size'];
+        if ($size < 32 || !preg_match('/\A%PDF-[12]\.[0-9](?:\r\n|\r|\n)/', fread($stream, 16))) return false;
+        if (fseek($stream, max(0, $size - 2048)) !== 0) return false;
+        $tail = stream_get_contents($stream);
+        if (!preg_match('/startxref\s+([0-9]+)\s+%%EOF[\x00\x09\x0A\x0C\x0D\x20]*\z/', $tail, $match)) return false;
+        $offset = (int)$match[1];
+        if ($offset < 9 || $offset >= $size || fseek($stream, $offset) !== 0) return false;
+        $xref = fread($stream, 2048);
+        // PDFs may use a conventional xref table or a PDF 1.5+ cross-reference stream.
+        return (bool)preg_match('/\Axref\s+[0-9]+\s+[0-9]+\s/', $xref)
+            || (bool)preg_match('/\A[0-9]+\s+[0-9]+\s+obj\s*<<(?:(?!>>).)*\/Type\s*\/XRef\b/s', $xref);
+    } finally {
+        fclose($stream);
+    }
+}
+
+/** Inspect bytes server-side; raster and curriculum PDF uploads work without Fileinfo. */
 function imageUploadMime(string $path): string {
     if (class_exists('finfo') && function_exists('finfo_open')) {
         return (string)(new finfo(FILEINFO_MIME_TYPE))->file($path);
@@ -10,7 +31,8 @@ function imageUploadMime(string $path): string {
     $types = [IMAGETYPE_JPEG => 'image/jpeg', IMAGETYPE_PNG => 'image/png',
         IMAGETYPE_WEBP => 'image/webp', IMAGETYPE_GIF => 'image/gif'];
     if ($info && $info[0] > 0 && $info[1] > 0 && isset($types[$info[2]])) return $types[$info[2]];
-    throw new RuntimeException('Choose a valid JPG, PNG, WebP or GIF image. Other upload types require the PHP Fileinfo extension in your hosting PHP settings.');
+    if (uploadPdfSignatureValid($path)) return 'application/pdf';
+    throw new RuntimeException('Choose a valid JPG, PNG, WebP, GIF or PDF file. Video uploads require the PHP Fileinfo extension in your hosting PHP settings.');
 }
 
 /** Admin-only diagnostics: no credentials, paths, or uploaded content. */
