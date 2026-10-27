@@ -2603,7 +2603,10 @@ function sanitizeSvgFile(string $path): bool {
  */
 function storeDepartmentUpload(array $file, string $kind): array {
     if (!function_exists('mb_substr')) throw new RuntimeException('Uploads require the PHP mbstring extension. Enable mbstring in your hosting PHP settings.');
-    $file = imageUploadPrepare($file);
+    // Supported SVGs must reach the XML sanitizer below, rather than raster detection.
+    $sanitizedSvg = in_array($kind, ['logo', 'program_image', 'enrollment_illustration'], true)
+        && strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION)) === 'svg';
+    if (!$sanitizedSvg) $file = imageUploadPrepare($file);
     $configs = [
         'department_banner' => [
             'label' => 'department banner',
