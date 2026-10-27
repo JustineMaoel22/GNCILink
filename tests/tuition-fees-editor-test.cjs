@@ -57,6 +57,15 @@ const php=(...args)=>execFileSync('docker',['compose','exec','-T','--user','www-
     const pdf='%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0/Kids[]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
     await evaluate(`(()=>{const input=Array.from(document.querySelectorAll('input[type=file]')).at(-1);const dt=new DataTransfer();dt.items.add(new File([${JSON.stringify(pdf)}],${JSON.stringify(prefix+'.pdf')},{type:'application/pdf'}));input.files=dt.files;input.dispatchEvent(new Event('change'));})()`);
     await until(()=>evaluate(`${frame}.defaultView.GNCTuitionFees.categories.college.documents.some(d=>d.title===${JSON.stringify(prefix)})`),'PDF not staged');
+    await evaluate('Array.from(document.querySelectorAll("#vePop button")).find(b=>b.textContent==="Add PDF").click()');
+    await evaluate(`(()=>{const input=Array.from(document.querySelectorAll('input[type=file]')).at(-1);const dt=new DataTransfer();dt.items.add(new File([${JSON.stringify(pdf)}],${JSON.stringify(prefix+' second.pdf')},{type:'application/pdf'}));input.files=dt.files;input.dispatchEvent(new Event('change'));})()`);
+    await until(()=>evaluate(`${frame}.getElementById('feeDocumentTitle').textContent===${JSON.stringify(prefix+' second')}`),'Newly added second PDF was not selected');
+    const stagedUrls=await evaluate(`${frame}.defaultView.GNCTuitionFees.categories.college.documents.filter(d=>d.title.startsWith(${JSON.stringify(prefix)})).map(d=>d.url)`);
+    assert.equal(stagedUrls.length,2);assert.notEqual(stagedUrls[0],stagedUrls[1],'Uploads have distinct preview URLs');
+    await evaluate('Array.from(document.querySelectorAll("#vePop button")).find(b=>b.textContent==="View").click()');
+    assert.equal(await evaluate(`${frame}.getElementById('feePdfFrame').getAttribute('src')`),stagedUrls[0]+'#view=FitH','Manage PDFs can view the first upload');
+    await evaluate(`(()=>{const select=${frame}.getElementById('feeDocumentSelect');select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    assert.equal(await evaluate(`${frame}.getElementById('feePdfFrame').getAttribute('src')`),stagedUrls[1]+'#view=FitH','The editor selector can view the second upload');
     assert(!(await(await fetch(base+'/pages/admission/tuition-fees.php')).text()).includes(prefix),'Staged PDF stays private');
     await evaluate('document.getElementById("vePrimary").click()');
     await until(()=>evaluate('Boolean(document.querySelector(".ve-publish-accept,.cms-completeness-publish"))'),'Publish dialog missing');
@@ -64,6 +73,11 @@ const php=(...args)=>execFileSync('docker',['compose','exec','-T','--user','www-
     let published;
     await until(async()=>{const html=await(await fetch(base+'/pages/admission/tuition-fees.php')).text();const json=JSON.parse(html.match(/id="feeDocumentsData">([\s\S]*?)<\/script>/)[1]);published=json.college.documents.find(doc=>doc.title===prefix);return !!published;},'Published PDF missing');
     const response=await fetch(base+published.url);assert.equal(response.status,200);assert.equal((await response.text()).slice(0,5),'%PDF-');
+    const publishedHtml=await(await fetch(base+'/pages/admission/tuition-fees.php')).text();
+    const publishedDocs=JSON.parse(publishedHtml.match(/id="feeDocumentsData">([\s\S]*?)<\/script>/)[1]).college.documents.filter(doc=>doc.title.startsWith(prefix));
+    assert.equal(publishedDocs.length,2,'Both PDFs are published');
+    assert.notEqual(publishedDocs[0].url,publishedDocs[1].url,'Published PDFs keep distinct file paths');
+    const secondResponse=await fetch(base+publishedDocs[1].url);assert.equal(secondResponse.status,200);assert.equal((await secondResponse.text()).slice(0,5),'%PDF-');
     await until(()=>evaluate(`Boolean(document.getElementById("veFrame")?.contentDocument?.querySelector('[data-ve-key="hero_intro"]')?.__ve)&&document.getElementById("vePrimary").disabled`),'Editor refresh');
     const post=async(change,file)=>evaluate(`(async()=>{const fd=new FormData();fd.append('csrf_token',VE_CONFIG.csrf);fd.append('texts','{}');fd.append('documents',JSON.stringify([${JSON.stringify(change)}]));${file?"fd.append('pdf_0',new File(['invalid pdf'],'invalid.pdf',{type:'application/pdf'}));":''}const res=await fetch('/admin/action/tuition-fees-handler.php',{method:'POST',body:fd});return {status:res.status,body:await res.json()};})()`);
     const bad=await post({id:published.id,category:'college',title:prefix+' invalid'},true);
@@ -71,6 +85,7 @@ const php=(...args)=>execFileSync('docker',['compose','exec','-T','--user','www-
     const stillLive=await(await fetch(base+'/pages/admission/tuition-fees.php')).text();assert(stillLive.includes(prefix));assert(!stillLive.includes(prefix+' invalid'),'Failed upload rolls back title changes');
     const renamed=await post({id:published.id,category:'college',title:prefix+' renamed'});assert.equal(renamed.body.success,true);
     const removed=await post({id:published.id,category:'college',remove:true});assert.equal(removed.body.success,true);
+    assert.equal((await post({id:publishedDocs[1].id,category:'college',remove:true})).body.success,true);
     assert(!(await(await fetch(base+'/pages/admission/tuition-fees.php')).text()).includes(prefix),'Removed document disappears');
     const denied=await fetch(base+'/admin/action/tuition-fees-handler.php',{method:'POST',body:new URLSearchParams({texts:'{}',documents:'[]'})});assert.equal(denied.status,403,'Anonymous publishing rejected');
     console.log('PASS: all guidance text and icons are editable; icon selection enables Publish, stays private, persists through the handler and rejects invalid markup; PDF publication, category switching, rename, removal and authorization.');

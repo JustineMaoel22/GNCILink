@@ -11,6 +11,14 @@ foreach ([7,201,'36',null] as $badSize) {
     catch(InvalidArgumentException $e) {}
 }
 $legacy=$box;unset($legacy['fontSize']);
+foreach (['inter','lora','montserrat','noto-serif','open-sans','poppins','roboto','rubik'] as $font) {
+    tlCheck(textLayoutNormalize([$id=>['desktop'=>['fontFamily'=>$font]]])[$id]['desktop']['fontFamily']===$font,'Font-only settings accepted');
+}
+foreach (['Arial','',null,[], 'url(https://evil.example/font)', 'inter; color:red'] as $font) {
+    try {textLayoutNormalize([$id=>['desktop'=>['fontFamily'=>$font]]]);throw new RuntimeException('Accepted invalid font');}
+    catch(InvalidArgumentException $e) {}
+}
+$box['fontFamily']='lora';
 tlCheck(!isset(textLayoutNormalize([$id=>['desktop'=>$legacy]])[$id]['desktop']['fontSize']),'Existing placements remain compatible');
 foreach ([[$id=>['phone'=>$box]],[$id=>['desktop'=>array_merge($box,['w'=>101])]],[$id=>['desktop'=>array_merge($box,['x'=>'4'])]],['bad selector'=>['desktop'=>$box]],[$id=>['desktop'=>array_merge($box,['css'=>'color:red'])]]] as $bad){try{textLayoutNormalize($bad);throw new RuntimeException('Accepted invalid layout');}catch(InvalidArgumentException $e){}}
 $db=getDB();$route='/pages/academics/college/program.php?slug=__layout-test-'.bin2hex(random_bytes(8));
@@ -19,6 +27,9 @@ try {
     textLayoutSave($db,$route,[$id=>['mobile'=>['x'=>0,'y'=>0,'w'=>95,'h'=>50]]],1);
     $saved=textLayoutLoad($db,$route);tlCheck(count($saved[$id])===2,'Device updates merge');tlCheck($saved[$id]['desktop']['w']===40.0,'Stored round trip');
     tlCheck($saved[$id]['desktop']['fontSize']===36.0&&!isset($saved[$id]['mobile']['fontSize']),'Text size persists for its selected device');
+    tlCheck($saved[$id]['desktop']['fontFamily']==='lora','Font family persists with layout');
+    textLayoutSave($db,$route,[$id=>['tablet'=>['fontFamily'=>'inter']]],1);
+    tlCheck(textLayoutLoad($db,$route)[$id]['tablet']===['fontFamily'=>'inter'],'Font-only settings round trip');
     textLayoutSave($db,$route,[$id=>['desktop'=>null]],1);tlCheck(!isset(textLayoutLoad($db,$route)[$id]['desktop']),'Reset removes one breakpoint');
     tlCheck(textLayoutLoad($db,'/pages/academics/college/program.php?slug=__other')===[],'Different pages isolated');
 } finally {$db->prepare('DELETE FROM text_layout_settings WHERE page_key=?')->execute([hash('sha256',textLayoutRoute($route))]);}

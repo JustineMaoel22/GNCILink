@@ -527,6 +527,13 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
     /* ---------- Desktop: Academics flyouts ---------- */
     document.querySelectorAll('#mainNavbar .nav-item.dropdown').forEach(function (academicsItem) {
         var canHover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+        var rootCloseDelay = 80;
+        var hoverCloseDelay = 350;
+        var rootCloseTimer;
+        var submenuCloseTimers = new WeakMap();
+        var hoverEnabled = function () {
+            return canHover && window.innerWidth >= 1200 && !document.documentElement.classList.contains('gnc-editor-preview');
+        };
         var rootMenu = academicsItem.querySelector(':scope > .gnc-dropdown-menu');
         var fitRootMenu = function () {
             if (!rootMenu) return;
@@ -536,7 +543,12 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
         fitRootMenu();
         academicsItem.addEventListener('mouseenter', fitRootMenu);
         academicsItem.addEventListener('show.bs.dropdown', fitRootMenu);
-        window.addEventListener('resize', function () { fitRootMenu(); resetAll(); });
+        window.addEventListener('resize', function () {
+            clearTimeout(rootCloseTimer);
+            academicsItem.classList.remove('show');
+            fitRootMenu();
+            resetAll();
+        });
 
         var toggleOf = function (li) {
             return li.querySelector(':scope > .gnc-submenu-row > .gnc-submenu-toggle');
@@ -563,6 +575,7 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
         };
 
         var setOpen = function (li, open) {
+            clearTimeout(submenuCloseTimers.get(li));
             li.classList.toggle('show', open);
             var btn = toggleOf(li);
             if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -617,17 +630,38 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
                 });
             }
 
-            // Mouse users: hover opens (CSS); make sure click-opened siblings close and flyouts fit.
+            // Keep flyouts open while crossing small gaps or moving diagonally into them.
             li.addEventListener('mouseenter', function () {
-                if (!canHover || document.documentElement.classList.contains('gnc-editor-preview')) return;
+                if (!hoverEnabled()) return;
                 closeSiblings(li);
-                position(li);
+                setOpen(li, true);
+            });
+            li.addEventListener('mouseleave', function () {
+                if (!hoverEnabled()) return;
+                submenuCloseTimers.set(li, setTimeout(function () {
+                    setOpen(li, false);
+                }, hoverCloseDelay));
             });
         });
 
-        academicsItem.addEventListener('hidden.bs.dropdown', resetAll);
+        academicsItem.addEventListener('hidden.bs.dropdown', function () {
+            clearTimeout(rootCloseTimer);
+            academicsItem.classList.remove('show');
+            resetAll();
+        });
+        academicsItem.addEventListener('mouseenter', function () {
+            if (!hoverEnabled()) return;
+            clearTimeout(rootCloseTimer);
+            academicsItem.classList.add('show');
+        });
         academicsItem.addEventListener('mouseleave', function () {
-            if (canHover && !document.documentElement.classList.contains('gnc-editor-preview')) resetAll();
+            if (!hoverEnabled()) return;
+            // Close ordinary dropdowns promptly; preserve the grace period for deeper flyouts.
+            var delay = academicsItem.querySelector('.gnc-dropdown-submenu.show') ? hoverCloseDelay : rootCloseDelay;
+            rootCloseTimer = setTimeout(function () {
+                academicsItem.classList.remove('show');
+                resetAll();
+            }, delay);
         });
     });
 

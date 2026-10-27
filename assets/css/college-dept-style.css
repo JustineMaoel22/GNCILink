@@ -203,6 +203,10 @@
   display: block;
 }
 
+.dept-intro-program .dept-hero-prefix:empty { margin-bottom: 0; }
+.dept-intro-program .dept-header-extra { margin: 12px 0 0; color: var(--gnc-template-text, var(--gnc-green-light)); font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere; }
+.dept-intro-program .dept-header-extra[hidden] { display: none !important; }
+
 .dept-intro-program .dept-header-banner {
   position: absolute;
   inset: 0;
@@ -218,6 +222,10 @@
 }
 
 .dept-intro-program .dept-header-banner img[hidden] { display: none; }
+
+@media (max-width: 767px) {
+  .dept-intro-program.dept-mobile-background-hidden .dept-header-banner { display: none; }
+}
 
 .dept-intro-program .dept-banner-help {
   position: absolute;

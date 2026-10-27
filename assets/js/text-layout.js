@@ -3,6 +3,32 @@
     'use strict';
     const published = Object.assign({},window.GNC_TEXT_LAYOUT || {}), settings = JSON.parse(JSON.stringify(published));
     const placed = new Map();
+    const fonts = window.GNC_TEXT_FONTS || {};
+    const loadedFonts = new Set();
+    const fontStyle=document.createElement('style');
+    // Rich-text headings and links can have their own font rules. Preserve icon fonts.
+    fontStyle.textContent='[data-gnc-text][style*="--gnc-text-font:"] :is(p,h1,h2,h3,h4,h5,h6,ul,ol,li,blockquote,a,strong,em,b,u,span:not([class])){font-family:var(--gnc-text-font)!important}';
+    document.head.appendChild(fontStyle);
+    function loadFont(key) {
+        if (!Object.prototype.hasOwnProperty.call(fonts,key) || loadedFonts.has(key)) return;
+        loadedFonts.add(key);
+        const link=document.createElement('link');link.rel='stylesheet';
+        const query=new URLSearchParams({family:fonts[key].label+':ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700',display:'swap'});
+        link.href='https://fonts.googleapis.com/css2?'+query;
+        link.dataset.gncGoogleFont=key;
+        link.addEventListener('load',()=>{if(document.fonts)document.fonts.ready.then(schedule);});
+        document.head.appendChild(link);
+    }
+    function applyFont(el,box) {
+        if(isMedia(el))return;
+        if(Number.isFinite(box.fontSize))el.style.fontSize=clamp(box.fontSize,8,200)+'px';
+        if(Object.prototype.hasOwnProperty.call(fonts,box.fontFamily)) {
+            loadFont(box.fontFamily);
+            const family='"'+fonts[box.fontFamily].label+'", '+fonts[box.fontFamily].fallback;
+            el.style.setProperty('--gnc-text-font',family);
+            el.style.setProperty('font-family',family,'important');
+        }
+    }
     const mode = () => innerWidth < 768 ? 'mobile' : innerWidth <= 1024 ? 'tablet' : 'desktop';
     const clamp = (n,min,max) => Math.max(min,Math.min(max,n));
     let controller=null, scheduled=0;
@@ -21,14 +47,19 @@
     function restore() {
         placed.forEach((entry,el) => {
             if(entry.style===null)el.removeAttribute('style');else el.setAttribute('style',entry.style);
-            if(entry.wrap.parentNode){entry.wrap.replaceWith(el);}
+            if(entry.wrap?.parentNode){entry.wrap.replaceWith(el);}
         }); placed.clear();
     }
     function apply() {
         restore();
         targets().forEach((el,id) => {
             const box=settings[id]?.[mode()];
-            if(!box || el.closest('[data-gnc-layout-ignore]') || el.querySelector('[data-gnc-text]'))return;
+            if(!box || el.closest('[data-gnc-layout-ignore]') || (el.querySelector('[data-gnc-text]')&&!el.hasAttribute('data-gnc-layout-group')))return;
+            if(!('x' in box)) {
+                placed.set(el,{style:el.getAttribute('style'),wrap:null});
+                applyFont(el,box);
+                return;
+            }
             const boundary=section(el), r=el.getBoundingClientRect(), b=boundary.getBoundingClientRect();
             if(!r.width || !b.width || !b.height)return;
             const style=el.getAttribute('style'), cs=getComputedStyle(el), wrap=document.createElement('span');
@@ -44,7 +75,7 @@
             const top=clamp(origin.top+box.y*b.height/100,b.top,Math.max(b.top,b.bottom-naturalHeight));
             Object.assign(el.style,{position:'absolute',display:'block',boxSizing:'border-box',margin:'0',left:(left-origin.left)+'px',top:(top-origin.top)+'px',width:w+'px',maxWidth:'none',height:'auto',minHeight:box.h+'px',overflow:'visible',overflowWrap:'anywhere',animation:'none',transition:'none'});
             if(isMedia(el))Object.assign(el.style,{height:box.h+'px',minHeight:'0',maxHeight:'none',objectFit:'contain'});
-            else if(Number.isFinite(box.fontSize))el.style.fontSize=clamp(box.fontSize,8,200)+'px';
+            else applyFont(el,box);
             // Wrapping text may be taller than its old box; never clip its contents.
             const actual=el.getBoundingClientRect();
             if(actual.bottom>b.bottom && actual.height<=b.height)el.style.top=(b.bottom-actual.height-origin.top)+'px';
@@ -91,9 +122,22 @@
         }
         function commit(value,preserveFont=true){
             const id=identify(selected);if(!id)return;
-            const size=settings[id]?.[mode()]?.fontSize;
-            if(value&&preserveFont&&Number.isFinite(size))value=Object.assign({fontSize:size},value);
+            const current=settings[id]?.[mode()];
+            if(value&&preserveFont){
+                const typography={};
+                if(Number.isFinite(current?.fontSize))typography.fontSize=current.fontSize;
+                if(current?.fontFamily)typography.fontFamily=current.fontFamily;
+                value=Object.assign(typography,value);
+            }
             options.stage(id,mode(),value,published[id]?.[mode()]||null);refresh();
+        }
+        function changeFontFamily(key){
+            if(!selected||isMedia(selected)||options.state().busy||options.state().preview)return;
+            if(key!==''&&!Object.prototype.hasOwnProperty.call(fonts,key))return;
+            const id=identify(selected);if(!id)return;
+            const box=Object.assign({},settings[id]?.[mode()]||{});
+            if(key)box.fontFamily=key;else delete box.fontFamily;
+            commit(Object.keys(box).length?box:null,false);
         }
         function changeFontSize(delta){
             if(!selected||isMedia(selected)||options.state().busy||options.state().preview)return;
@@ -109,7 +153,7 @@
             if(!enabled||!selected||options.state().busy||options.state().preview||event.button!==0)return;
             event.preventDefault();event.stopImmediatePropagation();selected.blur();
             const boundary=section(placed.get(selected)?.wrap||selected), b=boundary.getBoundingClientRect(),r=selected.getBoundingClientRect();
-            const slot=placed.get(selected)?.wrap.getBoundingClientRect()||r;
+            const slot=placed.get(selected)?.wrap?.getBoundingClientRect()||r;
             drag={dir,x:event.clientX,y:event.clientY,r,b,slot,id:event.pointerId,original:settings[identify(selected)]?.[mode()]||null};
             document.addEventListener('pointermove',move,true);document.addEventListener('pointerup',end,true);document.addEventListener('pointercancel',cancel,true);
             overlay.querySelector('[data-direction="'+dir+'"]').setPointerCapture?.(event.pointerId);
@@ -154,12 +198,14 @@
         overlay.addEventListener('keydown',e=>{
             if(e.key==='Escape'){cancel();enabled=false;refresh();return;}
             if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)||!selected)return;
-            e.preventDefault();const b=section(placed.get(selected)?.wrap||selected).getBoundingClientRect(),r=selected.getBoundingClientRect(),slot=placed.get(selected)?.wrap.getBoundingClientRect()||r;
+            e.preventDefault();const b=section(placed.get(selected)?.wrap||selected).getBoundingClientRect(),r=selected.getBoundingClientRect(),slot=placed.get(selected)?.wrap?.getBoundingClientRect()||r;
             const step=snapping?(e.shiftKey?gridSize*5:gridSize):(e.shiftKey?10:1);commit({x:clamp((r.left-slot.left+(e.key==='ArrowRight'?step:e.key==='ArrowLeft'?-step:0))/b.width*100,-100,100),y:clamp((r.top-slot.top+(e.key==='ArrowDown'?step:e.key==='ArrowUp'?-step:0))/b.height*100,-100,100),w:clamp(r.width/b.width*100,1,100),h:r.height});
         });
         addEventListener('scroll',refresh,{passive:true});addEventListener('resize',refresh);
         controller={refresh,eligible:el=>!!el&&!!identify(el)&&!el.closest('[data-gnc-layout-ignore]')&&!el.querySelector('[data-gnc-text]'),
             changeFontSize,fontSize:()=>selected&&!isMedia(selected)?parseFloat(getComputedStyle(selected).fontSize):null,
+            changeFontFamily,fontFamily:()=>settings[identify(selected)]?.[mode()]?.fontFamily||'',
+            fonts:()=>Object.entries(fonts).map(([key,font])=>[key,font.label]),
             select(el){if(selected!==el){selected=el;enabled=false;}refresh();},
             toggle(){enabled=!enabled;refresh();},active:()=>enabled,
             snapping:()=>snapping,toggleSnap(){snapping=!snapping;refresh();},

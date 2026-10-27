@@ -38,9 +38,14 @@ function departmentPageContent(array $dept, bool $refresh = false): array {
     $id = (int)$dept['dept_id'];
     if (!$refresh && isset($cache[$id])) return $cache[$id];
     $name = (string)$dept['dept_name'];
+    $headerParts = preg_match('/^(College\s+of)\s+(.+)$/iu', $name, $parts) ? [$parts[1], $parts[2]] : ['', $name];
     $defaults = [
         'header_text_hidden' => ['0', 'Header text visibility', 1],
         'header_logo_hidden' => ['0', 'Header logo visibility', 1],
+        'header_mobile_background_hidden' => ['0', 'Hide header background on mobile', 1],
+        'header_prefix' => [$headerParts[0], 'Header prefix', 100],
+        'header_subject' => [$headerParts[1], 'Header title', 255],
+        'header_extra_text' => ['', 'Extra header text', 255],
         'hero_title' => [$name, 'Page heading', 255],
         'overview_label' => ['Overview', 'Overview label', 100],
         'overview_title' => ['About the ' . $name, 'Overview heading', 255],
@@ -89,7 +94,7 @@ function departmentPageField(array $dept, string $key): string {
     $field = departmentPageContent($dept)[$key];
     return ceField('dept-page-text', ['key' => $key, 'label' => $field['label'], 'max' => $field['max'],
         'multiline' => $field['max'] > 255, 'rich'=>$field['max']>255, 'ph' => 'Add ' . strtolower($field['label']),
-        'optional' => str_ends_with($key, '_empty') || str_starts_with($key, 'facebook_') || in_array($key, ['vision_title', 'vision_text', 'mission_title', 'mission_text'], true)]);
+        'optional' => str_ends_with($key, '_empty') || str_starts_with($key, 'facebook_') || in_array($key, ['header_prefix', 'header_extra_text', 'vision_title', 'vision_text', 'mission_title', 'mission_text'], true)]);
 }
 
 function departmentPageText(array $dept, string $key): string {
@@ -113,7 +118,7 @@ function saveDepartmentPageContent(int $id, array $changes): array {
     $fields = departmentPageContent($dept);
     foreach ($changes as $key => &$text) {
         if (!isset($fields[$key]) || !is_string($text)) throw new InvalidArgumentException('Unknown department text field.');
-        if (in_array($key, ['header_text_hidden', 'header_logo_hidden'], true) && !in_array($text, ['0', '1'], true)) {
+        if (in_array($key, ['header_text_hidden', 'header_logo_hidden', 'header_mobile_background_hidden'], true) && !in_array($text, ['0', '1'], true)) {
             throw new InvalidArgumentException('Invalid header visibility.');
         }
         if (in_array($key, ['vision_icon', 'mission_icon'], true)) {

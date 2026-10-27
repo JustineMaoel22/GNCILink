@@ -702,6 +702,7 @@
             textLayout.select(textTarget);
             if(textLayout.eligible(textTarget))items=[{icon:'arrows-move',label:layoutMedia?'Move and resize logo':'Move and resize text',on:textLayout.active(),run:function(){textLayout.toggle();renderToolbar();}},{icon:'grid-3x3',label:'Snap to grid',title:'Snap to grid',on:textLayout.snapping(),run:function(){textLayout.toggleSnap();renderToolbar();}},{icon:'arrow-counterclockwise',label:layoutMedia?'Reset logo placement':'Reset text placement',run:function(){textLayout.reset();}}].concat(items||[]);
             if(textLayout.eligible(textTarget)&&!layoutMedia)items=[
+                {type:'select',title:'Google Font ('+S.win.GNCTextLayout.device()+')',value:textLayout.fontFamily(),options:[['','Default font']].concat(textLayout.fonts()),onChange:function(value){textLayout.changeFontFamily(value);renderToolbar();}},
                 {icon:'dash',label:'Smaller text',run:function(){textLayout.changeFontSize(-2);renderToolbar();}},
                 {type:'chip',text:Math.round(textLayout.fontSize()*100)/100+' px'},
                 {icon:'plus',label:'Bigger text',run:function(){textLayout.changeFontSize(2);renderToolbar();}},
@@ -3005,7 +3006,7 @@
         var DFIELD = { 'dept-name': 'dept_name', 'dept-hero': 'hero_text', 'dept-about': 'about_text', 'dept-office-label': 'office_label',
             'dean-name': 'dean_name', 'dean-title': 'dean_title', 'dean-bio': 'dean_bio', 'dean-phone': 'dean_phone',
             'dean-email': 'dean_email', 'dean-office': 'dean_office', 'dean-hours': 'dean_hours' };
-        var DEPT_KEYS = ['dept_name', 'hero_text', 'about_text', 'office_label', 'facebook_url'];
+        var DEPT_KEYS = ['dept_name', 'hero_text', 'about_text', 'office_label', 'facebook_url', 'theme_color'];
         var DEAN_KEYS = ['dean_name', 'dean_title', 'dean_bio', 'dean_phone', 'dean_email', 'dean_office', 'dean_hours'];
         function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
         function dBase(k) { return DD[k] == null ? '' : String(DD[k]); }
@@ -3049,6 +3050,16 @@
         function itemRef(ref) { var m = /^(\w+):(\d+)/.exec(ref || ''); return m && PD && PD.items[m[1]] ? { type: m[1], i: +m[2] } : null; }
 
         function bindEditing(doc) {
+            previewDepartmentColor(doc);
+            if (TD && TD.fields.header_mobile_background_hidden) {
+                var header = doc.querySelector('.dept-intro-program');
+                if (header) header.classList.toggle('dept-mobile-background-hidden', headerHidden('header_mobile_background_hidden'));
+            }
+            var extraHeader = TD && TD.fields.header_extra_text && doc.querySelector('[data-dept-header-extra]');
+            if (extraHeader) {
+                var extraText = own(textChanges, 'header_extra_text') ? textChanges.header_extra_text : TD.fields.header_extra_text.value;
+                extraHeader.hidden = !extraText.trim();
+            }
             if (TD) ['text', 'logo'].forEach(function (part) {
                 var element = doc.querySelector('[data-dept-header-' + part + ']');
                 if (element) element.classList.toggle('dept-header-hidden', headerHidden('header_' + part + '_hidden'));
@@ -3348,6 +3359,40 @@
         function headerHidden(key) {
             return TD && TD.fields[key] && (own(textChanges, key) ? textChanges[key] : TD.fields[key].value) === '1';
         }
+        function previewDepartmentColor(doc) {
+            if (!DD || DD.kind !== 'college') return;
+            var header = doc.querySelector('.dept-intro-program');
+            if (!header) return;
+            if (!header.hasAttribute('data-ve-original-theme')) header.setAttribute('data-ve-original-theme', header.getAttribute('style') || '');
+            if (!own(dChange, 'theme_color')) { header.setAttribute('style', header.getAttribute('data-ve-original-theme'));return; }
+            var hex = /^#[0-9a-f]{6}$/i.test(dVal('theme_color')) ? dVal('theme_color') : '#1F5E2C';
+            var rgb = [1,3,5].map(function(i){return parseInt(hex.slice(i,i+2),16);}), text = rgb.slice();
+            var luminance = function(channels){return channels.reduce(function(sum,n,i){var c=n/255;return sum+[.2126,.7152,.0722][i]*(c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4));},0);};
+            for(var i=0;i<14 && (luminance([249,246,241])+.05)/(luminance(text)+.05)<3;i++)text=text.map(function(n){return n*.93;});
+            var color = function(channels){return '#'+channels.map(function(n){return Math.round(n).toString(16).padStart(2,'0');}).join('');};
+            header.style.setProperty('--gnc-template',hex);
+            header.style.setProperty('--gnc-template-text',color(text));
+            header.style.setProperty('--gnc-template-tint','rgba('+rgb.join(',')+',0.10)');
+            header.style.setProperty('--gnc-template-dark',color(rgb.map(function(n){return n*.8;})));
+        }
+        function addHeaderText() {
+            var el = S.doc.querySelector('[data-dept-header-extra]');
+            if (!TD || !TD.fields.header_extra_text || !el) return;
+            var value = own(textChanges, 'header_extra_text') ? textChanges.header_extra_text : TD.fields.header_extra_text.value;
+            if (!value.trim()) {
+                value = 'Additional header text';
+                textChanges.header_extra_text = value;
+                el.textContent = value;
+            }
+            el.hidden = false;
+            if (headerHidden('header_text_hidden')) toggleHeaderPart('text');
+            bindEditing(S.doc);select({kind:'field',el:el});el.focus();chrome();
+        }
+        function removeHeaderTextBox(el) {
+            if (TD.fields.header_extra_text.value === '') delete textChanges.header_extra_text;
+            else textChanges.header_extra_text = '';
+            el.textContent = '';el.hidden = true;select(null);chrome();
+        }
         function toggleHeaderPart(part) {
             var key = 'header_' + part + '_hidden', value = headerHidden(key) ? '0' : '1';
             if (!TD || !TD.fields[key]) return;
@@ -3382,6 +3427,20 @@
             var headerControls = [];
             if (DD.kind === 'college' && TD) {
                 headerControls.push(h('small', { class: 've-pop-hint', text: 'Header changes apply only here. Publish to save them.' }));
+                if (TD.fields.header_mobile_background_hidden) {
+                    var mobileBackground = h('input',{type:'checkbox',checked:headerHidden('header_mobile_background_hidden'),'aria-label':'Hide background image on mobile'});
+                    mobileBackground.addEventListener('change',function(){
+                        var key='header_mobile_background_hidden', value=mobileBackground.checked?'1':'0';
+                        if(value===TD.fields[key].value)delete textChanges[key];else textChanges[key]=value;
+                        bindEditing(S.doc);chrome();
+                    });
+                    headerControls.push(h('label',{class:'ve-pop-row'},[mobileBackground,'Hide background image on mobile']));
+                }
+                var color = h('input', {type:'color',class:'ve-color','aria-label':'Department colour',value:/^#[0-9a-f]{6}$/i.test(dVal('theme_color'))?dVal('theme_color'):'#1F5E2C'});
+                color.addEventListener('input',function(){dSet('theme_color',color.value.toUpperCase());previewDepartmentColor(S.doc);chrome();});
+                headerControls.push(h('div',{class:'ve-pop-label',text:'Card and header colour'}));
+                headerControls.push(h('div',{class:'ve-pop-row'},[color,h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Use default colour',on:{click:function(){dSet('theme_color','');color.value='#1F5E2C';previewDepartmentColor(S.doc);chrome();}}})]));
+                if (TD.fields.header_extra_text) headerControls.push(h('button', {type:'button',class:'btn btn-sm btn-outline-success',text:'Add header text box',on:{click:addHeaderText}}));
                 ['text', 'logo'].forEach(function (part) {
                     headerControls.push(h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary',
                         text: (headerHidden('header_' + part + '_hidden') ? 'Restore' : 'Remove') + ' header ' + part,
@@ -3445,7 +3504,7 @@
             var deanKeys = DEAN_KEYS.filter(function (k) { return own(dChange, k); });
             if (deptKeys.length) p = p.then(function () {
                 return sendContent({ action: 'save_department_details', dept_id: DD.dept_id, dept_name: dVal('dept_name'), description: dBase('description'), hero_text: dVal('hero_text'),
-                    about_text: dVal('about_text'), facebook_url: dVal('facebook_url'), office_label: dVal('office_label'), theme_color: dBase('theme_color') }).then(function (r) {
+                    about_text: dVal('about_text'), facebook_url: dVal('facebook_url'), office_label: dVal('office_label'), theme_color: dVal('theme_color') }).then(function (r) {
                     if (r.ok) { did++; deptKeys.forEach(function (k) { delete dChange[k]; }); if (r.department) Object.keys(r.department).forEach(function (k) { DD[k] = r.department[k]; }); }
                     else errs.push('Department: ' + r.error);
                 });
@@ -3809,7 +3868,13 @@
                 } else if (sel.kind === 'field') {
                     var v = sel.el.__ve || {}, len = readField(sel.el).length;
                     it.push({ type: 'chip', icon: 'pencil', text: (v.label || 'Text') + (v.max ? '  ·  ' + len + ' / ' + v.max : '') });
-                    if (TD && sel.el.closest('[data-dept-header-text]')) it.push({ icon: 'trash', label: 'Remove header text', danger: true, run: function () { toggleHeaderPart('text'); } });
+                    if (TD && sel.el.closest('[data-dept-header-text]')) {
+                        if (sel.el.hasAttribute('data-dept-header-extra')) it.push({icon:'trash',label:'Remove text box',danger:true,run:function(){removeHeaderTextBox(sel.el);}});
+                        else {
+                            if (TD.fields.header_extra_text) it.push({icon:'plus-lg',label:'Add header text box',run:addHeaderText});
+                            it.push({ icon: 'trash', label: 'Remove header text', danger: true, run: function () { toggleHeaderPart('text'); } });
+                        }
+                    }
                     if (v.overview) return richTextTools().concat(it);
                     if (sel.item) itemActions(it, sel.item);
                     if (/^dept-program-(name|description)$/.test(sel.el.getAttribute('data-ve-field') || '')) departmentProgramActions(it, sel.el.getAttribute('data-ve-key'));
@@ -4851,6 +4916,7 @@
             doc.url=url; doc.size=Math.max(1,Math.round(file.size/1024))+' KB';
             if (!existing) api.categories[category].documents.push(doc);
             remember(doc,category).file=file;
+            api.show(category, api.categories[category].documents.indexOf(doc));
             refresh(); manage();
         }
         function manage(x,y) {

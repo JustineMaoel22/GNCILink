@@ -1,6 +1,18 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
-/** Numeric display metadata only; content continues through the existing CMS handlers. */
+/** Display metadata only; content continues through the existing CMS handlers. */
+function textLayoutFonts(): array {
+    return [
+        'inter'=>['label'=>'Inter','fallback'=>'sans-serif'],
+        'lora'=>['label'=>'Lora','fallback'=>'serif'],
+        'montserrat'=>['label'=>'Montserrat','fallback'=>'sans-serif'],
+        'noto-serif'=>['label'=>'Noto Serif','fallback'=>'serif'],
+        'open-sans'=>['label'=>'Open Sans','fallback'=>'sans-serif'],
+        'poppins'=>['label'=>'Poppins','fallback'=>'sans-serif'],
+        'roboto'=>['label'=>'Roboto','fallback'=>'sans-serif'],
+        'rubik'=>['label'=>'Rubik','fallback'=>'sans-serif'],
+    ];
+}
 function textLayoutRoute(string $route): string {
     if (strlen($route)>1000) throw new InvalidArgumentException('Invalid public page.');
     $parts = parse_url($route);
@@ -22,11 +34,17 @@ function textLayoutNormalize(array $entries): array {
         foreach ($devices as $device => $box) {
             if (!in_array($device, ['desktop','tablet','mobile'], true)) throw new InvalidArgumentException('Invalid device.');
             if ($box === null) { $out[$key][$device] = null; continue; }
-            if (!is_array($box) || array_diff(array_keys($box), ['x','y','w','h','fontSize'])) throw new InvalidArgumentException('Invalid text box.');
-            foreach (['x'=>[-100,100], 'y'=>[-100,100], 'w'=>[1,100], 'h'=>[0,3000]] as $prop => [$min,$max]) {
+            if (!is_array($box) || !$box || array_diff(array_keys($box), ['x','y','w','h','fontSize','fontFamily'])) throw new InvalidArgumentException('Invalid text box.');
+            $positioned = (bool)array_intersect(array_keys($box), ['x','y','w','h']);
+            if (!$positioned && !array_key_exists('fontFamily', $box)) throw new InvalidArgumentException('Invalid text box.');
+            foreach ($positioned ? ['x'=>[-100,100], 'y'=>[-100,100], 'w'=>[1,100], 'h'=>[0,3000]] : [] as $prop => [$min,$max]) {
                 $n = $box[$prop] ?? null;
                 if ((!is_int($n) && !is_float($n)) || !is_finite((float)$n) || $n < $min || $n > $max) throw new InvalidArgumentException('Text position or size is out of range.');
                 $out[$key][$device][$prop] = round((float)$n, 4);
+            }
+            if (array_key_exists('fontFamily', $box)) {
+                if (!is_string($box['fontFamily']) || !isset(textLayoutFonts()[$box['fontFamily']])) throw new InvalidArgumentException('Choose a font from the Google Fonts list.');
+                $out[$key][$device]['fontFamily'] = $box['fontFamily'];
             }
             if (array_key_exists('fontSize', $box)) {
                 $size = $box['fontSize'];

@@ -341,7 +341,7 @@ if ($editorMode) {
         }, array_values($postModules)), 'open' => $openUrl];
     }
     // Programs are edited on the canvas; their media controls live in the slide strip and page options.
-    $hasDrawer = in_array($veKind, ['home', 'admin', 'entity'], true) && !in_array($activeSlug, ['programs', 'graduate-school'], true);
+    $hasDrawer = in_array($veKind, ['home', 'admin', 'entity'], true) && !in_array($activeSlug, ['college-departments', 'programs', 'graduate-school'], true);
     $hasPanel  = $hasDrawer || $veEmbed !== null;
     $drawerFile = $veKind === 'home' ? 'homepage-president-manager.php'
         : ($veKind === 'admin' ? 'administration-manager.php' : 'department-media-manager.php');

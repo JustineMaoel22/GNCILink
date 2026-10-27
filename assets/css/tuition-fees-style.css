@@ -191,10 +191,14 @@ body { margin: 0; background: #f9f6f1; color: #25362b; }
 .fee-download:hover i { transform: translateY(2px); }
 .fee-download:active { transform: translateY(0) scale(.97); box-shadow: none; }
 .fee-document-stage { position: relative; min-height: 580px; background: #f5f4ef; }
+.fee-document-selector { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 12px 20px; border-bottom: 1px solid #e7ebe5; }
+.fee-document-selector label { color: #163f28; font-weight: 600; }
+.fee-document-selector select { flex: 1 1 200px; min-width: 0; max-width: 100%; padding: 9px 10px; border: 1px solid #dce4dd; border-radius: 6px; background: #fff; color: #25362b; font: inherit; }
+.fee-document-selector select:focus-visible { outline: 3px solid #d3a63a; outline-offset: 3px; }
+.fee-document-choice[aria-current="true"] { background: #edf3ec; font-weight: 700; }
 .fee-editor-manage { margin: 12px 20px; border: 1px dashed #8ba990; border-radius: 8px; padding: 9px 14px; background: #edf3ec; color: #0b4228; cursor: pointer; font: 600 13px Inter,system-ui,sans-serif; transition: background .2s ease, transform .2s ease, border-color .2s ease; }
 .fee-editor-manage:hover { background: #e2ecdf; border-color: #5f8a68; transform: translateY(-1px); }
-.fee-editor-pdf-cover { position: absolute; inset: 0; z-index: 1; cursor: pointer; }
-.ve-previewing .fee-editor-manage,.ve-previewing .fee-editor-pdf-cover { display: none !important; }
+.ve-previewing .fee-editor-manage { display: none !important; }
 .fee-document-stage iframe { display: block; width: 100%; height: clamp(580px,74vh,850px); border: 0; background: #414846; animation: feeFadeIn .8s ease .9s both; }
 .fee-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 580px; padding: 44px 28px; text-align: center; background: radial-gradient(ellipse at center,#fff 0%,#f5f4ef 80%); animation: feeFadeIn .7s ease .7s both; }
 .fee-empty-icon { display: flex; align-items: center; justify-content: center; width: 78px; height: 78px; margin-bottom: 6px; border: 1px solid #e6dfc9; border-radius: 20px; background: #faf6e9; color: #b18a29; font-size: 35px; animation: feeFloat 3.6s ease-in-out 1.4s infinite; }

@@ -9,7 +9,9 @@ $feeCategories = tuitionFeeCategories();
 $feeCategory = (string)($_GET['category'] ?? 'college');
 if (!isset($feeCategories[$feeCategory])) $feeCategory = 'college';
 $feeSelected = $feeCategories[$feeCategory];
-$feeDocument = $feeSelected['documents'][0] ?? null;
+$feeDocumentIndex = filter_var($_GET['document'] ?? 0, FILTER_VALIDATE_INT);
+if ($feeDocumentIndex === false || $feeDocumentIndex < 0 || !isset($feeSelected['documents'][$feeDocumentIndex])) $feeDocumentIndex = 0;
+$feeDocument = $feeSelected['documents'][$feeDocumentIndex] ?? null;
 $feeH = fn($value) => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
@@ -63,9 +65,16 @@ $feeH = fn($value) => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
                 <div class="fee-document-info"><span class="fee-pdf-icon"><i class="bi bi-file-earmark-pdf-fill" aria-hidden="true"></i></span><div><h2 id="feeDocumentTitle"><?= $feeH($feeDocument['title'] ?? $feeSelected['label'] . ' — Tuition and Fees') ?></h2><p id="feeDocumentMeta"><?= $feeDocument ? 'PDF Document · ' . $feeH($feeDocument['size']) : 'Tuition and fee schedules' ?></p></div></div>
                 <a class="fee-download" id="feeDownload"<?= $feeDocument ? ' href="' . $feeH($feeDocument['url']) . '"' : ' hidden' ?> download><i class="bi bi-download" aria-hidden="true"></i> <span<?= $feeMark('download_label') ?>><?= $feeText('download_label') ?></span></a>
             </header>
+            <div class="fee-document-selector" id="feeDocumentSelector"<?= count($feeSelected['documents']) > 1 ? '' : ' hidden' ?>>
+                <label for="feeDocumentSelect">Choose a PDF</label>
+                <select id="feeDocumentSelect" aria-controls="feePdfFrame">
+                    <?php foreach ($feeSelected['documents'] as $index => $document): ?>
+                    <option value="<?= $index ?>"<?= $index === $feeDocumentIndex ? ' selected' : '' ?>><?= $feeH($document['title']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
             <?php if ($feePreview): ?><button type="button" class="fee-editor-manage" data-ve-fee-manage><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Manage PDFs for this category</button><?php endif; ?>
             <div class="fee-document-stage">
-                <?php if ($feePreview): ?><div class="fee-editor-pdf-cover" data-ve-fee-pdf hidden aria-label="Select PDF to edit"></div><?php endif; ?>
                 <iframe id="feePdfFrame" title="Tuition and fees PDF document"<?= $feeDocument ? ' src="' . $feeH($feeDocument['url']) . '#view=FitH"' : ' hidden' ?>></iframe>
                 <div class="fee-empty" id="feeEmpty"<?= $feeDocument ? ' hidden' : '' ?>><span class="fee-empty-icon"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i></span><span class="fee-empty-label" id="feeEmptyCategory"><?= $feeH($feeSelected['label']) ?></span><h3<?= $feeMark('empty_title') ?>><?= $feeText('empty_title') ?></h3><div class="fee-empty-description cms-rich"<?= $feeMark('empty_intro') ?>><?= $feeText('empty_intro') ?></div><a href="/pages/contact-us.php"><span<?= $feeMark('contact_label') ?>><?= $feeText('contact_label') ?></span> <i class="bi bi-arrow-right" aria-hidden="true"></i></a></div>
             </div>

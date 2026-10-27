@@ -13,6 +13,20 @@ try {
         $id = (int)$dept['dept_id'];
         $original = departmentPageContent($dept);
         pageCheck(isset($original['leadership_title'], $original['profile_label'], $original['contacts_label']), 'Common editable fields are available');
+        pageCheck($original['header_mobile_background_hidden']['value']==='0','Mobile background is visible by default');
+        saveDepartmentPageContent($id,['header_mobile_background_hidden'=>'1']);
+        pageCheck(departmentPageContent($dept,true)['header_mobile_background_hidden']['value']==='1','Mobile background visibility persists');
+        saveDepartmentPageContent($id,['header_mobile_background_hidden'=>'0']);
+        foreach (['yes','', '2'] as $badMobileVisibility) {
+            try {saveDepartmentPageContent($id,['header_mobile_background_hidden'=>$badMobileVisibility]);throw new RuntimeException('Invalid mobile background visibility accepted');}
+            catch(InvalidArgumentException $expected) {}
+        }
+        saveDepartmentPageContent($id, ['header_prefix'=>'SCHOOL OF', 'header_subject'=>'Test header title', 'header_extra_text'=>'Additional <header> text']);
+        pageCheck(departmentPageContent($dept, true)['header_prefix']['value']==='SCHOOL OF', 'Header prefix persists independently');
+        pageCheck(departmentPageText($dept,'header_extra_text')==='Additional &lt;header&gt; text', 'Extra header text is escaped');
+        pageCheck(getDepartmentById($id)['dept_name']===$dept['dept_name'], 'Header-only edits preserve department identity');
+        saveDepartmentPageContent($id, ['header_extra_text'=>'']);
+        pageCheck(departmentPageText($dept,'header_extra_text')==='', 'Extra header text can be removed');
         saveDepartmentPageContent($id, ['header_logo_hidden' => '1', 'header_text_hidden' => '1']);
         $header = departmentPageContent($dept, true);
         pageCheck($header['header_logo_hidden']['value'] === '1' && $header['header_text_hidden']['value'] === '1', 'Header removals persist independently');
