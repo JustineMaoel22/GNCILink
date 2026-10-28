@@ -49,7 +49,7 @@ unset($school);
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-    <link href="/assets/css/admission-req-style.css" rel="stylesheet">
+    <link href="/assets/css/admission-req-style.css?v=<?= filemtime(__DIR__ . '/../../assets/css/admission-req-style.css') ?>" rel="stylesheet">
     <link href="/assets/css/basic-admission-req-style.css?v=<?= filemtime(__DIR__ . '/../../assets/css/basic-admission-req-style.css') ?>" rel="stylesheet">
     <link href="/assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="/assets/images/logos/gnc-logo-v1.svg">
@@ -96,6 +96,7 @@ unset($school);
                     </div>
                 </section>
                 <?php endforeach; ?>
+                <p class="admission-art-credit">Illustrations by <a href="https://storyset.com/" target="_blank" rel="noopener noreferrer">Storyset</a></p>
             </div>
         </section>
     </main>

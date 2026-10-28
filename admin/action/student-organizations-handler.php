@@ -11,12 +11,31 @@ try {
     switch ($action) {
         case 'save':
             $row=saveStudentOrganization($_POST,$_FILES);
-            logActivity((int)$_SESSION['user_id'],'UPDATE','student_organizations',(int)$row['org_id'],'Saved organization: '.$row['name']);
+            $activity=array_key_exists('archived',$_POST)?($row['archived_at']?'ARCHIVE':'RESTORE'):'UPDATE';
+            logActivity((int)$_SESSION['user_id'],$activity,'student_organizations',(int)$row['org_id'],'Saved organization: '.$row['name']);
             $result=['organization'=>$row,'gallery'=>studentOrganizationGallery((int)$row['org_id'])]; break;
         case 'delete':
             $id=(int)($_POST['org_id']??0); deleteStudentOrganization($id);
             logActivity((int)$_SESSION['user_id'],'DELETE','student_organizations',$id,'Deleted student organization'); break;
-        case 'move': moveStudentOrganization((int)($_POST['org_id']??0),(int)($_POST['direction']??0)); break;
+        case 'reorder':
+            $order=json_decode((string)($_POST['order']??''),true,16,JSON_THROW_ON_ERROR);
+            if (!is_array($order)) throw new InvalidArgumentException('Invalid organization order.');
+            reorderStudentOrganizations($order);
+            logActivity((int)$_SESSION['user_id'],'UPDATE','student_organizations',null,'Published organization order.');
+            $result=['order'=>array_map('intval',array_column(studentOrganizations(true),'org_id'))];
+            break;
+        case 'swap':
+            $id=filter_var($_POST['org_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+            $target=filter_var($_POST['target_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+            if ($id===false || $id===null || $target===false || $target===null) throw new InvalidArgumentException('Choose two valid organizations.');
+            swapStudentOrganizations($id,$target);
+            logActivity((int)$_SESSION['user_id'],'UPDATE','student_organizations',$id,'Swapped organization positions with '.$target);
+            $result=['order'=>array_map('intval',array_column(studentOrganizations(true),'org_id'))];
+            break;
+        case 'move':
+            moveStudentOrganization((int)($_POST['org_id']??0),(int)($_POST['direction']??0));
+            $result=['order'=>array_map('intval',array_column(studentOrganizations(true),'org_id'))];
+            break;
         case 'save_page':
             $values=json_decode((string)($_POST['texts']??''),true,32,JSON_THROW_ON_ERROR);
             if (!is_array($values)) throw new InvalidArgumentException('Invalid page text.');

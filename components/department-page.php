@@ -10,7 +10,7 @@ require_once __DIR__ . '/department-public.php';
 // editing markers and the current stored values. Visitors never get either.
 $cePreview = cePreviewCanManage();
 
-$slug = trim((string)($_GET['slug'] ?? ''));
+$slug = isset($_GET['slug']) && is_string($_GET['slug']) ? trim($_GET['slug']) : '';
 $dept = $slug !== '' ? publicDepartment($slug, $cePreview) : null; // null when missing OR archived (editors in the preview may open a hidden one to restore it)
 
 if (!$dept) {

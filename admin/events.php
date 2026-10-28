@@ -23,9 +23,10 @@ $evtDefaultStatus   = $isSuperAdmin ? 'draft' : 'pending';
 // ---------------------------------------------------------------
 function evt_generateCsrfToken(PDO $db, int $userId): string {
     $token  = bin2hex(random_bytes(32));
-    $expiry = date('Y-m-d H:i:s', time() + 3600); // 1 hour
-    $stmt = $db->prepare("INSERT INTO csrf_tokens (user_id, token, expires_at) VALUES (?, ?, ?)");
-    $stmt->execute([$userId, $token, $expiry]);
+    // Use the same database clock as verification, even when PHP and MySQL
+    // have different time zones on the host.
+    $stmt = $db->prepare("INSERT INTO csrf_tokens (user_id, token, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))");
+    $stmt->execute([$userId, $token]);
     return $token;
 }
 

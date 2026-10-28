@@ -16,10 +16,16 @@ independently of other unsaved page changes. The dialog explains this behavior.
 Cancel restores the existing preview without changing the database.
 
 Settings are shared by the image file's URL wherever that photo is cropped. Each
-container retains its own dimensions and aspect ratio; contain/full-image views
-are unaffected. PNG, JPEG, WEBP and GIF uploads are supported. Existing local SVGs
-can also be positioned in cover containers; contain illustrations are left alone.
-Videos are excluded.
+container retains its own dimensions and aspect ratio. Organization logo containers
+opt in with `data-image-frame-fit="contain"`: their full logo remains visible at
+100%, and saved zoom applies in both the directory and organization detail page.
+Other contain/full-image views are unaffected. PNG, JPEG, WEBP and GIF uploads are
+supported. Existing local SVGs can also be positioned in cover containers;
+contain illustrations are left alone. Videos are excluded.
+
+Uniform photos opt in with `data-image-frame-ratio="natural"`: upload previews use
+each selected file's own aspect ratio, and existing images retain their natural
+layout dimensions while saved zoom and position apply inside that box.
 
 `components/image-framing-assets.php` supplies the shared runtime and saved settings
 through the public navbar/footer and admin header. It exposes no editing controls

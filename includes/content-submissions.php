@@ -32,7 +32,7 @@ function rbacContentRoutes(): array {
         '/admin/action/athletics-sports-handler.php','/admin/action/community-activities-handler.php',
         '/admin/action/enrollment-canvas-handler.php','/admin/action/enrollment-illustrations-handler.php',
         '/admin/action/faqs-handler.php','/admin/action/image-framing-handler.php',
-        '/admin/action/payment-guide-handler.php','/admin/action/student-achievements-handler.php',
+        '/admin/action/payment-guide-handler.php','/admin/action/scholarship-handler.php','/admin/action/student-achievements-handler.php',
         '/admin/action/student-organizations-handler.php','/admin/action/text-layout-handler.php',
         '/admin/action/tuition-fees-handler.php','/admin/settings.php'];
 }

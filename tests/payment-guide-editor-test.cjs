@@ -8,7 +8,7 @@ async function until(work,message){for(let end=Date.now()+30000;Date.now()<end;)
 let socket,session;
 const {execFileSync}=require('node:child_process');
 let ownsSlot=false;
-const php=(...args)=>execFileSync('docker',['compose','exec','-T','--user','www-data','web','php','tests/student-organizations-test.php',...args],{encoding:'utf8',windowsHide:true});
+const php=(...args)=>execFileSync('docker',['compose','exec','-T','--user','www-data','web','php','tests/admin-design-session.php',...args],{encoding:'utf8',windowsHide:true});
 (async()=>{
     await until(()=>fs.existsSync(path.join(profile,'DevToolsActivePort')),'Chrome did not start');
     const port=fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0];
@@ -22,7 +22,7 @@ const php=(...args)=>execFileSync('docker',['compose','exec','-T','--user','www-
     const base=process.env.BASE_URL||'http://localhost:8080';
     await send('Page.enable');await send('Network.enable');await send('Runtime.enable');socket.addEventListener('message',e=>{const p=JSON.parse(e.data);if(p.method==='Runtime.exceptionThrown')console.error('Browser exception:',JSON.stringify(p.params.exceptionDetails));});
     await send('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*','*cdn.jsdelivr.net*','*cdnjs.cloudflare.com*','*facebook.com*','*youtube.com*']});
-    session=JSON.parse(php('session'));
+    session=JSON.parse(php('create'));session.id=session.value;
     await send('Network.setCookie',{name:session.name,value:session.id,url:base});
     await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
 
@@ -43,6 +43,7 @@ const php=(...args)=>execFileSync('docker',['compose','exec','-T','--user','www-
         await evaluate('document.querySelector(".ve-publish-accept,.cms-completeness-publish").click()');
     }
     await load();
+    session.csrf=await evaluate('VE_CONFIG.csrf');
     assert.equal(await evaluate('VE_CONFIG.page.kind'),'payment-guide');
     assert.equal(await evaluate(`${frame}.querySelectorAll('[data-ve-img="payment-guide-image"]').length`),8);
     assert.equal(await evaluate('document.getElementById("vePrimary").disabled'),true);
@@ -100,7 +101,7 @@ const php=(...args)=>execFileSync('docker',['compose','exec','-T','--user','www-
         const response=await fetch((process.env.BASE_URL||'http://localhost:8080')+'/admin/action/payment-guide-handler.php',{method:'POST',headers:{Cookie:session.name+'='+session.id},body:new URLSearchParams({csrf_token:session.csrf,images:JSON.stringify({gcash:{reset:true}})})});
         assert.equal(response.status,200,'Fixture cleanup');
     }catch(error){console.error('Fixture cleanup failed',error.message);process.exitCode=1;}
-    if(session)try{php('destroy_session',session.id);}catch{}
+    if(session)try{php('destroy',session.id);}catch{}
     if(socket)socket.close();browser.kill();await delay(1000);
     if(path.dirname(profile)===os.tmpdir()&&path.basename(profile).startsWith('gnci-payment-editor-'))try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:3,retryDelay:200});}catch{}
 });

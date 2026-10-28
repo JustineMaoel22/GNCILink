@@ -30,6 +30,13 @@ for the tuition editor. Uploaded files live in `uploads/payment-guide/`; replaci
 or restoring an image removes its unused prior upload after the database commits.
 Default Storyset assets are preserved.
 
+SVG replacements are validated and sanitized directly; PHP Fileinfo is not
+required. The host must enable PHP DOM/XML for safe SVG and rich-text sanitization.
+If it is unavailable, the editor asks for that extension to be enabled.
+Raster images use server-side image detection and the shared 5 MB upload rules.
+Deploy `admin/action/payment-guide-handler.php` for this compatibility fix; no
+new migration is required for sites already using the payment guide editor.
+
 Validation: `node tests/payment-guide-editor-test.cjs` uses the local Docker stack
 and Chrome. It checks staging privacy, publishing, SVG sanitization, rollback,
 permissions, CSRF, restoring defaults, file cleanup, and responsive image loading.

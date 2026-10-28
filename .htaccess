@@ -35,20 +35,21 @@ Options -Indexes -MultiViews
 
     # ==========================================
     # 2. REDIRECT .PHP TO CLEAN URL
+    # Routing also supports local Docker hosts (including their port).
     # ==========================================
 
     # Redirect index.php to homepage
-    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
     RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
     RewriteCond %{THE_REQUEST} \s/+index\.php[\s?] [NC]
     RewriteRule ^index\.php$ / [R=302,L,NC]
 
     # Redirect page.php to /page
-    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
     RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
     RewriteCond %{THE_REQUEST} \s/+[^\s?]+\.php[\s?] [NC]
     RewriteCond %{REQUEST_URI} !^/(admin|api|chatbot|components|includes|config|tests|database)(/|$) [NC]
-    RewriteCond %{REQUEST_URI} !^/pages/academics/college/program\.php$ [NC]
+    RewriteCond %{REQUEST_URI} !^/pages/academics/college/(program|college-department)\.php$ [NC]
     RewriteRule ^(.+)\.php$ /$1 [R=302,L,NC]
 
 
@@ -56,7 +57,7 @@ Options -Indexes -MultiViews
     # 3. HOMEPAGE ROUTING
     # ==========================================
 
-    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
     RewriteRule ^$ index.php [END]
 
 
@@ -64,7 +65,7 @@ Options -Indexes -MultiViews
     # 4. EXISTING ROOT FILES AND DIRECTORIES
     # ==========================================
 
-    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [END]
@@ -75,10 +76,13 @@ Options -Indexes -MultiViews
     # ==========================================
 
     # Keep the program identifier in the path. PHP reads it from REQUEST_URI.
-    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
     RewriteRule ^pages/academics/college/program/[a-z0-9-]+/?$ pages/academics/college/program.php [END]
 
-    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
+    RewriteRule ^pages/academics/college/college-department/[a-z0-9-]+/?$ pages/academics/college/college-department.php [END]
+
+    RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
     RewriteCond %{REQUEST_FILENAME}.php -f
     RewriteRule ^(.+)$ $1.php [END]
 

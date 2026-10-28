@@ -24,7 +24,7 @@ function collegeDeptPublicUrl(array $dept): string {
     if ($slug === '') {
         return '/pages/academics/college/college-departments.php';
     }
-    return '/pages/academics/college/college-department.php?slug=' . rawurlencode($slug);
+    return '/pages/academics/college/college-department/' . rawurlencode($slug);
 }
 
 // Only college departments are shown, including in the editor preview.

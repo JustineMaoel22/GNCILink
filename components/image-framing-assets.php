@@ -12,5 +12,5 @@ if (!$gncFramingAdmin) {
 ?>
 <link rel="stylesheet" href="/assets/css/image-framing.css?v=<?= filemtime(__DIR__ . '/../assets/css/image-framing.css') ?>">
 <script>window.GNC_IMAGE_FRAMING_CONFIG = <?= json_encode(['admin' => $gncFramingAdmin, 'csrf' => $gncFramingAdmin ? generateCSRFToken() : '', 'settings' => $gncFramingSettings, 'hashedSettings' => $gncFramingHashes], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) ?>;</script>
-<script src="/assets/js/image-upload.js?v=<?= filemtime(__DIR__ . '/../assets/js/image-upload.js') ?>"></script>
+<script src="/assets/js/image-upload.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/image-upload.js'), 0, 16) ?>"></script>
 <script src="/assets/js/image-framing.js?v=<?= filemtime(__DIR__ . '/../assets/js/image-framing.js') ?>"></script>

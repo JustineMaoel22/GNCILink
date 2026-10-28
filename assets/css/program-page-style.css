@@ -2753,3 +2753,41 @@ body {
 @media (prefers-reduced-motion: reduce) {
     .why-num, .why-body { transition: none; }
 }
+
+/* =====================================================================
+   FIX: stop the page from shifting sideways on phones
+   - Scroll-reveal items start offset by 36px left/right; on a phone that
+     pushed the page wider than the screen and slid everything sideways.
+   - The spinning seal ring also stuck out past the container edge.
+   - "overflow-x: clip" is used (not "hidden") so it does not create a
+     scroll container and the sticky heading in "Why Choose" keeps working.
+   ===================================================================== */
+html, body {
+    overflow-x: clip;
+    max-width: 100%;
+}
+
+/* Clip each section so its own reveal-offsets and ring can't widen the page */
+.template-about,
+.template-why,
+.template-curriculum,
+.template-facilities,
+.template-uniform,
+.template-career,
+.bulletin-board,
+.template-cta {
+    overflow-x: clip;
+}
+
+/* On tablets/phones, reveal sideways items by sliding up instead of left/right */
+@media (max-width: 991px) {
+    .js-anim [data-anim="left"],
+    .js-anim [data-anim="right"] {
+        transform: translateY(28px);
+    }
+}
+
+/* Keep the seal ring inside the screen on small phones */
+@media (max-width: 575px) {
+    .about-seal-ring { width: 112%; }
+}

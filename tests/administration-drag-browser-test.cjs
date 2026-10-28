@@ -19,7 +19,8 @@ let socket,session,fixtureId,requestApi;
     socket.addEventListener('message',event=>{const packet=JSON.parse(event.data);if(packet.id&&pending.has(packet.id)){pending.get(packet.id)(packet);pending.delete(packet.id);}});
     const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++serial;pending.set(id,result=>result.error?reject(Error(JSON.stringify(result.error))):resolve(result.result));socket.send(JSON.stringify({id,method,params}));});
     const evaluate=async expression=>{const result=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));return result.result.value;};
-    session=JSON.parse(execFileSync('docker',['compose','exec','-T','--user','www-data','web','php','tests/student-organizations-test.php','session'],{encoding:'utf8',windowsHide:true}));
+    const auth=JSON.parse(execFileSync('docker',['compose','exec','-T','--user','www-data','web','php','tests/admin-design-session.php','create'],{encoding:'utf8',windowsHide:true}));
+    session={name:auth.name,id:auth.value};
     const base=process.env.BASE_URL||'http://localhost:8080';
     await send('Network.enable');await send('Network.setCookie',{name:session.name,value:session.id,url:base});
     await send('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*','*cdn.jsdelivr.net*','*cdnjs.cloudflare.com*','*facebook.com*']});
@@ -54,6 +55,10 @@ let socket,session,fixtureId,requestApi;
     assert.equal(await evaluate("document.getElementById('vePrimary').disabled"),false);
     await delay(450);await gesture(true);assert.deepEqual(await ids(),original,'Swapping back restores original order');
     assert.equal(await evaluate('window.VE.adapter().dirtyCount()'),0,'Restoring original order clears pending reorder');
+    if(process.env.DRAG_ONLY==='1'){
+        console.log('PASS: hold threshold, lifted preview, pointer tracking, exact swaps, Publish staging, and swapping back clears the pending order.');
+        return;
+    }
     await evaluate("document.getElementById('vePreviewBtn').click()");
     assert.equal(await evaluate("getComputedStyle(document.getElementById('veFrame').contentDocument.querySelector('.ve-drag-handle')).display"),'none','Drag controls are hidden in Preview');
     requestApi=async fields=>{const response=await fetch(base+'/admin/action/page-content-handler.php',{method:'POST',headers:{Cookie:session.name+'='+session.id},body:new URLSearchParams({csrf_token:session.csrf,...fields})});const result=await response.json();assert.equal(result.success,true,result.error);return result;};

@@ -29,14 +29,18 @@
         return match ? match[1] : (el.getAttribute('data-bg') || '');
     }
     function usable(src) { return !!pathOf(src) || sources.has(src); }
+    function fitOf(el) { return el && el.closest('[data-image-frame-fit="contain"]') ? 'contain' : 'cover'; }
     function cropped(el) {
         if (!el || !activeDocument(el.ownerDocument) || !usable(sourceOf(el))) return false;
+        // Full-size uniform photos keep their natural layout ratio but still
+        // support zoom and positioning within that original image box.
+        if (el.tagName === 'IMG' && el.getAttribute('data-image-frame-ratio') === 'natural') return true;
         // The editor and its iframe have separate API instances. A framed
         // background uses pixel sizes, so the other instance cannot rely on
         // background-size: cover to recognize it as an editable crop.
         if (framed.has(el) || el.hasAttribute('data-image-framed')) return true;
         const css = el.ownerDocument.defaultView.getComputedStyle(el);
-        return el.tagName === 'IMG' ? css.objectFit === 'cover' : css.backgroundSize.split(',').some(size => size.trim() === 'cover');
+        return el.tagName === 'IMG' ? css.objectFit === 'cover' || (css.objectFit === 'contain' && fitOf(el) === 'contain') : css.backgroundSize.split(',').some(size => size.trim() === 'cover');
     }
     function findTarget(el) {
         if (!el) return null;
@@ -189,6 +193,8 @@
         if(text!==undefined)el.textContent=text;return el;
     }
     function baseRatio(target,input) {
+        if ((input && input.getAttribute('data-image-frame-ratio') === 'natural') ||
+            (target && target.closest('[data-image-frame-ratio="natural"]'))) return null;
         // Sports images can extend beyond their clipped card; crop to the visible card.
         if(target&&target.closest)target=target.closest('[data-ve-sport]')||target;
         if(target){const rect=target.getBoundingClientRect();if(rect.width>0&&rect.height>0)return rect.width/rect.height;}
@@ -204,8 +210,9 @@
         try { return window.VEImageFraming || (window.parent !== window && window.parent.VEImageFraming) || null; }
         catch (_) { return null; }
     }
-    async function dialog({src,target=null,ratio=16/9,file=null}) {
+    async function dialog({src,target=null,ratio=16/9,file=null,fit=fitOf(target)}) {
         const picture=await natural(src), original=current(target,src), value=copy(original), undo=snapshot(target);
+        if (ratio === null) ratio = picture.naturalWidth / picture.naturalHeight;
         const editor = !file && visualEditor();
         return new Promise(resolve=>{
             modalOpen=true;if(hoverButton)hoverButton.hidden=true;
@@ -225,7 +232,7 @@
             box.append(title,help,preview,controls,note,error,actions);document.body.append(box);
             const priorFocus=document.activeElement;
             function paint(){
-                const w=preview.clientWidth,h=preview.clientHeight,k=Math.max(w/picture.naturalWidth,h/picture.naturalHeight)*value.zoom;
+                const w=preview.clientWidth,h=preview.clientHeight,k=(fit==='contain'?Math.min:Math.max)(w/picture.naturalWidth,h/picture.naturalHeight)*value.zoom;
                 const iw=picture.naturalWidth*k,ih=picture.naturalHeight*k;
                 Object.assign(img.style,{width:iw+'px',height:ih+'px',left:(w-iw)*value.x/100+'px',top:(h-ih)*value.y/100+'px'});
                 zoom.value=value.zoom;output.textContent=Math.round(value.zoom*100)+'%';minus.disabled=value.zoom<=1;plus.disabled=value.zoom>=4;
@@ -237,7 +244,7 @@
             preview.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();preview.focus();preview.setPointerCapture(e.pointerId);drag={id:e.pointerId,x:e.clientX,y:e.clientY,value:copy(value)};preview.classList.add('is-dragging');});
             preview.addEventListener('pointermove',e=>{
                 if(!drag||e.pointerId!==drag.id)return;
-                const w=preview.clientWidth,h=preview.clientHeight,k=Math.max(w/picture.naturalWidth,h/picture.naturalHeight)*value.zoom;
+                const w=preview.clientWidth,h=preview.clientHeight,k=(fit==='contain'?Math.min:Math.max)(w/picture.naturalWidth,h/picture.naturalHeight)*value.zoom;
                 const dx=picture.naturalWidth*k-w,dy=picture.naturalHeight*k-h;
                 value.x=dx>0.01?clamp(drag.value.x-(e.clientX-drag.x)*100/dx,0,100):50;
                 value.y=dy>0.01?clamp(drag.value.y-(e.clientY-drag.y)*100/dy,0,100):50;paint();
@@ -352,7 +359,7 @@
                 // determine the upload preview instead of the landscape fallback.
                 const assignedTarget=uploadTargets.get(input);
                 const target=findTarget(assignedTarget)||assignedTarget||findTarget(input.closest('form,.modal,.card')||input.parentElement);
-                for(const file of pictures){if(files.has(file))continue;const src=nativeObjectURL(file);sources.set(src,file);const value=await dialog({src,target:null,file,ratio:baseRatio(target,input)});URL.revokeObjectURL(src);sources.delete(src);if(!value){input.value='';break;}}
+                for(const file of pictures){if(files.has(file))continue;const src=nativeObjectURL(file);sources.set(src,file);const value=await dialog({src,target:null,file,ratio:baseRatio(target,input),fit:fitOf(target)});URL.revokeObjectURL(src);sources.delete(src);if(!value){input.value='';break;}}
                 input.dispatchEvent(new Event('change',{bubbles:true}));
             }).catch(err=>{console.error('Image framing:',err);input.value='';input.dispatchEvent(new Event('change',{bubbles:true}));});
         },true);

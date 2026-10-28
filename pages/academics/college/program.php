@@ -218,7 +218,7 @@ if ($program !== null) {
     $departmentIndexTitle = $isBasicProgram ? 'Basic Education Departments' : ($isGraduateProgram ? 'Graduate School' : 'College Departments');
     $departmentIndexUrl = $isBasicProgram ? '/pages/academics/basic-edu/basic-edu-dept.php' : ($isGraduateProgram ? '/pages/academics/graduate-school/graduate-school.php' : '/pages/academics/college/college-dept.php');
     $deptUrl    = !empty($program['dept_slug'])
-        ? '/pages/academics/college/college-department.php?slug=' . rawurlencode($program['dept_slug'])
+        ? '/pages/academics/college/college-department/' . rawurlencode($program['dept_slug'])
         : '/pages/academics/college/college-dept.php';
     if ($isBasicProgram && in_array($program['dept_slug'] ?? '', ['casa-gradeschool', 'hs-monte', 'jhs-regular', 'shs-regular'], true)) {
         $deptUrl = '/pages/academics/basic-edu/basic-edu-department/' . rawurlencode($program['dept_slug']) . '.php';
@@ -607,7 +607,7 @@ if ($program !== null) {
                 <?php foreach ($uniforms as $u): ?>
                 <div class="col-lg-5 col-md-6">
                     <div class="template-uniform-card">
-                        <img src="<?= $e($u['image_url']) ?>" alt="<?= $e($u['title'] !== '' ? $u['title'] : 'Uniform') ?>" loading="lazy" onclick="openUniformLightbox(this.src, this.alt)">
+                        <img src="<?= $e($u['image_url']) ?>" alt="<?= $e($u['title'] !== '' ? $u['title'] : 'Uniform') ?>" data-image-frame-ratio="natural" loading="lazy" onclick="openUniformLightbox(this.src, this.alt)">
                     </div>
                 </div>
                 <?php endforeach; ?>

@@ -71,7 +71,7 @@ $roleName = (string)($currentUser['role'] ?? ($_SESSION['role'] ?? ''));
 $basicEduSlugs = ['casa-gradeschool', 'jhs-regular', 'hs-monte', 'shs-regular'];
 
 // Pages that are NOT edited with the text editor (they have their own tools)
-$customSlugs = ['home', 'college-departments', 'programs', 'administration', 'graduate-school', 'tuition-fees', 'online-payment-guide'];
+$customSlugs = ['home', 'college-departments', 'programs', 'administration', 'graduate-school', 'tuition-fees', 'online-payment-guide', 'scholarships'];
 
 // Where each page appears on the public website (shown as "View live page")
 $publicUrls = [
@@ -129,6 +129,8 @@ $publicUrls['athletics-sports'] = '/pages/student%20life/athletics-sports.php';
 $publicUrls['student-achievements'] = '/pages/student%20life/student-achievement.php';
 $titleOf['tuition-fees'] = 'Tuition and Fees';
 $titleOf['online-payment-guide'] = 'Online Payment Guide';
+$titleOf['scholarships'] = 'Scholarship Opportunities';
+$publicUrls['scholarships'] = '/pages/admission/scholarship.php';
 $publicUrls['student-organizations'] = studentOrganizationsUrl();
 
 // News, announcements and events keep their own editors (and their approval workflow). The Visual Editor opens those very
@@ -183,7 +185,7 @@ $pending = ($canApprove && $reviewReady) ? getPendingSections() : [];
 // ── Which panel is open? ──
 $validPanels = ['hub'];
 if ($canApprove) $validPanels[] = 'review';
-if ($canManagePages) { $validPanels[] = 'home'; $validPanels[] = 'basic-education'; $validPanels[] = 'student-organizations'; $validPanels[] = 'student-achievements'; $validPanels[] = 'athletics-sports'; $validPanels[] = 'tuition-fees'; $validPanels[] = 'online-payment-guide'; }
+if ($canManagePages) { $validPanels[] = 'home'; $validPanels[] = 'basic-education'; $validPanels[] = 'student-organizations'; $validPanels[] = 'student-achievements'; $validPanels[] = 'athletics-sports'; $validPanels[] = 'tuition-fees'; $validPanels[] = 'online-payment-guide'; $validPanels[] = 'scholarships'; }
 if ($postModules && $canManagePages) $validPanels[] = 'updates';
 if ($canManagePages) $validPanels[] = 'community-activities';
 if ($canManagePages) $validPanels[] = 'faqs';
@@ -208,6 +210,7 @@ if ($editorMode) {
         : (in_array($activeSlug, ['college-departments', 'programs', 'basic-education', 'graduate-school'], true) ? 'entity' : 'sections'))));
     if ($activeSlug === 'tuition-fees') $veKind = 'tuition';
     if ($activeSlug === 'online-payment-guide') $veKind = 'payment-guide';
+    if ($activeSlug === 'scholarships') $veKind = 'scholarships';
     if ($activeSlug === 'student-achievements') $veKind = 'achievements';
     if ($activeSlug === 'athletics-sports') $veKind = 'sports';
     if ($activeSlug === 'community-activities') $veKind = 'community';
@@ -227,6 +230,7 @@ if ($editorMode) {
     if ($canManagePages) $pickerPages[] = ['slug'=>'community-activities','title'=>'Community Extension Activities','group'=>'Student life','icon'=>'heart'];
     if ($canManagePages) $pickerPages[] = ['slug'=>'faqs','title'=>'Frequently Asked Questions','group'=>'Student resources','icon'=>'question-circle'];
     if ($canManagePages && !in_array('online-payment-guide',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'online-payment-guide','title'=>'Online Payment Guide','group'=>'Admissions','icon'=>'credit-card'];
+    if ($canManagePages && !in_array('scholarships',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'scholarships','title'=>'Scholarship Opportunities','group'=>'Admissions','icon'=>'mortarboard'];
     if ($canManagePages && !in_array('tuition-fees',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'tuition-fees','title'=>'Tuition and Fees','group'=>'Admissions','icon'=>'file-earmark-pdf'];
     if ($postModules && $canManagePages) $pickerPages[] = ['slug' => 'updates', 'title' => 'News, announcements & events', 'group' => 'Posts', 'icon' => 'megaphone'];
 
@@ -242,7 +246,7 @@ if ($editorMode) {
         $subs[] = ['label'=>'All organizations','url'=>$withPreview(studentOrganizationsUrl())];
         $publicUrl = studentOrganizationsUrl();
         foreach (studentOrganizations(true) as $organization) {
-            $subs[] = ['key'=>$organization['slug'],'label'=>$organization['name'].($organization['status']==='draft'?' (Unpublished)':''),'url'=>$withPreview(studentOrganizationsUrl($organization['slug']))];
+            $subs[] = ['key'=>$organization['slug'],'label'=>$organization['name'].(!empty($organization['archived_at'])?' (Archived)':($organization['status']==='draft'?' (Unpublished)':'')),'url'=>$withPreview(studentOrganizationsUrl($organization['slug']))];
             if ($wantSub === $organization['slug']) $publicUrl=studentOrganizationsUrl($organization['slug']);
         }
         $pageUrl=$withPreview($publicUrl);
@@ -400,6 +404,7 @@ foreach (getContentHubPages() as $row) {
               'where' => $publicUrls[$slug] ?? ''];
 }
 if ($canManagePages) {
+    $hub[] = ['title'=>'Scholarship Opportunities','type'=>'Admissions','status'=>'live','ts'=>0,'note'=>'Scholarship information, photos, discounts and application requirements','open'=>'scholarships','href'=>'?page=scholarships','where'=>$publicUrls['scholarships']];
     $hub[] = ['title'=>'Online Payment Guide','type'=>'Admissions','status'=>'live','ts'=>0,'note'=>'Payment instructions, account details, links and illustrations','open'=>'online-payment-guide','href'=>'?page=online-payment-guide','where'=>$publicUrls['online-payment-guide']];
     $hub[] = ['title'=>'Tuition and Fees','type'=>'Admissions','status'=>'live','ts'=>0,'note'=>'Tuition text, fee categories and PDF schedules','open'=>'tuition-fees','href'=>'?page=tuition-fees','where'=>$publicUrls['tuition-fees']];
     foreach ($customPages as $cp) {
@@ -415,7 +420,7 @@ if ($canManagePages) {
     $hub[] = ['title'=>'Community Extension Activities','type'=>'Student life','status'=>'live','ts'=>0,'note'=>'Activities, categories, photos and display order','open'=>'community-activities','href'=>'?page=community-activities','where'=>$publicUrls['community-activities']];
     $hub[] = ['title'=>'Frequently Asked Questions','type'=>'Student resources','status'=>'live','ts'=>0,'note'=>'Questions, answers and display order','open'=>'faqs','href'=>'?page=faqs','where'=>$publicUrls['faqs']];
     foreach (studentOrganizations(true) as $organization) {
-        $hub[] = ['title'=>$organization['name'],'type'=>'Organization','status'=>$organization['status']==='published'?'live':'draft','ts'=>strtotime($organization['updated_at']),'note'=>$organization['category_name']??'Uncategorized','open'=>'student-organizations','href'=>'?page=student-organizations&sub='.rawurlencode($organization['slug']),'where'=>studentOrganizationsUrl($organization['slug'])];
+        $hub[] = ['title'=>$organization['name'],'type'=>'Organization','status'=>!empty($organization['archived_at'])?'hidden':($organization['status']==='published'?'live':'draft'),'ts'=>strtotime($organization['updated_at']),'note'=>$organization['category_name']??'Uncategorized','open'=>'student-organizations','href'=>'?page=student-organizations&sub='.rawurlencode($organization['slug']),'where'=>studentOrganizationsUrl($organization['slug'])];
     }
     foreach (getContentHubDepartments() as $d) {
         $isBasic = !empty($d['slug']) && in_array((string)$d['slug'], $basicEduSlugs, true);
@@ -687,6 +692,7 @@ include __DIR__ . '/../components/header-admin.php';
             <a class="ce-nav-link" href="?page=student-organizations"><i class="bi bi-people"></i><span>Student Organizations Management</span></a>
             <a class="ce-nav-link" href="?page=student-achievements"><i class="bi bi-trophy"></i><span>Student Achievements</span></a>
             <a class="ce-nav-link" href="?page=athletics-sports"><i class="bi bi-dribbble"></i><span>Athletics and Sports</span></a>
+            <a class="ce-nav-link" href="?page=community-activities"><i class="bi bi-heart"></i><span>Community Extension Activities</span></a>
         </div>
         <?php endif; ?>
 

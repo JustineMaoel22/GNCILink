@@ -15,6 +15,7 @@ function studentOrgPageFields(): array {
         'section_title' => ['Section heading', 'Student Organizations', 255],
         'section_description' => ['Section description', 'A place for every interest, every course, and every GNCian.', 1500],
         'gallery_title' => ['Gallery heading', 'Through the Lens', 255],
+        'facebook_eyebrow' => ['Contact section eyebrow', 'Stay Updated', 100],
         'facebook_title' => ['Facebook heading', 'Connect with Us', 255],
         'facebook_description' => ['Facebook introduction', 'If you have concerns or need assistance feel free to message our page.', 1500],
         'leadership_title' => ['Leadership section heading', 'Leadership and Capacity Building', 255],
@@ -93,7 +94,7 @@ function studentOrganizations(bool $includeDrafts = false): array {
         return getDB()->query("SELECT o.*, c.name AS category_name,l.file_path AS logo_url,b.file_path AS cover_url
             FROM student_organizations o LEFT JOIN student_org_categories c ON c.category_id=o.category_id
             LEFT JOIN media_library l ON l.media_id=o.logo_media_id LEFT JOIN media_library b ON b.media_id=o.cover_media_id
-            " . ($includeDrafts ? '' : "WHERE o.status='published'") . ' ORDER BY o.display_order,o.org_id')->fetchAll(PDO::FETCH_ASSOC);
+            " . ($includeDrafts ? '' : "WHERE o.status='published' AND o.archived_at IS NULL") . ' ORDER BY o.display_order,o.org_id')->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) { if ($e->getCode() !== '42S02') throw $e; return []; }
 }
 function studentOrganizationGallery(int $id): array {
@@ -131,6 +132,9 @@ function saveStudentOrganization(array $input, array $files = []): array {
     if ($data['name'] === '' && !contentPublishAllowsIncomplete()) throw new InvalidArgumentException('Enter an organization name.');
     $status = $input['status'] ?? $current['status'] ?? 'draft';
     if (!in_array($status, ['draft','published'], true)) throw new InvalidArgumentException('Choose Published or Unpublished.');
+    if (array_key_exists('archived',$input) && !in_array($input['archived'],[0,1,'0','1'],true)) throw new InvalidArgumentException('Invalid archive state.');
+    $archivedAt=$current['archived_at']??null;
+    if (array_key_exists('archived',$input)) $archivedAt=(int)$input['archived']===1?($archivedAt??date('Y-m-d H:i:s')):null;
     $category = (int)($input['category_id'] ?? $current['category_id'] ?? 0);
     if ($category && !in_array($category, array_map('intval',array_column(studentOrgCategories(),'category_id')),true)) throw new InvalidArgumentException('Category not found.');
     if ($data['facebook_url'] !== '') {
@@ -172,8 +176,8 @@ function saveStudentOrganization(array $input, array $files = []): array {
             $stmt=$db->prepare('INSERT INTO student_organizations (slug,name,display_order) VALUES (?,?,(SELECT COALESCE(MAX(display_order),0)+1 FROM (SELECT display_order FROM student_organizations) ranked))');
             $stmt->execute([$slug,$data['name']]); $id=(int)$db->lastInsertId();
         }
-        $stmt=$db->prepare('UPDATE student_organizations SET name=?,category_id=?,description=?,about_text=?,vision=?,mission=?,facebook_url=?,logo_media_id=?,cover_media_id=?,status=? WHERE org_id=?');
-        $stmt->execute([$data['name'],$category?:null,$data['description'],$data['about_text'],$data['vision'],$data['mission'],$data['facebook_url'],$data['logo_media_id'],$data['cover_media_id'],$status,$id]);
+        $stmt=$db->prepare('UPDATE student_organizations SET name=?,category_id=?,description=?,about_text=?,vision=?,mission=?,facebook_url=?,logo_media_id=?,cover_media_id=?,status=?,archived_at=? WHERE org_id=?');
+        $stmt->execute([$data['name'],$category?:null,$data['description'],$data['about_text'],$data['vision'],$data['mission'],$data['facebook_url'],$data['logo_media_id'],$data['cover_media_id'],$status,$archivedAt,$id]);
         foreach ($gallery as $image) if (in_array((int)$image['image_id'],$remove,true)) {
             $db->prepare('DELETE FROM student_org_gallery WHERE image_id=? AND org_id=?')->execute([$image['image_id'],$id]); $retired[]=(int)$image['media_id'];
         }
@@ -195,6 +199,36 @@ function deleteStudentOrganization(int $id): void {
     $media=array_merge([$current['logo_media_id'],$current['cover_media_id']],array_column(studentOrganizationGallery($id),'media_id'));
     getDB()->prepare('DELETE FROM student_organizations WHERE org_id=?')->execute([$id]);
     if (!getDB()->inTransaction()) foreach (array_unique(array_filter($media)) as $item) deleteMediaIfUnreferenced((int)$item);
+}
+function reorderStudentOrganizations(array $orderedIds): void {
+    if (!$orderedIds || count($orderedIds)>1000 || !array_is_list($orderedIds)) throw new InvalidArgumentException('Invalid organization order.');
+    foreach ($orderedIds as $id) if (!is_int($id) || $id<=0) throw new InvalidArgumentException('Invalid organization order.');
+    if (count(array_unique($orderedIds))!==count($orderedIds)) throw new InvalidArgumentException('Duplicate organizations in order.');
+    $db=getDB(); $owns=!$db->inTransaction(); if ($owns) $db->beginTransaction();
+    try {
+        $ids=array_map('intval',$db->query('SELECT org_id FROM student_organizations ORDER BY display_order,org_id FOR UPDATE')->fetchAll(PDO::FETCH_COLUMN));
+        if (array_diff($orderedIds,$ids)) throw new InvalidArgumentException('An organization no longer exists. Refresh and try again.');
+        // Replace only these slots, preserving other categories and pagination pages.
+        $selected=array_fill_keys($orderedIds,true); $next=0;
+        foreach ($ids as &$id) if (isset($selected[$id])) $id=$orderedIds[$next++];
+        unset($id);
+        $stmt=$db->prepare('UPDATE student_organizations SET display_order=? WHERE org_id=?');
+        foreach ($ids as $i=>$id) $stmt->execute([$i,$id]);
+        if ($owns) $db->commit();
+    } catch (Throwable $e) { if ($owns) $db->rollBack(); throw $e; }
+}
+function swapStudentOrganizations(int $id, int $targetId): void {
+    if ($id <= 0 || $targetId <= 0 || $id === $targetId) throw new InvalidArgumentException('Choose two different organizations.');
+    $db=getDB(); $owns=!$db->inTransaction(); if ($owns) $db->beginTransaction();
+    try {
+        $ids=array_map('intval',$db->query('SELECT org_id FROM student_organizations ORDER BY display_order,org_id FOR UPDATE')->fetchAll(PDO::FETCH_COLUMN));
+        $first=array_search($id,$ids,true); $second=array_search($targetId,$ids,true);
+        if ($first===false || $second===false) throw new InvalidArgumentException('Organization not found.');
+        [$ids[$first],$ids[$second]]=[$ids[$second],$ids[$first]];
+        $stmt=$db->prepare('UPDATE student_organizations SET display_order=? WHERE org_id=?');
+        foreach ($ids as $i=>$org) $stmt->execute([$i,$org]);
+        if ($owns) $db->commit();
+    } catch (Throwable $e) { if ($owns) $db->rollBack(); throw $e; }
 }
 function moveStudentOrganization(int $id, int $direction): void {
     if (!in_array($direction,[-1,1],true)) throw new InvalidArgumentException('Invalid order.');

@@ -9,7 +9,7 @@ $orgEscape=static fn($value)=>htmlspecialchars((string)$value,ENT_QUOTES,'UTF-8'
     <div class="d-flex justify-content-between align-items-center mb-3"><h3 class="h6 mb-0">Organizations</h3><button type="button" class="btn-gnc-primary btn-sm" id="orgAdd">Add Organization</button></div>
     <div class="org-management-list">
     <?php foreach ($orgRows as $index=>$row): ?>
-        <div class="org-management-row"><div><strong><?= $orgEscape($row['name']) ?></strong><small><?= $orgEscape($row['category_name']?:'Uncategorized') ?> · <?= $row['status']==='published'?'Published':'Unpublished' ?></small></div><div class="org-management-actions">
+        <div class="org-management-row" data-org-row="<?= (int)$row['org_id'] ?>"><div><strong><?= $orgEscape($row['name']) ?></strong><small><?= $orgEscape($row['category_name']?:'Uncategorized') ?> · <?= $row['status']==='published'?'Published':'Unpublished' ?></small></div><div class="org-management-actions">
             <button type="button" class="btn btn-sm btn-outline-secondary" data-org-edit="<?= (int)$row['org_id'] ?>">Edit</button>
             <a class="btn btn-sm btn-outline-secondary" href="?page=student-organizations&amp;sub=<?= rawurlencode($row['slug']) ?>">Preview</a>
             <button type="button" class="btn btn-sm btn-outline-secondary" data-org-move="<?= (int)$row['org_id'] ?>" data-direction="-1" aria-label="Move <?= $orgEscape($row['name']) ?> up"<?= $index===0?' disabled':'' ?>>↑</button>
@@ -66,6 +66,24 @@ $orgEscape=static fn($value)=>htmlspecialchars((string)$value,ENT_QUOTES,'UTF-8'
     }
     async function post(fd){fd.set('csrf_token',csrf);const response=await fetch('/admin/action/student-organizations-handler.php',{method:'POST',credentials:'same-origin',body:fd});let result;try{result=await response.json();}catch(_){throw Error('The server could not read the request. Try smaller image files.');}if(!response.ok||!result.success)throw Error(result.error||'Could not save the change.');return result;}
     function reload(slug){changed(false);window.__veLeaving=true;location.href='?page=student-organizations'+(slug?'&sub='+encodeURIComponent(slug):'');}
+    function updateOrder(order){
+        const list=root.querySelector('.org-management-list');
+        order.forEach(id=>{const row=list.querySelector('[data-org-row="'+id+'"]');if(row)list.appendChild(row);});
+        const rows=Array.from(list.querySelectorAll('[data-org-row]'));
+        rows.forEach((row,index)=>row.querySelectorAll('[data-org-move]').forEach(button=>{button.disabled=button.dataset.direction==='-1'?index===0:index===rows.length-1;}));
+    }
+    document.addEventListener('org:order-updated',event=>updateOrder(event.detail.order||[]));
+    async function moveOrganization(values){
+        if(busy)return;
+        if(window.OrganizationEditor&&window.OrganizationEditor.hasChanges()){await window.AdminDialogs.alert('Save or publish your visual edits before changing the order.');return;}
+        busy=true;root.querySelectorAll('[data-org-move]').forEach(button=>button.disabled=true);
+        try{
+            const result=await post(new URLSearchParams(values));
+            if(Array.isArray(result.order))updateOrder(result.order);
+            if(window.OrganizationEditor&&window.OrganizationEditor.refreshOrder)await window.OrganizationEditor.refreshOrder();
+        }catch(error){await window.AdminDialogs.alert(error.message);}
+        finally{busy=false;updateOrder(Array.from(root.querySelectorAll('[data-org-row]'),row=>row.dataset.orgRow));}
+    }
     async function action(values){if(busy||!await discard()||!await visualGuard())return;busy=true;root.querySelectorAll('button').forEach(button=>button.disabled=true);try{await post(new URLSearchParams(values));reload();}catch(error){await window.AdminDialogs.alert(error.message);busy=false;root.querySelectorAll('button').forEach(button=>button.disabled=false);}}
     document.getElementById('orgAdd').addEventListener('click',()=>edit(0));
     document.getElementById('orgCancel').addEventListener('click',async()=>{if(await discard()){form.hidden=true;changed(false);}});
@@ -77,7 +95,7 @@ $orgEscape=static fn($value)=>htmlspecialchars((string)$value,ENT_QUOTES,'UTF-8'
     root.addEventListener('click',async event=>{const button=event.target.closest('button');if(!button)return;
         if(button.dataset.orgEdit){edit(button.dataset.orgEdit);return;}
         if(button.dataset.orgDelete){const record=records.find(row=>Number(row.org_id)===Number(button.dataset.orgDelete));if(await window.AdminDialogs.confirm('Delete “'+record.name+'” permanently? This removes its page and gallery.'))action({action:'delete',org_id:record.org_id});}
-        if(button.dataset.orgMove)action({action:'move',org_id:button.dataset.orgMove,direction:button.dataset.direction});
+        if(button.dataset.orgMove)moveOrganization({action:'move',org_id:button.dataset.orgMove,direction:button.dataset.direction});
         if(button.dataset.categoryEdit){const category=categories.find(row=>Number(row.category_id)===Number(button.dataset.categoryEdit));categoryForm.elements.category_id.value=category.category_id;categoryForm.elements.name.value=category.name;categoryForm.elements.name.focus();}
         if(button.dataset.categoryDelete&&await window.AdminDialogs.confirm('Delete this category? Its organizations will remain available as Uncategorized.'))action({action:'delete_category',category_id:button.dataset.categoryDelete});
     });

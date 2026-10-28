@@ -45,6 +45,8 @@
     function openWhenReady() {
         clearTimeout(openTimer);
         if(hasOpened || !selected.length)return;
+        if(window.GNCVisitorFeedback?.hasPrompted())return;
+        if(window.GNCVisitorFeedback?.due()){openTimer=setTimeout(openWhenReady,1000);return;}
         const remaining=dueAt-Date.now();
         if(remaining>0){openTimer=setTimeout(openWhenReady,remaining);return;}
         if(document.hidden)return;

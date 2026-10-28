@@ -1,0 +1,30 @@
+html.gnc-feedback-open { overflow: hidden; scrollbar-gutter: stable; }
+.gnc-feedback { position: fixed; inset: 0; width: min(700px,calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid #dce5dc; border-radius: 20px; background: #faf9f5; color: #183b28; box-shadow: 0 24px 80px #08231540; overflow: auto; overscroll-behavior: contain; font: 14px/1.6 Inter,system-ui,sans-serif; }
+.gnc-feedback:not([open]),.gnc-feedback[hidden],.gnc-feedback [hidden] { display: none !important; }
+.gnc-feedback::backdrop { background: #08231599; backdrop-filter: blur(3px); }
+.gnc-feedback[open] { animation: gnc-feedback-in .22s ease-out; }
+.gnc-feedback[open]::backdrop { animation: gnc-feedback-fade-in .22s ease-out; }
+.gnc-feedback.is-closing { animation: gnc-feedback-out .18s ease-in forwards; }
+.gnc-feedback.is-closing::backdrop { animation: gnc-feedback-fade-out .18s ease-in forwards; }
+.gnc-feedback-inner { position: relative; padding: 32px; text-align: center; }
+.gnc-feedback-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #866717; }
+.gnc-feedback h2 { font: 700 clamp(24px,5vw,30px)/1.25 Georgia,serif; margin: 12px 18px; }
+.gnc-feedback p { color: #59655d; margin: 12px 0; }
+.gnc-feedback button { font: inherit; cursor: pointer; border-radius: 9px; padding: 10px 16px; border: 1px solid #b8c9bd; }
+.gnc-feedback .gnc-feedback-primary { color: #fff; background: #0b4228; border-color: #0b4228; }
+.gnc-feedback .gnc-feedback-primary:hover { background: #1f5e2c; }
+.gnc-feedback .gnc-feedback-secondary { color: #174c2a; background: #fff; }
+.gnc-feedback .gnc-feedback-close { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: #eaf0e9; color: #174c2a; font: 26px/1 system-ui,sans-serif; }
+.gnc-feedback button:focus-visible { outline: 3px solid #bd941c; outline-offset: 3px; }
+.gnc-feedback button:disabled { cursor: default; opacity: .55; }
+.gnc-feedback-form { display: block; width: 100%; height: min(540px,55dvh); min-height: 240px; margin: 20px 0 12px; border: 1px solid #dce5dc; border-radius: 10px; background: #fff; }
+.gnc-feedback .gnc-feedback-help { font-size: 12px; }
+.gnc-feedback-fallback { color: #1f5e2c; font-size: 12px; text-decoration: underline; }
+.gnc-feedback-fallback:focus-visible { outline: 3px solid #bd941c; outline-offset: 3px; }
+.gnc-feedback-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+@keyframes gnc-feedback-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes gnc-feedback-out { to { opacity: 0; transform: translateY(8px) scale(.98); } }
+@keyframes gnc-feedback-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gnc-feedback-fade-out { to { opacity: 0; } }
+@media(max-width:400px) { .gnc-feedback-inner { padding: 28px 18px; } .gnc-feedback-actions button { flex: 1; } }
+@media(prefers-reduced-motion:reduce) { .gnc-feedback,.gnc-feedback::backdrop { animation: none !important; transition: none !important; } }

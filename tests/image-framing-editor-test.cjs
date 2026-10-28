@@ -7,6 +7,7 @@ const framing = fs.readFileSync('assets/js/image-framing.js', 'utf8');
 const updates = [], requests = [], messages = [];
 let confirmation, fail = false, otherChanges = 0, otherPublishes = 0;
 const context = vm.createContext({
+    C: {}, drafts: null,
     window: { GNCImageFraming: { set: (path, value) => updates.push({ path, value }) } },
     S: { busy: false, win: { GNCImageFraming: { set: (path, value) => updates.push({ path, value }) } } },
     same: (a, b) => JSON.stringify(a) === JSON.stringify(b),

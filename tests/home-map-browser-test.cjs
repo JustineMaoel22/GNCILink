@@ -38,6 +38,7 @@ let socket;
 
     const base = process.env.BASE_URL || 'http://localhost:8080';
     await send('Network.enable');
+    await send('Network.setCacheDisabled', { cacheDisabled: true });
     await send('Network.setBlockedURLs', { urls: ['*fonts.gstatic.com*', '*cdn.jsdelivr.net*', '*facebook.com*', '*cloudflareinsights.com*', '*cdnjs.cloudflare.com*'] });
     // Leave the optional font stylesheet pending to simulate a slow external service.
     let fontPending = false;
@@ -50,6 +51,10 @@ let socket;
     await until(() => fontPending, 'Font request was not intercepted');
     await delay(1500);
     assert.equal(await evaluate("!!document.getElementById('map') && document.querySelectorAll('.chip').length === 9"), true, 'Map must initialize while the optional font stylesheet is still pending');
+    assert.equal(await evaluate("(()=>{const m=document.getElementById('map'),r=m.getBoundingClientRect(),v=m.viewBox.baseVal;return v.x<=0&&v.y<=0&&v.x+v.width>=1421.9&&v.y+v.height>=2303.9&&Math.abs(v.width/v.height-r.width/r.height)<.001;})()"),true,'Cold startup shows the entire campus before fonts finish');
+    await evaluate("document.getElementById('map').style.width='85%'");
+    await until(()=>evaluate("(()=>{const m=document.getElementById('map'),r=m.getBoundingClientRect(),v=m.viewBox.baseVal;return Math.abs(v.width/v.height-r.width/r.height)<.001;})()"),'Camera must follow SVG viewport changes even when its outer container stays unchanged');
+    await evaluate("document.getElementById('map').style.width=''");
     await evaluate("go('beta')");
     assert.equal(await evaluate("current === 'beta' && document.getElementById('path').classList.contains('go')"), true, 'Building routes work without the external font');
     await send('Fetch.disable');
@@ -72,6 +77,7 @@ let socket;
         await until(() => evaluate("!!document.querySelector('.gnc-map-frame') && document.readyState !== 'loading'"), 'Homepage unavailable');
         await evaluate("document.documentElement.classList.remove('gnc-intro-on'); document.querySelector('.gnc-map-frame').scrollIntoView({block:'start',behavior:'instant'})");
         await until(() => evaluate("(() => { const f=document.querySelector('.gnc-map-frame'); return getComputedStyle(f).opacity === '1' && !!f.contentDocument.getElementById('map') && f.contentDocument.querySelectorAll('.chip').length === 9; })()"), 'Map did not appear on first scroll at ' + width);
+        assert.equal(await evaluate("(()=>{const frame=document.querySelector('.gnc-map-frame'),m=frame.contentDocument.getElementById('map'),r=m.getBoundingClientRect(),v=m.viewBox.baseVal;return v.x<=0&&v.y<=0&&v.x+v.width>=1421.9&&v.y+v.height>=2303.9&&Math.abs(v.width/v.height-r.width/r.height)<.001;})()"),true,'First visit fits the full campus at '+width+'px without resetting');
         await evaluate("document.querySelector('.gnc-map-frame').contentWindow.go('banzali')");
         assert.equal(await evaluate("document.querySelector('.gnc-map-frame').contentWindow.current"), 'banzali');
         await evaluate("scrollTo({top:0,behavior:'instant'})");

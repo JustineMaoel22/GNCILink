@@ -34,9 +34,9 @@ try {
         catch (InvalidArgumentException $expected) {}
         settingsCheck(!aiImageCheckerEnabled(), 'Invalid requests preserve saved preference');
     }
-    foreach (['Content Admin', 'Content Editor', 'Office Staff'] as $role) {
+    foreach (['The Mirror', 'Office Staff'] as $role) {
         $_SESSION['user_role'] = $role;
-        settingsCheck(!hasPermission('manage_settings'), 'Settings permission is Super Admin only');
+        settingsCheck(!hasPermission('manage_settings'), 'Restricted roles cannot manage settings');
         try { saveAiImageCheckerSetting(['csrf_token' => $token, 'ai_image_checker_enabled' => '1']); throw new Exception('Unauthorized update accepted'); }
         catch (RuntimeException $expected) {}
         settingsCheck(!aiImageCheckerEnabled(), 'Unauthorized save preserves preference');
@@ -44,6 +44,28 @@ try {
     $_SESSION['user_role'] = 'Super Admin';
     saveAiImageCheckerSetting(['csrf_token' => $token, 'ai_image_checker_enabled' => '1']);
     settingsCheck(photoCheckImage($photo)['reason'] === 'ai_generated', 'Re-enabling restores enforcement');
+    $db->exec("DELETE FROM admin_settings WHERE setting_key='page_suggestions_enabled'");
+    settingsCheck(pageSuggestionsEnabled(),'Missing popup setting defaults to On');
+    savePageSuggestionsSetting(['csrf_token'=>$token,'page_suggestions_enabled'=>'0']);
+    settingsCheck(!pageSuggestionsEnabled(),'Popup Off persists');
+    settingsCheck(aiImageCheckerEnabled(),'Popup preference preserves AI image checker preference');
+    ob_start();include __DIR__.'/../components/recommendations.php';$disabledMarkup=ob_get_clean();
+    settingsCheck(!str_contains($disabledMarkup,'gncRecommendations')&&!str_contains($disabledMarkup,'recommendations.js'),'Off suppresses popup markup and scripts');
+    foreach ([['csrf_token'=>'invalid','page_suggestions_enabled'=>'1'],['csrf_token'=>$token,'page_suggestions_enabled'=>'yes'],['csrf_token'=>$token,'page_suggestions_enabled'=>['1']],['csrf_token'=>$token]] as $input) {
+        $rejected=false;try{savePageSuggestionsSetting($input);}catch(InvalidArgumentException $e){$rejected=true;}
+        settingsCheck($rejected&&!pageSuggestionsEnabled(),'Malformed popup settings and missing CSRF preserve Off');
+    }
+    foreach (['The Mirror','Office Staff'] as $role) {
+        $_SESSION['user_role']=$role;
+        $rejected=false;try{savePageSuggestionsSetting(['csrf_token'=>$token,'page_suggestions_enabled'=>'1']);}catch(RuntimeException $e){$rejected=true;}
+        settingsCheck($rejected&&!pageSuggestionsEnabled(),'Unauthorized roles cannot enable the popup');
+    }
+    $_SESSION['user_role']='Super Admin';
+    savePageSuggestionsSetting(['csrf_token'=>$token,'page_suggestions_enabled'=>'1']);
+    settingsCheck(pageSuggestionsEnabled(),'Popup On persists');
+    ob_start();include __DIR__.'/../components/recommendations.php';$enabledMarkup=ob_get_clean();
+    settingsCheck(str_contains($enabledMarkup,'id="gncRecommendations"')&&str_contains($enabledMarkup,'/assets/js/recommendations.js'),'On restores popup markup and scripts');
+    echo "PASS: suggested pages popup default, saved On/Off, rendering, independent preferences, CSRF, malformed inputs, and role restrictions.\n";
     echo "PASS: default On, persisted On/Off, AI enforcement restored, disabled checks bypassed, invalid files blocked, CSRF, input validation and role restrictions; database writes rolled back and no AI API calls made.\n";
 } finally {
     $db->rollBack();

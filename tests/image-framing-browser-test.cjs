@@ -23,7 +23,8 @@ const php=(...args)=>execFileSync('docker',['compose','exec','-T','--user','www-
     const base=process.env.BASE_URL||'http://localhost:8080';
     await send('Page.enable');await send('Network.enable');await send('Runtime.enable');socket.addEventListener('message',e=>{const p=JSON.parse(e.data);if(p.method==='Runtime.exceptionThrown')console.error('Browser exception:',JSON.stringify(p.params.exceptionDetails));});
     await send('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*','*cdn.jsdelivr.net*','*cdnjs.cloudflare.com*','*facebook.com*','*youtube.com*']});
-    session=JSON.parse(php('session'));
+    const auth=JSON.parse(execFileSync('docker',['compose','exec','-T','--user','www-data','web','php','tests/admin-design-session.php','create'],{encoding:'utf8',windowsHide:true}));
+    session={name:auth.name,id:auth.value};
     await send('Network.setCookie',{name:session.name,value:session.id,url:base});
     await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
 
@@ -68,6 +69,38 @@ const php=(...args)=>execFileSync('docker',['compose','exec','-T','--user','www-
     await evaluate('document.querySelector(".image-frame-actions button").click()');
     await until(()=>evaluate('!document.querySelector(".image-frame-dialog")'),'Portrait cancel failed');
     await evaluate('document.getElementById("emptyPortraitSlot").remove();document.getElementById("unnamedPortraitUpload").remove()');
+    // Organization logos opt into framing while keeping contain sizing at 100%.
+    await evaluate(`(()=>{
+        const slot=document.createElement('span');slot.id='orgLogoSlot';slot.setAttribute('data-image-frame-fit','contain');slot.style.cssText='display:block;width:86px;height:86px;border-radius:50%';
+        const img=document.createElement('img');img.id='orgLogoImage';img.src=${JSON.stringify(imagePath)};img.style.cssText='width:100%;height:100%;object-fit:contain;border-radius:50%';slot.append(img);document.body.append(slot);
+        const plain=img.cloneNode();plain.id='plainContainImage';document.body.append(plain);
+    })()`);
+    await until(()=>evaluate('document.getElementById("orgLogoImage").naturalWidth>0'),'Logo fixture did not load');
+    assert.equal(await evaluate('GNCImageFraming.findTarget(document.getElementById("orgLogoSlot"))?.id'),'orgLogoImage','Organization contain logos can be repositioned');
+    assert.equal(await evaluate('GNCImageFraming.findTarget(document.getElementById("plainContainImage"))'),null,'Other contain illustrations remain unaffected');
+    await evaluate('void GNCImageFraming.edit(document.getElementById("orgLogoSlot"))');
+    await until(()=>evaluate('Boolean(document.querySelector(".image-frame-dialog[open]"))'),'Organization logo dialog unavailable');
+    const logoPreview=await evaluate(`(()=>{const p=document.querySelector('.image-frame-preview'),i=p.querySelector('img');return {width:p.clientWidth,height:p.clientHeight,iw:parseFloat(i.style.width),ih:parseFloat(i.style.height)};})()`);
+    assert(Math.abs(logoPreview.width-logoPreview.height)<2,'Organization logo preview keeps its square frame');
+    assert(logoPreview.iw<=logoPreview.width+1&&logoPreview.ih<=logoPreview.height+1,'Contain logo stays fully visible at 100%');
+    await zoomTo(2);
+    assert.equal(await evaluate('document.getElementById("orgLogoImage").style.transform'),'scale(2)','Zoom applies to the organization logo');
+    await evaluate('document.querySelector(".image-frame-actions button").click()');
+    assert.equal(await evaluate('document.getElementById("orgLogoImage").style.transform'),'','Cancel restores the logo');
+    await evaluate(`(()=>{
+        const input=document.createElement('input');input.type='file';input.id='orgLogoUpload';document.body.append(input);GNCImageFraming.setUploadTarget(input,document.getElementById('orgLogoSlot'));
+        const canvas=document.createElement('canvas');canvas.width=240;canvas.height=120;canvas.getContext('2d').fillRect(0,0,240,120);
+        canvas.toBlob(blob=>{const transfer=new DataTransfer();transfer.items.add(new File([blob],'logo.png',{type:'image/png'}));input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));},'image/png');
+    })()`);
+    await until(()=>evaluate('Boolean(document.querySelector(".image-frame-dialog[open]"))'),'Organization logo upload dialog unavailable');
+    assert.equal(await evaluate(`(()=>{const p=document.querySelector('.image-frame-preview'),i=p.querySelector('img');return Math.abs(parseFloat(i.style.height)-p.clientHeight/2)<2;})()`),true,'Non-square logo upload uses contain sizing in the square frame');
+    await zoomTo(2);
+    await evaluate('document.querySelector(".image-frame-save").click()');
+    await until(()=>evaluate('!document.querySelector(".image-frame-dialog")'),'Organization logo upload not accepted');
+    await evaluate(`(()=>{const input=document.getElementById('orgLogoUpload'),img=document.getElementById('orgLogoImage');img.src=URL.createObjectURL(input.files[0]);})()`);
+    await until(()=>evaluate('document.getElementById("orgLogoImage").style.transform==="scale(2)"'),'Accepted logo zoom did not reflect in the card');
+    await evaluate('document.getElementById("orgLogoSlot").remove();document.getElementById("orgLogoUpload").remove();document.getElementById("plainContainImage").remove()');
+    console.log('PASS: organization logo contain sizing, zoom, cancel, and accepted upload preview; unrelated contain images unchanged');
     await until(()=>evaluate('Boolean(document.getElementById("modal-image-preview")?.getAttribute("src"))'),'Announcement preview missing');
     const beforeStyle=await evaluate('document.getElementById("modal-image-preview").getAttribute("style")');
     await openPreview();

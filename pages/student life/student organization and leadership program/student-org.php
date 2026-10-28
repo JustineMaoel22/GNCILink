@@ -6,7 +6,8 @@ $leadershipImages = studentOrgPageImages();
 $organizations = studentOrganizations($orgPreview);
 $categories = studentOrgCategories();
 $category = max(0, (int)($_GET['category'] ?? 0));
-$filtered = array_values(array_filter($organizations, fn($org) => !$category || (int)$org['category_id'] === $category));
+$archived = $orgPreview && ($_GET['archived'] ?? '') === '1';
+$filtered = array_values(array_filter($organizations, fn($org) => (!$orgPreview || !empty($org['archived_at']) === $archived) && (!$category || (int)$org['category_id'] === $category)));
 $total = count($filtered); $pages = max(1, (int)ceil($total / 6));
 $page = min($pages, max(1, (int)($_GET['p'] ?? 1)));
 $visible = array_slice($filtered, ($page - 1) * 6, 6);
@@ -17,7 +18,7 @@ $leadImage = static function($key,$class) use($leadershipImages,$orgH) {
     $image=$leadershipImages[$key];
     return '<div class="'.$class.'"'.ceManageMark('data-ve-org-page-media="'.$key.'" data-warning-optional="true" data-ve-label="'.$orgH($image['label']).'"').'><img src="'.$orgH($image['path']).'" alt="'.($key==='retreat_photo'?'GNCI campus':'').'" loading="lazy"></div>';
 };
-$pageLink = static fn($number, $filter) => studentOrganizationsUrl() . '?' . http_build_query(array_filter(['category'=>$filter,'p'=>$number,'ce_preview'=>$orgPreview?'1':null],fn($value)=>$value!==null));
+$pageLink = static fn($number, $filter) => studentOrganizationsUrl() . '?' . http_build_query(array_filter(['category'=>$filter,'p'=>$number,'ce_preview'=>$orgPreview?'1':null,'archived'=>$archived?'1':null],fn($value)=>$value!==null));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -29,16 +30,19 @@ $pageLink = static fn($number, $filter) => studentOrganizationsUrl() . '?' . htt
     <link href="/assets/css/student-org-style.css?v=<?= filemtime(__DIR__.'/../../../assets/css/student-org-style.css') ?>" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&amp;display=block">
     <link rel="icon" href="/assets/images/logos/gnc-logo-v1.svg">
-    <?php if ($orgPreview): ?>
+    <?php if ($orgPreview || isset($_GET['category']) || isset($_GET['p'])): ?>
     <style>
-        /* Category navigation in the admin must not replay the page entrance. */
+        /* Result navigation must not replay entrances, including card scroll reveals. */
         .student-org-hero,
         .student-org-breadcrumb,
         .student-org-hero h1,
         .student-org-hero .cms-rich,
         .student-org-directory h2::after,
         .student-org-filters a,
-        .student-org-grid { animation: none; }
+        .student-org-grid,
+        .student-org-card,
+        .student-org-pagination,
+        .js-reveal { animation: none !important; }
     </style>
     <?php endif; ?>
 </head>
@@ -59,26 +63,27 @@ $pageLink = static fn($number, $filter) => studentOrganizationsUrl() . '?' . htt
             <a href="<?= $orgH($pageLink(1,0)) ?>" class="<?= !$category?'is-active':'' ?>"<?= !$category?' aria-current="true"':'' ?>>All</a>
             <?php foreach ($categories as $cat): ?><a href="<?= $orgH($pageLink(1,(int)$cat['category_id'])) ?>" class="<?= $category===(int)$cat['category_id']?'is-active':'' ?>"<?= $category===(int)$cat['category_id']?' aria-current="true"':'' ?>><?= $orgH($cat['name']) ?></a><?php endforeach; ?>
             <?php if ($orgPreview): ?><button type="button" class="org-canvas-control" data-ve-org-categories>Manage categories</button><?php endif; ?>
+            <?php if ($orgPreview): ?><a href="<?= $orgH(studentOrganizationsUrl().'?ce_preview=1'.($archived?'':'&archived=1')) ?>" data-ve-org-archive-view><?= $archived?'Active organizations':'Archived' ?></a><?php endif; ?>
         </nav>
         <?php if (!$visible): ?>
-        <div class="student-org-empty"><i class="bi bi-people" aria-hidden="true"></i><h3><?= $category?'No organizations in this category':'No student organizations are published yet' ?></h3><p><?= $orgPreview?'Use Add organization below, then click its text and pictures to edit.':'Check back soon to discover ways to get involved on campus.' ?></p></div>
+        <div class="student-org-empty"><i class="bi bi-people" aria-hidden="true"></i><h3><?= $archived?'No archived organizations':($category?'No organizations in this category':'No student organizations are published yet') ?></h3><p><?= $archived?'Organizations you archive will appear here after Publish.':($orgPreview?'Use Add organization below, then click its text and pictures to edit.':'Check back soon to discover ways to get involved on campus.') ?></p></div>
         <?php endif; ?>
         <div class="student-org-grid">
             <?php foreach ($visible as $org): ?>
             <article class="student-org-card" data-org-url="<?= $orgH(studentOrganizationsUrl($org['slug']).($orgPreview?'&ce_preview=1':'')) ?>"<?= ceManageMark('data-ve-org-card="'.(int)$org['org_id'].'" data-ve-label="'.$orgH($org['name']).'"') ?>>
                 <div class="student-org-card-cover"><span class="org-cover-picture"<?= ceManageMark('data-ve-org-media="cover" data-warning-image data-warning-label="Organization cover"') ?>><?php if ($org['cover_url']): ?><img src="<?= $orgH($org['cover_url']) ?>" alt="" loading="lazy"><?php elseif ($orgPreview): ?><span>Add cover image</span><?php endif; ?></span>
                     <?php if ($org['category_name']): ?><span class="student-org-category"><?= $orgH($org['category_name']) ?></span><?php endif; ?>
-                    <?php if ($orgPreview && $org['status']!=='published'): ?><span class="student-org-draft">Unpublished</span><?php endif; ?>
+                    <?php if ($orgPreview && ($org['status']!=='published' || $archived)): ?><span class="student-org-draft"><?= $archived?'Archived':'Unpublished' ?></span><?php endif; ?>
                 </div>
                 <div class="student-org-card-body"><div class="student-org-card-heading">
-                    <span class="student-org-card-logo"<?= ceManageMark('data-ve-org-media="logo" data-warning-image data-warning-label="Organization logo"') ?>><?php if ($org['logo_url']): ?><img src="<?= $orgH($org['logo_url']) ?>" alt="" loading="lazy"><?php else: ?><i class="bi bi-people" aria-hidden="true"></i><?php endif; ?></span>
+                    <span class="student-org-card-logo" data-image-frame-fit="contain"<?= ceManageMark('data-ve-org-media="logo" data-warning-image data-warning-label="Organization logo"') ?>><?php if ($org['logo_url']): ?><img src="<?= $orgH($org['logo_url']) ?>" alt="" loading="lazy"><?php else: ?><i class="bi bi-people" aria-hidden="true"></i><?php endif; ?></span>
                     <h3<?= $orgField('name') ?>><?= $orgH($org['name']) ?></h3>
                 </div><div class="cms-rich"<?= $orgField('description') ?>><?= renderSectionContent($org['description']) ?></div>
                 <?php if ($orgPreview): ?><button type="button" class="org-canvas-control" data-ve-org-details>Edit organization page</button> <button type="button" class="org-canvas-control" data-ve-org-assign-category>Assign category<?= $org['category_name']?': '.$orgH($org['category_name']):'' ?></button><?php endif; ?></div>
                 <?php if(!$orgPreview): ?><a class="student-org-card-link" href="<?= $orgH(studentOrganizationsUrl($org['slug'])) ?>" aria-label="View <?= $orgH($org['name']) ?>"></a><?php endif; ?>
             </article>
             <?php endforeach; ?>
-            <?php if ($orgPreview): ?><button type="button" class="org-add-card" data-ve-org-add data-warning-placeholder="true"><i class="bi bi-plus-lg" aria-hidden="true"></i><span>Add organization</span></button><?php endif; ?>
+            <?php if ($orgPreview && !$archived): ?><button type="button" class="org-add-card" data-ve-org-add data-warning-placeholder="true"><i class="bi bi-plus-lg" aria-hidden="true"></i><span>Add organization</span></button><?php endif; ?>
         </div>
         <?php if ($pages>1): ?><nav class="student-org-pagination" aria-label="Organization pages">
             <?php if ($page>1): ?><a href="<?= $orgH($pageLink($page-1,$category)) ?>" aria-label="Previous page"><i class="bi bi-chevron-left" aria-hidden="true"></i></a><?php endif; ?>
@@ -126,11 +131,13 @@ $pageLink = static fn($number, $filter) => studentOrganizationsUrl() . '?' . htt
     <?= ceData('veOrgData',['fields'=>$settings,'images'=>$leadershipImages,'icons'=>academicFeatureIconChoices(),'organization'=>null,'organizations'=>$visible,'categories'=>$categories,'listingUrl'=>studentOrganizationsUrl()]) ?>
     <?php include __DIR__.'/../../../components/footer.php'; ?>
     <?php if (!$orgPreview): ?>
+    <script src="/assets/js/student-org-filters.js?v=<?= filemtime(__DIR__.'/../../../assets/js/student-org-filters.js') ?>"></script>
     <script>
     // Scroll-reveal: classes are added here (not in the markup), so the page stays fully visible without JS
     // and inside the editor preview, which is excluded by the PHP check above.
     (function () {
-        if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            || ['category','p'].some(function(key){return new URLSearchParams(location.search).has(key);})) return;
 
         var groups = [
             { sel: '.student-org-card',          type: 'up',    stagger: 0.09, perRow: 3 },

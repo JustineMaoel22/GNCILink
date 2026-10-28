@@ -18,9 +18,9 @@ function textLayoutRoute(string $route): string {
     $parts = parse_url($route);
     $path = rawurldecode($parts['path'] ?? '');
     $programSlug = null;
-    if (preg_match('~^/pages/academics/college/program/([a-z0-9-]+)/?$~D', $path, $programMatch)) {
-        $programSlug = $programMatch[1];
-        $path = '/pages/academics/college/program.php';
+    if (preg_match('~^/pages/academics/college/(program|college-department)/([a-z0-9-]+)/?$~D', $path, $programMatch)) {
+        $programSlug = $programMatch[2];
+        $path = '/pages/academics/college/' . $programMatch[1] . '.php';
     }
     // Clean public URLs share the existing CMS placement key with their PHP page.
     if ($path === '/index') $path = '/index.php';

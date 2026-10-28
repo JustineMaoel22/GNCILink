@@ -47,6 +47,13 @@ let socket;
     assert.equal(await evaluate('upload.disabled'),false,'Timeout unlocks the file input');
     assert.equal(await evaluate('document.querySelector("[role=status]").hidden'),true,'Timeout clears optimizing notice');
     await evaluate('hangOptimization=false;select([timedFile])');await until(()=>evaluate('changes===3'),'A timed-out file could not be retried');
+
+    const local=await evaluate(`(async()=>{const result=[];const canvas=document.createElement('canvas');canvas.width=80;canvas.height=60;canvas.getContext('2d').fillStyle='rgba(255,0,0,0.5)';canvas.getContext('2d').fillRect(0,0,40,60);const before=calls;for(const mime of ['image/png','image/jpeg','image/webp']){const blob=await new Promise(resolve=>canvas.toBlob(resolve,mime));const file=new File([blob,new Uint8Array(6*1024*1024)],'real.'+mime.split('/')[1],{type:mime});const optimized=await GNCImageUpload.optimize(file);const bitmap=await createImageBitmap(optimized);const probe=document.createElement('canvas');probe.width=bitmap.width;probe.height=bitmap.height;probe.getContext('2d').drawImage(bitmap,0,0);const alpha=probe.getContext('2d').getImageData(70,20,1,1).data[3];result.push({mime:optimized.type,size:optimized.size,width:bitmap.width,height:bitmap.height,alpha});bitmap.close();}return {result,requests:calls-before};})()`);
+    assert.equal(local.requests,0,'Static photos optimize without server requests');
+    for(const item of local.result){assert(item.size<=5*1024*1024);assert.equal(item.width,80);assert.equal(item.height,60);if(item.mime==='image/png'||item.mime==='image/webp')assert.equal(item.alpha,0,'Transparency preserved');}
+    assert.deepEqual(local.result.map(item=>item.mime),['image/png','image/jpeg','image/webp']);
+    console.log('PASS: real PNG/JPG/WebP browser optimization, original formats and dimensions, alpha preservation, and no server requests.');
+
     console.log('PASS: file inputs, mixed batches, cached repeat selections, error rejection, drag/drop, timeout cleanup and retry.');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
     if(socket)socket.close();browser.kill();await delay(1000);

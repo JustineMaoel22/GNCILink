@@ -38,8 +38,9 @@ function gncRecCatalog(PDO $db): array {
         if (!$d['slug']) continue;
         $legacy = '/pages/academics/basic-edu/basic-edu-department/'.$d['slug'].'.php';
         $url = $d['department_type'] === 'basic-education' && is_file(__DIR__.'/..'.$legacy)
-            ? $legacy : '/pages/academics/college/college-department.php?slug='.rawurlencode($d['slug']);
+            ? $legacy : '/pages/academics/college/college-department/'.rawurlencode($d['slug']);
         $aliases = ['/pages/academics/college/departments/'.$d['slug'].'.php'];
+        $aliases[] = '/pages/academics/college/college-department.php?slug=' . rawurlencode($d['slug']);
         if ($d['slug'] === 'graduate-school') $aliases[] = '/pages/academics/graduate-school/graduate-school.php';
         $add('department:'.$d['dept_id'], $url, $d['dept_name'], 'Departments', $d['about_text'] ?: $d['description'], $d['image'], ['academics','dept:'.$d['dept_id']], null, $aliases);
     }

@@ -10,6 +10,9 @@ $db = getDB(); $newFiles = []; $oldFiles = [];
 try {
     $changes = json_decode((string)($_POST['images'] ?? '{}'), true, 16, JSON_THROW_ON_ERROR);
     $texts = json_decode((string)($_POST['texts'] ?? '{}'), true, 16, JSON_THROW_ON_ERROR);
+    if (!class_exists('DOMDocument') || !method_exists('DOMDocument', 'loadXML') || !method_exists('DOMDocument', 'loadHTML')) {
+        throw new InvalidArgumentException('Publishing the payment guide requires the PHP DOM/XML extension on your host. Enable it in your hosting PHP settings and try again.');
+    }
     $fields = paymentGuideFieldDefaults();
     if (!is_array($texts) || count($texts) > count($fields)) throw new InvalidArgumentException('Invalid payment guide text changes.');
     foreach ($texts as $key => &$value) {
@@ -38,17 +41,20 @@ try {
             continue;
         }
         $file = $_FILES['image_' . $key] ?? null;
-        $file = imageUploadPrepare($file);
         if (!$file || is_array($file['error']) || $file['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) throw new InvalidArgumentException('Choose an illustration to upload.');
         $size = filesize($file['tmp_name']);
-        if (!$size || $size > 5 * 1024 * 1024) throw new InvalidArgumentException('Choose an image of up to 5 MB.');
+        if (!$size) throw new InvalidArgumentException('Choose an image of up to 5 MB.');
         if (strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) === 'svg') {
+            if ($size > IMAGE_UPLOAD_MAX_BYTES) throw new InvalidArgumentException('Choose an image of up to 5 MB.');
             if (!sanitizeSvgFile($file['tmp_name'])) throw new InvalidArgumentException('Invalid SVG. Export the illustration again and retry.');
             $extension = 'svg';
         } else {
+            $file = imageUploadPrepare($file);
+            if ($file['size'] > IMAGE_UPLOAD_MAX_BYTES) throw new InvalidArgumentException('Choose an image of up to 5 MB.');
             $types = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'];
-            $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
-            if (!isset($types[$mime]) || !@getimagesize($file['tmp_name'])) throw new InvalidArgumentException('Upload an SVG, PNG, JPG, or WEBP illustration.');
+            $detected = @getimagesize($file['tmp_name']);
+            $mime = $detected['mime'] ?? '';
+            if (!isset($types[$mime])) throw new InvalidArgumentException('Upload an SVG, PNG, JPG, or WEBP illustration.');
             $extension = $types[$mime];
         }
         $folder = dirname(__DIR__, 2) . '/uploads/payment-guide';

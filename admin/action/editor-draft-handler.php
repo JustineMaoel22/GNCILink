@@ -24,9 +24,9 @@ if (!is_string($page) || !preg_match('/\A[a-z0-9-]{1,100}\z/', $page) || !is_str
 $pages = getEditablePages();
 if (!rbacSafePreviewRoute($route)) edReply(['error'=>'This preview route is not allowed.'],403);
 $allowed = array_column($pages, 'slug');
-if ($manager) $allowed = array_merge($allowed, ['home','basic-education','graduate-school','programs','college-departments','administration','student-organizations','student-achievements','athletics-sports','community-activities','faqs','tuition-fees','online-payment-guide']);
+if ($manager) $allowed = array_merge($allowed, ['home','basic-education','graduate-school','programs','college-departments','administration','student-organizations','student-achievements','athletics-sports','community-activities','faqs','tuition-fees','online-payment-guide','scholarships']);
 if (!in_array($page, $allowed, true)) edReply(['error' => 'This page is not available to you.'], 403);
-if (!$manager && in_array($page, ['home','administration','college-departments','programs','graduate-school','basic-education','basic-education-departments','student-organizations','student-achievements','athletics-sports','community-activities','faqs','tuition-fees','online-payment-guide'], true)) edReply(['error' => 'You cannot edit this page.'], 403);
+if (!$manager && in_array($page, ['home','administration','college-departments','programs','graduate-school','basic-education','basic-education-departments','student-organizations','student-achievements','athletics-sports','community-activities','faqs','tuition-fees','online-payment-guide','scholarships'], true)) edReply(['error' => 'You cannot edit this page.'], 403);
 $userId = (int)$_SESSION['user_id'];
 $key = $page . ':' . $route;
 $revision = filter_var($_POST['revision'] ?? 0, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);

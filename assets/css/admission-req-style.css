@@ -419,6 +419,20 @@ html, body {
     animation: admFloat 6s ease-in-out 1.2s infinite;
 }
 
+.admission-art-credit {
+    margin: 24px 0 0;
+    color: #637167;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    text-align: right;
+}
+
+.admission-art-credit a {
+    color: #1f5e2c;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 /* ---------- Respect reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
     *,

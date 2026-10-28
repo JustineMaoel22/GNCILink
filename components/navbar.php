@@ -86,7 +86,7 @@ $academicsMenu = [
    reached or has no college departments, "College" shows as a plain link
    with no submenu (see the gnc-nav HTML comment for the reason).
    ============================================================= */
-$gncDeptPage    = '/pages/academics/college/college-department.php';
+$gncDeptPage    = '/pages/academics/college/college-department';
 $gncProgramPage = '/pages/academics/college/program';
 
 // Reason the dynamic menu fell back (printed in the HTML comment below).
@@ -145,7 +145,7 @@ $gncLoadCollegeMenu = function () use ($gncDeptPage, $gncProgramPage, &$gncFallb
 
             $item = [
                 'label' => (string) $d['dept_name'],
-                'href'  => $gncDeptPage . '?slug=' . rawurlencode($deptSlug),
+                'href'  => $gncDeptPage . '/' . rawurlencode($deptSlug),
             ];
 
             $kids = [];
@@ -245,7 +245,7 @@ $studentLifeGroups = [
         ['label' => 'Athletics and Sports', 'href' => '/pages/student%20life/athletics-sports.php'],
     ]],
     ['heading' => 'Student Resources', 'items' => [
-        ['label' => 'Access Student Email', 'href' => 'https://login.microsoftonline.com/', 'target' => '_blank'],
+        ['label' => 'Student Portal', 'href' => '/coming-soon.php', 'target' => '_blank'],
         ['label' => 'OSA Student Grievance', 'href' => 'https://osa.gncipampanga.com/', 'target' => '_blank'],
         ['label' => 'GNCI Library', 'href' => 'http://library.gncipampanga.com/', 'target' => '_blank'],
         ['label' => 'Frequently Asked Questions', 'href' => '/pages/faq.php'],
@@ -417,11 +417,11 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
                 </li>
 
                 <li class="nav-item ms-2">
-                    <a class="btn-portal" href="/coming-soon.php" target="_blank">
+                    <a class="btn-portal" href="https://login.microsoftonline.com/" target="_blank" rel="noopener noreferrer">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill" viewBox="0 0 16 16">
                             <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
                         </svg>
-                        Student Portal
+                        Access Student Email
                     </a>
                 </li>
             </ul>
@@ -506,11 +506,11 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
         </ul>
 
         <div class="gnc-mobile-portal d-grid gap-2">
-            <a class="btn-portal w-100 justify-content-center" href="/coming-soon.php" target="_blank">
+            <a class="btn-portal w-100 justify-content-center" href="https://login.microsoftonline.com/" target="_blank" rel="noopener noreferrer">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill" viewBox="0 0 16 16">
                     <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
                 </svg>
-                Student Portal
+                Access Student Email
             </a>
         </div>
     </div>

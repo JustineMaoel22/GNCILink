@@ -30,10 +30,10 @@ $settingMark=static fn($key)=>ceField('org-setting',['key'=>$key,'max'=>$setting
 <nav class="dynamic-org-breadcrumb" aria-label="breadcrumb"><a href="<?= $orgH(studentOrganizationsUrl().($orgPreview?'?ce_preview=1':'')) ?>">Student Organizations</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span><?= $orgH($org['name']) ?></span></nav>
 <h1<?= $mark('name') ?>><?= $orgH($org['name']) ?></h1><div class="cms-rich"<?= $mark('description') ?>><?= renderSectionContent($org['description']) ?></div>
 <?php if ($orgPreview): ?><button type="button" class="org-assign-category" data-ve-org-assign-category>Assign category<?= $org['category_name']?': '.$orgH($org['category_name']):'' ?></button><?php endif; ?>
-<?php if ($orgPreview && $org['status']==='draft'): ?><small class="org-unpublished">Unpublished ? visible only in the editor</small><?php endif; ?>
+<?php if ($orgPreview && (!empty($org['archived_at']) || $org['status']==='draft')): ?><small class="org-unpublished"><?= !empty($org['archived_at'])?'Archived — hidden from visitors':'Unpublished — visible only in the editor' ?></small><?php endif; ?>
 </div></div></section>
 <section class="dynamic-org-about org-overview"><div class="org-about-copy"><span class="org-eyebrow">Overview</span><h2>About <?= $orgH($org['name']) ?></h2><div class="cms-rich"<?= $mark('about_text') ?>><?= renderSectionContent($org['about_text']) ?></div></div>
-<?php if ($org['logo_url']||$orgPreview): ?><div class="org-logo-frame"><?= $media($org['logo_url'],'Organization logo','logo') ?></div><?php endif; ?>
+<?php if ($org['logo_url']||$orgPreview): ?><div class="org-logo-frame" data-image-frame-fit="contain"><?= $media($org['logo_url'],'Organization logo','logo') ?></div><?php endif; ?>
 </section>
 <?php if ($org['vision']||$org['mission']||$orgPreview): ?>
 <section class="org-values" aria-label="Vision and mission">
@@ -44,10 +44,13 @@ $settingMark=static fn($key)=>ceField('org-setting',['key'=>$key,'max'=>$setting
 <?php if ($gallery||$orgPreview): ?><section class="org-gallery-section"><span class="org-eyebrow">Gallery</span><h2<?= $settingMark('gallery_title') ?>><?= $orgH($settings['gallery_title']['value']) ?></h2>
 <div class="org-gallery"><?php foreach ($gallery as $image): ?><a href="<?= $orgH($image['image_url']) ?>" target="_blank" rel="noopener" aria-label="View gallery photo"<?= ceManageMark('data-ve-org-gallery="'.(int)$image['image_id'].'"') ?>><img src="<?= $orgH($image['image_url']) ?>" alt="<?= $orgH($org['name']) ?> gallery photo" loading="lazy"></a><?php endforeach; ?>
 <?php if ($orgPreview): ?><button type="button" class="org-gallery-add" data-ve-org-gallery-add data-warning-placeholder="true">+ Add gallery image</button><?php endif; ?></div></section><?php endif; ?>
-<?php if ($facebook||$orgPreview): ?><section class="org-facebook" data-warning-optional="true"><span class="org-eyebrow">Stay Updated</span><h2<?= $settingMark('facebook_title') ?>><?= $orgH($settings['facebook_title']['value']) ?></h2>
+<?php if ($facebook||$orgPreview): ?><section class="org-facebook" data-warning-optional="true"><span class="org-eyebrow"<?= $settingMark('facebook_eyebrow') ?>><?= $orgH($settings['facebook_eyebrow']['value']) ?></span><h2<?= $settingMark('facebook_title') ?>><?= $orgH($settings['facebook_title']['value']) ?></h2>
 <p<?= $settingMark('facebook_description') ?>><?= $orgH($settings['facebook_description']['value']) ?></p>
-<?php if ($facebook): ?><iframe title="<?= $orgH($org['name']) ?> Facebook page" src="<?= $orgH($facebook) ?>" width="500" height="130" loading="lazy" allow="encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe><?php endif; ?>
-<?php if ($orgPreview): ?><p<?= $mark('facebook_url') ?>><?= $orgH($org['facebook_url']) ?></p><?php endif; ?></section><?php endif; ?>
+<div class="org-facebook-slot">
+<?php if ($facebook): ?><div class="org-fb-box"><iframe title="<?= $orgH($org['name']) ?> Facebook page" src="<?= $orgH($facebook) ?>" width="500" height="130" scrolling="no" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+<?php if ($orgPreview): ?><button type="button" class="org-fb-edit" data-ve-org-facebook aria-label="Edit Facebook page URL" title="Click to change the Facebook page"></button><?php endif; ?></div>
+<?php elseif ($orgPreview): ?><button type="button" class="org-fb-add" data-ve-org-facebook><span aria-hidden="true">+</span><span>Add the Facebook page link</span></button><?php endif; ?>
+</div></section><?php endif; ?>
 <?php endif; ?>
 </main>
 <?= $org?ceData('veOrgData',['fields'=>$settings,'organization'=>$org,'icons'=>academicFeatureIconChoices(),'categories'=>studentOrgCategories(),'gallery'=>$gallery,'listingUrl'=>studentOrganizationsUrl()]):'' ?>

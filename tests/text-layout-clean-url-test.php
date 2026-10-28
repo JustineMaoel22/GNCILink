@@ -10,6 +10,8 @@ foreach ([
     ['/pages/academics/college/program?slug=beed', '/pages/academics/college/program.php?slug=beed'],
     ['/pages/academics/college/program/beed?ce_preview=1', '/pages/academics/college/program.php?slug=beed'],
     ['/pages/academics/college/program/beed?slug=other', '/pages/academics/college/program.php?slug=beed'],
+    ['/pages/academics/college/college-department/cased?ce_preview=1', '/pages/academics/college/college-department.php?slug=cased'],
+    ['/pages/academics/college/college-department/cased/?slug=other', '/pages/academics/college/college-department.php?slug=cased'],
     ['/pages/student%20life/athletics-sports?ce_preview=1', '/pages/student life/athletics-sports.php'],
     ['/index', '/'],
 ] as [$clean, $canonical]) {

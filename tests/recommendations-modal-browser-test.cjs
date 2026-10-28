@@ -30,7 +30,7 @@ let socket;
         window.__advanceRecommendationsClock=ms=>{offset+=ms;for(let i=0;i<20;i++){const due=Array.from(jobs.entries()).find(([,job])=>job.due<=Date.now());if(!due)break;jobs.delete(due[0]);due[1].callback(...due[1].args);}};
     })()`});
     await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
-    async function navigate(url){await send('Page.navigate',{url});await until(()=>evaluate(`location.href===${JSON.stringify(url)}&&document.readyState==='complete'`),'Page did not load: '+url);await until(()=>evaluate('document.querySelectorAll("#gncRecCards a").length>0'),'Recommendation catalog unavailable');}
+    async function navigate(url){url=(await fetch(url)).url;await send('Page.navigate',{url});await until(()=>evaluate(`(()=>{const expected=new URL(${JSON.stringify(url)});return location.pathname.replace(/\.php$/,'')===expected.pathname.replace(/\.php$/,'')&&location.search===expected.search&&document.readyState==='complete';})()`),'Page did not load: '+url);await until(()=>evaluate('document.querySelectorAll("#gncRecCards a").length>0'),'Recommendation catalog unavailable');}
     async function advance(ms){await evaluate(`window.__advanceRecommendationsClock(${ms})`);await delay(250);}
     await navigate(base+'/');
     assert.equal(await evaluate('document.getElementById("gncRecommendations").tagName'),'DIALOG');

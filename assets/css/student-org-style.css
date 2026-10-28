@@ -786,6 +786,10 @@ body {
     }
 }
 
+.org-filter-results h2::after,
+.org-filter-results .student-org-filters a,
+.org-filter-results .student-org-grid { animation: none !important; }
+
 @media (prefers-reduced-motion: no-preference) {
     .student-org-grid {
         animation: org-list-enter 0.25s ease-out;

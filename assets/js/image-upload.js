@@ -20,6 +20,65 @@
     function isLargeImage(file) {
         return file.size > maxBytes && (/^image\//i.test(file.type) || /\.(jpe?g|png|webp|gif|svg)$/i.test(file.name));
     }
+    async function decodeForOptimization(blob) {
+        if (typeof createImageBitmap === 'function') {
+            try {
+                const bitmap = await createImageBitmap(blob);
+                return {source:bitmap, width:bitmap.width, height:bitmap.height, release:()=>bitmap.close()};
+            } catch (_) { /* Try the browser's normal image decoder next. */ }
+        }
+        const url = URL.createObjectURL(blob), image = new Image();
+        try {
+            await new Promise((resolve, reject) => {
+                image.onload = resolve;
+                image.onerror = () => reject(new Error('This photo could not be read. Please choose a valid JPG, PNG or WebP image.'));
+                image.src = url;
+            });
+            return {source:image, width:image.naturalWidth, height:image.naturalHeight, release:()=>URL.revokeObjectURL(url)};
+        } catch (error) { URL.revokeObjectURL(url); throw error; }
+    }
+    async function optimizeInBrowser(file) {
+        // Inspect signatures rather than trusting the file extension. Animated
+        // formats keep the server path so canvas never silently flattens them.
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        let mime;
+        if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) mime = 'image/jpeg';
+        else if (bytes[0] === 137 && String.fromCharCode(...bytes.slice(1, 4)) === 'PNG') {
+            mime = 'image/png';
+            const view = new DataView(bytes.buffer);
+            for (let offset = 8; offset + 12 <= bytes.length;) {
+                const length = view.getUint32(offset);
+                const type = String.fromCharCode(...bytes.slice(offset + 4, offset + 8));
+                if (type === 'acTL') return null;
+                if (type === 'IEND') break;
+                if (length > bytes.length - offset - 12) break;
+                offset += length + 12;
+            }
+        } else if (String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP') {
+            if (String.fromCharCode(...bytes.slice(12, 16)) === 'VP8X' && (bytes[20] & 2)) return null;
+            mime = 'image/webp';
+        } else return null;
+        const bitmap = await decodeForOptimization(new Blob([bytes], {type: mime}));
+        const canvas = document.createElement('canvas');
+        try {
+            if (bitmap.width * bitmap.height > 80000000 || Math.max(bitmap.width, bitmap.height) > 20000) throw new Error('This image is too large to optimize. Please use a smaller photo.');
+            let scale = Math.min(1, 2560 / Math.max(bitmap.width, bitmap.height));
+            for (let attempt = 0; attempt < 8; attempt++) {
+                canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+                canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+                const context = canvas.getContext('2d');
+                if (!context) return null;
+                context.drawImage(bitmap.source, 0, 0, canvas.width, canvas.height);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, mime, Math.max(.65, .9 - attempt * .04)));
+                // Keep the original image format and alpha; unsupported encoders
+                // fall back to the existing server optimizer.
+                if (!blob || blob.type !== mime) return null;
+                if (blob.size > 0 && blob.size <= maxBytes) return new File([blob], file.name, {type: mime, lastModified: file.lastModified});
+                scale *= Math.max(.25, Math.min(.8, Math.sqrt(maxBytes * .9 / blob.size)));
+            }
+            return null;
+        } finally { bitmap.release(); canvas.width = canvas.height = 0; }
+    }
     async function optimize(file) {
         if (!isLargeImage(file)) return file;
         if (prepared.has(file)) return prepared.get(file);
@@ -28,6 +87,8 @@
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), optimizationTimeoutMs);
             try {
+                const local = await optimizeInBrowser(file);
+                if (local) return local;
                 const form = new FormData();
                 form.set('image', file);
                 form.set('csrf_token', window.GNC_IMAGE_FRAMING_CONFIG.csrf || '');

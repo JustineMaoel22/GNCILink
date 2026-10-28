@@ -1,4 +1,6 @@
-<?php if (!isset($_GET['ce_preview']) && http_response_code() !== 404 && !defined('GNC_RECOMMENDATIONS_RENDERED')):
+<?php
+require_once __DIR__.'/../admin/settings-functions.php';
+if (!isset($_GET['ce_preview']) && http_response_code() !== 404 && !defined('GNC_RECOMMENDATIONS_RENDERED') && pageSuggestionsEnabled()):
 define('GNC_RECOMMENDATIONS_RENDERED', true); ?>
 <link rel="stylesheet" href="/assets/css/recommendations.css?v=<?= filemtime(__DIR__.'/../assets/css/recommendations.css') ?>">
 <dialog class="gnc-rec" id="gncRecommendations" aria-labelledby="gncRecTitle" aria-describedby="gncRecSummary" hidden>

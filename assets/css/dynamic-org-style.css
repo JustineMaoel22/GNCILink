@@ -171,3 +171,15 @@ body{background:#f9f6f1;color:#26372c}.org-overview,.org-values,.org-gallery-sec
     max-width: 900px;
     margin: 0;
 }
+
+/* Match the compact, centered College Departments Facebook section. */
+.org-facebook > p { max-width: 100ch; margin: 0 auto 24px; font-size: 15px; line-height: 1.7; color: #6b6b66; }
+.org-facebook-slot { width: 100%; }
+.org-fb-box { position: relative; width: 100%; max-width: 500px; margin-inline: auto; border-radius: 8px; overflow: hidden; transition: transform .3s ease, box-shadow .3s ease; }
+.org-fb-box:hover { transform: translateY(-5px); box-shadow: 0 8px 24px #20382718; }
+.org-fb-box iframe { display: block; width: 100%; height: 130px; border: 0; background: transparent; border-radius: inherit; }
+.org-fb-edit { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; border: 0; background: transparent; cursor: pointer; border-radius: 8px; }
+.org-fb-edit:focus-visible { outline: 2px solid #d3a63a; outline-offset: -3px; }
+.org-fb-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6rem; width: 100%; max-width: 500px; min-height: 130px; margin-inline: auto; border: 2px dashed #a0b6a4; border-radius: 8px; background: #f0f4ef; color: #356641; font: inherit; cursor: pointer; }
+.org-fb-add > span:first-child { font-size: 28px; line-height: 1; }
+.org-fb-add:hover, .org-fb-add:focus-visible { border-color: #1f5e2c; background: #e7efe8; }

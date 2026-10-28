@@ -367,3 +367,9 @@ html, body {
     font-size: 12px;
     text-align: right;
 }
+
+.enrollment-art-credit a {
+    color: #1f5e2c;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}

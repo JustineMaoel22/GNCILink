@@ -1129,6 +1129,7 @@ foreach ($pgPrograms as $p):
                     // picture
                     if (hasImg) {
                         var thumb = el.querySelector('.thumb'), fileIn = el.querySelector('input[type=file]'), rm = el.querySelector('.pgm-img-rm');
+                        if (type === 'uniform') fileIn.setAttribute('data-image-frame-ratio', 'natural');
                         var showThumb = function () {
                             var url = r.file ? URL.createObjectURL(r.file) : (r.remove ? null : r.image_url);
                             thumb.style.backgroundImage = url ? 'url("' + url.replace(/"/g, '%22') + '")' : '';

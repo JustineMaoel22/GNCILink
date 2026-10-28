@@ -238,6 +238,7 @@
 
     // ══════════════════ file picker ══════════════════
     function pickFile(accept, cb, personPhoto, uploadTarget, preserveImage) {
+        fileInput.removeAttribute('data-image-frame-ratio');
         fileInput.value = '';
         if (window.GNCImageFraming) window.GNCImageFraming.setUploadTarget(fileInput, uploadTarget || (S.sel && S.sel.el));
         if (personPhoto) fileInput.setAttribute('data-photo-check', '');
@@ -856,6 +857,7 @@
         if (btnPageOpts) btnPageOpts.hidden = !(S.adapter.hasPageOptions && S.adapter.hasPageOptions()) || S.preview;
         if (editorFeedback) editorFeedback.refresh();
         if(textLayout)textLayout.refresh();
+        if(S.adapter.renderDock)S.adapter.renderDock();
     }
     /** Run an async save with the buttons locked and a status message. */
     function run(label, fn) {
@@ -967,6 +969,7 @@
         var u; try { u = new URL(url, window.location.origin); } catch (e) { return null; }
         var p = u.pathname, slug = u.searchParams.get('slug') || '', m;
         if ((m = p.match(/^\/pages\/academics\/college\/program\/([a-z0-9-]+)\/?$/))) return { page: 'programs', sub: m[1] };
+        if ((m = p.match(/^\/pages\/academics\/college\/college-department\/([a-z0-9-]+)\/?$/))) return { page: m[1] === 'graduate-school' ? 'graduate-school' : 'college-departments', sub: m[1] };
         if (/\/program\.php$/.test(p)) return { page: 'programs', sub: slug };
         if (/\/college-department\.php$/.test(p)) return { page: slug === 'graduate-school' ? 'graduate-school' : 'college-departments', sub: slug };
         if (/\/college-dept\.php$/.test(p)) return { page: 'college-departments', sub: '' };
@@ -2278,6 +2281,88 @@
     }
 
     // ══════════════════ ADAPTER: Administration (people and offices) ══════════════════
+    function bindCardSwap(grid,doc,options) {
+        var controller=new doc.defaultView.AbortController(),signal=controller.signal;
+        var selector=options.selector;
+        var attr=selector.slice(1,-1),pending=null,timer=null,drag=null,target=null,preview=null,liftFrame=null;
+        $$(selector,grid).forEach(function(card){
+            card.style.position='relative';
+            var handle=h('button',{type:'button',class:'ve-drag-handle','aria-label':'Hold and drag to swap positions',title:'Hold and drag onto another card to swap positions'},[icon('grip-vertical'),h('span',{text:'Move'})]);
+            if(options.handleLeft){handle.style.left='8px';handle.style.right='auto';}
+            card.appendChild(handle);
+        });
+        function follow(x,y){
+            if(!preview||!drag)return;
+            preview.style.transform='translate3d('+(x-drag.offsetX)+'px,'+(y-drag.offsetY)+'px,0)';
+        }
+        function showPreview(){
+            var rect=drag.card.getBoundingClientRect(),clone=drag.card.cloneNode(true);
+            drag.offsetX=drag.x-rect.left;drag.offsetY=drag.y-rect.top;
+            [clone].concat($$('*',clone)).forEach(function(el){
+                Array.prototype.slice.call(el.attributes).forEach(function(attribute){if(attribute.name==='id'||attribute.name==='contenteditable'||attribute.name.indexOf('data-ve-')===0)el.removeAttribute(attribute.name);});
+                Array.prototype.slice.call(el.classList).forEach(function(name){if(name.indexOf('reveal')!==-1||name==='ve-hover'||name==='ve-selected')el.classList.remove(name);});
+            });
+            clone.style.width='100%';clone.style.height='100%';clone.style.margin='0';clone.style.animation='none';clone.style.transitionDelay='0s';
+            var inner=doc.createElement('div');inner.style.width='100%';inner.style.height='100%';inner.appendChild(clone);
+            preview=doc.createElement('div');preview.className='ve-drag-preview';preview.setAttribute('aria-hidden','true');preview.setAttribute('inert','');
+            preview.style.width=rect.width+'px';preview.style.height=rect.height+'px';preview.appendChild(inner);doc.body.appendChild(preview);follow(drag.x,drag.y);
+            liftFrame=doc.defaultView.requestAnimationFrame(function(){if(preview)preview.classList.add('is-lifted');});
+        }
+        function clear(landing){
+            clearTimeout(timer);timer=null;
+            if(liftFrame)doc.defaultView.cancelAnimationFrame(liftFrame);liftFrame=null;
+            if(drag){drag.card.classList.remove('ve-drag-source');try{drag.card.releasePointerCapture(drag.pointerId);}catch(_){}if(options.suppressClick)options.suppressClick();}
+            if(target)target.classList.remove('ve-drag-target');
+            if(preview){
+                var floating=preview;preview=null;
+                if(landing&&landing.nodeType===1&&!doc.defaultView.matchMedia('(prefers-reduced-motion: reduce)').matches){
+                    var rect=landing.getBoundingClientRect();
+                    floating.animate([{transform:floating.style.transform,opacity:1},{transform:'translate3d('+rect.left+'px,'+rect.top+'px,0)',opacity:0}],{duration:180,easing:'ease-out'}).finished.then(function(){floating.remove();},function(){floating.remove();});
+                }else floating.remove();
+            }
+            doc.documentElement.classList.remove('ve-dragging');pending=null;drag=null;target=null;
+        }
+        grid.addEventListener('pointerdown',function(event){
+            if(S.preview||S.busy||!event.isPrimary||event.button!==0)return;
+            var card=event.target.closest(selector);if(!card||!grid.contains(card))return;
+            var handle=event.target.closest('.ve-drag-handle');
+            if(!handle&&event.target.closest('[contenteditable],button,a,input,textarea,select'))return;
+            if(event.pointerType==='touch'&&!handle)return;
+            if(options.canStart&&!options.canStart(card))return;
+            pending={card:card,x:event.clientX,y:event.clientY,pointerId:event.pointerId};
+            timer=setTimeout(function(){
+                if(!pending||S.preview||S.busy)return;
+                drag=pending;pending=null;select(null);closePop();doc.defaultView.getSelection().removeAllRanges();
+                showPreview();drag.card.classList.add('ve-drag-source');doc.documentElement.classList.add('ve-dragging');
+                try{drag.card.setPointerCapture(drag.pointerId);}catch(_){}
+            },350);
+        },{signal:signal});
+        doc.addEventListener('pointermove',function(event){
+            if(pending&&event.pointerId===pending.pointerId&&Math.hypot(event.clientX-pending.x,event.clientY-pending.y)>8){clear();return;}
+            if(!drag||event.pointerId!==drag.pointerId)return;
+            if(S.preview||S.busy){clear();return;}
+            event.preventDefault();
+            follow(event.clientX,event.clientY);
+            var under=doc.elementFromPoint(event.clientX,event.clientY),next=under&&under.closest(selector);
+            if(!next||next===drag.card||!grid.contains(next))next=null;
+            if(target!==next){if(target)target.classList.remove('ve-drag-target');target=next;if(target)target.classList.add('ve-drag-target');}
+            var view=doc.defaultView;if(event.clientY<50)view.scrollBy(0,-18);else if(event.clientY>view.innerHeight-50)view.scrollBy(0,18);
+        },{passive:false,signal:signal});
+        doc.addEventListener('pointerup',function(event){
+            if(drag&&event.pointerId!==drag.pointerId)return;
+            var landing=null;
+            if(drag&&target&&!S.preview&&!S.busy){
+                event.preventDefault();landing=drag.card;
+                options.swap(drag.card,target);
+            }
+            clear(landing);
+        },{signal:signal});
+        doc.addEventListener('pointercancel',clear,{signal:signal});
+        doc.addEventListener('keydown',function(event){if(event.key==='Escape')clear();},{signal:signal});
+        doc.defaultView.addEventListener('blur',clear,{signal:signal});
+        return function(){clear();controller.abort();};
+    }
+
     function AdminAdapter() {
         var secs = (C.admin && C.admin.sections) || [];
         var curKey = C.page.section || (secs[0] && secs[0].key) || '';
@@ -2313,82 +2398,12 @@
         }
         function bindDrag(grid,doc) {
             var selector=grid.getAttribute('data-ve-grid')==='offices'?'[data-ve-office]':'[data-ve-person]';
-            var attr=selector.slice(1,-1),pending=null,timer=null,drag=null,target=null,preview=null,liftFrame=null;
-            initialOrders.set(grid,idsInGrid(grid,attr));
-            $$(selector,grid).forEach(function(card){
-                card.style.position='relative';
-                card.appendChild(h('button',{type:'button',class:'ve-drag-handle','aria-label':'Hold and drag to swap positions',title:'Hold and drag onto another card to swap positions'},[icon('grip-vertical'),h('span',{text:'Move'})]));
-            });
-            function follow(x,y){
-                if(!preview||!drag)return;
-                preview.style.transform='translate3d('+(x-drag.offsetX)+'px,'+(y-drag.offsetY)+'px,0)';
-            }
-            function showPreview(){
-                var rect=drag.card.getBoundingClientRect(),clone=drag.card.cloneNode(true);
-                drag.offsetX=drag.x-rect.left;drag.offsetY=drag.y-rect.top;
-                [clone].concat($$('*',clone)).forEach(function(el){
-                    Array.prototype.slice.call(el.attributes).forEach(function(attribute){if(attribute.name==='id'||attribute.name==='contenteditable'||attribute.name.indexOf('data-ve-')===0)el.removeAttribute(attribute.name);});
-                    Array.prototype.slice.call(el.classList).forEach(function(name){if(name.indexOf('reveal')!==-1||name==='ve-hover'||name==='ve-selected')el.classList.remove(name);});
-                });
-                clone.style.width='100%';clone.style.height='100%';clone.style.margin='0';clone.style.animation='none';clone.style.transitionDelay='0s';
-                var inner=doc.createElement('div');inner.style.width='100%';inner.style.height='100%';inner.appendChild(clone);
-                preview=doc.createElement('div');preview.className='ve-drag-preview';preview.setAttribute('aria-hidden','true');preview.setAttribute('inert','');
-                preview.style.width=rect.width+'px';preview.style.height=rect.height+'px';preview.appendChild(inner);doc.body.appendChild(preview);follow(drag.x,drag.y);
-                liftFrame=doc.defaultView.requestAnimationFrame(function(){if(preview)preview.classList.add('is-lifted');});
-            }
-            function clear(landing){
-                clearTimeout(timer);timer=null;
-                if(liftFrame)doc.defaultView.cancelAnimationFrame(liftFrame);liftFrame=null;
-                if(drag){drag.card.classList.remove('ve-drag-source');try{drag.card.releasePointerCapture(drag.pointerId);}catch(_){}suppressClickUntil=Date.now()+400;}
-                if(target)target.classList.remove('ve-drag-target');
-                if(preview){
-                    var floating=preview;preview=null;
-                    if(landing&&landing.nodeType===1&&!doc.defaultView.matchMedia('(prefers-reduced-motion: reduce)').matches){
-                        var rect=landing.getBoundingClientRect();
-                        floating.animate([{transform:floating.style.transform,opacity:1},{transform:'translate3d('+rect.left+'px,'+rect.top+'px,0)',opacity:0}],{duration:180,easing:'ease-out'}).finished.then(function(){floating.remove();},function(){floating.remove();});
-                    }else floating.remove();
-                }
-                doc.documentElement.classList.remove('ve-dragging');pending=null;drag=null;target=null;
-            }
-            grid.addEventListener('pointerdown',function(event){
-                if(S.preview||S.busy||!event.isPrimary||event.button!==0)return;
-                var card=event.target.closest(selector);if(!card||card.closest('[data-ve-grid]')!==grid)return;
-                var handle=event.target.closest('.ve-drag-handle');
-                if(!handle&&event.target.closest('[contenteditable],button,a,input,textarea,select'))return;
-                if(event.pointerType==='touch'&&!handle)return;
-                pending={card:card,x:event.clientX,y:event.clientY,pointerId:event.pointerId};
-                timer=setTimeout(function(){
-                    if(!pending||S.preview||S.busy)return;
-                    drag=pending;pending=null;select(null);closePop();doc.defaultView.getSelection().removeAllRanges();
-                    showPreview();drag.card.classList.add('ve-drag-source');doc.documentElement.classList.add('ve-dragging');
-                    try{drag.card.setPointerCapture(drag.pointerId);}catch(_){}
-                },350);
-            });
-            doc.addEventListener('pointermove',function(event){
-                if(pending&&event.pointerId===pending.pointerId&&Math.hypot(event.clientX-pending.x,event.clientY-pending.y)>8){clear();return;}
-                if(!drag||event.pointerId!==drag.pointerId)return;
-                if(S.preview||S.busy){clear();return;}
-                event.preventDefault();
-                follow(event.clientX,event.clientY);
-                var under=doc.elementFromPoint(event.clientX,event.clientY),next=under&&under.closest(selector);
-                if(!next||next===drag.card||next.closest('[data-ve-grid]')!==grid)next=null;
-                if(target!==next){if(target)target.classList.remove('ve-drag-target');target=next;if(target)target.classList.add('ve-drag-target');}
-                var view=doc.defaultView;if(event.clientY<50)view.scrollBy(0,-18);else if(event.clientY>view.innerHeight-50)view.scrollBy(0,18);
-            },{passive:false});
-            doc.addEventListener('pointerup',function(event){
-                if(drag&&event.pointerId!==drag.pointerId)return;
-                var landing=null;
-                if(drag&&target&&!S.preview&&!S.busy){
-                    event.preventDefault();var first=unitOf(drag.card),second=unitOf(target),marker=doc.createComment('swap');
-                    grid.insertBefore(marker,first);grid.insertBefore(first,second);grid.insertBefore(second,marker);marker.remove();
-                    landing=drag.card;
-                    rememberOrder(grid,attr);toast('Positions swapped. Publish to save the new order.','ok');
-                }
-                clear(landing);
-            });
-            doc.addEventListener('pointercancel',clear);
-            doc.addEventListener('keydown',function(event){if(event.key==='Escape')clear();});
-            doc.defaultView.addEventListener('blur',clear);
+            var attr=selector.slice(1,-1);initialOrders.set(grid,idsInGrid(grid,attr));
+            bindCardSwap(grid,doc,{selector:selector,suppressClick:function(){suppressClickUntil=Date.now()+400;},swap:function(source,target){
+                var first=unitOf(source),second=unitOf(target),marker=doc.createComment('swap');
+                grid.insertBefore(marker,first);grid.insertBefore(first,second);grid.insertBefore(second,marker);marker.remove();
+                rememberOrder(grid,attr);toast('Positions swapped. Publish to save the new order.','ok');
+            }});
         }
 
         function bind(doc) {
@@ -2767,9 +2782,12 @@
         function pickFiles(accept, cb) {
             fileInput.value = ''; fileInput.setAttribute('accept', accept); fileInput.multiple = true;
             fileInput.removeAttribute('data-photo-check');
+            if (tab === 'uniform') fileInput.setAttribute('data-image-frame-ratio', 'natural');
+            else fileInput.removeAttribute('data-image-frame-ratio');
             if (window.GNCImageFraming) {
                 var target = S.doc && S.doc.querySelector(tab === 'banner'
                     ? '.hero-slide.is-active,.hero-slides,.template-hero'
+                    : tab === 'uniform' ? '.template-uniform-card img'
                     : '.fcar-slide img,.fcar-track img,.fcar-viewport');
                 window.GNCImageFraming.setUploadTarget(fileInput, target);
             }
@@ -2931,16 +2949,6 @@
             ]), r.left, r.top - 150);
         }
 
-        // small style for the two tabs in the strip
-        (function () {
-            if (D.getElementById('veDockTabsCss')) return;
-            var st = D.createElement('style'); st.id = 'veDockTabsCss';
-            st.textContent = '.ve-dock-tabs{display:flex;flex-direction:column;align-items:flex-start;gap:.2rem}' +
-                '.ve-dock-tab{display:inline-flex;align-items:center;gap:.4rem;border:0;background:transparent;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;padding:.2rem .45rem;border-radius:6px;opacity:.55;cursor:pointer;white-space:nowrap}' +
-                '.ve-dock-tab:hover{opacity:1}.ve-dock-tab.is-on{opacity:1;background:rgba(9,64,36,.10)}';
-            D.head.appendChild(st);
-        })();
-
         function renderStrip() {
             if (!dock) return;
             var any = LISTS.banner.data || LISTS.facility.data || LISTS.uniform.data;
@@ -3028,7 +3036,7 @@
             var rows = pRows[type]; if (!rows) return false;
             var base = PD.items[type];
             if (rows.length !== base.length) return true;
-            return rows.some(function (r, i) { return r.file || r.removeImg || ITEM_FIELDS.some(function (f) { return String(r[f] || '') !== String(base[i][f] || ''); }); });
+            return rows.some(function (r, i) { return r.file || r.removeImg || ((type==='badge'||type==='career') && Number(r.item_id||0)!==Number(base[i].item_id||0)) || ITEM_FIELDS.some(function (f) { return String(r[f] || '') !== String(base[i][f] || ''); }); });
         }
         function pruneRows() { Object.keys(pRows).forEach(function (t) { if (!rowsChanged(t)) delete pRows[t]; }); }
         function listDirty() { return Object.keys(pRows).filter(rowsChanged).length; }
@@ -3557,8 +3565,92 @@
             rows.forEach(function (r, n) { if (r.file) files['file_' + n] = r.file; });
             return send(PROG_URL, fields, files);
         }
-        /** Adding, moving and deleting a card save straight away (the order and number of cards change the page), then the page refreshes. */
+        function renderBadges() {
+            if(!PD)return;
+            var group=S.doc.querySelector('.template-badges'),add=group&&group.querySelector('[data-ve-add="item"][data-ve-type="badge"]');
+            if(!group||!add)return;
+            var existing={};
+            $$('[data-ve-item^="badge:"]',group).forEach(function(card){
+                var index=Number(card.getAttribute('data-ve-item').split(':')[1]),base=PD.items.badge[index];
+                var key=card.getAttribute('data-ve-badge-key')||(base&&'saved-'+base.item_id);
+                if(key)existing[key]=card;
+            });
+            var keep=[];
+            curRows('badge').forEach(function(row,index){
+                var key=row.item_id?'saved-'+row.item_id:(row.draft_key||(row.draft_key='badge-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)));
+                var card=existing[key];
+                if(!card)card=h('div',{class:'template-badge'},[h('span'),h('div',{},[h('strong'),h('span')])]);
+                card.setAttribute('data-ve-item','badge:'+index);card.setAttribute('data-ve-badge-key',key);
+                var parts=/^(bi|material):([a-z0-9_-]+)$/i.exec(row.icon||''),glyph=parts?parts[2]:'star';
+                var glyphNode=parts&&parts[1]==='bi'?h('i',{class:'bi bi-'+glyph+' template-badge-icon','aria-hidden':'true'}):h('span',{class:'material-symbols-outlined template-badge-icon','aria-hidden':'true',text:glyph});
+                card.firstElementChild.replaceWith(glyphNode);
+                ['title','subtitle'].forEach(function(prop){
+                    var field=card.lastElementChild.querySelector(prop==='title'?'strong':'span'),ref='badge:'+index+':'+prop;
+                    field.textContent=row[prop]||'';field.setAttribute('data-ve-field','prog-item');field.setAttribute('data-ve-key',ref);
+                    field.setAttribute('data-ve-label',prop==='title'?'Badge title':'Badge subtitle');field.setAttribute('data-ve-max','255');
+                    makeField(field,function(_,value){setItemProp(ref,value);});
+                });
+                group.insertBefore(card,add);keep.push(card);
+            });
+            $$('[data-ve-item^="badge:"]',group).forEach(function(card){if(keep.indexOf(card)===-1)card.remove();});
+        }
+        function renderCareers() {
+            if(!PD)return;
+            var group=S.doc.getElementById('careerRail'),add=group&&group.querySelector('[data-ve-add="item"][data-ve-type="career"]');
+            if(!group||!add)return;
+            var existing={},keep=[],active=group.querySelector('.career-panel.is-open');
+            $$('[data-ve-item^="career:"]',group).forEach(function(card){
+                var index=Number(card.getAttribute('data-ve-item').split(':')[1]),base=PD.items.career[index];
+                var key=card.getAttribute('data-ve-career-key')||(base&&'saved-'+base.item_id);
+                if(key)existing[key]=card;
+            });
+            curRows('career').forEach(function(row,index){
+                var key=row.item_id?'saved-'+row.item_id:(row.draft_key||(row.draft_key='career-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)));
+                var card=existing[key];
+                if(!card)card=h('article',{class:'career-panel',tabindex:'0'},[
+                    h('div',{class:'career-panel-bg'}),h('span',{class:'career-index'}),h('span',{class:'career-vlabel'}),
+                    h('div',{class:'career-content'},[h('h3',{class:'career-title'}),h('div',{class:'career-desc cms-rich'})])
+                ]);
+                card.setAttribute('data-ve-item','career:'+index);card.setAttribute('data-ve-career-key',key);
+                card.querySelector('.career-index').textContent=String(index+1).padStart(2,'0');
+                card.querySelector('.career-vlabel').textContent=row.title||'';
+                var bg=card.querySelector('.career-panel-bg'),url=row.removeImg?'':row.image_url||'';
+                if(row.file){
+                    if(card.__veCareerFile!==row.file){card.__veCareerFile=row.file;card.__veCareerUrl=previewUrl(row.file);}
+                    url=card.__veCareerUrl;
+                }
+                bg.style.backgroundImage=url?'url('+JSON.stringify(url)+')':'none';
+                card.classList.toggle('career-panel--plain',!url);
+                ['title','body'].forEach(function(prop){
+                    var field=card.querySelector(prop==='title'?'.career-title':'.career-desc'),ref='career:'+index+':'+prop;
+                    if(prop==='body'){
+                        field.innerHTML=/<[a-z][\s\S]*>/i.test(row.body||'')?cleanHtml(row.body):plainToHtml(row.body||'');
+                        field.setAttribute('data-ve-rich','');field.setAttribute('data-ve-multiline','');
+                    }else field.textContent=row.title||'';
+                    field.setAttribute('data-ve-field','prog-item');field.setAttribute('data-ve-key',ref);
+                    field.setAttribute('data-ve-label',prop==='title'?'Career title':'Description');
+                    field.setAttribute('data-ve-ph',prop==='title'?'Career title':'Description');field.setAttribute('data-ve-max',prop==='body'?'2000':'255');
+                    makeField(field,function(_,value){setItemProp(ref,value);if(prop==='title')card.querySelector('.career-vlabel').textContent=value;});
+                });
+                if(!card.__veCareerOpen){
+                    card.__veCareerOpen=true;
+                    ['mouseenter','focus','click'].forEach(function(event){card.addEventListener(event,function(){
+                        $$('.career-panel',group).forEach(function(panel){panel.classList.toggle('is-open',panel===card);});
+                    });});
+                }
+                group.insertBefore(card,add);keep.push(card);
+            });
+            $$('[data-ve-item^="career:"]',group).forEach(function(card){if(keep.indexOf(card)===-1)card.remove();});
+            if(keep.length&&keep.indexOf(active)===-1)keep[0].classList.add('is-open');
+        }
+        /** Badge and career structure stays in the draft with other page edits. */
         async function structural(type, rows, msg) {
+            if(type==='badge'||type==='career'){
+                if(S.busy)return;
+                pRows[type]=rows;pruneRows();select(null);
+                if(type==='badge')renderBadges();else renderCareers();
+                chrome();toast((type==='badge'?'Badges':'Career opportunities')+' updated. Save draft or Publish when ready.','ok');return;
+            }
             if (!await okToReload(rowsChanged(type) ? 1 : 0)) return;
             run('Saving…', function () {
                 return postItems(type, rows).then(function (r) {
@@ -3583,7 +3675,7 @@
         }
         async function deleteItem(r) {
             var rows = cardRowsOf(r.type).slice(), row = rows[r.i];
-            if (!await window.AdminDialogs.confirm('Delete “' + (row && row.title || 'this card') + '” for good?\n\nIt is removed from the website straight away. This cannot be undone.')) return;
+            if (!await window.AdminDialogs.confirm(r.type==='badge'||r.type==='career'?'Remove “'+(row&&row.title||'this card')+'”?\n\nThis stays in the draft until Publish.':'Delete “' + (row && row.title || 'this card') + '” for good?\n\nIt is removed from the website straight away. This cannot be undone.')) return;
             rows.splice(r.i, 1);
             structural(r.type, rows, 'Deleted.');
         }
@@ -3739,7 +3831,7 @@
             Object.keys(pRows).filter(rowsChanged).forEach(function (type) {
                 p = p.then(function () {
                     return postItems(type, pRows[type]).then(function (r) {
-                        if (r.ok) { did++; delete pRows[type]; } else errs.push((ITEM_LABEL[type] || 'Cards') + ' list: ' + r.error);
+                        if (r.ok) { did++; delete pRows[type];if((type==='badge'||type==='career')&&Array.isArray(r.items)){PD.items[type]=r.items;if(type==='badge')renderBadges();else renderCareers();} } else errs.push((ITEM_LABEL[type] || 'Cards') + ' list: ' + r.error);
                     });
                 });
             });
@@ -3754,6 +3846,8 @@
                 if(!value)return {textChanges:textChanges,departmentPrograms:departmentPrograms,nextProgramDraft:nextProgramDraft,officeChange:officeChange,bChange:bChange,bFiles:bFiles,bLogos:bLogos,dChange:dChange,dFiles:dFiles,dRemove:dRemove,pChange:pChange,pMeta:pMeta,pRows:pRows,slideReplacements:slideReplacements,pPdf:pPdf,pMedia:pMedia,departmentOrder:departmentOrder&&departmentOrder.order()};
                 textChanges=value.textChanges;departmentPrograms=value.departmentPrograms;nextProgramDraft=value.nextProgramDraft;officeChange=value.officeChange;bChange=value.bChange;bFiles=value.bFiles;bLogos=value.bLogos;dChange=value.dChange;dFiles=value.dFiles;dRemove=value.dRemove;pChange=value.pChange;pMeta=value.pMeta;pRows=value.pRows;slideReplacements=value.slideReplacements||{};pPdf=value.pPdf||null;pMedia=value.pMedia||{};
                 Object.keys(departmentPrograms).forEach(function(key){if(!S.doc.querySelector('[data-ve-program-card="'+cssEsc(key)+'"]'))appendProgramCard(S.doc,false,key,departmentPrograms[key]);});
+                if(PD&&pRows.badge)renderBadges();
+                if(PD&&pRows.career)renderCareers();
                 bindEditing(S.doc);
             },
             draftRebind:function(){bindEditing(S.doc);restoreSlideReplacements();if(pMedia.seal&&pMedia.seal.file){var seal=S.doc.querySelector('.about-feature-seal-wrap img');if(seal)seal.src=previewUrl(pMedia.seal.file);}},
@@ -4101,13 +4195,32 @@
     }
 
     function OrganizationAdapter() {
-        var data = null, records = {}, settings = {}, pageFiles = {}, pageRemoved = {}, serial = 0;
+        var data = null, records = {}, settings = {}, pageFiles = {}, pageRemoved = {}, serial = 0, pendingOrder = [];
         var endpoint = '/admin/action/student-organizations-handler.php';
         function entry(row) { return {base:row, changes:{}, files:{}, removed:{}, gallery:[], galleryRemoved:[]}; }
         function changed(rec) { return !rec.base.org_id || Object.keys(rec.changes).length || Object.keys(rec.files).length || Object.keys(rec.removed).length || rec.gallery.length || rec.galleryRemoved.length; }
-        function dirty() { return Object.keys(settings).length + Object.keys(pageFiles).length + Object.keys(pageRemoved).length + Object.keys(records).filter(function(id){return changed(records[id]);}).length; }
+        function dirty() { return (pendingOrder.length?1:0) + Object.keys(settings).length + Object.keys(pageFiles).length + Object.keys(pageRemoved).length + Object.keys(records).filter(function(id){return changed(records[id]);}).length; }
         function record(el) { var card=el&&el.closest('[data-ve-org-card]'); return records[card?card.getAttribute('data-ve-org-card'):data.organization&&data.organization.org_id]; }
         function value(rec,key) { return Object.prototype.hasOwnProperty.call(rec.changes,key)?rec.changes[key]:rec.base[key]; }
+        function isArchived(rec) { return Object.prototype.hasOwnProperty.call(rec.changes,'archived')?rec.changes.archived==='1':!!rec.base.archived_at; }
+        function archiveBadge(rec) {
+            var key=Object.keys(records).find(function(id){return records[id]===rec;}),card=S.doc.querySelector('[data-ve-org-card="'+cssEsc(key)+'"]');
+            var pending=Object.prototype.hasOwnProperty.call(rec.changes,'archived');
+            var label=pending?(isArchived(rec)?'Archive pending':'Restore pending'):(isArchived(rec)?'Archived':value(rec,'status')==='draft'?'Unpublished':'');
+            var container=card?card.querySelector('.student-org-card-cover'):S.doc.querySelector('.dynamic-org-hero-inner');
+            if(!container)return;
+            var badge=container.querySelector(card?'.student-org-draft':'.org-unpublished');
+            if(!label){if(badge)badge.remove();return;}
+            if(!badge){badge=S.doc.createElement(card?'span':'small');badge.className=card?'student-org-draft':'org-unpublished';container.appendChild(badge);}
+            badge.hidden=false;badge.textContent=label;
+        }
+        function toggleArchive(rec) {
+            if(S.busy||!rec||!rec.base.org_id)return;
+            var next=!isArchived(rec);
+            if(next===!!rec.base.archived_at)delete rec.changes.archived;else rec.changes.archived=next?'1':'0';
+            archiveBadge(rec);renderToolbar();chrome();
+            toast(!Object.prototype.hasOwnProperty.call(rec.changes,'archived')?'Archive change canceled.':next?'Archive pending. Publish to hide this organization.':'Restore pending. Publish to apply this change.','ok');
+        }
         function editFields(root) {
             $$('[data-ve-field]',root).forEach(function(el){
                 var type=el.getAttribute('data-ve-field'),key=el.getAttribute('data-ve-key');
@@ -4119,17 +4232,46 @@
                 });
             });
         }
+        function previewOrgFacebook() {
+            if(!data || !data.organization)return;
+            var rec=records[data.organization.org_id], box=S.doc.querySelector('.org-facebook-slot');
+            if(!rec || !box)return;
+            var url=value(rec,'facebook_url') || '';
+            box.replaceChildren();
+            var button=S.doc.createElement('button');button.type='button';button.setAttribute('data-ve-org-facebook','');
+            if(url){
+                var wrapper=S.doc.createElement('div');wrapper.className='org-fb-box';
+                var frame=S.doc.createElement('iframe');frame.title=rec.base.name+' Facebook page';frame.width='500';frame.height='130';frame.loading='lazy';frame.scrolling='no';frame.referrerPolicy='strict-origin-when-cross-origin';
+                frame.allow='autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share';
+                frame.src='https://www.facebook.com/plugins/page.php?href='+encodeURIComponent(url)+'&tabs=&width=500&height=130&small_header=false&adapt_container_width=true&hide_cover=true&show_facepile=false&show_posts=false';
+                button.className='org-fb-edit';button.setAttribute('aria-label','Edit Facebook page URL');button.title='Click to change the Facebook page';
+                wrapper.append(frame,button);box.appendChild(wrapper);
+            }else{
+                button.className='org-fb-add';
+                var plus=S.doc.createElement('span');plus.textContent='+';plus.setAttribute('aria-hidden','true');
+                var label=S.doc.createElement('span');label.textContent='Add the Facebook page link';button.append(plus,label);box.appendChild(button);
+            }
+        }
+        function editOrgFacebook() {
+            var rec=records[data.organization.org_id];
+            askText({label:'Facebook page URL',anchor:S.doc.querySelector('[data-ve-org-facebook]'),value:value(rec,'facebook_url') || '',max:500,placeholder:'https://www.facebook.com/your-page',hint:'Use an HTTPS Facebook page URL. Leave blank to remove it. Publish to save.',done:function(url){
+                url=url.trim();var valid=!url;
+                if(url){try{var parsed=new URL(url);valid=parsed.protocol==='https:'&&['facebook.com','www.facebook.com','m.facebook.com'].includes(parsed.hostname)&&!/[\s\x00-\x1f\x7f]/.test(url)&&!parsed.username&&!parsed.password;}catch(ignore){}}
+                if(!valid){toast('Enter an HTTPS Facebook page URL.','error');return;}
+                if(url===(rec.base.facebook_url || ''))delete rec.changes.facebook_url;else rec.changes.facebook_url=url;
+                previewOrgFacebook();chrome();renderToolbar();
+            }});
+        }
         function request(fields,files) { return send(endpoint,fields,files).then(function(result){if(!result.ok)throw new Error(result.error);return result;}); }
         function failure(error) { toast(error.message||'Could not save this change.','error'); }
         async function save(rec,status) {
-            var payload=Object.assign({},rec.changes,{action:'save',org_id:rec.base.org_id||0,status:status||value(rec,'status')||'draft'});
+            var payload=Object.assign({},rec.changes,{action:'save',org_id:rec.base.org_id||0,status:Object.prototype.hasOwnProperty.call(rec.changes,'archived')?(value(rec,'status')||'draft'):(status||value(rec,'status')||'draft')});
             if(!rec.base.org_id)payload.name=value(rec,'name')||'';
             Object.keys(rec.removed).forEach(function(key){payload['remove_'+key]='1';});
             rec.galleryRemoved.forEach(function(id,index){payload['remove_gallery['+index+']']=id;});
             var uploads=Object.assign({},rec.files);rec.gallery.forEach(function(file,index){if(file)uploads['gallery['+index+']']=file;});
             var result=await request(payload,uploads);rec.base=result.organization;rec.changes={};rec.files={};rec.removed={};rec.gallery=[];rec.galleryRemoved=[];
-            var id=Object.keys(records).find(function(key){return records[key]===rec;});var card=$('[data-ve-org-card="'+id+'"]',S.doc);
-            if(card){var badge=$('.student-org-draft',card);if(rec.base.status==='draft'&&!badge){badge=S.doc.createElement('span');badge.className='student-org-draft';$('.student-org-card-cover',card).appendChild(badge);}if(badge){badge.textContent='Unpublished';badge.hidden=rec.base.status==='published';}}
+            archiveBadge(rec);
             if(data.organization){data.organization=rec.base;
                 var gallery=$('.org-gallery',S.doc),add=gallery&&$('[data-ve-org-gallery-add]',gallery);
                 if(gallery&&Array.isArray(result.gallery)){
@@ -4147,7 +4289,7 @@
             var card=h('article',{'class':'student-org-card','data-ve-org-card':id,'data-ve-label':'New organization'},[
                 h('div',{class:'student-org-card-cover'},[h('span',{class:'org-cover-picture','data-ve-org-media':'cover','data-warning-image':true,'data-warning-label':'Organization cover',text:'Add cover image'}),h('span',{class:'student-org-draft',text:'Unpublished'})]),
                 h('div',{class:'student-org-card-body'},[
-                    h('div',{class:'student-org-card-heading'},[h('span',{class:'student-org-card-logo','data-ve-org-media':'logo','data-warning-image':true,'data-warning-label':'Organization logo'},[icon('image')]),h('h3',{'data-ve-field':'org-field','data-ve-key':'name','data-ve-label':'Organization name','data-ve-max':255})]),
+                    h('div',{class:'student-org-card-heading'},[h('span',{class:'student-org-card-logo','data-image-frame-fit':'contain','data-ve-org-media':'logo','data-warning-image':true,'data-warning-label':'Organization logo'},[icon('image')]),h('h3',{'data-ve-field':'org-field','data-ve-key':'name','data-ve-label':'Organization name','data-ve-max':255})]),
                     h('div',{class:'cms-rich','data-ve-rich':true,'data-ve-field':'org-field','data-ve-key':'description','data-ve-label':'Short description','data-ve-max':1500,'data-ve-multiline':true}),
                     h('button',{type:'button',class:'org-canvas-control','data-ve-org-details':true,text:'Edit organization page'}),
                     h('button',{type:'button',class:'org-canvas-control','data-ve-org-assign-category':true,text:'Assign category'})])]);
@@ -4187,7 +4329,7 @@
                 var card=$('[data-ve-org-card="'+id+'"]',S.doc),badge=card&&$('.student-org-category',card),cat=category(value(rec,'category_id'));if(badge)badge.textContent=cat?cat.name:'Uncategorized';assignCategoryLabel(rec,cat);});
             var nav=$('.student-org-filters',S.doc);if(!nav)return;
             var active=nav.querySelector('a.is-active'),selected=active?new URL(active.href).searchParams.get('category'):null;
-            $$('a',nav).slice(1).forEach(function(link){link.remove();});
+            $$('a',nav).slice(1).filter(function(link){return !link.hasAttribute('data-ve-org-archive-view');}).forEach(function(link){link.remove();});
             categories.forEach(function(cat){var link=h('a',{href:data.listingUrl+'?ce_preview=1&category='+cat.category_id,text:cat.name});if(String(cat.category_id)===selected){link.className='is-active';link.setAttribute('aria-current','true');}nav.insertBefore(link,$('[data-ve-org-categories]',nav));});
             if(!selected||!category(selected)){var all=nav.querySelector('a');all.className='is-active';all.setAttribute('aria-current','true');}
         }
@@ -4205,9 +4347,50 @@
         function saveUnpublished(rec) {
             closePop();savePageDraft();
         }
+        async function refreshOrgOrder() {
+            if (!data || data.organization) return;
+            if(dirty())throw new Error('Save or publish the pending organization changes before refreshing the order.');
+            var response=await fetch(S.url,{credentials:'same-origin',cache:'no-store'});
+            if(!response.ok)throw new Error('Order saved, but the card list could not be updated. Try again.');
+            var next=new DOMParser().parseFromString(await response.text(),'text/html');
+            var directory=next.querySelector('.student-org-directory'),json=next.getElementById('veOrgData');
+            if(!directory||!json)throw new Error('Order saved, but the card list could not be updated.');
+            var updated=JSON.parse(json.textContent),scroll=S.win.scrollY;
+            S.doc.querySelector('.student-org-directory').replaceWith(S.doc.importNode(directory,true));
+            (updated.organizations||[]).forEach(function(row){records[row.org_id]=entry(row);});
+            data.organizations=updated.organizations;
+            editFields(S.doc);bindOrganizationDrag();select(null);S.win.scrollTo({top:scroll,behavior:'instant'});chrome();
+        }
+        var dragGrids=new WeakSet(),disposeDrag=null,suppressOrgClickUntil=0;
+        function bindOrganizationDrag() {
+            var grid=S.doc.querySelector('.student-org-grid');if(!grid||dragGrids.has(grid))return;dragGrids.add(grid);
+            if(disposeDrag)disposeDrag();
+            disposeDrag=bindCardSwap(grid,S.doc,{selector:'[data-ve-org-card]',handleLeft:true,suppressClick:function(){suppressOrgClickUntil=Date.now()+400;},canStart:function(card){
+                return !!records[card.getAttribute('data-ve-org-card')].base.org_id;
+            },swap:function(source,target){
+                if(!records[target.getAttribute('data-ve-org-card')].base.org_id)return;
+                swapCards(source,target);select(null);toast('Positions swapped. Save draft or Publish when ready.','ok');
+            }});
+        }
+        function swapCards(source,target) {
+            var marker=S.doc.createComment('swap'),grid=source.parentNode;
+            grid.insertBefore(marker,source);grid.insertBefore(source,target);grid.insertBefore(target,marker);marker.remove();
+            var ids=$$('[data-ve-org-card]',grid).map(function(card){return +card.getAttribute('data-ve-org-card');}).filter(function(id){return id>0;});
+            var baseline=(data.organizations||[]).map(function(row){return +row.org_id;});
+            pendingOrder=same(ids,baseline)?[]:ids;renderToolbar();chrome();
+        }
+        async function publishOrder() {
+            if(!pendingOrder.length)return;
+            var result=await request({action:'reorder',order:JSON.stringify(pendingOrder)});
+            pendingOrder=[];
+            data.organizations.sort(function(a,b){return result.order.indexOf(+a.org_id)-result.order.indexOf(+b.org_id);});
+            D.dispatchEvent(new CustomEvent('org:order-updated',{detail:{order:result.order}}));
+        }
         function move(rec,direction) {
-            if(dirty()){toast('Save or publish your changes before changing the order.','warn');return;}
-            run('Updating order...',async function(){try{await request({action:'move',org_id:rec.base.org_id,direction:direction});loadFrame(S.url,true);}catch(error){failure(error);}});
+            if(S.busy||data.organization)return;
+            var cards=$$('[data-ve-org-card]',S.doc),source=cards.find(function(card){return record(card)===rec;}),index=cards.indexOf(source),target=cards[index+direction];
+            if(!source||!target||!rec.base.org_id||!record(target).base.org_id)return;
+            swapCards(source,target);toast('Order changed. Save draft or Publish when ready.','ok');
         }
         function removeOrganization(rec,el) {
             if(data.organization&&Object.keys(settings).length){toast('Publish your page heading changes before deleting this organization.','warn');return;}
@@ -4225,9 +4408,31 @@
             loadFrame(withParam(url, 'ce_preview', '1'));
             var sub=$('#veSub'); if (sub) sub.value=withParam(url,'ce_preview','1');
         }
+        async function navigateDirectory(url) {
+            if(S.busy)return;
+            if(!await guardDirty('You have unsaved organization changes. Leave without saving them?')||S.busy)return;
+            S.busy=true;chrome();
+            try {
+                var response=await fetch(withParam(url,'ce_preview','1'),{credentials:'same-origin',cache:'no-store'});
+                if(!response.ok)throw new Error('Could not load the organization page. Try again.');
+                var next=new DOMParser().parseFromString(await response.text(),'text/html'),main=next.querySelector('main'),json=next.getElementById('veOrgData');
+                if(!main||!json)throw new Error('Could not load the organization page. Try again.');
+                JSON.parse(json.textContent);
+                var scroll=S.win.scrollY;
+                discardImagePositions();select(null);closePop();
+                if(textLayout){textLayout.dispose();textLayout=null;}
+                S.doc.querySelector('main').replaceWith(S.doc.importNode(main,true));
+                S.doc.getElementById('veOrgData').replaceWith(S.doc.importNode(json,true));
+                S.url=withParam(url,'ce_preview','1');S.win.history.replaceState(null,'',S.url);
+                S.adapter.mount(S.doc);
+                if(C.canPublish&&S.win.GNCTextLayout)textLayout=S.win.GNCTextLayout.create({state:function(){return {busy:S.busy,preview:S.preview};},stage:stageTextPlacement});
+                if(drafts&&drafts.supported())await drafts.load(S.url);
+                applyPreview();S.win.scrollTo({top:scroll,behavior:'instant'});
+            }catch(error){failure(error);}finally{S.busy=false;chrome();}
+        }
         return {
             draftState:function(value){
-                if(!value)return {records:records,settings:settings,pageFiles:pageFiles,pageRemoved:pageRemoved,serial:serial};records=value.records;settings=value.settings;pageFiles=value.pageFiles;pageRemoved=value.pageRemoved;serial=value.serial;
+                if(!value)return {records:records,settings:settings,pageFiles:pageFiles,pageRemoved:pageRemoved,serial:serial,pendingOrder:pendingOrder};records=value.records;settings=value.settings;pageFiles=value.pageFiles;pageRemoved=value.pageRemoved;serial=value.serial;pendingOrder=value.pendingOrder||[];
                 if(!data.organization)Object.keys(records).forEach(function(key){if(!S.doc.querySelector('[data-ve-org-card="'+cssEsc(key)+'"]'))addOrganization(key,records[key]);});editFields(S.doc);
                 if(data.organization){
                     var rec=record(null),add=$('[data-ve-org-gallery-add]',S.doc);
@@ -4237,16 +4442,20 @@
                     }
                 }
             },
-            draftRebind:function(){editFields(S.doc);},
+            consumeClick:function(){return Date.now()<suppressOrgClickUntil;},
+            refreshOrder:refreshOrgOrder,
+            draftRebind:function(){editFields(S.doc);previewOrgFacebook();Object.keys(records).forEach(function(id){archiveBadge(records[id]);});},
             mount: function (doc) {
                 try { data=JSON.parse(doc.getElementById('veOrgData').textContent); } catch (_) { data=null; }
-                records={};settings={};pageFiles={};pageRemoved={};if(!data)return false;
+                records={};settings={};pageFiles={};pageRemoved={};pendingOrder=[];if(!data)return false;
                 (data.organization?[data.organization]:data.organizations||[]).forEach(function(row){records[row.org_id]=entry(row);});
-                editFields(doc);
-                if(new URL(S.frame.src).searchParams.get('add_org')==='1')addOrganization();
+                editFields(doc);bindOrganizationDrag();
+                if(new URL(S.url,window.location.origin).searchParams.get('add_org')==='1')addOrganization();
                 return false;
             },
             pick: function (target) {
+                if(target.closest('.ve-drag-handle'))return {kind:'none'};
+                if(target.closest('[data-ve-org-facebook]')){editOrgFacebook();return {kind:'none'};}
                 var orgIcon=target.closest('[data-ve-org-icon]');if(orgIcon)return {kind:'org-icon',el:orgIcon,key:orgIcon.getAttribute('data-ve-org-icon')};
                 var assign=target.closest('[data-ve-org-assign-category]');
                 if(assign){select({kind:'org-assign-category',el:assign});categories(record(assign));return {kind:'none'};}
@@ -4284,7 +4493,8 @@
                 var rec=record(selected.el);
                 if(selected.kind==='field'||selected.kind==='org-card'){
                     var items=selected.kind==='field'?[{type:'chip',icon:'pencil',text:selected.el.__ve.label||'Text'}]:[];
-                    if(rec)items=items.concat([{icon:'pencil-square',label:'Edit page',run:function(){openDetails(rec);}},{icon:'tags',label:'Category',run:function(){categories(rec);}},{icon:'save',label:'Save draft',run:function(){saveUnpublished(rec);}},{icon:'cloud-upload',title:'Publish organization',run:function(){confirmPublish('Publish this organization?',function(){run('Publishing...',async function(){try{await save(rec,'published');toast('Published. Your changes are live now.','ok');chrome();renderToolbar();}catch(error){failure(error);}});});}},{icon:'arrow-left',title:'Move earlier',run:function(){move(rec,-1);}},{icon:'arrow-right',title:'Move later',run:function(){move(rec,1);}},{icon:'trash',title:'Delete organization',danger:true,run:function(){removeOrganization(rec,selected.el);}}]);
+                    if(rec)items=items.concat([{icon:'pencil-square',label:'Edit page',run:function(){openDetails(rec);}},{icon:'tags',label:'Category',run:function(){categories(rec);}},{icon:'save',label:'Save draft',run:function(){saveUnpublished(rec);}},{icon:'cloud-upload',title:'Publish organization',run:function(){confirmPublish('Publish this organization?',function(){run('Publishing...',async function(){try{await save(rec,'published');await publishOrder();toast('Published. Your changes are live now.','ok');chrome();renderToolbar();}catch(error){failure(error);}});});}},{icon:'arrow-left',title:'Move earlier',run:function(){move(rec,-1);}},{icon:'arrow-right',title:'Move later',run:function(){move(rec,1);}},{icon:'trash',title:'Delete organization',danger:true,run:function(){removeOrganization(rec,selected.el);}}]);
+                    if(rec&&rec.base.org_id)items.push({icon:isArchived(rec)?'arrow-counterclockwise':'archive',label:isArchived(rec)?'Restore organization':'Archive organization',run:function(){toggleArchive(rec);}});
                     return items;
                 }
                 if (selected.kind!=='org-media') return [];
@@ -4300,13 +4510,17 @@
             },
             onLink: function (link) {
                 var url=new URL(link.getAttribute('href'),window.location.origin);
-                if (url.origin===window.location.origin && /\/(student-org|dynamic-org)\.php$/.test(url.pathname)) {navigate(url.pathname+url.search);return true;}
+                if (url.origin===window.location.origin && /\/(student-org|dynamic-org)(?:\.php)?$/.test(url.pathname)) {
+                    if(!data.organization&&link.closest('.student-org-pagination,.student-org-filters'))navigateDirectory(url.pathname+url.search);
+                    else navigate(url.pathname+url.search);
+                    return true;
+                }
                 return false;
             },
             dirtyCount: dirty,
             status: function(){return {text:dirty()?plural(dirty(),'unsaved change'):'Everything here is saved',tone:dirty()?'warn':'ok'};},
             hasPageOptions: function(){return !!data;},
-            pageOptions: function(x,y){var rec=record(null);var buttons=[h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Manage categories',on:{click:function(){categories(null);}}})];if(rec)buttons.push(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Save draft',on:{click:function(){closePop();saveUnpublished(rec);}}}),h('button',{type:'button',class:'btn btn-sm btn-outline-danger',text:'Delete organization',on:{click:function(){removeOrganization(rec,null);}}}));openPop(h('div',{class:'ve-pop-form'},buttons),x,y);},
+            pageOptions: function(x,y){var rec=record(null);var buttons=[h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Manage categories',on:{click:function(){categories(null);}}})];if(rec&&rec.base.org_id)buttons.push(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:isArchived(rec)?'Restore organization':'Archive organization',on:{click:function(){closePop();toggleArchive(rec);}}}));if(rec)buttons.push(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Save draft',on:{click:function(){closePop();saveUnpublished(rec);}}}),h('button',{type:'button',class:'btn btn-sm btn-outline-danger',text:'Delete organization',on:{click:function(){removeOrganization(rec,null);}}}));openPop(h('div',{class:'ve-pop-form'},buttons),x,y);},
             actions: function(){return {secondary:{label:'Add Organization',icon:'plus-circle'},primary:{label:'Publish',icon:'cloud-upload',disabled:!data||(!dirty()&&(!data.organization||data.organization.status==='published'))}};},
             runSecondary: addOrganization,
             runPrimary: function(){
@@ -4316,6 +4530,7 @@
                         return (async function(){try{
                             if(Object.keys(settings).length||Object.keys(pageFiles).length||Object.keys(pageRemoved).length){var page=await request({action:'save_page',texts:JSON.stringify(settings),remove_images:JSON.stringify(Object.keys(pageRemoved))},pageFiles);Object.keys(settings).forEach(function(key){data.fields[key].value=settings[key];});if(page.images)data.images=page.images;settings={};pageFiles={};pageRemoved={};}
                             for(var id of Object.keys(records)){var rec=records[id];if(changed(rec)||(data.organization&&rec.base.status!=='published'))await save(rec,'published');}
+                            await publishOrder();
                             reloadEditor('Published. Your changes are live now.',entityRoute(S.url),true);
                         }catch(error){failure(error);}})();
                     });
@@ -4325,6 +4540,56 @@
     }
     function SportsAdapter() {
         var data=null, rows=[], texts={}, files={}, backgroundFiles={}, teams=[],teamFiles={},facilities=[],facilityFiles={},baseline='',preparing=0,speed=1,motion=true,facebookUrl='';
+        var dock=S.frame&&S.frame.ownerDocument.getElementById('veDock'),dockTab='sports';
+        function dockLists(){return {
+            sports:{label:'Sports photos',icon:'dribbble',rows:rows,selector:'data-ve-sport',image:'data-ve-sport-image',limit:30,add:add,kind:'sport'},
+            teams:{label:'Team logos',icon:'shield',rows:teams,selector:'data-ve-team',image:'data-ve-team-image',limit:20,add:addTeam,kind:'team-logo'},
+            facilities:{label:'Facility slides',icon:'images',rows:facilities,selector:'data-ve-facility',image:'data-ve-facility-image',limit:24,add:addFacility,kind:'facility'}
+        };}
+        function openDockItem(list,row,index,button){
+            if(S.busy||S.preview)return;
+            var node=S.doc.querySelector('['+list.selector+'="'+cssEsc(row.id)+'"]');if(!node)return;
+            if(dockTab==='sports')setMotion(false);
+            if(dockTab==='facilities')refreshFacilities(index);
+            node.scrollIntoView({block:'center',inline:'nearest',behavior:'smooth'});
+            var selection={kind:list.kind,el:node};select(selection);
+            var name=h('input',{class:'form-control form-control-sm',type:'text',value:row.name,maxlength:'120','aria-label':'Name'});
+            var content=h('div',{class:'ve-pop-form'},[h('strong',{text:list.label+' · '+(index+1)}),name,
+                h('button',{type:'button',class:'btn btn-sm btn-gnc',text:'Use name',on:{click:function(){
+                    var value=name.value.trim();if(!value){name.focus();return;}
+                    var field=node.querySelector('[data-ve-field="'+(dockTab==='sports'?'sport-name':dockTab==='teams'?'team-name':'facility-name')+'"]');
+                    row.name=value;if(field){field.textContent=value;if(field.__ve)field.__ve.onChange(field,value);}
+                    closePop();renderToolbar();chrome();
+                }}})]);
+            var actions=h('div',{class:'ve-pop-row'});
+            S.adapter.toolbar(selection).forEach(function(item){actions.appendChild(buildItem(item));});content.appendChild(actions);
+            var rect=button.getBoundingClientRect();openPop(content,rect.left,rect.top-210,null,true);
+        }
+        function renderDock(){
+            if(!dock)return;
+            dock.hidden=!data||S.preview;if(dock.hidden)return;
+            var lists=dockLists(),list=lists[dockTab],old=dock.querySelector('.ve-dock-track'),scroll=old?old.scrollLeft:0;
+            var focused=dock.contains(dock.ownerDocument.activeElement)?dock.ownerDocument.activeElement.getAttribute('data-sports-dock'):null;
+            dock.innerHTML='';
+            dock.appendChild(h('div',{class:'ve-dock-label ve-dock-tabs',role:'tablist','aria-label':'Athletics photos'},Object.keys(lists).map(function(key){
+                return h('button',{type:'button',role:'tab','aria-selected':String(key===dockTab),class:'ve-dock-tab'+(key===dockTab?' is-on':''),'data-sports-dock':key,
+                    on:{click:function(){closePop();dockTab=key;renderDock();}}},[icon(lists[key].icon),h('span',{text:lists[key].label+' ('+lists[key].rows.length+')'})]);
+            })));
+            var track=h('div',{class:'ve-dock-track',role:'list'});
+            list.rows.forEach(function(row,index){
+                var node=S.doc.querySelector('['+list.selector+'="'+cssEsc(row.id)+'"]'),image=node&&node.querySelector('['+list.image+']');
+                var src=image&&!image.hidden?image.src:row.image;
+                var button=h('button',{type:'button',class:'ve-thumb',role:'listitem',disabled:S.busy||preparing>0,'data-sports-dock':row.id,title:'Edit '+row.name,
+                    on:{click:function(){openDockItem(list,row,index,button);}}},[
+                    src?h('img',{class:'ve-thumb-img',src:src,alt:''}):h('span',{class:'ve-thumb-img ve-thumb-video'},[icon('image')]),
+                    h('span',{class:'ve-thumb-n',text:String(index+1)}),h('span',{class:'ve-thumb-t',text:clip(row.name||'Untitled',22)})]);
+                track.appendChild(button);
+            });
+            dock.appendChild(track);track.scrollLeft=scroll;
+            dock.appendChild(h('button',{type:'button',class:'ve-add-slide','data-sports-dock':'add',disabled:S.busy||preparing>0||list.rows.length>=list.limit,
+                on:{click:function(){list.add();}}},[icon('plus-lg'),h('span',{text:dockTab==='teams'?'Add logo':dockTab==='facilities'?'Add slides':'Add sport'})]));
+            if(focused){var control=dock.querySelector('[data-sports-dock="'+cssEsc(focused)+'"]');if(control)control.focus({preventScroll:true});}
+        }
         function payload(){return {texts:texts,speed:speed,facebook_url:facebookUrl,sports:rows.map(function(row){return {id:row.id,name:row.name,type:row.type};}),teams:teams.map(function(team){return {id:team.id,name:team.name};}),facilities:facilities.map(function(facility){return {id:facility.id,name:facility.name};})};}
         function editFacebook(){
             askText({label:'Facebook page address',anchor:S.doc.querySelector('[data-ve-sports-facebook]'),value:facebookUrl,max:255,placeholder:'https://www.facebook.com/your-page',hint:'Leave blank to remove the Facebook page. Publish to save.',done:function(value){
@@ -4466,6 +4731,7 @@
             if(delta<0)figure.parentNode.insertBefore(figure,target);else figure.parentNode.insertBefore(target,figure);refreshFacilities(index+delta);chrome();renderToolbar();
         }
         return {
+            renderDock:renderDock,
             draftState:function(value){
                 if(!value)return {rows:rows,texts:texts,files:files,backgroundFiles:backgroundFiles,teams:teams,teamFiles:teamFiles,facilities:facilities,facilityFiles:facilityFiles,baseline:baseline,speed:speed,facebookUrl:facebookUrl};
                 rows=value.rows;texts=value.texts;files=value.files;backgroundFiles=value.backgroundFiles;teams=value.teams;teamFiles=value.teamFiles;facilities=value.facilities;facilityFiles=value.facilityFiles;baseline=value.baseline;speed=value.speed;facebookUrl=value.facebookUrl;
@@ -4771,17 +5037,87 @@
         };
     }
 
-    function PaymentGuideAdapter() {
-        var data, changes = {}, texts = {}, urls = [];
-        function dirty() { return Object.keys(changes).length + Object.keys(texts).length; }
+    function PaymentGuideAdapter() { return AdmissionsContentAdapter(false); }
+    function ScholarshipAdapter() { return AdmissionsContentAdapter(true); }
+    function AdmissionsContentAdapter(scholarship) {
+        var textSelector = scholarship ? '[data-ve-field="scholarship-text"]' : '[data-ve-field="payment-guide-text"]';
+        var imageSelector = scholarship ? '[data-ve-img="scholarship-image"]' : '[data-ve-img="payment-guide-image"]';
+        var dataId = scholarship ? 'veScholarshipData' : 'vePaymentGuideData';
+        var title = scholarship ? 'scholarship' : 'payment guide';
+        var data, changes = {}, texts = {}, urls = [], entries = [], entryFiles = {};
+        function dirty() { return Object.keys(changes).length + Object.keys(texts).length + (scholarship && data && JSON.stringify(entries) !== JSON.stringify(data.entries || []) ? 1 : 0) + Object.keys(entryFiles).length; }
+        function entryOf(id) { return entries.find(function(entry){return entry.id === id;}); }
+        function renderEntries() {
+            if (!scholarship || !S.doc) return;
+            ['gnc','government'].forEach(function(category){
+                var grid=S.doc.querySelector('[data-scholarship-list="'+category+'"]');
+                var template=S.doc.getElementById('sch-entry-template-'+category);
+                if (!grid || !template) return;
+                grid.replaceChildren();
+                grid.hidden=!entries.some(function(entry){return entry.category===category;});
+                entries.filter(function(entry){return entry.category===category;}).forEach(function(entry){
+                    var card=template.content.firstElementChild.cloneNode(true);
+                    card.setAttribute('data-scholarship-entry',entry.id);
+                    ['title','description'].forEach(function(prop){
+                        var el=card.querySelector('[data-sch-entry-prop="'+prop+'"]');
+                        el.setAttribute('data-ve-key',entry.id+'_'+prop);el.textContent=entry[prop];
+                        makeField(el,function(node,value){entry[prop]=value;});
+                    });
+                    var link=card.querySelector('.sch-entry-link');link.hidden=!entry.url;link.setAttribute('href',entry.url);
+                    var pdf=entryFiles[entry.id] ? previewUrl(entryFiles[entry.id]) : entry.pdf;
+                    var viewer=card.querySelector('.sch-pdf');viewer.hidden=!pdf;
+                    if(pdf){card.querySelector('.sch-pdf-frame').src=pdf+'#view=FitH';card.querySelector('.sch-pdf-frame').title=entry.title+' (PDF)';card.querySelector('[data-sch-pdf-open]').href=pdf;card.querySelector('[data-sch-pdf-download]').href=pdf;}
+                    grid.appendChild(card);
+                });
+            });
+        }
+        function entryForm(category, current) {
+            var name=h('input',{class:'form-control',type:'text',maxlength:255,value:current?current.title:'','aria-label':'Scholarship title'});
+            var description=h('textarea',{class:'form-control',rows:5,maxlength:6000,'aria-label':'Scholarship details'});description.value=current?current.description:'';
+            var url=h('input',{class:'form-control',type:'text',maxlength:2048,value:current?current.url:'','aria-label':'Scholarship link'});
+            var group=h('select',{class:'form-select','aria-label':'Scholarship category'},[
+                h('option',{value:'gnc',text:'GNC Scholarships'}),h('option',{value:'government',text:'Government Scholarships'})
+            ]);group.value=category;
+            var selectedPdf=null;
+            var pdfInput=h('input',{type:'file',accept:'application/pdf,.pdf',class:'form-control','aria-label':'Scholarship PDF',on:{change:function(){selectedPdf=pdfInput.files[0] || null;}}});
+            var error=h('p',{class:'text-danger',role:'alert'});
+            var save=h('button',{type:'button',class:'btn btn-gnc',text:current?'Save changes':'Add scholarship',on:{click:function(){
+                var destination=url.value.trim();
+                if (!name.value.trim() || name.value.trim().length>255 || description.value.length>6000) {error.textContent='Enter a title and keep the details within the allowed length.';return;}
+                var valid=!destination || (!/[\s\x00-\x1f\x7f<>"\\]/.test(destination) && /^\/(?!\/)/.test(destination));
+                if (!valid) {try {var parsed=new URL(destination);valid=['http:','https:'].includes(parsed.protocol)&&!!parsed.hostname&&!/[\s\x00-\x1f\x7f<>"\\]/.test(destination);}catch(ignore){}}
+                if (!valid || destination.length>2048) {error.textContent='Use an HTTP or HTTPS link, or a local path starting with /.';return;}
+                if (!current && !selectedPdf) {error.textContent='Choose a PDF for the scholarship.';return;}
+                if(selectedPdf && (!/\.pdf$/i.test(selectedPdf.name) || !selectedPdf.size || selectedPdf.size>20*MB)){error.textContent='Choose a PDF of up to 20 MB.';return;}
+                if (!current && entries.length>=100) {error.textContent='Use up to 100 scholarship entries.';return;}
+                var entry=current || {id:Array.from(crypto.getRandomValues(new Uint8Array(8)),function(value){return value.toString(16).padStart(2,'0');}).join('')};
+                Object.assign(entry,{category:group.value,title:name.value.trim(),description:description.value.trim(),url:destination});
+                if(selectedPdf)entryFiles[entry.id]=selectedPdf;
+                if (!current) entries.push(entry);
+                closePop();renderEntries();select(null);chrome();
+            }}});
+            popBelowToolbar(h('div',{class:'ve-pop-form'},[
+                h('strong',{text:current?'Edit scholarship':'Add scholarship'}),h('label',{text:'Category'},[group]),h('label',{text:'Title'},[name]),
+                h('label',{text:'Details and requirements'},[description]),h('label',{text:'Learn more link (optional)'},[url]),h('label',{text:current?'Replace PDF (optional)':'Scholarship PDF'},[pdfInput]),h('p',{class:'ve-pop-hint',text:'PDF files up to 20 MB. Visitors can view, open, or download the document.'}),error,
+                h('div',{class:'ve-pop-row'},[h('button',{type:'button',class:'btn btn-outline-secondary',text:'Cancel',on:{click:closePop}}),save])
+            ]),null,true);
+        }
+        function entryTools(el) {
+            var card=el.closest('[data-scholarship-entry]'), entry=card&&entryOf(card.getAttribute('data-scholarship-entry'));
+            if (!entry) return [];
+            return [
+                {icon:'pencil',label:'Edit scholarship',run:function(){entryForm(entry.category,entry);}},
+                {icon:'trash',label:'Remove scholarship',danger:true,run:function(){confirmPop('Remove scholarship?','This entry will be removed from the website when you publish.','Remove',function(){entries=entries.filter(function(item){return item.id!==entry.id;});delete entryFiles[entry.id];renderEntries();select(null);chrome();});}}
+            ];
+        }
         function bindFields(doc) {
-            $$('[data-ve-field="payment-guide-text"]', doc).forEach(function (el) {
+            $$(textSelector, doc).forEach(function (el) {
                 var key = el.getAttribute('data-ve-key'), field = data.fields[key];
                 if (!field) return;
                 makeField(el, function (node, value) {
                     if (value === field.value) delete texts[key]; else texts[key] = value;
                     // Account details appear in both payment options and share one saved value.
-                    $$('[data-ve-field="payment-guide-text"]', doc).forEach(function (other) {
+                    $$(textSelector, doc).forEach(function (other) {
                         if (other !== node && other.getAttribute('data-ve-key') === key) {
                             if (field.type === 'rich') other.innerHTML = node.innerHTML; else other.textContent = value;
                         }
@@ -4804,7 +5140,7 @@
                 }
             });
         }
-        function imageOf(el) { return el.querySelector('img'); }
+        function imageOf(el) { return el.tagName === 'IMG' ? el : el.querySelector('img'); }
         function restore(el, key) {
             imageOf(el).src = data.images[key].default;
             if (data.images[key].url === data.images[key].default) delete changes[key];
@@ -4812,9 +5148,9 @@
             chrome(); renderToolbar();
         }
         function replace(el, key) {
-            pickFile('image/svg+xml,image/png,image/jpeg,image/webp,.svg,.png,.jpg,.jpeg,.webp', function (file) {
-                if (!/\.(svg|png|jpe?g|webp)$/i.test(file.name) || file.size > 5 * MB) {
-                    toast('Choose an SVG, PNG, JPG, or WEBP image of up to 5 MB.', 'error'); return;
+            pickFile(scholarship ? 'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp' : 'image/svg+xml,image/png,image/jpeg,image/webp,.svg,.png,.jpg,.jpeg,.webp', function (file) {
+                if (!(scholarship ? /\.(png|jpe?g|webp)$/i : /\.(svg|png|jpe?g|webp)$/i).test(file.name) || file.size > 5 * MB) {
+                    toast(scholarship ? 'Choose a PNG, JPG, or WEBP image of up to 5 MB.' : 'Choose an SVG, PNG, JPG, or WEBP image of up to 5 MB.', 'error'); return;
                 }
                 var url = previewUrl(file); urls.push(url);
                 changes[key] = {reset:false, file:file}; imageOf(el).src = url;
@@ -4826,51 +5162,72 @@
             window.open('https://storyset.com/', '_blank', 'noopener,noreferrer');
         }
         return {
-            draftState:function(value){if(!value)return {changes:changes,texts:texts};changes=value.changes;texts=value.texts;},
+            draftState:function(value){if(!value)return {changes:changes,texts:texts,entries:entries,entryFiles:entryFiles};changes=value.changes;texts=value.texts;entries=value.entries || (data && data.entries) || [];entryFiles=value.entryFiles || {};renderEntries();},
             mount:function (doc) {
                 urls.forEach(function (url) { URL.revokeObjectURL(url); }); urls = []; changes = {}; texts = {}; data = null;
-                try { data = JSON.parse(doc.getElementById('vePaymentGuideData').textContent); } catch (_) {}
+                try { data = JSON.parse(doc.getElementById(dataId).textContent); } catch (_) {}
                 if (data && data.fields) bindFields(doc);
+                entryFiles={};
+                entries=data && data.entries ? JSON.parse(JSON.stringify(data.entries)) : [];
+                renderEntries();
                 return false;
             },
             pick:function (target) {
+                var add=scholarship && target.closest('[data-ve-scholarship-add]');
+                if(add){entryForm(add.getAttribute('data-ve-scholarship-add'));return {kind:'none'};}
                 var field = fieldOf(target);
                 if (field && field.__ve) return {kind:'field',el:field};
+                var entry=scholarship && target.closest('[data-scholarship-entry]');
+                if(entry)return {kind:'scholarship-entry',el:entry};
                 var link = target.closest('[data-ve-payment-link]');
                 if (link && data) return {kind:'payment-guide-link',el:link};
-                var el = target.closest('[data-ve-img="payment-guide-image"]');
-                return el && data ? {kind:'payment-guide-image', el:el, key:el.getAttribute('data-ve-key')} : null;
+                var el = target.closest(imageSelector);
+                return el && data ? {kind:'payment-guide-image', el:el, key:el.getAttribute('data-ve-key'),stop:!!scholarship} : null;
             },
             toolbar:function (sel) {
                 if (sel.kind === 'field' || sel.kind === 'payment-guide-link') {
                     var link = sel.el.closest('[data-ve-payment-link]');
                     var items = [{type:'chip',text:sel.kind === 'field' ? sel.el.__ve.label : 'Button destination',icon:'pencil'}];
+                    if (scholarship) items=items.concat(entryTools(sel.el));
                     if (link) items.push({icon:'link-45deg',label:'Edit destination',run:function () { editDestination(link); }});
+                    var scholarshipLink = scholarship && sel.el.closest('a[data-bs-target]');
+                    if (scholarshipLink) items.push({icon:'card-text',label:'Edit scholarship details',run:function(){S.doc.defaultView.bootstrap.Modal.getOrCreateInstance(S.doc.querySelector(scholarshipLink.getAttribute('data-bs-target'))).show();}});
                     return items;
                 }
+                if (sel.kind === 'scholarship-entry') return entryTools(sel.el);
                 if (sel.kind !== 'payment-guide-image') return [];
                 return [
                     {type:'chip', text:data.images[sel.key].label, icon:'image'},
-                    {icon:'image', label:'Change illustration', primary:true, run:function () { replace(sel.el, sel.key); }},
-                    {icon:'arrow-counterclockwise', label:'Restore Storyset illustration', run:function () { restore(sel.el, sel.key); }},
-                    {icon:'box-arrow-up-right', label:'Browse Storyset', run:browse}
-                ];
+                    scholarship && sel.el.closest('[data-bs-target]') ? {icon:'card-text',label:'Edit scholarship details',run:function(){var link=sel.el.closest('[data-bs-target]');S.doc.defaultView.bootstrap.Modal.getOrCreateInstance(S.doc.querySelector(link.getAttribute('data-bs-target'))).show();}} : null,
+                    {icon:'image', label:scholarship ? 'Change photo' : 'Change illustration', primary:true, run:function () { replace(sel.el, sel.key); }},
+                    {icon:'arrow-counterclockwise', label:scholarship ? 'Restore original photo' : 'Restore Storyset illustration', run:function () { restore(sel.el, sel.key); }},
+                    scholarship ? null : {icon:'box-arrow-up-right', label:'Browse Storyset', run:browse}
+                ].filter(Boolean);
             },
             dirtyCount:dirty,
-            status:function () { return {text:dirty() ? plural(dirty(),'unsaved change') : 'Click text, a button, or an illustration to edit. Publish when ready.', tone:dirty()?'warn':'ok'}; },
-            actions:function () { return {secondary:{label:'Browse Storyset',icon:'box-arrow-up-right'}, primary:{label:'Publish',icon:'cloud-upload',disabled:!data || !dirty()}}; },
-            runSecondary:browse,
+            status:function () { return {text:dirty() ? plural(dirty(),'unsaved change') : scholarship ? 'Click text or a photo to edit. Open scholarship details to edit discounts and requirements.' : 'Click text, a button, or an illustration to edit. Publish when ready.', tone:dirty()?'warn':'ok'}; },
+            actions:function () { return {secondary:scholarship ? {label:'Open scholarship details',icon:'card-text'} : {label:'Browse Storyset',icon:'box-arrow-up-right'}, primary:{label:'Publish',icon:'cloud-upload',disabled:!data || !dirty()}}; },
+            runSecondary:function () {
+                if (!scholarship) return browse();
+                popBelowToolbar(h('div',{class:'ve-pop-body'},[
+                    h('button',{type:'button',class:'ve-btn',text:'Basic Education scholarships',on:{click:function(){closePop();S.doc.defaultView.bootstrap.Modal.getOrCreateInstance(S.doc.getElementById('basicEdModal')).show();}}}),
+                    h('button',{type:'button',class:'ve-btn',text:'College scholarships and requirements',on:{click:function(){closePop();S.doc.defaultView.bootstrap.Modal.getOrCreateInstance(S.doc.getElementById('collegeModal')).show();}}}),
+                    h('button',{type:'button',class:'ve-btn',text:'Government scholarships',on:{click:function(){closePop();S.doc.defaultView.bootstrap.Tab.getOrCreateInstance(S.doc.getElementById('gov-tab')).show();}}})
+                ]));
+            },
             runPrimary:function () {
-                confirmPublish('Publish payment guide changes?', function () {
-                    run('Publishing payment guide...', function () {
+                confirmPublish('Publish ' + title + ' changes?', function () {
+                    run('Publishing ' + title + '...', function () {
                         var payload = {}, files = {};
                         Object.keys(changes).forEach(function (key) {
                             payload[key] = {reset:changes[key].reset};
                             if (changes[key].file) files['image_'+key] = changes[key].file;
                         });
-                        return send('/admin/action/payment-guide-handler.php', {images:JSON.stringify(payload),texts:JSON.stringify(texts)}, files).then(function (result) {
+                        var fields={images:JSON.stringify(payload),texts:JSON.stringify(texts)};
+                        if(scholarship){fields.entries=JSON.stringify(entries);Object.keys(entryFiles).forEach(function(id){files['pdf_'+id]=entryFiles[id];});}
+                        return send(scholarship ? '/admin/action/scholarship-handler.php' : '/admin/action/payment-guide-handler.php', fields, files).then(function (result) {
                             if (!result.ok) { toast(result.error,'error'); return; }
-                            changes = {}; texts = {}; reloadEditor('Published. Your changes are live now.');
+                            changes = {}; texts = {}; if(scholarship){data.entries=JSON.parse(JSON.stringify(entries));entryFiles={};} reloadEditor('Published. Your changes are live now.');
                         });
                     });
                 });
@@ -5041,7 +5398,7 @@
 
     // ══════════════════ start ══════════════════
     var kind = C.page.kind;
-    S.adapter = kind === 'faqs' ? FaqAdapter() : kind === 'community' ? CommunityActivitiesAdapter() : kind === 'sports' ? SportsAdapter() : kind === 'payment-guide' ? PaymentGuideAdapter() : kind === 'achievements' ? AchievementAdapter() : kind === 'tuition' ? TuitionAdapter() : kind === 'organizations' ? OrganizationAdapter() : kind === 'home' ? HomeAdapter() : kind === 'admin' ? AdminAdapter() : kind === 'sections' ? SectionsAdapter() : kind === 'feed' ? FeedAdapter() : EntityAdapter();
+    S.adapter = kind === 'faqs' ? FaqAdapter() : kind === 'community' ? CommunityActivitiesAdapter() : kind === 'sports' ? SportsAdapter() : kind === 'scholarships' ? ScholarshipAdapter() : kind === 'payment-guide' ? PaymentGuideAdapter() : kind === 'achievements' ? AchievementAdapter() : kind === 'tuition' ? TuitionAdapter() : kind === 'organizations' ? OrganizationAdapter() : kind === 'home' ? HomeAdapter() : kind === 'admin' ? AdminAdapter() : kind === 'sections' ? SectionsAdapter() : kind === 'feed' ? FeedAdapter() : EntityAdapter();
     function withImagePositions(adapter) {
         var dirty = adapter.dirtyCount, actions = adapter.actions, status = adapter.status, primary = adapter.runPrimary;
         adapter.dirtyCount = function () { return dirty.call(adapter) + displayPlacementCount(); };
@@ -5081,7 +5438,7 @@
         await run('Discarding draft…',async function(){await drafts.clear();leaving=true;window.location.reload();});
     });
     S.url = C.page.url;
-    if (kind === 'organizations') window.OrganizationEditor = { hasChanges: unsavedPageChanges };
+    if (kind === 'organizations') window.OrganizationEditor = { hasChanges: unsavedPageChanges, refreshOrder: function(){return S.adapter.refreshOrder();} };
 
     var ob = $('#veOutlineBtn');
     if (ob) ob.addEventListener('click', function () { var r = ob.getBoundingClientRect(); if (S.adapter.openOutline) S.adapter.openOutline(r.left, r.bottom + 8); });

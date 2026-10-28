@@ -1,11 +1,39 @@
 # Admin image uploads
 
-Saved images are limited to 5 MB (5,242,880 bytes). Larger originals are sent to
-the existing photo optimizer before staging or publishing. The server optimizes
+Saved images are limited to 5 MB (5,242,880 bytes). Larger static JPG, PNG and WebP
+photos are optimized in the browser before staging or uploading, retaining their
+format and transparency. Oversized photos are resized to at most 2560 pixels on
+their longest side, then reduced further as needed to fit the limit. This path
+does not require PHP Imagick and avoids uploading the oversized original.
+GIF, animated PNG/WebP, and browsers without the required image APIs retain the
+existing server optimizer path so animation is not flattened. The server optimizes
 oversized originals again when needed, and checks the resulting file size.
 Images already within the limit retain their original bytes. If optimization is
 unavailable or fails, the image is rejected and the existing modal explains the
-5 MB limit. Automatic optimization requires the PHP Imagick extension.
+5 MB limit. The server optimization fallback requires the PHP Imagick extension.
+Hosting request limits must still allow the resulting image and complete request.
+
+For the homepage hosting fix, deploy `assets/js/image-upload.js` and refresh the
+Content Editor. The shared asset include already versions this script by its
+file contents, so deployments that preserve timestamps still refresh the script.
+No database change is required. Local tests cover the real
+homepage upload flow with the server optimizer blocked, PNG/JPG/WebP formats,
+transparency, unchanged small images, upload errors, timeout cleanup and retry.
+
+For Uniform uploads, deploy the current `assets/js/image-upload.js` and refresh
+the Content Editor (clear the hosting/CDN cache if it still serves an older copy).
+Static PNGs are compressed before the repositioning dialog, including browsers
+without ImageBitmap support. This avoids sending the oversized original to PHP.
+`node tests/program-uniform-framing-browser-test.cjs` checks PNGs over 5 MB with
+the server optimizer unavailable, using both browser decoding paths. Animated
+PNGs still use the server path to preserve animation.
+
+Facilities uses the same browser optimizer. Deploy `assets/js/image-upload.js`
+and `components/image-framing-assets.php` together, then refresh the editor.
+The Facilities picker is tested with static JPG, PNG and WebP files over 5 MB
+while the server optimizer is unavailable. The editor receives files below the
+saved-image limit after the position is accepted. GIF and animated images still
+require the server optimizer and sufficient hosting upload limits.
 
 Program and homepage banners and program pictures use `imageUploadMime()`:
 Fileinfo when available, or server-side raster image detection when unavailable.

@@ -7,9 +7,11 @@
     // Listing filters and pagination return directly to results without replaying the opening wipe.
     const newsResults = /\/news-and-announcement\.php$/.test(location.pathname) && location.hash === '#na-results';
     const achievementResults = /\/student-achievement\.php$/.test(location.pathname) && location.hash === '#more-achievements';
+    const orgResults = /\/student-org(?:\.php)?$/.test(location.pathname)
+        && ['category', 'p'].some(key => new URLSearchParams(location.search).has(key));
     if (editorPreview) root.classList.add('gnc-editor-preview');
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (editorPreview || newsResults || achievementResults
+    if (editorPreview || newsResults || achievementResults || orgResults
         || motion.matches || root.classList.contains('gnc-intro-on')) {
         overlay.remove();
         return;

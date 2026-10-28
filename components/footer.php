@@ -78,6 +78,7 @@ try {
     // Footer still renders without the section if analytics is unavailable.
 }
 ?>
+<?php include_once __DIR__ . '/visitor-feedback.php'; ?>
 <?php include_once __DIR__ . '/recommendations.php'; ?>
 <footer class="gnc-footer">
     <div class="gnc-footer-banner">
@@ -108,7 +109,7 @@ try {
             <?php endif; ?>
 
             <div class="row gy-5">
-                <div class="col-lg-3 col-md-6">
+                <div class="col-lg-4 col-md-6">
                     <h5 class="gnc-footer-brand">Guagua National Colleges</h5>
                     <p class="gnc-footer-tagline">Fides, Scientia et. Patria</p>
                     <p class="gnc-footer-desc">
@@ -118,42 +119,44 @@ try {
                     <h6 class="gnc-footer-heading">Contact Us</h6>
                     <ul class="gnc-footer-contact-list">
                         <li>
-                            <i class="bi bi-geo-alt-fill"></i>
-                            <span>Rep. Eligio Lagman St, Sta. Filomena Rd, Guagua, Pampanga</span>
+                            <span class="gnc-footer-contact-icon" aria-hidden="true"><i class="bi bi-geo-alt-fill"></i></span>
+                            <span class="gnc-footer-contact-text">
+                                <a href="https://www.google.com/maps/search/?api=1&amp;query=Guagua+National+Colleges,+Pampanga" target="_blank" rel="noopener noreferrer">Rep. Eligio Lagman St, Sta. Filomena Rd, Guagua, Pampanga</a>
+                            </span>
                         </li>
                         <li>
-                            <i class="bi bi-telephone-fill"></i>
-                            <span>(045) 123-4567</span>
+                            <span class="gnc-footer-contact-icon" aria-hidden="true"><i class="bi bi-telephone-fill"></i></span>
+                            <span class="gnc-footer-contact-text"><a href="tel:0451234567">(045) 123-4567</a></span>
                         </li>
                         <li>
-                            <i class="bi bi-envelope-fill"></i>
-                            <span>info@gnc.edu.ph</span>
+                            <span class="gnc-footer-contact-icon" aria-hidden="true"><i class="bi bi-envelope-fill"></i></span>
+                            <span class="gnc-footer-contact-text"><a href="mailto:info@gnc.edu.ph">info@gnc.edu.ph</a></span>
                         </li>
                         <li>
-                            <i class="bi bi-clock-fill"></i>
-                            <span>Monday - Friday<br>8:00AM - 5:00PM</span>
+                            <span class="gnc-footer-contact-icon" aria-hidden="true"><i class="bi bi-clock-fill"></i></span>
+                            <span class="gnc-footer-contact-text">Monday - Friday<br>8:00AM - 5:00PM</span>
                         </li>
                     </ul>
 
                     <div class="gnc-footer-socials">
-                        <a href="https://www.facebook.com/gnc.edu.ph" aria-label="Facebook" target="_blank"><i class="bi bi-facebook"></i></a>
-                        <a href="https://www.instagram.com/gnci1918/" aria-label="Instagram" target="_blank"><i class="bi bi-instagram"></i></a>
-                        <a href="https://www.linkedin.com/school/guagua-national-colleges/" aria-label="LinkedIn" target="_blank"><i class="bi bi-linkedin"></i></a>
+                        <a href="https://www.facebook.com/gnc.edu.ph" aria-label="Facebook" target="_blank" rel="noopener noreferrer"><i class="bi bi-facebook"></i></a>
+                        <a href="https://www.instagram.com/gnci1918/" aria-label="Instagram" target="_blank" rel="noopener noreferrer"><i class="bi bi-instagram"></i></a>
+                        <a href="https://www.linkedin.com/school/guagua-national-colleges/" aria-label="LinkedIn" target="_blank" rel="noopener noreferrer"><i class="bi bi-linkedin"></i></a>
                     </div>
                 </div>
 
-                <div class="col-lg-2 col-md-6">
+                <div class="col-lg-3 col-md-6">
                     <h6 class="gnc-footer-heading">Visitor Counter</h6>
                     <div class="gnc-visitor-stats">
                         <div class="gnc-visitor-stat">
-                            <i class="bi bi-person-check-fill"></i>
+                            <i class="bi bi-person-check-fill" aria-hidden="true"></i>
                             <div>
                                 <span class="gnc-visitor-num" id="gncVisitorsToday"><?= number_format($gncVisitorStats['today']) ?></span>
                                 <span class="gnc-visitor-label">Today's Visitors</span>
                             </div>
                         </div>
                         <div class="gnc-visitor-stat">
-                            <i class="bi bi-people-fill"></i>
+                            <i class="bi bi-people-fill" aria-hidden="true"></i>
                             <div>
                                 <span class="gnc-visitor-num" id="gncVisitorsTotal"><?= number_format($gncVisitorStats['total']) ?></span>
                                 <span class="gnc-visitor-label">Total Visitors</span>
@@ -163,23 +166,21 @@ try {
 
                     <h6 class="gnc-footer-heading gnc-footer-heading-spaced">Student Resources</h6>
                     <ul class="gnc-footer-links">
-                        <li><a href="http://library.gncipampanga.com/" target="_blank" rel="noopener noreferrer">Libraries <i class="bi bi-chevron-right"></i></a></li>
-                        <li><a href="/index.php#events">Calendar <i class="bi bi-chevron-right"></i></a></li>
-                        <li><a href="https://login.microsoftonline.com/" target="_blank" rel="noopener noreferrer">Access Student Email <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+                        <li><a href="http://library.gncipampanga.com/" target="_blank" rel="noopener noreferrer">Libraries <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+                        <li><a href="/index.php#events">Calendar <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+                        <li><a href="/coming-soon.php" target="_blank" rel="noopener noreferrer">Student Portal <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
                     </ul>
                 </div>
 
-                <div class="col-lg-7">
+                <div class="col-lg-5 col-12">
                     <div class="gnc-footer-map">
-                        <a href="https://www.google.com/maps/search/?api=1&query=Guagua+National+Colleges,+Pampanga"
-                        target="_blank" rel="noopener" class="gnc-footer-map-link">
-                            View on Google Maps
+                        <a href="https://www.google.com/maps/search/?api=1&amp;query=Guagua+National+Colleges,+Pampanga"
+                        target="_blank" rel="noopener noreferrer" class="gnc-footer-map-link">
+                            <i class="bi bi-geo-alt-fill" aria-hidden="true"></i> View on Google Maps
                         </a>
                         <iframe
+                            title="Map showing Guagua National Colleges"
                             src="https://maps.google.com/maps?q=Guagua+National+Colleges,+Pampanga&t=&z=16&ie=UTF8&iwloc=&output=embed"
-                            width="100%"
-                            height="100%"
-                            style="border:0; min-height: 300px;"
                             allowfullscreen=""
                             loading="lazy"
                             referrerpolicy="no-referrer-when-downgrade">
@@ -192,17 +193,32 @@ try {
 
     <div class="gnc-footer-bottom">
         <div class="container">
-            <div class="d-flex flex-wrap justify-content-between align-items-center">
-                <p class="mb-0">&copy; 2026 Guagua National Colleges, Inc. All rights reserved.</p>
-                <p class="mb-0">
-                    <a href="/coming-soon.php">Privacy Policy</a> &nbsp;|&nbsp; <a href="/coming-soon.php">Terms of Use</a>
-                </p>
+            <div class="gnc-footer-bottom-inner">
+                <p class="gnc-footer-copy">&copy; <?= date('Y') ?> Guagua National Colleges, Inc. All rights reserved.</p>
+                <nav class="gnc-footer-legal" aria-label="Legal">
+                    <a href="/coming-soon.php">Privacy Policy</a>
+                    <span aria-hidden="true">&bull;</span>
+                    <a href="/coming-soon.php">Terms of Use</a>
+                </nav>
+                <a href="#" class="gnc-footer-totop" id="gncBackToTop" aria-label="Back to top"><i class="bi bi-arrow-up" aria-hidden="true"></i></a>
             </div>
         </div>
     </div>
 </footer>
 
 <?php include_once __DIR__ . '/../chatbot/widget.php'; ?>
+
+<script>
+(function () {
+    var btn = document.getElementById('gncBackToTop');
+    if (!btn) return;
+    btn.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+    });
+})();
+</script>
 
 <script>
 (function () {

@@ -314,12 +314,14 @@
 
 .hss-flip-card {
     all: unset;
-    display: block;
+    display: grid;
+    box-sizing: border-box;
     cursor: pointer;
     width: 100%;
-    min-height: 380px;
+    min-width: 0;
     perspective: 1600px;
     border-radius: 14px;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .hss-flip-card:focus-visible {
@@ -328,10 +330,10 @@
 }
 
 .hss-flip-card-inner {
-    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     width: 100%;
     height: 100%;
-    min-height: 380px;
     text-align: left;
     transform-style: preserve-3d;
     transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
@@ -342,15 +344,18 @@
 }
 
 .hss-face {
-    position: absolute;
-    inset: 0;
+    position: relative;
+    grid-area: 1 / 1;
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 380px;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
     border-radius: 14px;
     background-color: #ffffff;
     border: 1px solid #e6e1d8;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-    padding: 24px 24px 110px;
+    padding: 24px 24px 130px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -418,6 +423,7 @@
     flex-direction: column;
     gap: 14px;
     flex: 1;
+    min-width: 0;
 }
 
 .hss-contact-list li {
@@ -449,6 +455,7 @@
     font-size: 0.82rem;
     color: #202020;
     line-height: 1.4;
+    overflow-wrap: anywhere;
 }
 
 /* Wave Graphic */
@@ -473,9 +480,10 @@
 /* Bottom Nameplate Overlay */
 .hss-badge {
     position: absolute;
-    bottom: 20px;
+    bottom: 40px;
     left: 20px;
     width: calc(100% - 40px);
+    box-sizing: border-box;
     
     /* Glass Effect Properties */
     background: rgba(8, 51, 30, 0.75); 
@@ -549,7 +557,7 @@
 /* Tap to flip hint */
 .hss-flip-hint {
     position: absolute;
-    bottom: 16px;
+    bottom: 12px;
     right: 20px;
     display: flex;
     align-items: center;
@@ -567,16 +575,6 @@
     color: rgba(255, 255, 255, 0.85);
 }
 
-@media (max-width: 480px) {
-    .hss-front-body {
-        flex-direction: column;
-    }
-    .hss-photo {
-        flex: 0 0 auto;
-        width: 100%;
-        max-width: 140px;
-    }
-}
 
 /* =============================================================
    SCROLL ANIMATIONS
@@ -883,4 +881,122 @@
     .admin-badge::before, .admin-badge-title, .admin-badge-sub,
     .admin-photo-card::after,
     .hss-flip-hint i { transition: none !important; }
+}
+
+/* =============================================================
+   RESPONSIVE — all devices
+   Breakpoints: 1400+ (large desktop), 992, 768, 576, 400
+   ============================================================= */
+
+/* Never allow sideways scrolling from this page's content */
+.admin-section, .admin-tabs-wrap, .admin-hero { overflow-x: clip; }
+.admin-section-inner img { max-width: 100%; }
+
+/* ---------- Large screens ---------- */
+@media (min-width: 1400px) {
+    .admin-hero-inner,
+    .admin-tabs-inner,
+    .admin-section-inner { max-width: 1320px; }
+    .admin-grid { grid-template-columns: repeat(4, minmax(0, 300px)); }
+}
+
+/* ---------- Tablets / small laptops ---------- */
+@media (max-width: 992px) {
+    .admin-section { padding: 50px 20px; }
+}
+
+@media (max-width: 900px) {
+    .hss-grid { max-width: 640px; margin-inline: auto; }
+}
+
+/* ---------- Large phones ---------- */
+@media (max-width: 768px) {
+    .admin-hero-inner { padding: 32px 20px 36px; }
+    .admin-tabs-wrap { padding: 0 20px 20px; margin-top: 20px; }
+    .admin-section { padding: 40px 20px 50px; }
+    .admin-section-intro { margin-bottom: 28px; }
+    .admin-hero { background-position: 70% center; }
+}
+
+/* ---------- Phones ---------- */
+@media (max-width: 576px) {
+    .admin-hero-inner { padding: 28px 16px 30px; }
+    .admin-tabs-wrap { padding: 0 16px 18px; }
+    .admin-section { padding: 32px 16px 44px; }
+    .admin-hero p { font-size: 13.5px; }
+
+    /* tabs: one swipeable row instead of a tall wrapped stack */
+    .admin-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 14px;   /* room for the active-tab shadow */
+        margin-bottom: -14px;
+    }
+    .admin-tabs::-webkit-scrollbar { display: none; }
+    .admin-tab { flex: 0 0 auto; }
+
+    /* people grid: card fills the screen width */
+    .admin-grid { grid-template-columns: minmax(0, 340px); gap: 26px; }
+    .admin-card-wrap { padding: 20px 16px; }
+    .admin-square-top, .admin-square-bottom { width: 120px; height: 120px; }
+
+    /* flip cards */
+    .hss-grid { gap: 22px; }
+    .hss-face { padding: 20px 18px 124px; min-height: 0; }
+    .hss-office-title { font-size: 1.25rem; margin-bottom: 14px; }
+    .hss-services-title { font-size: 1.25rem; }
+    .hss-front-body { flex-direction: column; gap: 16px; }
+    .hss-photo { flex: 0 0 auto; width: 100%; max-width: 180px; }
+    .hss-badge { left: 14px; width: calc(100% - 28px); bottom: 38px; padding: 12px 14px; }
+    .hss-badge-title { font-size: 0.95rem; }
+    .hss-badge-sub { font-size: 0.74rem; line-height: 1.3; }
+    .hss-flip-hint { right: 16px; bottom: 11px; }
+    .hss-wave { height: 110px; }
+    .hss-contact-value { font-size: 0.86rem; }
+    .hss-services-list li { font-size: 0.9rem; }
+}
+
+/* ---------- Small phones (iPhone SE, Galaxy Fold, etc.) ---------- */
+@media (max-width: 400px) {
+    .admin-section { padding: 28px 12px 40px; }
+    .admin-card-wrap { padding: 18px 12px; }
+    .admin-square-top, .admin-square-bottom { width: 96px; height: 96px; }
+    .hss-face { padding: 18px 14px 120px; }
+    .hss-photo { max-width: 150px; }
+    .hss-office-title { font-size: 1.15rem; }
+}
+
+/* ---------- Landscape phones: avoid stretching the card too tall ---------- */
+@media (max-height: 480px) and (orientation: landscape) {
+    .admin-open-label img { width: 44px; height: 44px; }
+}
+
+/* ---------- Touch devices: bigger tap targets, no sticky hover ---------- */
+@media (hover: none) {
+    .admin-tab { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
+/* ---------- Mobile: centered flip-card layout ---------- */
+@media (max-width: 576px) {
+    .hss-office-title,
+    .hss-services-title { text-align: center; }
+
+    .hss-front-body {
+        align-items: center;
+    }
+    .hss-photo {
+        margin-inline: auto;
+    }
+    /* centre the contact block; text inside stays left-aligned so icons line up */
+    .hss-contact-list,
+    .hss-services-list {
+        flex: 0 1 auto;
+        width: fit-content;
+        max-width: 100%;
+        margin-inline: auto;
+    }
+    .hss-badge { text-align: center; }
+    .hss-flip-hint { left: 0; right: 0; justify-content: center; }
 }
