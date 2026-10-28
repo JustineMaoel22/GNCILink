@@ -87,7 +87,7 @@ $academicsMenu = [
    with no submenu (see the gnc-nav HTML comment for the reason).
    ============================================================= */
 $gncDeptPage    = '/pages/academics/college/college-department.php';
-$gncProgramPage = '/pages/academics/college/program.php';
+$gncProgramPage = '/pages/academics/college/program';
 
 // Reason the dynamic menu fell back (printed in the HTML comment below).
 $gncFallbackReason = '';
@@ -157,7 +157,7 @@ $gncLoadCollegeMenu = function () use ($gncDeptPage, $gncProgramPage, &$gncFallb
                 $name = trim((string) ($p['program_name'] ?? ''));
                 $kids[] = [
                     'label' => $name !== '' ? $name : $code,
-                    'href'  => $gncProgramPage . '?slug=' . rawurlencode($pslug),
+                    'href'  => $gncProgramPage . '/' . rawurlencode($pslug),
                 ];
             }
             if ($isGraduateSchool) {

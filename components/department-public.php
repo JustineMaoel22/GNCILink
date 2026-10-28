@@ -172,7 +172,7 @@ function publicDepartmentPrograms(int $deptId): array {
  */
 function publicProgramPageUrl(array $program): string {
     if (!empty($program['slug'])) {
-        return '/pages/academics/college/program.php?slug=' . urlencode($program['slug']);
+        return '/pages/academics/college/program/' . rawurlencode($program['slug']);
     }
     $code = preg_replace('/[^a-z0-9-]/', '', strtolower((string)($program['program_code'] ?? '')));
     return '/pages/academics/college/programs/' . ($code !== '' ? $code : 'index') . '.php';

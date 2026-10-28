@@ -32,7 +32,20 @@ if (($_GET['ce_preview'] ?? '') === '1') {
     }
 }
 
-$slug    = isset($_GET['slug']) ? (string)$_GET['slug'] : '';
+$programRequestPath = (string)parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+$slug = isset($_GET['slug']) && is_string($_GET['slug']) ? $_GET['slug'] : '';
+if (preg_match('~^/pages/academics/college/program/([a-z0-9-]+)/?$~D', $programRequestPath, $programPathMatch)) {
+    $slug = $programPathMatch[1];
+} elseif (in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true)
+    && preg_match('~^/pages/academics/college/program(?:\.php)?$~D', $programRequestPath)
+    && preg_match('/^[a-z0-9-]+$/D', $slug)) {
+    $programQuery = $_GET;
+    unset($programQuery['slug']);
+    $programQueryString = http_build_query($programQuery, '', '&', PHP_QUERY_RFC3986);
+    header('Location: /pages/academics/college/program/' . rawurlencode($slug)
+        . ($programQueryString !== '' ? '?' . $programQueryString : ''), true, 302);
+    exit;
+}
 $program = publicProgramPage($slug);
 if ($program === null && $cePreview) {
     // The editor may open a program that is hidden from visitors (so it can be shown again). Visitors still get "not found".
@@ -52,7 +65,7 @@ if ($program === null) {
     // A renamed program keeps its old link working.
     $moved = publicProgramSlugRedirect(strtolower(trim($slug)));
     if ($moved !== null && $moved !== strtolower(trim($slug))) {
-        header('Location: /pages/academics/college/program.php?slug=' . rawurlencode($moved), true, 301);
+        header('Location: /pages/academics/college/program/' . rawurlencode($moved), true, 301);
         exit;
     }
     http_response_code(404);

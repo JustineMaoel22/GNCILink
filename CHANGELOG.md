@@ -1,6 +1,7 @@
 # Changelog
 
-## [0.14.1-alpha] - 2026-10-28
+## [0.15.0-alpha] - 2026-10-28
 
-### Bug Fixes
-* Fixed PHP rendering error caused by extensionless URLs and text-layout helper overwriting HTML-escaping functions.
+### New Features & Improvements
+* Upgraded program URLs to clean paths (with automatic redirection from old query-string links while preserving editor support, layouts, and analytics)[cite: 24].
+* Removed progress bar in the administration navbar.

@@ -17,12 +17,18 @@ function textLayoutRoute(string $route): string {
     if (strlen($route)>1000) throw new InvalidArgumentException('Invalid public page.');
     $parts = parse_url($route);
     $path = rawurldecode($parts['path'] ?? '');
+    $programSlug = null;
+    if (preg_match('~^/pages/academics/college/program/([a-z0-9-]+)/?$~D', $path, $programMatch)) {
+        $programSlug = $programMatch[1];
+        $path = '/pages/academics/college/program.php';
+    }
     // Clean public URLs share the existing CMS placement key with their PHP page.
     if ($path === '/index') $path = '/index.php';
     if (str_starts_with($path, '/pages/') && !str_ends_with($path, '/') && pathinfo($path, PATHINFO_EXTENSION) === '') $path .= '.php';
     if (!is_array($parts) || isset($parts['host']) || isset($parts['scheme']) || !preg_match('~\A/(?:index\.php|pages/[a-zA-Z0-9_/ .-]+\.php)?\z~D', $path) || str_contains($path, '..')) throw new InvalidArgumentException('Invalid public page.');
     if ($path === '/index.php') $path = '/';
     parse_str($parts['query'] ?? '', $query);
+    if ($programSlug !== null) $query['slug'] = $programSlug;
     foreach (['ce_preview','_','_ve','section','add_org'] as $key) unset($query[$key]);
     foreach ($query as $key => $value) if (!is_string($value) || strlen($key) > 80 || strlen($value) > 200) throw new InvalidArgumentException('Invalid page parameters.');
     ksort($query);

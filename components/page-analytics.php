@@ -73,6 +73,13 @@ if (!function_exists('gncPageNow')) {
         // Preserve entity identity for dynamic pages while dropping tracking and editor parameters.
         $query = [];
         parse_str((string)(parse_url($raw, PHP_URL_QUERY) ?? ''), $query);
+        // Keep historical counts and entity identity when program URLs become clean paths.
+        if (preg_match('~^/pages/academics/college/program/([a-z0-9-]+)$~D', $path, $programMatch)) {
+            $query['slug'] = $programMatch[1];
+            $path = '/pages/academics/college/program.php';
+        } elseif ($path === '/pages/academics/college/program') {
+            $path .= '.php';
+        }
         $keys = in_array($path, ['/pages/academics/college/program.php', '/pages/academics/college/college-department.php'], true)
             ? ['slug'] : (in_array($path, ['/news-article.php', '/announcement-article.php', '/event.php'], true) ? ['id', 'slug'] : []);
         $keep = [];

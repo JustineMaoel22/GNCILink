@@ -659,21 +659,6 @@
    that administration.js already adds to .reveal-up / .reveal-scale.
    ============================================================= */
 
-/* ---------- Page scroll progress bar (modern browsers only) ---------- */
-@supports (animation-timeline: scroll()) {
-    body::before {
-        content: "";
-        position: fixed; top: 0; left: 0; right: 0;
-        height: 3px; z-index: 1900;
-        background: linear-gradient(90deg, #d3a63a, #8f1230, #1F5E2C);
-        transform: scaleX(0); transform-origin: left;
-        pointer-events: none;
-        animation: adProgress linear both;
-        animation-timeline: scroll(root);
-    }
-}
-@keyframes adProgress { to { transform: scaleX(1); } }
-
 /* ---------- Hero ---------- */
 .admin-breadcrumb i {
     display: inline-block;
@@ -884,7 +869,6 @@
 
 /* ---------- Respect "reduce motion" ---------- */
 @media (prefers-reduced-motion: reduce) {
-    body::before,
     .admin-breadcrumb i,
     .admin-tab, .admin-tab.active,
     .reveal-scale.is-visible *,

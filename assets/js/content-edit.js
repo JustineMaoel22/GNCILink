@@ -966,6 +966,7 @@
     function entityRoute(url) {
         var u; try { u = new URL(url, window.location.origin); } catch (e) { return null; }
         var p = u.pathname, slug = u.searchParams.get('slug') || '', m;
+        if ((m = p.match(/^\/pages\/academics\/college\/program\/([a-z0-9-]+)\/?$/))) return { page: 'programs', sub: m[1] };
         if (/\/program\.php$/.test(p)) return { page: 'programs', sub: slug };
         if (/\/college-department\.php$/.test(p)) return { page: slug === 'graduate-school' ? 'graduate-school' : 'college-departments', sub: slug };
         if (/\/college-dept\.php$/.test(p)) return { page: 'college-departments', sub: '' };

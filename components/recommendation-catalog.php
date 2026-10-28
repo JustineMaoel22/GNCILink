@@ -25,11 +25,12 @@ function gncRecCatalog(PDO $db): array {
         $code = strtolower($p['program_code']);
         $programDepartments[$code] = $p['dept_id'];
         $aliases = [];
+        $aliases[] = '/pages/academics/college/program.php?slug=' . rawurlencode($p['slug']);
         foreach (['college','graduate-school'] as $level) {
             $legacy = '/pages/academics/' . $level . '/programs/' . $p['slug'] . '.php';
             if (is_file(__DIR__ . '/..' . $legacy)) $aliases[] = $legacy;
         }
-        $add('program:'.$p['program_id'], '/pages/academics/college/program.php?slug='.rawurlencode($p['slug']),
+        $add('program:'.$p['program_id'], '/pages/academics/college/program/'.rawurlencode($p['slug']),
             $p['program_name'] ?: $p['program_code'], 'Programs', $p['description'], $p['image'],
             ['academics','program:'.$code, $p['dept_id'] ? 'dept:'.$p['dept_id'] : ''], null, $aliases);
     }
