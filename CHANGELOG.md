@@ -1,11 +1,6 @@
 # Changelog
 
-## [0.14.0-alpha] - 2026-10-27
-
-### New Features
-* Added font selector tool.
-* Added an option to place an additional text box.
-* Added an option to hide the background image in mobile view.
+## [0.14.1-alpha] - 2026-10-28
 
 ### Bug Fixes
-* Fixed PDF upload functionality in program curriculum and tuition and fees sections.
+* Fixed PHP rendering error caused by extensionless URLs and text-layout helper overwriting HTML-escaping functions.
