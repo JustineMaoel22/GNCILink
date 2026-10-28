@@ -40,19 +40,14 @@ Options -Indexes -MultiViews
     # Redirect index.php to homepage
     RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
     RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
-    RewriteCond %{THE_REQUEST} \s/+(public/)?index\.php[\s?] [NC]
-    RewriteRule ^(public/)?index\.php$ / [R=302,L,NC]
-
-    # Redirect public/page.php to /page
-    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
-    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
-    RewriteCond %{THE_REQUEST} \s/+public/[^\s?]+\.php[\s?] [NC]
-    RewriteRule ^public/(.+)\.php$ /$1 [R=302,L,NC]
+    RewriteCond %{THE_REQUEST} \s/+index\.php[\s?] [NC]
+    RewriteRule ^index\.php$ / [R=302,L,NC]
 
     # Redirect page.php to /page
     RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
     RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
     RewriteCond %{THE_REQUEST} \s/+[^\s?]+\.php[\s?] [NC]
+    RewriteCond %{REQUEST_URI} !^/(admin|api|chatbot|components|includes|config|tests|database)(/|$) [NC]
     RewriteRule ^(.+)\.php$ /$1 [R=302,L,NC]
 
 
@@ -61,7 +56,7 @@ Options -Indexes -MultiViews
     # ==========================================
 
     RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
-    RewriteRule ^$ public/index.php [END]
+    RewriteRule ^$ index.php [END]
 
 
     # ==========================================
@@ -75,7 +70,7 @@ Options -Indexes -MultiViews
 
 
     # ==========================================
-    # 5. PHP FILES IN PUBLIC_HTML
+    # 5. EXTENSIONLESS PHP PAGES
     # ==========================================
 
     RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
@@ -83,36 +78,6 @@ Options -Indexes -MultiViews
     RewriteRule ^(.+)$ $1.php [END]
 
 
-    # ==========================================
-    # 6. PHP FILES INSIDE PUBLIC DIRECTORY
-    # ==========================================
-
-    # Example:
-    # /pages/academics/college/program
-    # loads:
-    # public/pages/academics/college/program.php
-
-    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
-    RewriteCond %{DOCUMENT_ROOT}/public/$1.php -f
-    RewriteRule ^(.+)$ public/$1.php [END]
-
-
-    # ==========================================
-    # 7. STATIC FILES INSIDE PUBLIC
-    # ==========================================
-
-    # Load CSS, JS, images and other files
-    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
-    RewriteCond %{DOCUMENT_ROOT}/public/$1 -f [OR]
-    RewriteCond %{DOCUMENT_ROOT}/public/$1 -d
-    RewriteRule ^(.+)$ public/$1 [END]
-
-
-    # ==========================================
-    # 8. FRONT CONTROLLER FALLBACK
-    # ==========================================
-
-    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
-    RewriteRule ^ public/index.php [END]
+    # Unknown paths use the server's normal 404 response.
 
 </IfModule>
