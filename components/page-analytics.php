@@ -106,6 +106,8 @@ if (!function_exists('gncPageNow')) {
         $path = gncPageNormalizePath($rawPath);
         if ($path === null) return false;
         $title = gncPageCleanTitle($rawTitle, $path);
+        // Missing program pages must not become popular-page recommendations.
+        if (strcasecmp($title, 'Program not found') === 0) return false;
 
         $attempt = function () use ($db, $path, $title): void {
             $now   = gncPageNow();
@@ -154,15 +156,16 @@ if (!function_exists('gncPageNow')) {
      */
     function gncPopularPages(PDO $db, int $limit = 5, array $excludeUrls = []): array {
         $limit = max(1, min(100, $limit));
-        $where = '';
-        $params = [];
+        // Hide previously recorded missing-program pages in public and admin lists.
+        $where = 'WHERE LOWER(TRIM(page_title)) <> :missingProgramTitle';
+        $params = [':missingProgramTitle' => 'program not found'];
         if ($excludeUrls) {
             $ph = [];
             foreach (array_values($excludeUrls) as $i => $u) {
                 $ph[] = ":x$i";
                 $params[":x$i"] = $u;
             }
-            $where = 'WHERE page_url NOT IN (' . implode(',', $ph) . ')';
+            $where .= ' AND page_url NOT IN (' . implode(',', $ph) . ')';
         }
         try {
             $stmt = $db->prepare("

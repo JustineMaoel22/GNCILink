@@ -1,7 +1,8 @@
 
-# Disable directory listing for the main website and subfolders
+# Disable directory listing
 Options -Indexes
 
+# Protect server configuration
 <Files ".user.ini">
     Require all denied
 </Files>
@@ -14,7 +15,7 @@ Options -Indexes
     # GNCILink - Main Domain Only
     # ==========================================
 
-    # Prevent main domain access to subdomain folders
+    # Prevent access to subdomain folders
     RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
     RewriteRule ^(cba|clinic|library|osa)\.gncipampanga\.com(/|$) - [F,L,NC]
 
@@ -22,9 +23,31 @@ Options -Indexes
     RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
     RewriteRule (^|/)(app|config|storage|vendor|\.git)(/|$) - [F,L,NC]
 
-    # Block sensitive files
+    # Block sensitive files, including extensionless paths
     RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
-    RewriteRule (^|/)(\.env[^/]*|secrets\.php|config\.php|composer\.(json|lock)|package(-lock)?\.json|README\.md|[^/]+\.(sql|bak|log))$ - [F,L,NC]
+    RewriteRule (^|/)(\.env[^/]*|secrets(\.php)?|config(\.php)?|composer\.(json|lock)|package(-lock)?\.json|README\.md|[^/]+\.(sql|bak|log))$ - [F,L,NC]
+
+    # ==========================================
+    # REMOVE .PHP FROM VISIBLE URL
+    # ==========================================
+
+    # Redirect index.php to homepage
+    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{THE_REQUEST} \s/+(public/)?index\.php([?\s]) [NC]
+    RewriteRule ^(public/)?index\.php$ / [R=302,L,NC]
+
+    # Redirect /public/page.php to /page
+    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{THE_REQUEST} \s/+public/[^\s?]+\.php([?\s]) [NC]
+    RewriteRule ^public/(.+)\.php$ /$1 [R=302,L,NC]
+
+    # Redirect /page.php to /page
+    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{THE_REQUEST} \s/+[^\s?]+\.php([?\s]) [NC]
+    RewriteRule ^(.+)\.php$ /$1 [R=302,L,NC]
 
     # ==========================================
     # GNCILink Website Routing
@@ -46,7 +69,24 @@ Options -Indexes
     RewriteCond %{DOCUMENT_ROOT}/public/$1 -d
     RewriteRule ^(.+)$ public/$1 [L]
 
-    # Front controller fallback
+    # ==========================================
+    # EXTENSIONLESS PHP ROUTING
+    # ==========================================
+
+    # Support PHP files in public_html
+    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteCond %{REQUEST_FILENAME}.php -f
+    RewriteRule ^(.+)$ $1.php [L]
+
+    # Support PHP files inside public/
+    RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
+    RewriteCond %{DOCUMENT_ROOT}/public/$1.php -f
+    RewriteRule ^(.+)$ public/$1.php [L]
+
+    # ==========================================
+    # FRONT CONTROLLER FALLBACK
+    # ==========================================
+
     RewriteCond %{HTTP_HOST} ^(www\.)?gncipampanga\.com$ [NC]
     RewriteRule ^ public/index.php [L]
 
