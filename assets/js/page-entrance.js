@@ -5,7 +5,10 @@
     const root = document.documentElement;
     const editorPreview = window.top !== window.self || new URLSearchParams(location.search).has('ce_preview');
     // Listing filters and pagination return directly to results without replaying the opening wipe.
-    const newsResults = /\/news-and-announcement\.php$/.test(location.pathname) && location.hash === '#na-results';
+    const newsResults = /\/news-and-announcement\.php$/.test(location.pathname)
+        && (location.hash === '#na-results'
+            || ['page', 'category', 'department', 'program', 'type'].some(key => new URLSearchParams(location.search).has(key)));
+    if (newsResults) root.classList.add('na-pagination-visit');
     const achievementResults = /\/student-achievement\.php$/.test(location.pathname) && location.hash === '#more-achievements';
     const orgResults = /\/student-org(?:\.php)?$/.test(location.pathname)
         && ['category', 'p'].some(key => new URLSearchParams(location.search).has(key));

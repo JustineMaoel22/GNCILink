@@ -439,8 +439,9 @@ function na_url(array $overrides = []): string {
     return 'news-and-announcement.php' . (!empty($params) ? '?' . http_build_query($params) : '') . '#na-results';
 }
 ?>
+<?php $skipPageEntrance = (bool)array_intersect_key($_GET, array_flip(['page', 'category', 'department', 'program', 'type'])); ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= $skipPageEntrance ? ' class="na-pagination-visit"' : '' ?>>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -526,6 +527,19 @@ function na_url(array $overrides = []): string {
         .na-empty-btn:hover{background:#0d4a26;color:#fff}
         .na-page-gap{align-self:center;padding:0 .3rem;color:#888}
         @media (prefers-reduced-motion:reduce){.na-card{animation:none!important}}
+        /* Pagination and category changes show results without page entrances. */
+        html.na-pagination-visit{scroll-behavior:auto!important}
+        .na-pagination-visit #gncPageEntrance{display:none!important}
+        .na-pagination-visit .skeleton-wrap img{transition:none!important}
+        .na-pagination-visit .skeleton-wrap::before,
+        .na-pagination-visit .skeleton-line,
+        .na-pagination-visit .skeleton-hero::before{animation:none!important}
+        .na-pagination-visit .newsannouncement-hero-inner,
+        .na-pagination-visit .na-toolbar,
+        .na-pagination-visit .na-card,
+        .na-pagination-visit .gnc-pinned-carousel,
+        .na-pagination-visit .na-sidebar .gnc-upcoming-card,
+        .na-pagination-visit .na-sidebar .na-events-card{animation:none!important}
     </style>
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>

@@ -350,11 +350,13 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
 <?php include_once __DIR__ . '/site-disclaimer.php'; ?>
 <?php include_once __DIR__ . '/image-framing-assets.php'; ?>
 <link rel="stylesheet" href="/assets/css/page-entrance.css?v=<?= filemtime(__DIR__ . '/../assets/css/page-entrance.css') ?>">
+<?php if (empty($skipPageEntrance)): ?>
 <div id="gncPageEntrance" aria-hidden="true"<?= $isHome ? ' data-opening-title="Guagua National Colleges"' : '' ?>>
     <i style="--n:0"></i><i style="--n:1"></i><i style="--n:2"></i><i style="--n:3"></i><i style="--n:4"></i><i style="--n:5"></i>
     <div class="gnc-page-entrance-label"><img src="/assets/images/logos/gnc-logo-v1.svg" alt=""><span></span></div>
 </div>
 <script src="/assets/js/page-entrance.js?v=<?= filemtime(__DIR__ . '/../assets/js/page-entrance.js') ?>"></script>
+<?php endif; ?>
 <script src="/assets/js/page-skeletons.js?v=<?= filemtime(__DIR__ . '/../assets/js/page-skeletons.js') ?>"></script>
 <nav id="mainNavbar" class="navbar gnc-navbar <?= $isHome ? 'fixed-top is-home' : 'sticky-top' ?> navbar-expand-xl shadow-sm">
     <div class="container">
