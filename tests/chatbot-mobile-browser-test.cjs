@@ -1,8 +1,10 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),http=require('node:http');
 const {spawn,execFileSync}=require('node:child_process');
 const markup=execFileSync('php',['chatbot/widget.php'],{encoding:'utf8',windowsHide:true});
+let chatRequests=0;
 const server=http.createServer((req,res)=>{
     const pathname=new URL(req.url,'http://localhost').pathname;
+    if(pathname==='/chatbot/chatbot.php'){chatRequests++;res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({ok:true,reply:'Test answer'}));}
     if(['/chatbot/chatbot.js','/chatbot/chatbot.css'].includes(pathname)){
         res.setHeader('Content-Type',pathname.endsWith('.js')?'application/javascript':'text/css');return res.end(fs.readFileSync('.'+pathname));
     }
@@ -33,6 +35,11 @@ let browser,socket,profile;
     await evaluate('window.scrollTo({top:700,behavior:"instant"});GNCBot.open()');
     assert.equal(await evaluate('document.body.classList.contains("gncbot-noscroll")'),true,'Page locked on mobile');
     assert.equal(await evaluate('getComputedStyle(document.querySelector(".gncbot-panel")).animationName'),'gncbot-in','Opening animates');
+    assert.equal(await evaluate('!document.querySelector(".gncbot-consent").hidden&&document.querySelector(".gncbot-form").hidden'),true,'Consent prompt replaces composer before agreement');
+    await evaluate(`document.querySelector('.gncbot-input').value='Test question';document.querySelector('.gncbot-form').dispatchEvent(new Event('submit',{cancelable:true}));`);
+    await pause(100);assert.equal(chatRequests,0,'No messages sent before agreement');
+    await evaluate('document.querySelector(".gncbot-agree").click()');
+    assert.equal(await evaluate('document.querySelector(".gncbot-consent").hidden&&!document.querySelector(".gncbot-form").hidden'),true,'Agreement starts chat');
     // Simulate the visual viewport becoming shorter and panning when a keyboard opens.
     await evaluate(`window.testViewport=new EventTarget();testViewport.height=410;testViewport.offsetTop=95;Object.defineProperty(window,'visualViewport',{value:testViewport,configurable:true});window.dispatchEvent(new Event('resize'));document.querySelector('.gncbot-input').focus({preventScroll:true})`);
     await pause(250);
@@ -51,7 +58,16 @@ let browser,socket,profile;
     await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
     await evaluate('GNCBot.open()');
     assert.equal(await evaluate('!document.body.classList.contains("gncbot-noscroll")&&document.querySelector(".gncbot-panel").getBoundingClientRect().width===390'),true,'Desktop remains floating');
-    console.log('PASS: mobile viewport offset/height, fixed composer/header, scroll restoration, open/close animations, rapid reopening, draft retention, reduced motion and desktop layout.');
+    await evaluate(`document.querySelector('.gncbot-input').value='Test question';document.querySelector('.gncbot-form').dispatchEvent(new Event('submit',{cancelable:true}));`);
+    await until(()=>chatRequests===1,'Chat works after agreement');
+    await send('Page.reload');
+    await until(()=>evaluate('document.readyState==="complete"&&!!window.GNCBot'),'Reload complete');
+    assert.equal(await evaluate('document.querySelector(".gncbot-consent").hidden'),true,'Agreement persists across reload in the same tab');
+    await evaluate('sessionStorage.removeItem("gncbot.ai-consent.v1")');
+    await send('Page.reload');
+    await until(()=>evaluate('document.readyState==="complete"&&!!window.GNCBot'),'Fresh consent state');
+    assert.equal(await evaluate('!document.querySelector(".gncbot-consent").hidden&&document.querySelector(".gncbot-form").hidden'),true,'No stored agreement requires consent again');
+    console.log('PASS: consent blocks requests before agreement, enables chat and persists within tab; mobile viewport, scrolling, animations, rapid reopen, reduced motion and desktop layout.');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
     socket?.close();browser?.kill();server.close();await pause(500);
     if(profile&&path.dirname(path.resolve(profile))===path.resolve(os.tmpdir())&&path.basename(profile).startsWith('gnci-chat-mobile-')){try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:3,retryDelay:200});}catch{}}

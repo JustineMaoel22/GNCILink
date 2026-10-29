@@ -31,6 +31,21 @@
 
   var endpoint = root.getAttribute('data-endpoint') || '/chatbot/chatbot.php';
   var state = { messages: [], busy: false, open: false, ctrl: null, typingNode: null };
+  var consentKey = 'gncbot.ai-consent.v1', agreed = false;
+  try { agreed = sessionStorage.getItem(consentKey) === 'yes'; } catch (e) { /* keep consent in memory if storage is unavailable */ }
+  var consent = root.querySelector('.gncbot-consent'), agreeButton = root.querySelector('.gncbot-agree');
+  function showConsentState() {
+    consent.hidden = agreed;
+    el.scroller.hidden = !agreed; el.form.hidden = !agreed;
+    root.querySelector('.gncbot-note').hidden = !agreed;
+  }
+  agreeButton.addEventListener('click', function () {
+    agreed = true;
+    try { sessionStorage.setItem(consentKey, 'yes'); } catch (e) { /* current page still works */ }
+    showConsentState(); scrollDown();
+    el.input.focus({ preventScroll: true });
+  });
+  showConsentState();
 
   /* ------------------------------------------------------------ page context */
   function pageContext() {
@@ -181,8 +196,7 @@
 
   /* ------------------------------------------------------------ chat flow */
   function ask(text, isRetry) {
-    var privacyChoice=document.getElementById('gncbot-ai-choice');
-    if(!privacyChoice || !privacyChoice.checked){if(privacyChoice){privacyChoice.focus();privacyChoice.setCustomValidity('Please choose whether to send your messages to Google Gemini.');privacyChoice.reportValidity();privacyChoice.addEventListener('change',function(){privacyChoice.setCustomValidity('');},{once:true});}return;}
+    if (!agreed) { agreeButton.focus({ preventScroll: true }); return; }
     text = String(text || '').replace(/\s+/g, ' ').trim();
     if (!text || state.busy) { return; }
     if (text.length > MAX_LEN) { addBubble('model', 'Your message is too long. Please keep it under ' + MAX_LEN + ' characters.', { error: true }); return; }
@@ -269,7 +283,8 @@
       root.classList.add('is-open', 'has-opened');
       el.panel.hidden = false; el.panel.removeAttribute('inert');
       fitViewport(); scrollDown();
-      if (matchMedia('(hover: hover)').matches) { el.input.focus(); }
+      if (!agreed) { agreeButton.focus({ preventScroll: true }); }
+      else if (matchMedia('(hover: hover)').matches) { el.input.focus(); }
     } else {
       if (el.panel.hidden) { return; }
       el.panel.setAttribute('inert', '');

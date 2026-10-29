@@ -121,4 +121,11 @@ body.gncbot-noscroll { position: fixed; top: var(--gb-scroll-top, 0px); left: 0;
 @media (prefers-reduced-motion: reduce) { .gncbot-panel, .gncbot-typing span, .gncbot-launcher { animation: none !important; transition: none !important; } .gncbot-conversation { scroll-behavior: auto; } }
 @media print { #gncbot { display: none !important; } }
 
-.gncbot-privacy-choice{display:block;font:12px/1.5 Inter,Arial,sans-serif;padding:10px 16px;color:#385344}.gncbot-privacy-choice input{accent-color:#1f5e2c;margin-right:6px}.gncbot-note a{color:inherit;text-decoration:underline}
+.gncbot-consent { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 22px 18px; background: var(--gb-bg); }
+.gncbot-consent h3 { margin: 0 0 14px; font-size: 18px; color: var(--gb-dark); }
+.gncbot-consent p { margin: 0 0 16px; }
+.gncbot-consent a,.gncbot-note a { color: inherit; text-decoration: underline; }
+.gncbot-agree { min-height: 44px; padding: 12px 18px; border: 0; border-radius: 10px; background: var(--gb-green); color: #fff; font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1.4; }
+.gncbot-agree:hover { background: var(--gb-dark); }
+.gncbot-agree:focus-visible { outline: 3px solid var(--gb-gold); outline-offset: 3px; }
+.gncbot-consent .gncbot-consent-note { margin-top: 14px; font-size: 12px; color: var(--gb-muted); }

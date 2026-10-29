@@ -55,20 +55,26 @@ $gncbotMascot = rtrim(dirname($gncbotBase), '/') . '/assets/images/chatbot.png';
             </button>
         </header>
 
-        <div class="gncbot-conversation">
+        <div class="gncbot-consent" aria-labelledby="gncbot-consent-title">
+            <h3 id="gncbot-consent-title">Before you chat with Cian</h3>
+            <p>Your questions, recent chat turns and page context will be sent to Google Gemini to generate answers. Do not share passwords, student records or other sensitive information.</p>
+            <p>AI can make mistakes. Confirm important details with GNC. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google privacy</a>.</p>
+            <button type="button" class="gncbot-agree">Agree and start chat</button>
+            <p class="gncbot-consent-note">Your choice is remembered in this tab. You can close the chat without agreeing.</p>
+        </div>
+        <div class="gncbot-conversation" hidden>
         <div class="gncbot-messages" role="log" aria-live="polite" aria-relevant="additions"></div>
         <div class="gncbot-suggestions" aria-label="Suggested questions"></div>
-        <label class="gncbot-privacy-choice"><input type="checkbox" id="gncbot-ai-choice"> I agree to send my question, recent chat turns and page context to Google Gemini to answer me. Do not include passwords, student records or other sensitive information.</label>
         </div>
 
-        <form class="gncbot-form" autocomplete="off">
+        <form class="gncbot-form" autocomplete="off" hidden>
             <label for="gncbot-input" class="gncbot-sr">Type your question</label>
             <textarea id="gncbot-input" class="gncbot-input" rows="1" maxlength="500" placeholder="Ask about GNC programs, events, offices..." enterkeyhint="send"></textarea>
             <button type="submit" class="gncbot-send" aria-label="Send message">
                 <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3.4 20.4 21 12 3.4 3.6 3.3 10l12.6 2-12.6 2 .1 6.4Z"/></svg>
             </button>
         </form>
-        <p class="gncbot-note">AI can make mistakes. Please confirm important details with GNC. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google privacy</a>. Chat history stays in this tab until you clear it or close the tab; Google processes the messages you send.</p>
+        <p class="gncbot-note" hidden>AI can make mistakes. Please confirm important details with GNC. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google privacy</a>. Chat history stays in this tab until you clear it or close the tab; Google processes the messages you send.</p>
     </section>
 </div>
 <script src="<?= $gncbotBase ?>/chatbot.js?v=<?= $gncbotVer('chatbot.js') ?>" defer></script>
