@@ -30,6 +30,7 @@
         <div class="core-values-hero">
             <div class="core-values-hero-inner">
                 <nav class="core-values-breadcrumb reveal-up" aria-label="breadcrumb">
+                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>About</span>
                     <i class="bi bi-chevron-right"></i>
                     <span class="dept-current">Core Values</span>

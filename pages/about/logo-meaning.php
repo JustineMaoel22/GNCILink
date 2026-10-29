@@ -31,6 +31,7 @@
         <div class="logo-meaning-hero">
             <div class="logo-meaning-hero-inner">
                 <nav class="logo-meaning-breadcrumb reveal-up" aria-label="breadcrumb">
+                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>About</span>
                     <i class="bi bi-chevron-right"></i>
                     <span class="logo-meaning-current">Institutional Logo and Meaning</span>

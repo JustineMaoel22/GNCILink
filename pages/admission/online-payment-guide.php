@@ -27,6 +27,7 @@ $guideLink = fn($key) => ceManageMark('data-ve-payment-link="' . ceAttr($key) . 
         <div class="tuition-hero">
             <div class="tuition-hero-inner">
                 <nav class="tuition-breadcrumb" aria-label="breadcrumb">
+                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>Admissions</span><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span class="tuition-current" aria-current="page"><?= $guideText('hero_title') ?></span>
                 </nav>

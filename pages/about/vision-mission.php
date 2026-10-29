@@ -70,6 +70,7 @@ function vmRenderText(?string $text, string $key): void {
         <div class="vision-mission-hero">
             <div class="vision-mission-hero-inner">
                 <nav class="vision-mission-breadcrumb reveal-up" aria-label="breadcrumb">
+                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>About</span>
                     <i class="bi bi-chevron-right"></i>
                     <span class="dept-current">Vision and Mission</span>

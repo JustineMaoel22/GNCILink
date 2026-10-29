@@ -34,6 +34,7 @@ unset($field);
         <div class="enrollment-hero">
             <div class="enrollment-hero-inner">
                 <nav class="enrollment-breadcrumb" aria-label="breadcrumb">
+                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>Admissions</span>
                     <i class="bi bi-chevron-right"></i>
                     <span class="enrollment-current">Enrollment Procedures</span>

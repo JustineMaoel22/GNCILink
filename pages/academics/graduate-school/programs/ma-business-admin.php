@@ -56,6 +56,7 @@ $ctaIcon     = 'material:volunteer_activism';
         <div class="row align-items-center g-0">
             <div class="col-lg-6">
                 <nav class="template-breadcrumb" aria-label="breadcrumb">
+                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>ACADEMICS</span>
                     <i class="bi bi-chevron-right"></i>
                     <a href="/pages/academics/graduate-school/graduate-school.php">GRADUATE SCHOOL</a>

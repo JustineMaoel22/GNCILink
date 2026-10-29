@@ -32,6 +32,7 @@ foreach (scholarshipDefaultRequirements() as $i => $value) $schRequirements[] = 
         <div class="scholarship-hero">
             <div class="scholarship-hero-inner">
                 <nav class="scholarship-breadcrumb" aria-label="breadcrumb">
+                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>Admissions</span>
                     <i class="bi bi-chevron-right"></i>
                     <span class="scholarship-current"><?= $schText('copy_1') ?></span>

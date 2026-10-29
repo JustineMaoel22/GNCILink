@@ -37,6 +37,7 @@ $impactUrl=static fn($page)=>'?'.http_build_query(array_merge($communityPreview?
         <div class="community-activity-hero" style="<?= $escape('background-image:url('.json_encode($community['hero_image']).')') ?>">
             <div class="community-activity-hero-inner">
                 <nav class="community-activity-breadcrumb" aria-label="breadcrumb">
+                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>Student Life</span>
                     <i class="bi bi-chevron-right"></i>
                     <span class="community-activity-current" data-community-breadcrumb><?= $escape($text('hero_title')) ?></span>

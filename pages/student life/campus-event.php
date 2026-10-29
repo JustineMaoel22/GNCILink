@@ -69,6 +69,7 @@ $campusPageUrl = static fn($page) => '?' . http_build_query(array_merge($calenda
         <div class="campus-event-hero">
             <div class="campus-event-hero-inner">
                 <nav class="campus-event-breadcrumb" aria-label="breadcrumb">
+                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>Student Life</span>
                     <i class="bi bi-chevron-right"></i>
                     <span class="campus-event-current">Campus Events</span>

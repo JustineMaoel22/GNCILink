@@ -428,6 +428,7 @@ $photoFallback  = '/assets/images/logos/gnc-logo-v1.svg';
         <div class="admin-hero">
             <div class="admin-hero-inner">
                 <nav class="admin-breadcrumb reveal-up" aria-label="breadcrumb">
+                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>About</span>
                     <i class="bi bi-chevron-right"></i>
                     <span class="admin-current">Administration</span>

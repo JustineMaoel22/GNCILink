@@ -27,7 +27,7 @@ $settingMark=static fn($key)=>ceField('org-setting',['key'=>$key,'max'=>$setting
 <section class="org-not-found"><h1>Organization not found</h1><p>This organization may be unpublished or no longer available.</p><a href="<?= $orgH(studentOrganizationsUrl()) ?>">View student organizations</a></section>
 <?php else: ?>
 <section class="dynamic-org-intro"><div class="dynamic-org-hero"><div class="dynamic-org-hero-inner">
-<nav class="dynamic-org-breadcrumb" aria-label="breadcrumb"><a href="<?= $orgH(studentOrganizationsUrl().($orgPreview?'?ce_preview=1':'')) ?>">Student Organizations</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span><?= $orgH($org['name']) ?></span></nav>
+<nav class="dynamic-org-breadcrumb" aria-label="breadcrumb"><a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i><a href="<?= $orgH(studentOrganizationsUrl().($orgPreview?'?ce_preview=1':'')) ?>">Student Organizations</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span><?= $orgH($org['name']) ?></span></nav>
 <h1<?= $mark('name') ?>><?= $orgH($org['name']) ?></h1><div class="cms-rich"<?= $mark('description') ?>><?= renderSectionContent($org['description']) ?></div>
 <?php if ($orgPreview): ?><button type="button" class="org-assign-category" data-ve-org-assign-category>Assign category<?= $org['category_name']?': '.$orgH($org['category_name']):'' ?></button><?php endif; ?>
 <?php if ($orgPreview && (!empty($org['archived_at']) || $org['status']==='draft')): ?><small class="org-unpublished"><?= !empty($org['archived_at'])?'Archived — hidden from visitors':'Unpublished — visible only in the editor' ?></small><?php endif; ?>

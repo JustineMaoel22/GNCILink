@@ -225,6 +225,7 @@ $cdText = function (?string $v) use ($cePreview): string {
                 <?php endif; ?>
                 <div class="dept-hero-inner">
                     <nav class="dept-breadcrumb" aria-label="breadcrumb">
+                        <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                         <span>Academics</span>
                         <i class="bi bi-chevron-right" aria-hidden="true"></i>
                         <a href="<?= cd_h($departmentIndexUrl) ?>"><?= cd_h($departmentIndexTitle) ?></a>

@@ -88,6 +88,7 @@ $publicDepartments = departmentApplyOrder($publicDepartments, departmentStoredOr
         <div class="cp-hero">
             <div class="cp-hero-inner">
                 <nav class="cp-breadcrumb" aria-label="breadcrumb" data-reveal>
+                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>Academics</span>
                     <i class="bi bi-chevron-right"></i>
                     <span class="cp-current" aria-current="page">College Departments</span>

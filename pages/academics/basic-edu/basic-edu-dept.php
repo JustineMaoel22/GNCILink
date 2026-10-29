@@ -31,6 +31,7 @@ cePreviewActive();
         <div class="basic-edu-hero">
             <div class="basic-edu-hero-inner">
                 <nav class="basic-edu-breadcrumb" aria-label="breadcrumb" data-reveal>
+                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>Academics</span>
                     <i class="bi bi-chevron-right"></i>
                     <span class="basic-edu-current">Basic Education Departments</span>
