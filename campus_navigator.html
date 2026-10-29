@@ -1244,7 +1244,7 @@
           } catch (e) {}
         statusEl.textContent = B[id].name;
         hud.classList.add("on");
-        // Focus the selected building independently of the route drawing.
+        // Follow the drawing trail, then settle on the selected building.
         if (window.followRoute) followRoute(id);
       }
       document.getElementById("clr").addEventListener("click", function () {
@@ -1382,8 +1382,7 @@
         window.fitView = function (anim) {
           setView(MW / 2, MH / 2, 1, anim);
         };
-        // Move straight to the selected building. Following the route first can
-        // leave a previous destination visible while the new line is drawing.
+        // Match the route's 400ms delay and 2800ms drawing duration.
         window.followRoute = function (id) {
           var building = document.getElementById("b-" + id);
           if (!building) return;
@@ -1394,7 +1393,30 @@
           // belong to the root SVG, not to that group's local coordinate system.
           var world = document.getElementById("world").transform.baseVal.consolidate();
           if (world) point = point.matrixTransform(world.matrix);
-          setView(point.x, point.y, 2, true);
+          if (reduce) { setView(point.x, point.y, 2, false); return; }
+          cancelAnimationFrame(raf);
+          var length = path.getTotalLength(), start = path.getPointAtLength(0);
+          var initial = { z: view.z, cx: view.cx, cy: view.cy };
+          var started = performance.now(), delay = 400, duration = 2800;
+          (function step(now) {
+            var elapsed = Math.max(0, now - started), progress, target;
+            if (elapsed < delay) {
+              progress = 1 - Math.pow(1 - elapsed / delay, 3);
+              view = {
+                z: Math.exp(Math.log(initial.z) + (Math.log(2) - Math.log(initial.z)) * progress),
+                cx: initial.cx + (start.x - initial.cx) * progress,
+                cy: initial.cy + (start.y - initial.cy) * progress
+              };
+            } else {
+              progress = Math.min(1, (elapsed - delay) / duration);
+              progress = progress * progress * (3 - 2 * progress);
+              target = path.getPointAtLength(length * progress);
+              view = { z: 2, cx: target.x, cy: target.y };
+            }
+            apply(view);
+            if (elapsed < delay + duration) raf = requestAnimationFrame(step);
+            else setView(point.x, point.y, 2, true);
+          })(started);
         };
         window.focusRoute = function (id) {
           try {

@@ -22,7 +22,7 @@ let browser,socket,profile;
     await send('Page.navigate',{url:'http://127.0.0.1:'+server.address().port});
     await until(()=>evaluate('!!window.followRoute'),'Map ready');
     async function checkBuilding(id){
-      await evaluate(`document.getElementById('c-${id}').click()`);await pause(650);
+      await evaluate(`clear(true);document.getElementById('c-${id}').click()`);await pause(3900);
       assert.equal(await evaluate(`(()=>{
         const b=document.getElementById('b-${id}').getBBox(),p=svg.createSVGPoint();
         p.x=b.x+b.width/2;p.y=b.y+b.height/2;
@@ -32,15 +32,19 @@ let browser,socket,profile;
         return current==='${id}'&&Math.abs(v.x+v.width/2-x)<2&&Math.abs(v.y+v.height/2-y)<2;
       })()`),true,'Camera focuses '+id+' rather than the previous building');
     }
+    await evaluate("go('parking1')");await pause(500);
+    const nearGate=await evaluate('svg.viewBox.baseVal.y');
+    await pause(1500);
+    assert.ok(await evaluate('svg.viewBox.baseVal.y')<nearGate-200,'Camera moves along trail from main gate toward Parking 1');
     for(const id of ['parking1','beta','banzali','tanjangco','goseco','parking2'])await checkBuilding(id);
-    await evaluate("go('parking1');go('beta');go('banzali')");await pause(650);
+    await evaluate("go('parking1');go('beta');go('banzali')");await pause(3900);
     assert.equal(await evaluate("current==='banzali'&&svg.viewBox.baseVal.y>800"),true,'Rapid building changes finish at latest destination');
     await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
     await send('Page.reload');await until(()=>evaluate('!!window.followRoute'),'Reduced-motion reload');
     await checkBuilding('beta');
     await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
     await checkBuilding('parking1');await checkBuilding('beta');
-    console.log('PASS: Parking 1 to six building destinations, transformed building centers, rapid selection changes, reduced motion and desktop camera.');
+    console.log('PASS: zoom and movement along trail, six final building centers, rapid selection changes, reduced motion and desktop camera.');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
     socket?.close();browser?.kill();server.close();await pause(500);
     if(profile&&path.dirname(path.resolve(profile))===path.resolve(os.tmpdir())&&path.basename(profile).startsWith('gnci-chat-mobile-')){try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:3,retryDelay:200});}catch{}}
