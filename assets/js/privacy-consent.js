@@ -9,7 +9,7 @@
     choice=read();
     const allows=key=>!restricted&&!!choice&&choice[key]===true;
     function clearOptional(){
-        if(!allows('analytics')||!allows('personalization')||!allows('external'))fetch('/api/privacy-preferences.php',{method:'POST',credentials:'same-origin',headers:{'X-GNC-Privacy':'1'}}).catch(()=>{});
+        if(!allows('analytics'))fetch('/api/privacy-preferences.php',{method:'POST',credentials:'same-origin',headers:{'X-GNC-Privacy':'1'}}).catch(()=>{});
         try{if(!allows('analytics')){document.cookie='gnc_vid=; Path=/; Max-Age=0; SameSite=Lax'+(location.protocol==='https:'?'; Secure':'');for(const key of Object.keys(sessionStorage))if(key.startsWith('gnc_pv:'))sessionStorage.removeItem(key);}
             if(!allows('personalization'))for(const key of ['gnc_recommendations_v1','gnci_feedback_v1','gnci_feedback_prompt_v1'])localStorage.removeItem(key);
         }catch(_){}
