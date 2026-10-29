@@ -2,7 +2,8 @@
     'use strict';
     if(window.GNCPrivacy || new URLSearchParams(location.search).has('ce_preview') || /^\/admin(?:\/|$)/.test(location.pathname))return;
     const KEY='gnc_privacy_v1',AGE=180*86400000,CATEGORIES=['analytics','personalization','external'];
-    const restricted=!!navigator.globalPrivacyControl||navigator.doNotTrack==='1';
+    const privacySignal=navigator.globalPrivacyControl?'Global Privacy Control':navigator.doNotTrack==='1'?'Do Not Track':'';
+    const restricted=!!privacySignal;
     let choice=null,previousFocus=null;
     const channel=typeof BroadcastChannel==='function'?new BroadcastChannel('gnc-privacy-choices'):null;
     function read(){try{const raw=document.cookie.split('; ').find(row=>row.startsWith(KEY+'='));const saved=raw&&JSON.parse(decodeURIComponent(raw.slice(KEY.length+1)));if(saved&&saved.version===1&&Number.isInteger(saved.at)&&saved.at*1000<=Date.now()+300000&&Date.now()-saved.at*1000<AGE)return saved;}catch(_){}return null;}
@@ -14,7 +15,7 @@
             if(!allows('personalization'))for(const key of ['gnc_recommendations_v1','gnci_feedback_v1','gnci_feedback_prompt_v1'])localStorage.removeItem(key);
         }catch(_){}
     }
-    function manage(){const dialog=document.getElementById('gncPrivacyDialog');if(!dialog)return;previousFocus=document.activeElement;CATEGORIES.forEach(key=>{const input=dialog.querySelector('[name="'+key+'"]');input.checked=allows(key);input.disabled=restricted;});document.getElementById('gncPrivacySignal').textContent=restricted?'Your browser privacy signal is on. Optional features stay off.':'';if(!dialog.open)dialog.showModal();}
+    function manage(){const dialog=document.getElementById('gncPrivacyDialog');if(!dialog)return;previousFocus=document.activeElement;CATEGORIES.forEach(key=>{const input=dialog.querySelector('[name="'+key+'"]');input.checked=allows(key);input.disabled=restricted;});const signal=document.getElementById('gncPrivacySignal');signal.hidden=!restricted;signal.textContent=restricted?'Your browser sends '+privacySignal+'. These choices are locked off to respect that preference. To select optional features, change that setting in your browser and reload this page. You can keep browsing with all optional features off.':'';if(!dialog.open)dialog.showModal();}
     function close(){const dialog=document.getElementById('gncPrivacyDialog');if(dialog?.open)dialog.close();previousFocus?.focus({preventScroll:true});}
     function save(values){choice={version:1,at:Math.floor(Date.now()/1000)};CATEGORIES.forEach(key=>choice[key]=!restricted&&values[key]===true);document.cookie=KEY+'='+encodeURIComponent(JSON.stringify(choice))+'; Path=/; Max-Age='+Math.floor(AGE/1000)+'; SameSite=Lax'+(location.protocol==='https:'?'; Secure':'');clearOptional();const banner=document.getElementById('gncPrivacyBanner');if(banner)banner.hidden=true;close();updateFrames();window.dispatchEvent(new CustomEvent('gnc:privacychange',{detail:{...choice}}));channel?.postMessage('changed');}
     function sync(){const saved=read();if(JSON.stringify(saved)===JSON.stringify(choice))return;choice=saved;clearOptional();updateFrames();window.dispatchEvent(new CustomEvent('gnc:privacychange',{detail:choice}));}
