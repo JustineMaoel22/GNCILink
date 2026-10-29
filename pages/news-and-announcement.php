@@ -847,7 +847,7 @@ function na_url(array $overrides = []): string {
               <div class="na-side-stack">
                 <?php
                 $calendarFilterSection = 'na-results';
-                $calendarFilterTitle = 'News Categories';
+                $calendarFilterTitle = 'Departments & Programs Categories';
                 $calendarFilterUrl = static fn(array $filter) => na_url(array_merge(['department' => '', 'program' => '', 'page' => 1], $filter));
                 include __DIR__ . '/../components/calendar-program-filter.php';
                 ?>
