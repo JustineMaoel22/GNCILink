@@ -167,9 +167,11 @@ try {
 
                     <h6 class="gnc-footer-heading gnc-footer-heading-spaced">Student Resources</h6>
                     <ul class="gnc-footer-links">
-                        <li><a href="http://library.gncipampanga.com/" target="_blank" rel="noopener noreferrer">Libraries <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+                        <li><a href="http://library.gncipampanga.com/" target="_blank" rel="noopener noreferrer">GNCI Library <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
                         <li><a href="/index.php#events">Calendar <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
                         <li><a href="/coming-soon.php" target="_blank" rel="noopener noreferrer">Student Portal <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+                        <li><a href="https://osa.gncipampanga.com/" target="_blank" rel="noopener noreferrer">OSA Student Grievance <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+                        <li><a href="/pages/faq.php">Frequently Asked Questions <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
                     </ul>
                 </div>
 
