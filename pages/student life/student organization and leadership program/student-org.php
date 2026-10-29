@@ -51,7 +51,7 @@ $pageLink = static fn($number, $filter) => studentOrganizationsUrl() . '?' . htt
     <main>
     <section class="student-org-intro">
         <div class="student-org-hero"><div class="student-org-hero-inner">
-            <nav class="student-org-breadcrumb" aria-label="breadcrumb"><a href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span>Student Life</span><i class="bi bi-chevron-right" aria-hidden="true"></i><span>Student Organizations and Leadership Programs</span></nav>
+            <nav class="student-org-breadcrumb" aria-label="breadcrumb"><a class="gnc-breadcrumb-home" href="/" aria-label="Home" title="Home"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 1 0 7h2v8h4v-5h4v5h4V7h2L8 1Z"/></svg></a><i class="bi bi-chevron-right" aria-hidden="true"></i><span>Student Life</span><i class="bi bi-chevron-right" aria-hidden="true"></i><span title="Student Organizations and Leadership Programs">Organizations</span></nav>
             <h1<?= $orgMark('hero_title') ?>><?= $orgH($settings['hero_title']['value']) ?></h1>
             <div class="cms-rich"<?= $orgMark('hero_description') ?>><?= renderSectionContent($settings['hero_description']['value']) ?></div>
         </div></div>

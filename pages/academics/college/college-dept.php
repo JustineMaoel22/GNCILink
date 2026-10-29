@@ -88,10 +88,10 @@ $publicDepartments = departmentApplyOrder($publicDepartments, departmentStoredOr
         <div class="cp-hero">
             <div class="cp-hero-inner">
                 <nav class="cp-breadcrumb" aria-label="breadcrumb" data-reveal>
-                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
+                    <a class="gnc-breadcrumb-home" href="/" aria-label="Home" title="Home"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 1 0 7h2v8h4v-5h4v5h4V7h2L8 1Z"/></svg></a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>Academics</span>
                     <i class="bi bi-chevron-right"></i>
-                    <span class="cp-current" aria-current="page">College Departments</span>
+                    <span class="cp-current" aria-current="page" title="College Departments">COLLEGE DEPARTMENTS</span>
                 </nav>
                 <h1 data-reveal style="--d: 100ms"<?= basicEducationMark('college-index', 'text_01') ?>><?= basicEducationText('college-index', 'text_01') ?></h1>
                 <div class="cms-rich" data-reveal style="--d: 200ms"<?= basicEducationMark('college-index', 'text_02') ?>><?= basicEducationText('college-index', 'text_02') ?></div>

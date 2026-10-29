@@ -39,7 +39,7 @@ $highlightsUrl=static fn($page)=>'?'.http_build_query(array_merge(['highlights_p
             <img class="athletics-hero-image" src="<?= $sportsH($sportsContent['images']['hero']) ?>" width="1440" height="320" alt="Athletics and Sports banner" fetchpriority="high"<?= ceManageMark('data-ve-sports-background-area="hero" data-ve-img="sports-banner"') ?>>
             <div class="athletics-hero-copy">
                 <nav class="athletics-breadcrumb" aria-label="Breadcrumb">
-                    <a href="/">Home</a><span aria-hidden="true">›</span>
+                    <a class="gnc-breadcrumb-home" href="/" aria-label="Home" title="Home"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 1 0 7h2v8h4v-5h4v5h4V7h2L8 1Z"/></svg></a><span aria-hidden="true">›</span>
                     <span>Student Life</span><span aria-hidden="true">›</span>
                     <span aria-current="page">Athletics and Sports</span>
                 </nav>

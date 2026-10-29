@@ -34,10 +34,10 @@ unset($field);
         <div class="enrollment-hero">
             <div class="enrollment-hero-inner">
                 <nav class="enrollment-breadcrumb" aria-label="breadcrumb">
-                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
+                    <a class="gnc-breadcrumb-home" href="/" aria-label="Home" title="Home"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 1 0 7h2v8h4v-5h4v5h4V7h2L8 1Z"/></svg></a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>Admissions</span>
                     <i class="bi bi-chevron-right"></i>
-                    <span class="enrollment-current">Enrollment Procedures</span>
+                    <span class="enrollment-current" title="Enrollment Procedures">Enrollment</span>
                 </nav>
                 <h1>Enrollment Procedures</h1>
                 <p>GNCI welcomes applicants whose academic credentials, character, and potential demonstrate their readiness to benefit from the school's quality education and enriching intellectual, social, and spiritual environment.</p>

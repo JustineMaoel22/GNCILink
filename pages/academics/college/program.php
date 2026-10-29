@@ -346,16 +346,16 @@ if ($program !== null) {
         <div class="row align-items-center g-0">
             <div class="col-lg-6">
                 <nav class="template-breadcrumb" aria-label="breadcrumb">
-                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
+                    <a class="gnc-breadcrumb-home" href="/" aria-label="Home" title="Home"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 1 0 7h2v8h4v-5h4v5h4V7h2L8 1Z"/></svg></a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>ACADEMICS</span>
                     <i class="bi bi-chevron-right"></i>
-                    <a href="<?= $e($departmentIndexUrl) ?>"><?= $e(mb_strtoupper($departmentIndexTitle)) ?></a>
+                    <a href="<?= $e($departmentIndexUrl) ?>" title="<?= $e($departmentIndexTitle) ?>"><?= $e(gncBreadcrumbShortLabel($departmentIndexTitle)) ?></a>
                     <?php if ($deptName !== ''): ?>
                     <i class="bi bi-chevron-right"></i>
-                    <a href="<?= $e($deptUrl) ?>"><?= $e(mb_strtoupper($deptName)) ?></a>
+                    <a href="<?= $e($deptUrl) ?>" title="<?= $e($deptName) ?>"><?= $e(gncBreadcrumbShortLabel($deptName, (string)($program['dept_slug'] ?? ''))) ?></a>
                     <?php endif; ?>
                     <i class="bi bi-chevron-right"></i>
-                    <span><?= $e(mb_strtoupper($fullName)) ?></span>
+                    <span title="<?= $e($fullName) ?>" aria-current="page"><?= $e($program['program_code'] ?: $shortName) ?></span>
                 </nav>
 
                 <div class="template-hero-content">

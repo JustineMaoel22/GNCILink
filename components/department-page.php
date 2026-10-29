@@ -225,10 +225,10 @@ $cdText = function (?string $v) use ($cePreview): string {
                 <?php endif; ?>
                 <div class="dept-hero-inner">
                     <nav class="dept-breadcrumb" aria-label="breadcrumb">
-                        <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
+                        <a class="gnc-breadcrumb-home" href="/" aria-label="Home" title="Home"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 1 0 7h2v8h4v-5h4v5h4V7h2L8 1Z"/></svg></a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                         <span>Academics</span>
                         <i class="bi bi-chevron-right" aria-hidden="true"></i>
-                        <a href="<?= cd_h($departmentIndexUrl) ?>"><?= cd_h($departmentIndexTitle) ?></a>
+                        <a href="<?= cd_h($departmentIndexUrl) ?>" title="<?= cd_h($departmentIndexTitle) ?>"><?= cd_h(gncBreadcrumbShortLabel($departmentIndexTitle)) ?></a>
                         <?php if ($dept): ?>
                         <i class="bi bi-chevron-right" aria-hidden="true"></i>
                         <span class="dept-current" aria-current="page"<?= $isCollegeHeader ? ceField('dept-name', ['key'=>'navigation-name', 'max'=>255, 'label'=>'Department name in navigation and list cards']) : '' ?>><?= cd_h($pageTitle) ?></span>

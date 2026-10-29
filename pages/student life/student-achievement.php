@@ -57,7 +57,7 @@ foreach (array_merge($achievements,$achievementListing['items'],$achievementDeta
         <div class="achievement-hero">
             <div class="achievement-hero-inner">
                 <nav class="achievement-breadcrumb" aria-label="breadcrumb">
-                    <a href="/">Home</a>
+                    <a class="gnc-breadcrumb-home" href="/" aria-label="Home" title="Home"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 1 0 7h2v8h4v-5h4v5h4V7h2L8 1Z"/></svg></a>
                     <i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>Student Life</span>
                     <i class="bi bi-chevron-right"></i>

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/privacy.php';
+require_once __DIR__ . '/../includes/breadcrumbs.php';
 /**
  * Shared navbar partial.
  *

@@ -38,7 +38,7 @@ $feeH = fn($value) => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
         <div class="tuition-hero">
             <div class="tuition-hero-inner">
                 <nav class="tuition-breadcrumb" aria-label="breadcrumb">
-                    <a class="gnc-breadcrumb-home" href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
+                    <a class="gnc-breadcrumb-home" href="/" aria-label="Home" title="Home"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 1 0 7h2v8h4v-5h4v5h4V7h2L8 1Z"/></svg></a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                     <span>Admissions</span>
                     <i class="bi bi-chevron-right"></i>
                     <span class="tuition-current">Tuition and Fees</span>
