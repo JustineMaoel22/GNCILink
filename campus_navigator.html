@@ -203,12 +203,6 @@
           bottom: 8px;
           left: 8px;
         }
-        #legend > div:first-child {
-          display: none;
-        }
-        #mapwrap:has(#hud.on) #legend {
-          opacity: 0;
-        }
         #mapwrap {
           border-radius: 14px;
         }
@@ -620,9 +614,6 @@
         #hud > div {
           min-width: 0;
         }
-        #legend {
-          display: none;
-        }
       }
       @media (max-width: 360px) {
         #hud small {
@@ -631,9 +622,6 @@
       }
       /* short screens (landscape phones) */
       @media (max-height: 480px) {
-        #legend {
-          display: none;
-        }
         #stage {
           padding: max(6px, env(safe-area-inset-top))
             max(10px, env(safe-area-inset-right))
@@ -692,6 +680,16 @@
         outline: 2px solid var(--hi);
         outline-offset: 2px;
       }
+      #legend-toggle { display: none; }
+      @media (max-width: 560px), (max-height: 480px) {
+        #legend { top: 10px; bottom: auto; left: 10px; max-width: calc(100% - 86px); max-height: calc(100% - 82px); overflow-y: auto; pointer-events: auto; }
+        #legend-toggle { display: block; min-height: 44px; padding: 6px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--green); font: 700 12px/1.4 Inter, sans-serif; }
+        #legend-toggle:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px; }
+        #legend:not(.is-expanded) > div { display: none; }
+        #legend.is-expanded > div { display: block; }
+        #legend.is-expanded { overscroll-behavior: contain; }
+        #legend span { white-space: normal; }
+      }
       /* Office popups show the map without the home page's building selector. */
       .office-location-map #chips {
         display: none;
@@ -702,8 +700,9 @@
     <div id="stage">
       <div id="chips" role="toolbar" aria-label="Choose a building"></div>
       <div id="mapwrap">
-        <div id="legend" aria-hidden="true">
-          <div>
+        <div id="legend" aria-label="Map legend">
+          <button type="button" id="legend-toggle" aria-expanded="false" aria-controls="legend-buildings legend-rooms">Legend</button>
+          <div id="legend-buildings">
             <h4>Buildings</h4>
             <span><b>BETA</b>Beta Building</span
             ><span><b>BH</b>Banzali Hall</span
@@ -714,7 +713,7 @@
             <h4>Parking</h4>
             <span><b>P1</b>Parking 1</span><span><b>P2</b>Parking 2</span>
           </div>
-          <div>
+          <div id="legend-rooms">
             <h4>Room numbers</h4>
             <span><b>100</b>1st Floor</span><span><b>200</b>2nd Floor</span
             ><span><b>300</b>3rd Floor</span><span><b>400</b>4th Floor</span>
@@ -1166,6 +1165,11 @@
         parking2: ["P2", "#7b3fa0"],
       };
       var current = null;
+      document.getElementById('legend-toggle').addEventListener('click', function () {
+        var expanded = document.getElementById('legend').classList.toggle('is-expanded');
+        this.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        this.textContent = expanded ? 'Hide legend' : 'Legend';
+      });
       var officeMap = document.documentElement.classList.contains('office-location-map');
       var officeBuilding = null;
       function setOfficeBuilding(id) {

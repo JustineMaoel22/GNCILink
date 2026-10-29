@@ -21,6 +21,19 @@ let browser,socket,profile;
     await send('Emulation.setDeviceMetricsOverride',{width:390,height:620,deviceScaleFactor:1,mobile:true});
     await send('Page.navigate',{url:'http://127.0.0.1:'+server.address().port});
     await until(()=>evaluate('!!window.followRoute'),'Map ready');
+    for(const [width,height] of [[390,620],[360,640],[740,360]]){
+      await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true});
+      assert.equal(await evaluate('getComputedStyle(document.getElementById("legend-toggle")).display!=="none"'),true,'Legend button visible on mobile');
+      await evaluate('document.getElementById("legend-toggle").click()');
+      assert.equal(await evaluate(`['legend-buildings','legend-rooms'].every(id=>getComputedStyle(document.getElementById(id)).display!=='none')`),true,'Building, parking and floor keys available');
+      await evaluate("go('beta')");
+      assert.equal(await evaluate('getComputedStyle(document.getElementById("legend")).opacity'), '1','Route selection does not hide legend');
+      await evaluate('document.getElementById("legend-toggle").click()');
+      assert.equal(await evaluate('document.getElementById("legend-toggle").getAttribute("aria-expanded")'),'false','Legend collapses');
+    }
+    await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+    assert.equal(await evaluate('getComputedStyle(document.getElementById("legend-buildings")).display!=="none"'),true,'Desktop legend remains visible');
+    await send('Emulation.setDeviceMetricsOverride',{width:390,height:620,deviceScaleFactor:1,mobile:true});
     async function checkBuilding(id){
       await evaluate(`clear(true);document.getElementById('c-${id}').click()`);await pause(3900);
       assert.equal(await evaluate(`(()=>{
