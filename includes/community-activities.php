@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/image-framing.php';
+require_once __DIR__.'/image-upload.php';
 require_once __DIR__.'/content-publish-policy.php';
 
 const COMMUNITY_ACTIVITY_FIELDS = [
@@ -85,7 +86,7 @@ function communityActivityValidate(array $input,array $current): array {
 function communityActivityUpload(array $file): string {
     $file=imageUploadPrepare($file);
     if(($file['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK||!is_string($file['tmp_name']??null)||!is_uploaded_file($file['tmp_name']))throw new InvalidArgumentException('The image upload failed. Please try again.');
-    $size=filesize($file['tmp_name']);$mime=(new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+    $size=filesize($file['tmp_name']);$mime=imageUploadMime($file['tmp_name']);
     $types=['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','image/gif'=>'gif'];
     if(!$size||$size>5*1024*1024||!isset($types[$mime])||!getimagesize($file['tmp_name']))throw new InvalidArgumentException('Choose a JPG, PNG, WebP or GIF image of up to 5 MB.');
     $directory=dirname(__DIR__).'/uploads/community-activities';

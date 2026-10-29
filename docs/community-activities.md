@@ -41,6 +41,8 @@ This additive migration creates `community_activity_page` with one JSON document
 
 The existing editor-draft and image-framing migrations must also be installed. Publishing requires `manage_page_content`, login and CSRF verification. Client-provided image URLs are ignored: existing paths come from stored content and new paths only from validated uploads. All rendered text is escaped; public pages never load private drafts.
 
+Community image uploads use the shared `includes/image-upload.php` MIME validator, matching other Content Editor uploads. If PHP Fileinfo is unavailable, raster image types are detected from their contents using `getimagesize`; the JPG/PNG/WebP/GIF allowlist and 5 MB saved-image limit still apply. Deploy this helper with `includes/community-activities.php`. This compatibility change requires no database migration.
+
 The previously undone `community_extension_page` table, if present, is not read or modified by this feature. Replaced/deleted published image files are retained to protect existing references and recovery; failed new uploads are removed. Roll back the feature files together if necessary and retain the table for recovery. No destructive migration is required.
 
 ## Verification
