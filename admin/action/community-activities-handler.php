@@ -13,4 +13,4 @@ try{
     logActivity((int)$_SESSION['user_id'],'UPDATE','community_activity_page',1,'Published community activities');
     echo json_encode(['success'=>true,'revision'=>communityActivityRevision($saved)]);
 }catch(InvalidArgumentException|JsonException $e){http_response_code(422);echo json_encode(['error'=>$e->getMessage()]);}
-catch(Throwable $e){error_log('Community activities publish: '.$e->getMessage());http_response_code(500);echo json_encode(['error'=>'Could not publish the page. Your edits are available to retry. Check that community activity storage is installed.']);}
+catch(Throwable $e){error_log('Community activities publish: '.$e->getMessage());http_response_code(500);echo json_encode(['error'=>communityActivityPublishError($e)]);}

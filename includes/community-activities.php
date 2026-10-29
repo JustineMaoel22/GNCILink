@@ -13,6 +13,25 @@ const COMMUNITY_IMPACT_TEXT_DEFAULTS = ['impact_heading'=>'Community Impact','im
     'closing_title'=>'Join the Mission','closing_description'=>'Together, we create brighter, stronger communities.'];
 const COMMUNITY_CLOSING_IMAGE_DEFAULT = '/assets/images/DSC_2965.JPG';
 
+/** Only fixed, actionable messages reach the authenticated editor; SQL and paths stay private. */
+function communityActivityPublishError(Throwable $error): string {
+    if($error instanceof Error){
+        if(str_contains($error->getMessage(),'undefined function array_is_list('))return 'Publishing requires PHP 8.1 or newer. Update the PHP version for this website in your hosting panel.';
+        if(str_contains($error->getMessage(),'undefined function mb_strlen('))return 'Publishing requires the PHP mbstring extension. Enable mbstring for this website in your hosting panel.';
+        if($error->getMessage()==='Class "finfo" not found')return 'Image uploads require the PHP fileinfo extension. Enable fileinfo for this website in your hosting panel.';
+    }
+    if($error instanceof PDOException){
+        if($error->getCode()==='42S02')return 'A required database table is missing. Install the community activities and image framing migrations in the database used by this website.';
+        if($error->getCode()==='42S22')return 'The hosted database has an outdated table structure. Check the community activities and image framing table columns against their migrations.';
+        if(in_array((int)($error->errorInfo[1]??0),[1044,1045,1142,1143],true))return 'The website database account lacks permission for this operation. Ask your host to check its database access.';
+    }
+    if($error instanceof RuntimeException){
+        if($error->getMessage()==='Install the community activities migration.')return 'The community page record is missing. Import the community activities migration into the database used by this website.';
+        if(in_array($error->getMessage(),['Image storage is unavailable.','Could not store the image.'],true))return 'The server could not save the uploaded image. Ask your host to check write access and available space for uploads/community-activities.';
+    }
+    return 'Could not publish the page. Your edits are available to retry. The server encountered an unexpected error; ask your host for the PHP log entry beginning "Community activities publish:".';
+}
+
 /** Preserve the first existing photo when opening older page records. Once
  * saved, the shared image is independent of activity order and deletion. */
 function communityActivityShowcaseImage(array $content): string {
