@@ -8,6 +8,8 @@
 
   var root = document.getElementById('gncbot');
   if (!root) { return; }
+  // Keep fixed positioning independent of transformed page/animation containers.
+  if (root.parentNode !== document.body) { document.body.appendChild(root); }
 
   var MAX_LEN = 500, MAX_HISTORY = 6, MAX_STORED = 40, TIMEOUT_MS = 35000, STORE_KEY = 'gncbot.v1';
   var FRIENDLY = "Sorry, I'm having trouble responding right now. Please try again later.";
@@ -18,6 +20,7 @@
     launcher: root.querySelector('.gncbot-launcher'),
     panel: root.querySelector('.gncbot-panel'),
     list: root.querySelector('.gncbot-messages'),
+    scroller: root.querySelector('.gncbot-conversation'),
     chips: root.querySelector('.gncbot-suggestions'),
     form: root.querySelector('.gncbot-form'),
     input: root.querySelector('.gncbot-input'),
@@ -116,7 +119,7 @@
   }
 
   /* ------------------------------------------------------------ DOM helpers */
-  function scrollDown() { el.list.scrollTop = el.list.scrollHeight; }
+  function scrollDown() { el.scroller.scrollTop = el.scroller.scrollHeight; }
 
   function addBubble(role, text, opts) {
     opts = opts || {};
@@ -228,27 +231,59 @@
 
   /* ------------------------------------------------------------ open / close */
   var mobileMQ = window.matchMedia('(max-width: 576px)');
+  var closeTimer = null, pageScroll = null;
+
+  function lockPage(lock) {
+    if (lock && !pageScroll) {
+      pageScroll = { x: window.scrollX, y: window.scrollY };
+      document.body.style.setProperty('--gb-scroll-top', -pageScroll.y + 'px');
+      document.body.classList.add('gncbot-noscroll');
+    } else if (!lock && pageScroll) {
+      var saved = pageScroll; pageScroll = null;
+      document.body.classList.remove('gncbot-noscroll');
+      document.body.style.removeProperty('--gb-scroll-top');
+      window.scrollTo({ left: saved.x, top: saved.y, behavior: 'instant' });
+    }
+  }
 
   function fitViewport() {
     var h = (window.visualViewport && mobileMQ.matches) ? window.visualViewport.height : 0;
     // When there is no measured height, remove the inline override so the CSS default
     // (100vh, upgraded to 100dvh where supported) applies. Works on older phones too.
-    if (h) { root.style.setProperty('--gb-vh', h + 'px'); }
-    else { root.style.removeProperty('--gb-vh'); }
+    if (h) {
+      root.style.setProperty('--gb-vh', h + 'px');
+      root.style.setProperty('--gb-top', window.visualViewport.offsetTop + 'px');
+    } else {
+      root.style.removeProperty('--gb-vh'); root.style.removeProperty('--gb-top');
+    }
+    lockPage((state.open || root.classList.contains('is-closing')) && mobileMQ.matches);
   }
 
   function setOpen(open) {
+    clearTimeout(closeTimer);
     state.open = open;
-    root.classList.toggle('is-open', open);
-    if (open) { root.classList.add('has-opened'); }
-    el.panel.hidden = !open;
     el.launcher.setAttribute('aria-expanded', open ? 'true' : 'false');
     el.launcher.setAttribute('aria-label', open ? 'Close chat with Cian' : 'Open chat with Cian');
-    document.body.classList.toggle('gncbot-noscroll', open && mobileMQ.matches);
     if (open) {
+      root.classList.remove('is-closing');
+      root.classList.add('is-open', 'has-opened');
+      el.panel.hidden = false; el.panel.removeAttribute('inert');
       fitViewport(); scrollDown();
       if (matchMedia('(hover: hover)').matches) { el.input.focus(); }
-    } else { el.launcher.focus(); }
+    } else {
+      if (el.panel.hidden) { return; }
+      el.panel.setAttribute('inert', '');
+      if (el.panel.contains(document.activeElement)) { document.activeElement.blur(); }
+      root.classList.add('is-closing');
+      function finishClose() {
+        el.panel.hidden = true;
+        root.classList.remove('is-open', 'is-closing');
+        lockPage(false);
+        el.launcher.focus({ preventScroll: true });
+      }
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) { finishClose(); }
+      else { closeTimer = setTimeout(finishClose, 200); }
+    }
   }
 
   /* ------------------------------------------------------------ composer */
@@ -263,7 +298,11 @@
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); ask(el.input.value, false); }
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && state.open) { setOpen(false); } });
-  if (window.visualViewport) { window.visualViewport.addEventListener('resize', fitViewport); }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', fitViewport);
+    window.visualViewport.addEventListener('scroll', fitViewport);
+  }
+  window.addEventListener('resize', fitViewport);
   window.addEventListener('orientationchange', fitViewport);
 
   /* ------------------------------------------------------------ init */

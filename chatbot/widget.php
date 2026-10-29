@@ -55,9 +55,11 @@ $gncbotMascot = rtrim(dirname($gncbotBase), '/') . '/assets/images/chatbot.png';
             </button>
         </header>
 
+        <div class="gncbot-conversation">
         <div class="gncbot-messages" role="log" aria-live="polite" aria-relevant="additions"></div>
         <div class="gncbot-suggestions" aria-label="Suggested questions"></div>
         <label class="gncbot-privacy-choice"><input type="checkbox" id="gncbot-ai-choice"> I agree to send my question, recent chat turns and page context to Google Gemini to answer me. Do not include passwords, student records or other sensitive information.</label>
+        </div>
 
         <form class="gncbot-form" autocomplete="off">
             <label for="gncbot-input" class="gncbot-sr">Type your question</label>

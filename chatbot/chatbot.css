@@ -42,6 +42,10 @@
 }
 @supports (height: 100dvh) { .gncbot-panel { height: min(620px, calc(100dvh - 120px)); } }
 @keyframes gncbot-in { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes gncbot-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(16px) scale(.98); } }
+.gncbot.is-closing .gncbot-panel { animation: gncbot-out .18s ease both; pointer-events: none; }
+.gncbot-header,.gncbot-form,.gncbot-note { flex-shrink: 0; }
+.gncbot-conversation { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--gb-bg); scroll-behavior: smooth; }
 
 .gncbot-header { display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 14px; color: #fff;
   background: linear-gradient(135deg, var(--gb-dark), var(--gb-green)); border-bottom: 3px solid var(--gb-gold); }
@@ -54,7 +58,7 @@
 .gncbot-iconbtn:hover { background: rgba(255, 255, 255, .24); }
 
 /* ---- messages ---- */
-.gncbot-messages { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px; background: var(--gb-bg); display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
+.gncbot-messages { padding: 14px; background: var(--gb-bg); display: flex; flex-direction: column; gap: 10px; }
 .gncbot-msg { display: flex; flex-direction: column; max-width: 88%; }
 .gncbot-msg.is-user { align-self: flex-end; align-items: flex-end; }
 .gncbot-msg.is-bot { align-self: flex-start; }
@@ -99,10 +103,10 @@
   .gncbot-launcher { right: 14px; bottom: 14px; width: 84px; height: 84px; }
   .gncbot-launcher-label { display: none; }
   .gncbot.is-open .gncbot-launcher { display: none; }
-  .gncbot-panel { top: 0; right: 0; bottom: auto; left: 0; width: 100%; max-width: none;
+  .gncbot-panel { top: var(--gb-top, 0px); right: 0; bottom: auto; left: 0; width: 100%; max-width: none;
     height: 100vh; height: var(--gb-vh, 100vh);
     border-radius: 0; border: 0; box-shadow: none;
-    padding-top: env(safe-area-inset-top); animation: none; }
+    padding-top: env(safe-area-inset-top); }
   .gncbot-note { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
   .gncbot-input { font-size: 16px; } /* prevents iOS zoom-on-focus */
   .gncbot-msg { max-width: 92%; }
@@ -113,8 +117,8 @@
 @supports (height: 100dvh) {
   @media (max-height: 520px) and (min-width: 577px) { .gncbot-panel { height: calc(100dvh - 100px); } }
 }
-body.gncbot-noscroll { overflow: hidden; }
-@media (prefers-reduced-motion: reduce) { .gncbot-panel, .gncbot-typing span, .gncbot-launcher { animation: none !important; transition: none !important; } .gncbot-messages { scroll-behavior: auto; } }
+body.gncbot-noscroll { position: fixed; top: var(--gb-scroll-top, 0px); left: 0; right: 0; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .gncbot-panel, .gncbot-typing span, .gncbot-launcher { animation: none !important; transition: none !important; } .gncbot-conversation { scroll-behavior: auto; } }
 @media print { #gncbot { display: none !important; } }
 
 .gncbot-privacy-choice{display:block;font:12px/1.5 Inter,Arial,sans-serif;padding:10px 16px;color:#385344}.gncbot-privacy-choice input{accent-color:#1f5e2c;margin-right:6px}.gncbot-note a{color:inherit;text-decoration:underline}
