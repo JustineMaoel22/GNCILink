@@ -2793,8 +2793,8 @@ html, body {
     .about-feature { gap: .75rem; }
     .about-heading { font-size: clamp(1.45rem, 6vw, 1.65rem); overflow-wrap: break-word; }
     .about-body { text-align: start; font-size: .9rem; line-height: 1.75; }
-    .template-badges { grid-template-columns: minmax(0, max-content); justify-content: center; }
-    .template-badge { justify-content: flex-start; text-align: left; }
+    .template-badges { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+    .template-badge { justify-content: flex-start; align-items: center; text-align: left; }
     .template-badge, .template-badge div { min-width: 0; }
     .template-badge div { overflow-wrap: anywhere; }
 }
