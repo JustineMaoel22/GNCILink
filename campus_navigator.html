@@ -1244,8 +1244,8 @@
           } catch (e) {}
         statusEl.textContent = B[id].name;
         hud.classList.add("on");
-        // Camera follows the route as it draws (moderate zoom)
-        if (window.followRoute) followRoute();
+        // Focus the selected building independently of the route drawing.
+        if (window.followRoute) followRoute(id);
       }
       document.getElementById("clr").addEventListener("click", function () {
         clear();
@@ -1382,46 +1382,19 @@
         window.fitView = function (anim) {
           setView(MW / 2, MH / 2, 1, anim);
         };
-        // camera follows the drawing route: starts at the origin, tracks the line (same timing as the CSS draw), ends on the destination
-        window.followRoute = function () {
-          var Z = 2,
-            len = path.getTotalLength(),
-            p0 = path.getPointAtLength(0),
-            DELAY = 400,
-            DUR = 2800;
-          cancelAnimationFrame(raf);
-          var s = { z: view.z, cx: view.cx, cy: view.cy },
-            t0 = performance.now();
-          if (reduce) {
-            var e = path.getPointAtLength(len);
-            view = { z: Z, cx: e.x, cy: e.y };
-            apply(view);
-            return;
-          }
-          (function step(t) {
-            var el = t - t0,
-              tx,
-              ty,
-              tz = Z,
-              k;
-            if (el < DELAY) {
-              // glide to the start of the route
-              k = el / DELAY;
-              k = 1 - Math.pow(1 - k, 3);
-              view = {
-                z: Math.exp(Math.log(s.z) + (Math.log(Z) - Math.log(s.z)) * k),
-                cx: s.cx + (p0.x - s.cx) * k,
-                cy: s.cy + (p0.y - s.cy) * k,
-              };
-            } else {
-              k = Math.min(1, (el - DELAY) / DUR);
-              k = k * k * (3 - 2 * k); // ~ CSS ease-in-out
-              var pt = path.getPointAtLength(len * k);
-              view = { z: Z, cx: pt.x, cy: pt.y };
-            }
-            apply(view);
-            if (el < DELAY + DUR) raf = requestAnimationFrame(step);
-          })(t0);
+        // Move straight to the selected building. Following the route first can
+        // leave a previous destination visible while the new line is drawing.
+        window.followRoute = function (id) {
+          var building = document.getElementById("b-" + id);
+          if (!building) return;
+          var bounds = building.getBBox(), point = svg.createSVGPoint();
+          point.x = bounds.x + bounds.width / 2;
+          point.y = bounds.y + bounds.height / 2;
+          // Buildings are inside a transformed SVG group; camera coordinates
+          // belong to the root SVG, not to that group's local coordinate system.
+          var world = document.getElementById("world").transform.baseVal.consolidate();
+          if (world) point = point.matrixTransform(world.matrix);
+          setView(point.x, point.y, 2, true);
         };
         window.focusRoute = function (id) {
           try {
