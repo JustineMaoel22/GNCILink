@@ -40,6 +40,7 @@ function document() {
         defaultView: {innerWidth:1000,innerHeight:800,addEventListener(){},removeEventListener(){},requestAnimationFrame(fn){fn();return 1;},cancelAnimationFrame(){}},
         createElement(tag) { return new Element(tag, doc); },
         querySelectorAll(s) { return this.body.querySelectorAll(s); },
+        querySelector() { return null; },
         addEventListener(name, fn) { handlers.set(name, fn); },
         removeEventListener(name) { handlers.delete(name); },
         emit(name, target) { handlers.get(name)?.({target}); }

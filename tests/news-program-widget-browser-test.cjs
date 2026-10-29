@@ -21,15 +21,31 @@ let socket;
     await send('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*','*cdn.jsdelivr.net*','*cdnjs.cloudflare.com*','*facebook.com*','*youtube.com*']});
     await send('Page.addScriptToEvaluateOnNewDocument',{source:"try{sessionStorage.setItem('gncIntroSeen','1')}catch(_){}"});
 
-    for (const width of [1440,390]) {
-        await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+    for (const width of [1440,1366,1280,1093,1024,992,991,768,390]) {
+        await send('Emulation.setDeviceMetricsOverride',{width,height:width===1093?614:768,deviceScaleFactor:1,mobile:false});
         await send('Page.navigate',{url:base+'/pages/news-and-announcement.php'});
         await until(()=>evaluate('document.readyState==="complete" && Boolean(document.querySelector("#calendarProgramWidget:not([hidden])"))'),'News filter did not load');
-        await evaluate('document.getElementById("calendarProgramToggle").scrollIntoView({block:"center"});document.getElementById("calendarProgramToggle").click()');
+        await evaluate('document.querySelector("#gncPrivacyBanner [data-privacy-action=reject]")?.click()');
+        await until(()=>evaluate('!document.getElementById("gncPageEntrance")'),'Page entrance still visible');
+        await evaluate('document.getElementById("calendarProgramToggle").scrollIntoView({block:"center",behavior:"instant"});document.getElementById("calendarProgramToggle").click()');
         assert.equal(await evaluate('document.getElementById("calendarProgramToggle").getAttribute("aria-expanded")'),'true');
         assert.equal(await evaluate('document.querySelectorAll("#calendarProgramPanel .gnc-departments-list-item").length>0'),true);
         assert.equal(await evaluate('document.querySelectorAll("#calendarProgramPanel .gnc-programs-list-item").length>0'),true);
         assert.equal(await evaluate('(()=>{const r=document.getElementById("calendarProgramPanel").getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.height>100})()'),true,'Panel fits viewport');
+        await delay(300);
+        fs.writeFileSync(path.join(os.tmpdir(),'news-responsive-'+width+'.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+        assert.equal(await evaluate('(()=>{const panel=document.getElementById("calendarProgramPanel").getBoundingClientRect(),sidebar=document.querySelector(".na-sidebar").getBoundingClientRect();return panel.left>=sidebar.left-1&&panel.right<=sidebar.right+1;})()'),true,'Open filter stays inside the sidebar at '+width+'px');
+        assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'No horizontal page overflow at '+width+'px');
+        await until(()=>evaluate('(()=>{const button=document.querySelector(".gnc-program-widget-close"),r=button.getBoundingClientRect();return button.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));})()'),'Filter close action obscured at '+width+'px');
+        assert.equal(await evaluate('(()=>{const button=document.querySelector(".gnc-program-widget-close"),r=button.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&button.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));})()'),true,'Filter close action remains visible and clickable at '+width+'px');
+        assert.equal(await evaluate('(()=>{const list=document.querySelector("#calendarProgramPanel .gnc-programs-list");return list.scrollWidth<=list.clientWidth;})()'),true,'Long department names fit the panel at '+width+'px');
+        if(width===1280){
+            await send('Emulation.setDeviceMetricsOverride',{width,height:600,deviceScaleFactor:1,mobile:false});
+            await delay(200);
+            assert.equal(await evaluate('(()=>{const r=document.getElementById("calendarProgramPanel").getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;})()'),true,'Open filter adapts when the laptop window becomes shorter');
+            await evaluate('window.scrollBy({top:100,behavior:"instant"})');await delay(200);
+            assert.equal(await evaluate('(()=>{const r=document.getElementById("calendarProgramPanel").getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;})()'),true,'Open filter repositions after scrolling');
+        }
         const codes=await evaluate('Array.from(document.querySelectorAll("#calendarProgramPanel .gnc-programs-code"), el=>el.textContent.trim())');
         assert(codes.includes('BSIT'), 'College programs remain available');
         assert(codes.some(code=>code.startsWith('GS-')), 'Graduate School programs remain available');
@@ -47,7 +63,7 @@ let socket;
     assert.equal(await evaluate('document.getElementById("calendarProgramPanel").hidden'),false);
     assert.equal(await evaluate('document.getElementById("calendarProgramTitle").textContent.trim()'),'Calendar Categories');
     assert.equal(await evaluate('new URL(document.querySelector("#calendarProgramPanel .gnc-departments-list-item").href).hash'),'#events');
-    console.log('PASS: homepage filter preserved; desktop/mobile news dropdown, college/graduate programs and departments, department filtering and close action.');
+    console.log('PASS: news filter stays within sidebar at nine desktop/laptop/tablet/mobile viewports; long names, close button, resizing, scrolling, department filtering and homepage filter preserved.');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
     if(socket)socket.close();browser.kill();await delay(1000);
     if(path.dirname(profile)===os.tmpdir()&&path.basename(profile).startsWith('gnci-calendar-widget-'))try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:3,retryDelay:200});}catch{}

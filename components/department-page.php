@@ -470,7 +470,7 @@ $cdText = function (?string $v) use ($cePreview): string {
                 <div class="dept-fb-lead cms-rich" data-reveal="right" style="--d: 120ms"<?= departmentPageField($dept, 'facebook_intro') ?>><?= departmentPageText($dept, 'facebook_intro') ?></div>
                 <?php if ($fbEmbedUrl !== null): ?>
                 <div class="dept-fb-box" data-reveal="scale" style="--d: 200ms<?= $cePreview ? '; position: relative' : '' ?>">
-                    <iframe src="<?= cd_h($fbEmbedUrl) ?>" width="500" height="130" scrolling="no" frameborder="0"
+                    <iframe <?= gncPrivacyFrameSource($fbEmbedUrl) ?> width="500" height="130" scrolling="no" frameborder="0"
                             allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
                             allowfullscreen loading="lazy"
                             title="<?= cd_h($pageTitle) ?> Facebook page"></iframe>

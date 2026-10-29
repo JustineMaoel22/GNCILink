@@ -1,4 +1,9 @@
 html.gnc-feedback-open { overflow: hidden; scrollbar-gutter: stable; }
+.gnc-feedback-trigger { position: fixed; z-index: 1030; left: 0; top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; display: flex; align-items: center; gap: 10px; min-width: 48px; min-height: 150px; padding: 20px 14px; border: 0; border-radius: 0 6px 6px 0; background: #0b4228; color: #fff; box-shadow: 2px 3px 12px #08231526; font: 700 13px/1.4 Inter,system-ui,sans-serif; letter-spacing: 1.5px; cursor: pointer; }
+.gnc-feedback-trigger[hidden] { display: none !important; }
+.gnc-feedback-trigger:hover { background: #1f5e2c; }
+.gnc-feedback-trigger:focus-visible { outline: 3px solid #bd941c; outline-offset: 3px; }
+@media(max-width:600px) { .gnc-feedback-trigger { min-width: 44px; min-height: 130px; padding: 16px 12px; font-size: 12px; } }
 .gnc-feedback { position: fixed; inset: 0; width: min(700px,calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid #dce5dc; border-radius: 20px; background: #faf9f5; color: #183b28; box-shadow: 0 24px 80px #08231540; overflow: auto; overscroll-behavior: contain; font: 14px/1.6 Inter,system-ui,sans-serif; }
 .gnc-feedback:not([open]),.gnc-feedback[hidden],.gnc-feedback [hidden] { display: none !important; }
 .gnc-feedback::backdrop { background: #08231599; backdrop-filter: blur(3px); }

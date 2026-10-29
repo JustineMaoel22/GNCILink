@@ -58,13 +58,13 @@ let socket;
     await evaluate("VE.state.doc.querySelector('.fcar-slide img').click()");
     assert.equal(await evaluate('VE.state.sel.kind'),'program-slide','Facility picture offers replacement on click');
     await choose('replacement-facility.png','image/png',png);
-    await until(()=>evaluate("Object.keys(VE.adapter().draftState().slideReplacements).length===2"),'Facility not staged');
+    await until(()=>evaluate("!VE.state.busy&&VE.adapter().draftState().pRows.facility?.[0].file"),'Facility not staged');
     assert.equal(await evaluate("VE.state.doc.querySelector('.fcar-slide img').src.startsWith('blob:')"),true);
     await evaluate("document.getElementById('veSaveDraft').click()");
     await until(()=>evaluate("!VE.state.busy && document.getElementById('veStatus').textContent.includes('Draft saved')"),'Replacements draft not saved');
     await evaluate('window.pendingReload=true');await send('Page.reload');
     await until(()=>evaluate("Boolean(!window.pendingReload && window.VE && !VE.state.busy && document.getElementById('veStatus').textContent.includes('Draft saved'))"),'Replacements not restored');
-    assert.deepEqual(await evaluate("Object.values(VE.adapter().draftState().slideReplacements).map(c=>c.file.name).sort()"),['replacement-banner.png','replacement-facility.png']);
+    assert.deepEqual(await evaluate("Object.values(VE.adapter().draftState().slideReplacements).map(c=>c.file.name).concat(VE.adapter().draftState().pRows.facility.filter(r=>r.file).map(r=>r.file.name)).sort()"),['replacement-banner.png','replacement-facility.png']);
     assert.equal(await evaluate("VE.state.doc.querySelector('.hero-slide').style.backgroundImage.includes('blob:') && VE.state.doc.querySelector('.fcar-slide img').src.startsWith('blob:')"),true,'Both replacement previews restore');
     let reject=true;const uploads=[];
     socket.addEventListener('message',async event=>{
@@ -84,7 +84,7 @@ let socket;
         await until(async()=>uploads.length>=before+2 && await evaluate('Boolean(window.VE && !VE.state.busy && !document.querySelector(".ve-publish-dialog"))'),'Publish still running');
     }
     await publish();
-    assert.equal(await evaluate('Object.keys(VE.adapter().draftState().slideReplacements).length'),2,'Failed upload preserves both replacement files');
+    assert.equal(await evaluate('Object.keys(VE.adapter().draftState().slideReplacements).length+VE.adapter().draftState().pRows.facility.filter(r=>r.file).length'),2,'Failed upload preserves both replacement files');
     reject=false;await publish();
     await until(()=>evaluate("Boolean(window.VE && !VE.state.busy && document.getElementById('veLoader').hidden && document.getElementById('veDiscardDraft').hidden)"),'Successful upload did not finish');
     assert.equal(uploads.length,4);

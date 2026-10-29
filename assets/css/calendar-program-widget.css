@@ -63,10 +63,11 @@
 
 /* The news feed uses the same filter panel as the homepage calendar. */
 .na-sidebar .gnc-program-widget-toggle { width: 100%; }
-.na-sidebar .gnc-program-widget-panel { z-index: 50; }
+.na-sidebar .gnc-program-widget-panel { z-index: 50; width: min(430px,100%); }
 .na-sidebar .gnc-program-widget-panel .gnc-programs-list-item { flex-direction: row; align-items: center; gap: .65rem; }
 .na-sidebar .gnc-program-widget-panel .gnc-programs-code { flex: none; background: #eaf5ee; padding: .28rem .55rem; border-radius: 6px; font-size: .72rem; }
 .na-sidebar .gnc-program-widget-panel .gnc-programs-list-fullname { font-size: .83rem; font-weight: 600; }
+.na-sidebar .gnc-program-widget-panel :is(.gnc-department-filter-name,.gnc-programs-list-fullname) { min-width: 0; overflow-wrap: anywhere; }
 .na-sidebar .gnc-program-widget-panel .gnc-programs-list-item-active .gnc-programs-code { background: #094024; color: #fff; }
 
 .na-sidebar .na-side-stack { overflow: visible; max-height: none; }

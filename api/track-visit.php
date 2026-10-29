@@ -7,6 +7,7 @@
  */
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../components/page-analytics.php';
+require_once __DIR__ . '/../includes/privacy.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -17,6 +18,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     exit;
 }
 
+// Enforce the choice server-side too; bypassing the footer must not set an ID
+// or record visits before an opt-in. Preference cookies are not authorization.
+if (!gncPrivacyAllows('analytics')) { echo json_encode(['ok'=>false,'tracking'=>false]); exit; }
 try {
     $db = getDB();
     $pageTracked = false;

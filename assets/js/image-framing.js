@@ -28,7 +28,10 @@
         const match = /url\(["']?([^"')]+)["']?\)/.exec(bg);
         return match ? match[1] : (el.getAttribute('data-bg') || '');
     }
-    function usable(src) { return !!pathOf(src) || sources.has(src); }
+    function usable(src) {
+        if(pathOf(src)||sources.has(src))return true;
+        try{return !!(window.parent!==window&&window.parent.GNCImageFraming&&window.parent.GNCImageFraming.fileForSource(src));}catch(_){return false;}
+    }
     function fitOf(el) { return el && el.closest('[data-image-frame-fit="contain"]') ? 'contain' : 'cover'; }
     function cropped(el) {
         if (!el || !activeDocument(el.ownerDocument) || !usable(sourceOf(el))) return false;
@@ -266,6 +269,7 @@
                         set(path,value);documents.forEach(doc=>{try{const api=doc.defaultView.GNCImageFraming;if(api&&api!==window.GNCImageFraming)api.set(path,value);}catch(_){}});
                     }
                     finish(copy(value));documents.forEach(schedule);
+                    const draftEditor=visualEditor();if(file&&draftEditor&&draftEditor.stageFile)draftEditor.stageFile(target,file,copy(value));
                 }catch(e){error.textContent=e.message;save.disabled=false;cancel.disabled=false;}
             });
             previewObserver=new ResizeObserver(()=>{if(box.isConnected)paint();});previewObserver.observe(preview);
@@ -288,10 +292,26 @@
     async function edit(target) {
         target=findTarget(target);if(!target)return;
         const src=sourceOf(target),file=sources.get(src)||null;
+        // Draft uploads are owned by the outer editor. Its File/settings must
+        // also be used when the preview iframe's floating control is clicked.
+        if(!file){try{const parentApi=window.parent!==window&&window.parent.GNCImageFraming;if(parentApi&&parentApi.fileForSource(src))return parentApi.edit(target);}catch(_){} }
         try{return await dialog({src,target,file,ratio:baseRatio(target)});}catch(e){
             if(window.AdminDialogs)window.AdminDialogs.alert(e.message,{title:'Image preview unavailable'});
             else console.error('Image preview unavailable:',e.message);
         }
+    }
+    function visibleRect(target) {
+        let rect=target.getBoundingClientRect(),left=rect.left,top=rect.top,right=rect.right,bottom=rect.bottom;
+        const view=target.ownerDocument.defaultView,css=view.getComputedStyle(target);
+        // Framed images are enlarged and clipped; controls belong to the visible crop.
+        const inset=/^inset\(([\d.]+)% ([\d.]+)% ([\d.]+)% ([\d.]+)%/.exec(css.clipPath);
+        if(inset){top+=rect.height*Number(inset[1])/100;right-=rect.width*Number(inset[2])/100;bottom-=rect.height*Number(inset[3])/100;left+=rect.width*Number(inset[4])/100;}
+        for(let parent=target.parentElement;parent&&parent!==target.ownerDocument.body;parent=parent.parentElement){
+            const style=view.getComputedStyle(parent),bounds=parent.getBoundingClientRect();
+            if(/hidden|clip/.test(style.overflowX)){left=Math.max(left,bounds.left);right=Math.min(right,bounds.right);}
+            if(/hidden|clip/.test(style.overflowY)){top=Math.max(top,bounds.top);bottom=Math.min(bottom,bounds.bottom);}
+        }
+        return {left,top,right,bottom,width:Math.max(0,right-left),height:Math.max(0,bottom-top)};
     }
     function installHover(doc){
         if(hoverButton)return;
@@ -300,16 +320,16 @@
         function ensure(){if(!document.body)return false;hoverButton=element('button',{type:'button',class:'image-frame-trigger',hidden:'','aria-label':'Reposition image'},'↔ Reposition');document.body.append(hoverButton);hoverButton.addEventListener('click',()=>{if(hoverTarget)edit(hoverTarget);});return true;}
         function update(){
             pending=0;
-            if(modalOpen||doc.documentElement.classList.contains('ve-previewing')||document.body.classList.contains('ve-previewing')){hide();return;}
+            if(modalOpen||doc.querySelector('#vePop:not([hidden])')||doc.documentElement.classList.contains('ve-previewing')||document.body.classList.contains('ve-previewing')){hide();return;}
             if(!pointer)return;
             const hit=doc.elementFromPoint(pointer.x,pointer.y);
             // The control is outside the image DOM subtree; entering it must retain its target.
-            if(hoverButton&&(hoverButton.contains(hit)||doc.activeElement===hoverButton))return;
+            if(hoverButton&&!hoverButton.hidden&&(hoverButton.contains(hit)||doc.activeElement===hoverButton))return;
             if(!hit||hit.closest('.image-frame-dialog')){hide();return;}
             if(!hoverButton&&!ensure())return;
             const target=findTargetAt(hit,pointer.x,pointer.y);
             if(!target){hide();return;}
-            const rect=target.getBoundingClientRect();if(rect.width<45||rect.height<40){hide();return;}
+            const rect=visibleRect(target);if(rect.width<45||rect.height<40){hide();return;}
             let top=6;
             // A fixed/sticky navbar can cover the top of a hero after scrolling.
             const navbar=doc.getElementById('mainNavbar');
@@ -325,8 +345,11 @@
                 if(target.classList.contains('ve-selected')){hide();return;}
                 top=bottom-height;left=rect.left+(rect.width-width)/2;
             }
-            hoverButton.style.top=top+'px';
-            hoverButton.style.left=Math.max(6,Math.min(doc.documentElement.clientWidth-width-6,left))+'px';
+            const topValue=top+'px',leftValue=Math.max(6,Math.min(doc.documentElement.clientWidth-width-6,left))+'px';
+            if(hoverButton.style.top!==topValue)hoverButton.style.top=topValue;
+            if(hoverButton.style.left!==leftValue)hoverButton.style.left=leftValue;
+            // Follow reveal/hover transforms even when the pointer is stationary.
+            scheduleHover();
         }
         function scheduleHover(){if(!pending)pending=requestAnimationFrame(update);}
         function moved(e){pointer={x:e.clientX,y:e.clientY};scheduleHover();}
@@ -382,7 +405,15 @@
             if(Object.keys(values).length){if(!hidden){hidden=element('input',{type:'hidden',name:'image_framing'});form.append(hidden);}hidden.value=JSON.stringify(values);}else if(hidden)hidden.remove();
         },true);
     }
-    window.GNCImageFraming={findTarget,findTargetAt,edit,watch,set,apply,sourceOf,settings,cacheUpload,
+    window.GNCImageFraming={findTarget,findTargetAt,visibleRect,edit,watch,set,apply,sourceOf,settings,cacheUpload,
+        fileForSource:src=>sources.get(src)||null,
+        setFileSettings:(file,value)=>{
+            if(!(file instanceof File)||!value)return;
+            files.set(file,copy(value));
+            // FormData can clone a File when its filename is supplied. Restore the
+            // hash mapping too, so framing survives private-draft file decoding.
+            hash(file).then(digest=>fileFrames.set(digest,copy(value))).catch(()=>{});
+        },
         setUploadTarget:(input,target)=>{if(target)uploadTargets.set(input,target);else uploadTargets.delete(input);},
         fileSettings:file=>files.get(file),
         ready:Promise.resolve()

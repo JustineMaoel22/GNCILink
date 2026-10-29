@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/privacy.php';
 /**
  * Shared navbar partial.
  *
@@ -344,6 +345,8 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
 };
 ?>
 
+<link rel="stylesheet" href="/assets/css/privacy.css?v=<?= filemtime(__DIR__.'/../assets/css/privacy.css') ?>">
+<script src="/assets/js/privacy-consent.js?v=<?= filemtime(__DIR__.'/../assets/js/privacy-consent.js') ?>" defer></script>
 <?php include_once __DIR__ . '/image-framing-assets.php'; ?>
 <link rel="stylesheet" href="/assets/css/page-entrance.css?v=<?= filemtime(__DIR__ . '/../assets/css/page-entrance.css') ?>">
 <div id="gncPageEntrance" aria-hidden="true"<?= $isHome ? ' data-opening-title="Guagua National Colleges"' : '' ?>>

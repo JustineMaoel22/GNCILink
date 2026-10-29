@@ -11,13 +11,24 @@
             panel.hidden=true;toggle.setAttribute('aria-expanded','false');
             if (restoreFocus && !widget.hidden) toggle.focus({preventScroll:true});
         }
+        function positionPanel() {
+            if(panel.hidden)return;
+            const bounds=toggle.getBoundingClientRect(),nav=document.getElementById('mainNavbar');
+            const below=innerHeight-bounds.bottom-24,above=bounds.top-Math.max(16,nav?nav.getBoundingClientRect().bottom:16)-12;
+            const up=below<200&&above>below;panel.classList.toggle('opens-up',up);
+            panel.style.maxHeight=Math.max(120,Math.min(480,up?above:below))+'px';
+        }
+        let repositionFrame=0;
+        function schedulePosition() {
+            if(panel.hidden||repositionFrame)return;
+            repositionFrame=requestAnimationFrame(()=>{repositionFrame=0;positionPanel();});
+        }
+        window.addEventListener('resize',schedulePosition);
+        window.addEventListener('scroll',schedulePosition,{passive:true});
         toggle.addEventListener('click',() => {
             const open=panel.hidden;panel.hidden=!open;toggle.setAttribute('aria-expanded',String(open));
             if(open){
-                const bounds=toggle.getBoundingClientRect(),nav=document.getElementById('mainNavbar');
-                const below=innerHeight-bounds.bottom-24,above=bounds.top-Math.max(16,nav?nav.getBoundingClientRect().bottom:16)-12;
-                const up=below<200&&above>below;panel.classList.toggle('opens-up',up);
-                panel.style.maxHeight=Math.max(120,Math.min(480,up?above:below))+'px';
+                positionPanel();
                 const selected=panel.querySelector('.gnc-calendar-department-active,.gnc-programs-list-item-active,.gnc-calendar-filter-all-active'),list=panel.querySelector('.gnc-programs-list');
                 if(selected&&list)list.scrollTop=selected.offsetTop-list.offsetTop;
             }

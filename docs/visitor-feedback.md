@@ -20,6 +20,19 @@ custom star-rating implementation; no extra questions are added by the website.
 
 ## Testing on localhost
 
+The fixed vertical **RATE US** tab on the left opens the same dialog immediately
+and can reopen it after dismissal or acknowledgment without refreshing. Closing
+a manually opened dialog leaves the automatic timer and its cooldowns unchanged.
+After **I've submitted**, reopening the tab displays **You already submitted**
+instead of the form for the existing 30-day reminder pause. This acknowledgment
+persists in the same browser across page visits; clearing storage or revoking
+personalization clears it. Earlier cooldown records do not distinguish a
+dismissal from a submission, so only new acknowledgments show this message.
+**I've submitted** still pauses automatic reminders for 30 days. The automatic
+popup retains its existing 60-active-second timing and dismissal behavior.
+Both entry points respect existing personalization and embedded-service privacy
+choices; the tab opens privacy settings when those permissions are missing.
+
 1. Open http://localhost:8080/ in a fresh browser profile or private window.
 2. Browse public pages for a total of 60 active seconds. Time in background tabs
    does not count. The popup waits until other dialogs have closed.
@@ -59,7 +72,7 @@ normal browser requests when the iframe loads; no site-side proxy is involved.
 
 Run `node tests/visitor-feedback-browser-test.cjs` and
 `node tests/visitor-feedback-coordination-test.cjs` from the project root. The
-browser test needs local Docker/Chrome and intercepts Google Form loading; it
+browser test needs PHP CLI, local web hosting and Chrome and intercepts Google Form loading; it
 never submits a response. Its checks cover timing, lazy embedding, cooldowns,
 focus, mobile layout and admin exclusions. A live browser GET can separately
 verify the actual form renders without submitting test ratings.

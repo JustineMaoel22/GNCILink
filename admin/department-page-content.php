@@ -149,10 +149,12 @@ function saveDepartmentProgramCard(array $data, ?array $image = null): array {
     assertProgramDepartmentAllowed($deptId);
     $id = (int)($data['program_id'] ?? 0);
     if ($id < 0) throw new InvalidArgumentException('Invalid program.');
-    if (!is_string($data['program_name'] ?? null) || !is_string($data['description'] ?? '')) throw new InvalidArgumentException('Invalid program card text.');
-    $name = trim($data['program_name']);
+    $hasName = array_key_exists('program_name', $data);
+    $hasDescription = array_key_exists('description', $data);
+    if (($hasName && !is_string($data['program_name'])) || ($hasDescription && !is_string($data['description']))) throw new InvalidArgumentException('Invalid program card text.');
+    $name = trim($data['program_name'] ?? '');
     $description = richTextNormalize($data['description'] ?? '');
-    if (($name === '' && !contentPublishAllowsIncomplete()) || mb_strlen($name) > 255) throw new InvalidArgumentException('Enter a program heading of up to 255 characters.');
+    if (((!$id || $hasName) && $name === '' && !contentPublishAllowsIncomplete()) || mb_strlen($name) > 255) throw new InvalidArgumentException('Enter a program heading of up to 255 characters.');
     if (mb_strlen($description) > 5000) throw new InvalidArgumentException('The program description is too long (maximum 5000 characters).');
     $db = getDB();
     $current = null;
@@ -161,6 +163,8 @@ function saveDepartmentProgramCard(array $data, ?array $image = null): array {
         $stmt->execute([$id, $deptId]);
         $current = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$current) throw new InvalidArgumentException('Program not found in this department.');
+        if (!$hasName) $name = (string)$current['program_name'];
+        if (!$hasDescription) $description = (string)($current['description'] ?? '');
     }
     $upload = $image && ($image['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE ? storeProgramImageUpload($image) : null;
     $imageId = $upload['media_id'] ?? (!empty($data['remove_image']) ? null : ($current['image_media_id'] ?? null));
@@ -182,8 +186,15 @@ function saveDepartmentProgramCard(array $data, ?array $image = null): array {
             }
             $id = createProgramPage(['dept_id' => $deptId, 'program_name' => $name, 'program_code' => $code, 'theme' => 'green']);
         }
-        $stmt = $db->prepare('UPDATE programs SET program_name = ?, description = ?, image_media_id = ? WHERE program_id = ? AND dept_id = ?');
-        $stmt->execute([$name, $description, $imageId, $id, $deptId]);
+        // Omitted fields retain their stored values, including edits made in another tab.
+        $updates = []; $values = [];
+        if (!$current || $hasName) { $updates[] = 'program_name = ?'; $values[] = $name; }
+        if (!$current || $hasDescription) { $updates[] = 'description = ?'; $values[] = $description; }
+        if (!$current || $upload || !empty($data['remove_image'])) { $updates[] = 'image_media_id = ?'; $values[] = $imageId; }
+        if ($updates) {
+            $stmt = $db->prepare('UPDATE programs SET ' . implode(', ', $updates) . ' WHERE program_id = ? AND dept_id = ?');
+            $stmt->execute(array_merge($values, [$id, $deptId]));
+        }
         if ($ownsTransaction) $db->commit();
     } catch (Throwable $e) {
         if ($ownsTransaction) $db->rollBack();

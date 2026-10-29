@@ -4,6 +4,13 @@ Run `php database/migrate-student-organizations.php` once on each environment.
 The additive migration can be repeated and does not seed example organizations
 or categories, overwrite records, or modify existing CMS tables.
 
+Existing installations also need `php database/migrate-student-org-archive.php`
+before using organization archiving. Public pages and ordinary organization
+editing remain compatible with databases that do not yet have `archived_at`;
+archive requests report the required migration instead of failing with a SQL error.
+Deploy the updated `admin/student-organizations.php` for this compatibility fix.
+No database changes are performed by public page requests.
+
 Open **Content Editor → Student Organizations Management**. Use **Add
 Organization** in the top bar or the dashed card on the page. Type the name and
 summary directly on the new card, and click its cover/logo to upload pictures.
@@ -48,6 +55,10 @@ tables are the sole source of organization data. No JSON configuration or
 hardcoded organization/category lists are used.
 
 Validation:
+
+- `php tests/student-org-hosting-schema-test.php legacy` and the same command
+  with `current` check both schema versions using connection-local temporary
+  MySQL tables. Persistent records are unchanged.
 
 - `php tests/student-organizations-test.php` exercises database operations in a
   transaction and rolls back its changes.

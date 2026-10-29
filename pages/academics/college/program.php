@@ -253,7 +253,7 @@ if ($program !== null) {
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,100..700,0,0&display=block">
-    <link href="/assets/css/program-page-style.css" rel="stylesheet">
+    <link href="/assets/css/program-page-style.css?v=<?= filemtime(__DIR__ . '/../../../assets/css/program-page-style.css') ?>" rel="stylesheet">
     <script src="/assets/js/facility-coverflow.js?v=<?= filemtime(__DIR__.'/../../../assets/js/facility-coverflow.js') ?>"></script>
     <link href="/assets/css/base-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
@@ -409,10 +409,6 @@ if ($program !== null) {
                 <div class="about-feature-text">
                     <span class="about-eyebrow"<?= $pf('about_title', 'Small heading above the name') ?><?= $cePreview ? ' style="text-transform:uppercase"' : '' ?>><?= $e($cePreview ? $text('about_title') : mb_strtoupper($text('about_title'))) ?></span>
                     <h2 class="about-heading"<?= ceManageMark('data-ve-pick="prog-name" data-ve-field="prog-name" data-ve-key="full-name" data-ve-label="Full program name" data-ve-max="255"') ?>><?= $e($fullName) ?></h2>
-                    <?php if ($cePreview): ?>
-                    <small class="text-muted">Department card description</small>
-                    <p class="text-muted" data-ve-field="prog-description" data-ve-key="description" data-ve-label="Department card description" data-ve-max="5000" data-ve-multiline data-ve-ph="Write a short description for department cards"><?= $e((string)($program['description'] ?? '')) ?></p>
-                    <?php endif; ?>
                     <?php if (trim($c['about_text']) !== '' || $cePreview): ?>
                     <div class="about-body cms-rich"<?= $pf('about_text', 'About this program', true, 'Write about this program') ?>><?= $pt($c['about_text']) ?></div>
                     <?php endif; ?>

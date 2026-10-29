@@ -10,6 +10,7 @@
     let state={consent:null,history:{},shown:{}}, items=[], current=null, selected=[], observed=false, lastTick=Date.now(), counted=false;
     const restricted=!!navigator.globalPrivacyControl || navigator.doNotTrack==='1';
     function load() {
+        if (!window.GNCPrivacy?.allows('personalization')) { state={consent:false,history:{},shown:{}};return; }
         try {
             const saved=JSON.parse(localStorage.getItem(KEY));
             if (saved && saved.version===1 && Date.now()-(saved.updated || 0)<30*DAY) {
@@ -21,6 +22,7 @@
         } catch (e) { state={consent:null,history:{},shown:{}}; }
     }
     function save() {
+        if (!window.GNCPrivacy?.allows('personalization')) return false;
         try { localStorage.setItem(KEY,JSON.stringify({...state,version:1,updated:Date.now()})); return true; }
         catch (e) { $('gncRecStatus').textContent='Your browser cannot save this preference. Personalization works for this page only.'; return false; }
     }
@@ -100,10 +102,12 @@
         if (recordImpressions) markShown();
     }
     settings.addEventListener('click',()=>{privacy.hidden=!privacy.hidden; settings.setAttribute('aria-expanded',String(!privacy.hidden));});
-    $('gncRecEnable').addEventListener('click',()=>{ if(restricted)return; state.consent=true; counted=false; visit();save();render(); });
-    $('gncRecDisable').addEventListener('click',()=>{state={consent:false,history:{},shown:{}}; counted=false;save();render();});
+    $('gncRecEnable').addEventListener('click',()=>{ if(restricted)return;window.GNCPrivacy?.setCategory('personalization',true);state.consent=true;counted=false;visit();save();render(); });
+    $('gncRecDisable').addEventListener('click',()=>{window.GNCPrivacy?.setCategory('personalization',false);state={consent:false,history:{},shown:{}};counted=false;render();});
+    window.addEventListener('gnc:privacychange',()=>{load();state.consent=!!window.GNCPrivacy?.allows('personalization');counted=false;visit();render(false);});
     window.addEventListener('storage',e=>{if(e.key===KEY){load();render(false);}});
     load();
+    state.consent=!!window.GNCPrivacy?.allows('personalization');
     fetch('/api/recommendations.php',{credentials:'omit',signal:AbortSignal.timeout(10000)})
         .then(r=>{if(!r.ok)throw Error('Catalog unavailable');return r.json();})
         .then(data=>{

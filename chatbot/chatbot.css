@@ -116,3 +116,5 @@
 body.gncbot-noscroll { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .gncbot-panel, .gncbot-typing span, .gncbot-launcher { animation: none !important; transition: none !important; } .gncbot-messages { scroll-behavior: auto; } }
 @media print { #gncbot { display: none !important; } }
+
+.gncbot-privacy-choice{display:block;font:12px/1.5 Inter,Arial,sans-serif;padding:10px 16px;color:#385344}.gncbot-privacy-choice input{accent-color:#1f5e2c;margin-right:6px}.gncbot-note a{color:inherit;text-decoration:underline}

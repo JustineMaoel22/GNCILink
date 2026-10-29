@@ -29,7 +29,9 @@ function initSession() {
     if (session_status() === PHP_SESSION_NONE) {
         $secure=authIsHttps()||!authLocalDevelopment();
         ini_set('session.use_strict_mode','1');ini_set('session.use_only_cookies','1');ini_set('session.use_trans_sid','0');
-        session_set_cookie_params(['path'=>'/','httponly'=>true,'secure'=>$secure,'samesite'=>'Lax']);
+        // PHP must retain the login for at least the application's inactivity window.
+        ini_set('session.gc_maxlifetime', (string)max(SESSION_TIMEOUT, (int)ini_get('session.gc_maxlifetime')));
+        session_set_cookie_params(['lifetime'=>0,'path'=>'/','httponly'=>true,'secure'=>$secure,'samesite'=>'Lax']);
         session_start();
         // Regenerate session ID for security
         if (!isset($_SESSION['_initiated'])) {

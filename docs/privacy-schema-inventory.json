@@ -1,0 +1,2429 @@
+﻿{
+    "activity_logs": [
+        {
+            "column": "log_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "user_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "action",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "table_name",
+            "type": "varchar(100)",
+            "nullable": "YES"
+        },
+        {
+            "column": "record_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "description",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "admin_offices": [
+        {
+            "column": "office_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "section_key",
+            "type": "varchar(60)",
+            "nullable": "NO"
+        },
+        {
+            "column": "office_name",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "head_name",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "head_role",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "image_path",
+            "type": "varchar(500)",
+            "nullable": "YES"
+        },
+        {
+            "column": "phone",
+            "type": "varchar(100)",
+            "nullable": "YES"
+        },
+        {
+            "column": "email",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "location",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "hours",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "services",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "archived_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        }
+    ],
+    "admin_onboarding": [
+        {
+            "column": "user_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "status",
+            "type": "varchar(16)",
+            "nullable": "NO"
+        },
+        {
+            "column": "finished_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "admin_people": [
+        {
+            "column": "person_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "section_key",
+            "type": "varchar(60)",
+            "nullable": "NO"
+        },
+        {
+            "column": "name",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "role",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "image_path",
+            "type": "varchar(500)",
+            "nullable": "YES"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "archived_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        }
+    ],
+    "admin_sections": [
+        {
+            "column": "section_key",
+            "type": "varchar(60)",
+            "nullable": "NO"
+        },
+        {
+            "column": "title",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "description",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "layout",
+            "type": "enum('people','offices')",
+            "nullable": "NO"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_by",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        }
+    ],
+    "admin_settings": [
+        {
+            "column": "setting_key",
+            "type": "varchar(100)",
+            "nullable": "NO"
+        },
+        {
+            "column": "setting_value",
+            "type": "text",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        }
+    ],
+    "announcement_facebook_deliveries": [
+        {
+            "column": "announcement_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "page_id",
+            "type": "varchar(40)",
+            "nullable": "NO"
+        },
+        {
+            "column": "state",
+            "type": "varchar(20)",
+            "nullable": "NO"
+        },
+        {
+            "column": "post_id",
+            "type": "varchar(100)",
+            "nullable": "YES"
+        },
+        {
+            "column": "post_url",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "last_error",
+            "type": "varchar(500)",
+            "nullable": "YES"
+        },
+        {
+            "column": "attempted_by",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "announcement_images": [
+        {
+            "column": "image_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "announcement_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "media_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "announcements": [
+        {
+            "column": "announcement_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "category_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "program",
+            "type": "varchar(10)",
+            "nullable": "NO"
+        },
+        {
+            "column": "dept_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "user_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "title",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "slug",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "content",
+            "type": "longtext",
+            "nullable": "YES"
+        },
+        {
+            "column": "featured_image",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "status",
+            "type": "enum('draft','pending','published','archived')",
+            "nullable": "NO"
+        },
+        {
+            "column": "is_pinned",
+            "type": "tinyint(1)",
+            "nullable": "NO"
+        },
+        {
+            "column": "pinned_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "published_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "auth_password_resets": [
+        {
+            "column": "user_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "token_hash",
+            "type": "char(64)",
+            "nullable": "NO"
+        },
+        {
+            "column": "expires_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "auth_rate_limits": [
+        {
+            "column": "bucket_hash",
+            "type": "char(64)",
+            "nullable": "NO"
+        },
+        {
+            "column": "attempts",
+            "type": "int unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "expires_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "auth_security_logs": [
+        {
+            "column": "log_id",
+            "type": "bigint unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "user_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "action",
+            "type": "varchar(50)",
+            "nullable": "NO"
+        },
+        {
+            "column": "ip_address",
+            "type": "varchar(45)",
+            "nullable": "NO"
+        },
+        {
+            "column": "description",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "basic_education_content": [
+        {
+            "column": "page_key",
+            "type": "varchar(60)",
+            "nullable": "NO"
+        },
+        {
+            "column": "field_key",
+            "type": "varchar(100)",
+            "nullable": "NO"
+        },
+        {
+            "column": "content",
+            "type": "mediumtext",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "YES"
+        }
+    ],
+    "basic_enrollment_steps": [
+        {
+            "column": "step_id",
+            "type": "char(32)",
+            "nullable": "NO"
+        },
+        {
+            "column": "title",
+            "type": "varchar(150)",
+            "nullable": "NO"
+        },
+        {
+            "column": "location",
+            "type": "varchar(150)",
+            "nullable": "NO"
+        },
+        {
+            "column": "instruction",
+            "type": "text",
+            "nullable": "NO"
+        },
+        {
+            "column": "illustration",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_by",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        }
+    ],
+    "categories": [
+        {
+            "column": "category_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "category_name",
+            "type": "varchar(150)",
+            "nullable": "NO"
+        },
+        {
+            "column": "category_color",
+            "type": "varchar(7)",
+            "nullable": "YES"
+        },
+        {
+            "column": "description",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "community_activity_page": [
+        {
+            "column": "page_id",
+            "type": "tinyint unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "content",
+            "type": "mediumtext",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        }
+    ],
+    "community_extension_page": [
+        {
+            "column": "page_id",
+            "type": "tinyint unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "content",
+            "type": "mediumtext",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        }
+    ],
+    "content_editor_draft_chunks": [
+        {
+            "column": "draft_id",
+            "type": "bigint unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "chunk_no",
+            "type": "int unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "payload",
+            "type": "mediumblob",
+            "nullable": "NO"
+        }
+    ],
+    "content_editor_drafts": [
+        {
+            "column": "draft_id",
+            "type": "bigint unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "user_id",
+            "type": "bigint unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "page_key",
+            "type": "char(64)",
+            "nullable": "NO"
+        },
+        {
+            "column": "revision",
+            "type": "int unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        }
+    ],
+    "content_migrations": [
+        {
+            "column": "migration_key",
+            "type": "varchar(100)",
+            "nullable": "NO"
+        },
+        {
+            "column": "applied_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        }
+    ],
+    "csrf_tokens": [
+        {
+            "column": "token_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "user_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "token",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "expires_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "department_page_content": [
+        {
+            "column": "dept_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "field_key",
+            "type": "varchar(80)",
+            "nullable": "NO"
+        },
+        {
+            "column": "content",
+            "type": "text",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "YES"
+        }
+    ],
+    "departments": [
+        {
+            "column": "dept_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "dept_name",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "slug",
+            "type": "varchar(50)",
+            "nullable": "YES"
+        },
+        {
+            "column": "department_type",
+            "type": "enum('college','basic-education')",
+            "nullable": "NO"
+        },
+        {
+            "column": "description",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "faculty_head",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "dean_name",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "dean_title",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "dean_bio",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "dean_media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "dean_phone",
+            "type": "varchar(100)",
+            "nullable": "YES"
+        },
+        {
+            "column": "dean_email",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "dean_office",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "dean_hours",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "theme_color",
+            "type": "varchar(7)",
+            "nullable": "YES"
+        },
+        {
+            "column": "about_text",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "hero_text",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "facebook_url",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "office_label",
+            "type": "varchar(100)",
+            "nullable": "YES"
+        },
+        {
+            "column": "archived_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "office_building_id",
+            "type": "varchar(40)",
+            "nullable": "YES"
+        },
+        {
+            "column": "office_floor",
+            "type": "varchar(40)",
+            "nullable": "YES"
+        },
+        {
+            "column": "office_room",
+            "type": "varchar(40)",
+            "nullable": "YES"
+        },
+        {
+            "column": "office_details",
+            "type": "varchar(500)",
+            "nullable": "YES"
+        }
+    ],
+    "enrollment_illustrations": [
+        {
+            "column": "image_key",
+            "type": "varchar(40)",
+            "nullable": "NO"
+        },
+        {
+            "column": "image_path",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        }
+    ],
+    "events": [
+        {
+            "column": "event_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "category_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "program",
+            "type": "varchar(10)",
+            "nullable": "NO"
+        },
+        {
+            "column": "user_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "title",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "location",
+            "type": "varchar(500)",
+            "nullable": "YES"
+        },
+        {
+            "column": "start_date",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "end_date",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "status",
+            "type": "enum('draft','pending','published','archived')",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "dept_id",
+            "type": "int",
+            "nullable": "YES"
+        }
+    ],
+    "facebook_publishing_connection": [
+        {
+            "column": "connection_id",
+            "type": "tinyint unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "page_id",
+            "type": "varchar(40)",
+            "nullable": "NO"
+        },
+        {
+            "column": "page_name",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "environment",
+            "type": "varchar(10)",
+            "nullable": "NO"
+        },
+        {
+            "column": "enabled",
+            "type": "tinyint",
+            "nullable": "NO"
+        },
+        {
+            "column": "connected_by",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "facebook_publishing_requests": [
+        {
+            "column": "request_key",
+            "type": "char(64)",
+            "nullable": "NO"
+        },
+        {
+            "column": "user_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "announcement_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "faq_page": [
+        {
+            "column": "page_id",
+            "type": "tinyint unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "content",
+            "type": "text",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        }
+    ],
+    "faqs": [
+        {
+            "column": "faq_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "category_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "question",
+            "type": "text",
+            "nullable": "NO"
+        },
+        {
+            "column": "answer",
+            "type": "longtext",
+            "nullable": "NO"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_by",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "fb_api_call_log": [
+        {
+            "column": "id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "called_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "fb_posts_cache": [
+        {
+            "column": "fb_post_id",
+            "type": "varchar(64)",
+            "nullable": "NO"
+        },
+        {
+            "column": "message",
+            "type": "text",
+            "nullable": "NO"
+        },
+        {
+            "column": "image_media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "category_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "category_locked",
+            "type": "tinyint(1)",
+            "nullable": "NO"
+        },
+        {
+            "column": "permalink_url",
+            "type": "varchar(500)",
+            "nullable": "YES"
+        },
+        {
+            "column": "is_pinned",
+            "type": "tinyint(1)",
+            "nullable": "NO"
+        },
+        {
+            "column": "pinned_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "created_time",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "fetched_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "hero_slides": [
+        {
+            "column": "slide_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "media_type",
+            "type": "enum('image','video')",
+            "nullable": "NO"
+        },
+        {
+            "column": "media_path",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "media_path_mobile",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "poster_path",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "title",
+            "type": "varchar(100)",
+            "nullable": "YES"
+        },
+        {
+            "column": "subtitle",
+            "type": "varchar(150)",
+            "nullable": "YES"
+        },
+        {
+            "column": "btn1_text",
+            "type": "varchar(30)",
+            "nullable": "YES"
+        },
+        {
+            "column": "btn1_link",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "btn2_text",
+            "type": "varchar(30)",
+            "nullable": "YES"
+        },
+        {
+            "column": "btn2_link",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "status",
+            "type": "enum('published','draft')",
+            "nullable": "NO"
+        },
+        {
+            "column": "show_on_mobile",
+            "type": "tinyint(1)",
+            "nullable": "NO"
+        },
+        {
+            "column": "show_gradient",
+            "type": "tinyint(1)",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_by",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_at",
+            "type": "datetime",
+            "nullable": "YES"
+        }
+    ],
+    "homepage_president": [
+        {
+            "column": "id",
+            "type": "tinyint unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "name",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "title",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "org",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "eyebrow",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "heading",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "greeting",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "message",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_by",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        }
+    ],
+    "homepage_text": [
+        {
+            "column": "text_key",
+            "type": "varchar(60)",
+            "nullable": "NO"
+        },
+        {
+            "column": "value",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_by",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        }
+    ],
+    "image_display_settings": [
+        {
+            "column": "image_path",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "position_x",
+            "type": "decimal(7,4)",
+            "nullable": "NO"
+        },
+        {
+            "column": "position_y",
+            "type": "decimal(7,4)",
+            "nullable": "NO"
+        },
+        {
+            "column": "zoom",
+            "type": "decimal(5,4)",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_by",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "YES"
+        }
+    ],
+    "media_library": [
+        {
+            "column": "media_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "file_name",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "file_type",
+            "type": "varchar(100)",
+            "nullable": "NO"
+        },
+        {
+            "column": "file_size",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "file_path",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_by",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "news": [
+        {
+            "column": "news_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "category_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "user_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "title",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "slug",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "content",
+            "type": "longtext",
+            "nullable": "YES"
+        },
+        {
+            "column": "author",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "category",
+            "type": "varchar(20)",
+            "nullable": "NO"
+        },
+        {
+            "column": "featured_image",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "status",
+            "type": "enum('draft','pending','published','archived')",
+            "nullable": "NO"
+        },
+        {
+            "column": "is_pinned",
+            "type": "tinyint(1)",
+            "nullable": "NO"
+        },
+        {
+            "column": "pinned_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "published_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "academic_year",
+            "type": "varchar(9)",
+            "nullable": "YES"
+        }
+    ],
+    "news_images": [
+        {
+            "column": "image_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "news_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "media_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "office_services": [
+        {
+            "column": "service_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "office_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "service_name",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "description",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "requirements",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "procedure",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        }
+    ],
+    "offices": [
+        {
+            "column": "office_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "office_name",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "description",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "email",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "contact_no",
+            "type": "varchar(50)",
+            "nullable": "YES"
+        },
+        {
+            "column": "location",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "office_hours",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "media_id",
+            "type": "int",
+            "nullable": "YES"
+        }
+    ],
+    "page_sections": [
+        {
+            "column": "section_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "page_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "section_key",
+            "type": "varchar(60)",
+            "nullable": "YES"
+        },
+        {
+            "column": "title",
+            "type": "varchar(500)",
+            "nullable": "YES"
+        },
+        {
+            "column": "subtitle",
+            "type": "varchar(500)",
+            "nullable": "YES"
+        },
+        {
+            "column": "content",
+            "type": "longtext",
+            "nullable": "YES"
+        },
+        {
+            "column": "draft_content",
+            "type": "mediumtext",
+            "nullable": "YES"
+        },
+        {
+            "column": "status",
+            "type": "enum('draft','published')",
+            "nullable": "NO"
+        },
+        {
+            "column": "review_status",
+            "type": "enum('none','pending','rejected')",
+            "nullable": "NO"
+        },
+        {
+            "column": "submitted_by",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "submitted_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "reviewed_by",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "reviewed_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "review_note",
+            "type": "varchar(500)",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_by",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        },
+        {
+            "column": "media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        }
+    ],
+    "page_visits": [
+        {
+            "column": "page_id",
+            "type": "int unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "page_url",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "page_title",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "visit_count",
+            "type": "int unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "last_visited",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "page_visits_daily": [
+        {
+            "column": "page_id",
+            "type": "int unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "visit_date",
+            "type": "date",
+            "nullable": "NO"
+        },
+        {
+            "column": "views",
+            "type": "int unsigned",
+            "nullable": "NO"
+        }
+    ],
+    "pages": [
+        {
+            "column": "page_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "title",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "slug",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "description",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "page_type",
+            "type": "varchar(100)",
+            "nullable": "YES"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "status",
+            "type": "enum('active','inactive')",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_by",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "program_items": [
+        {
+            "column": "item_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "program_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "item_type",
+            "type": "varchar(20)",
+            "nullable": "NO"
+        },
+        {
+            "column": "title",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "subtitle",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "body",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "icon",
+            "type": "varchar(60)",
+            "nullable": "YES"
+        },
+        {
+            "column": "letter",
+            "type": "varchar(4)",
+            "nullable": "YES"
+        },
+        {
+            "column": "image_media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "image_path",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "program_sections": [
+        {
+            "column": "section_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "program_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "section_type",
+            "type": "varchar(50)",
+            "nullable": "NO"
+        },
+        {
+            "column": "title",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "subtitle",
+            "type": "varchar(500)",
+            "nullable": "YES"
+        },
+        {
+            "column": "content",
+            "type": "json",
+            "nullable": "YES"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "is_visible",
+            "type": "tinyint(1)",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "programs": [
+        {
+            "column": "program_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "program_code",
+            "type": "varchar(10)",
+            "nullable": "NO"
+        },
+        {
+            "column": "slug",
+            "type": "varchar(60)",
+            "nullable": "YES"
+        },
+        {
+            "column": "description",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "image_media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "theme_color",
+            "type": "varchar(7)",
+            "nullable": "YES"
+        },
+        {
+            "column": "theme_color_light",
+            "type": "varchar(7)",
+            "nullable": "YES"
+        },
+        {
+            "column": "dept_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "pdf_media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "program_name",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "is_published",
+            "type": "tinyint(1)",
+            "nullable": "NO"
+        },
+        {
+            "column": "core_values_enabled",
+            "type": "tinyint(1)",
+            "nullable": "NO"
+        },
+        {
+            "column": "hero_media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "seal_media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "page_content",
+            "type": "json",
+            "nullable": "YES"
+        }
+    ],
+    "rbac_submission_chunks": [
+        {
+            "column": "submission_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "chunk_no",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "payload",
+            "type": "mediumblob",
+            "nullable": "NO"
+        }
+    ],
+    "rbac_submissions": [
+        {
+            "column": "submission_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "user_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "kind",
+            "type": "varchar(30)",
+            "nullable": "NO"
+        },
+        {
+            "column": "route",
+            "type": "varchar(150)",
+            "nullable": "NO"
+        },
+        {
+            "column": "target_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "title",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "status",
+            "type": "varchar(20)",
+            "nullable": "NO"
+        },
+        {
+            "column": "revision",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "reason",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "reviewed_by",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "reviewed_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "site_visitors": [
+        {
+            "column": "id",
+            "type": "int unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "visitor_hash",
+            "type": "char(64)",
+            "nullable": "NO"
+        },
+        {
+            "column": "visit_date",
+            "type": "date",
+            "nullable": "NO"
+        },
+        {
+            "column": "first_seen",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "slug_history": [
+        {
+            "column": "id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "type",
+            "type": "enum('department','program')",
+            "nullable": "NO"
+        },
+        {
+            "column": "old_slug",
+            "type": "varchar(60)",
+            "nullable": "NO"
+        },
+        {
+            "column": "target_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        }
+    ],
+    "student_achievement_photos": [
+        {
+            "column": "photo_id",
+            "type": "int unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "achievement_id",
+            "type": "int unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "image_path",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "caption",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "sort_order",
+            "type": "int unsigned",
+            "nullable": "NO"
+        }
+    ],
+    "student_achievements": [
+        {
+            "column": "achievement_id",
+            "type": "int unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "title",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "description",
+            "type": "text",
+            "nullable": "NO"
+        },
+        {
+            "column": "program_organization",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "category_label",
+            "type": "varchar(100)",
+            "nullable": "NO"
+        },
+        {
+            "column": "academic_year",
+            "type": "varchar(9)",
+            "nullable": "YES"
+        },
+        {
+            "column": "image_path",
+            "type": "varchar(500)",
+            "nullable": "YES"
+        },
+        {
+            "column": "status",
+            "type": "enum('draft','published')",
+            "nullable": "NO"
+        },
+        {
+            "column": "is_featured",
+            "type": "tinyint(1)",
+            "nullable": "NO"
+        },
+        {
+            "column": "sort_order",
+            "type": "int unsigned",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "thumbnail_path",
+            "type": "varchar(500)",
+            "nullable": "YES"
+        },
+        {
+            "column": "achievers",
+            "type": "text",
+            "nullable": "YES"
+        }
+    ],
+    "student_org_categories": [
+        {
+            "column": "category_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "name",
+            "type": "varchar(100)",
+            "nullable": "NO"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "timestamp",
+            "nullable": "YES"
+        }
+    ],
+    "student_org_gallery": [
+        {
+            "column": "image_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "org_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "media_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        }
+    ],
+    "student_org_page_content": [
+        {
+            "column": "field_key",
+            "type": "varchar(80)",
+            "nullable": "NO"
+        },
+        {
+            "column": "content",
+            "type": "text",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "YES"
+        }
+    ],
+    "student_organizations": [
+        {
+            "column": "org_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "slug",
+            "type": "varchar(180)",
+            "nullable": "NO"
+        },
+        {
+            "column": "name",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "category_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "description",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "about_text",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "vision",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "mission",
+            "type": "text",
+            "nullable": "YES"
+        },
+        {
+            "column": "facebook_url",
+            "type": "varchar(500)",
+            "nullable": "YES"
+        },
+        {
+            "column": "logo_media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "cover_media_id",
+            "type": "int",
+            "nullable": "YES"
+        },
+        {
+            "column": "status",
+            "type": "enum('draft','published')",
+            "nullable": "NO"
+        },
+        {
+            "column": "display_order",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "created_at",
+            "type": "timestamp",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "YES"
+        },
+        {
+            "column": "archived_at",
+            "type": "datetime",
+            "nullable": "YES"
+        }
+    ],
+    "text_layout_settings": [
+        {
+            "column": "page_key",
+            "type": "char(64)",
+            "nullable": "NO"
+        },
+        {
+            "column": "settings",
+            "type": "mediumtext",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_by",
+            "type": "bigint unsigned",
+            "nullable": "YES"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "NO"
+        }
+    ],
+    "tuition_fee_content": [
+        {
+            "column": "field_key",
+            "type": "varchar(80)",
+            "nullable": "NO"
+        },
+        {
+            "column": "content",
+            "type": "text",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "YES"
+        }
+    ],
+    "tuition_fee_documents": [
+        {
+            "column": "document_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "category_key",
+            "type": "varchar(40)",
+            "nullable": "NO"
+        },
+        {
+            "column": "title",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "file_path",
+            "type": "varchar(500)",
+            "nullable": "NO"
+        },
+        {
+            "column": "file_size",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "timestamp",
+            "nullable": "YES"
+        }
+    ],
+    "users": [
+        {
+            "column": "user_id",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "first_name",
+            "type": "varchar(100)",
+            "nullable": "NO"
+        },
+        {
+            "column": "last_name",
+            "type": "varchar(100)",
+            "nullable": "NO"
+        },
+        {
+            "column": "email",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "password",
+            "type": "varchar(255)",
+            "nullable": "NO"
+        },
+        {
+            "column": "role",
+            "type": "enum('Super Admin','Content Admin','Content Editor','Office Staff','The Mirror')",
+            "nullable": "NO"
+        },
+        {
+            "column": "status",
+            "type": "enum('active','inactive')",
+            "nullable": "NO"
+        },
+        {
+            "column": "otp_code",
+            "type": "varchar(10)",
+            "nullable": "YES"
+        },
+        {
+            "column": "otp_expires_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "otp_verified",
+            "type": "tinyint(1)",
+            "nullable": "NO"
+        },
+        {
+            "column": "login_attempts",
+            "type": "int",
+            "nullable": "NO"
+        },
+        {
+            "column": "locked_until",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "remember_token",
+            "type": "varchar(255)",
+            "nullable": "YES"
+        },
+        {
+            "column": "remember_token_expires_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "last_login",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "created_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "updated_at",
+            "type": "datetime",
+            "nullable": "NO"
+        },
+        {
+            "column": "must_change_password",
+            "type": "tinyint(1)",
+            "nullable": "NO"
+        },
+        {
+            "column": "password_changed_at",
+            "type": "datetime",
+            "nullable": "YES"
+        },
+        {
+            "column": "credential_version",
+            "type": "int unsigned",
+            "nullable": "NO"
+        }
+    ]
+}

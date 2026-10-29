@@ -184,45 +184,47 @@
     <!-- ========================================== -->
     <!-- GALLERY SECTION -->
     <!-- ========================================== -->
+
+<!--
     <section class="gallery-section">
         <div class="container-fluid px-4 px-md-5">
             <div class="row g-3">
                 
-                <!-- Row 1, Image 1 (Wider) -->
+  
                 <div class="col-md-7">
                     <div class="gallery-image-wrapper">
                         <img src="/assets/images/gallery-1.png" alt="Team Group Photo 1" class="img-fluid gallery-img">
-                        <!-- ADD GALLERY IMAGE 1 ASSET PATH ABOVE -->
+
                     </div>
                 </div>
                 
-                <!-- Row 1, Image 2 (Narrower) -->
+    
                 <div class="col-md-5">
                     <div class="gallery-image-wrapper">
                         <img src="/assets/images/gallery-2.png" alt="Team Group Photo 2" class="img-fluid gallery-img">
-                        <!-- ADD GALLERY IMAGE 2 ASSET PATH ABOVE -->
+                       
                     </div>
                 </div>
 
-                <!-- Row 2, Image 1 (Narrower) -->
                 <div class="col-md-5">
                     <div class="gallery-image-wrapper">
                         <img src="/assets/images/gallery-3.png" alt="Team Group Photo 3" class="img-fluid gallery-img">
-                        <!-- ADD GALLERY IMAGE 3 ASSET PATH ABOVE -->
+                     
                     </div>
                 </div>
 
-                <!-- Row 2, Image 2 (Wider) -->
+
                 <div class="col-md-7">
                     <div class="gallery-image-wrapper">
                         <img src="/assets/images/gallery-4.png" alt="Team Group Photo 4" class="img-fluid gallery-img">
-                        <!-- ADD GALLERY IMAGE 4 ASSET PATH ABOVE -->
+                       
                     </div>
                 </div>
 
             </div>
         </div>
     </section>
+-->
 
     <?php include_once __DIR__ . '/../../../components/footer.php'; ?>
 

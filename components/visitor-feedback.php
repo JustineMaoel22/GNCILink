@@ -7,6 +7,9 @@ $feedbackFormUrl='https://docs.google.com/forms/d/e/1FAIpQLSextXO7NUBv8LnF-PArXy
 $feedbackEscape=static fn($value)=>htmlspecialchars($value,ENT_QUOTES,'UTF-8');
 ?>
 <link rel="stylesheet" href="/assets/css/visitor-feedback.css?v=<?= filemtime(__DIR__.'/../assets/css/visitor-feedback.css') ?>">
+<button type="button" id="gncFeedbackTrigger" class="gnc-feedback-trigger" aria-label="Rate us: open feedback form" aria-haspopup="dialog" aria-controls="gncVisitorFeedback" hidden>
+    <span aria-hidden="true">☆</span> RATE US
+</button>
 <dialog id="gncVisitorFeedback" class="gnc-feedback" aria-labelledby="gncFeedbackTitle" aria-describedby="gncFeedbackDescription" hidden>
     <div class="gnc-feedback-inner">
         <button type="button" class="gnc-feedback-close" aria-label="Close feedback dialog" data-feedback-dismiss>&times;</button>

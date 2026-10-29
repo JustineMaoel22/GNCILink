@@ -172,7 +172,7 @@ $highlightsUrl=static fn($page)=>'?'.http_build_query(array_merge(['highlights_p
             <p<?= $sportsField('facebook_description','Facebook section introduction') ?>><?= $sportsText('facebook_description') ?></p>
             <div class="athletics-facebook-box"<?= $sportsPreview?' data-ve-sports-facebook data-ve-pick="sports-facebook" data-ve-link="'.$sportsH($sportsContent['facebook_url']).'"':'' ?>>
                 <?php if($sportsFacebookEmbed!==null): ?>
-                <iframe src="<?= $sportsH($sportsFacebookEmbed) ?>" width="500" height="130" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen loading="lazy" title="GNC Sports Club Facebook page"></iframe>
+                <iframe <?= gncPrivacyFrameSource($sportsFacebookEmbed) ?> width="500" height="130" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen loading="lazy" title="GNC Sports Club Facebook page"></iframe>
                 <?php endif; ?>
                 <?php if($sportsPreview): ?>
                 <button type="button" class="athletics-facebook-edit" data-ve-sports-facebook-edit><i class="bi bi-facebook" aria-hidden="true"></i> <?= $sportsFacebookEmbed!==null?'Change Facebook page link':'Add the Facebook page link' ?></button>

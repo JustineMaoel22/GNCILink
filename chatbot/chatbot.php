@@ -60,6 +60,7 @@ $raw = file_get_contents('php://input', false, null, 0, 20000);
 if ($raw === false || $raw === '' || strlen($raw) >= 20000) { gncbot_fail(400, 'Bad request.', 'bad_request'); }
 $in = json_decode($raw, true);
 if (!is_array($in)) { gncbot_fail(400, 'Bad request.', 'bad_request'); }
+if (($in['ai_notice_accepted']??null)!==true) { gncbot_fail(422,'Please review the Google Gemini notice and choose whether to send your message.','privacy_choice'); }
 
 // ---------------------------------------------------------------- sanitise input
 function gncbot_text(mixed $v, int $max): string

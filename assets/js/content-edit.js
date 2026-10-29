@@ -201,6 +201,9 @@
         });
     }
     window.VEImageFraming = {
+        stageFile: function(target,file,value) {
+            if(S.adapter && S.adapter.fileFramingStaged)S.adapter.fileFramingStaged(target,file,value);
+        },
         stage: function (path, value, original) {
             if (!path) throw new Error('Choose an image stored on this website.');
             var base = imagePositions[path] ? imagePositions[path].base : original;
@@ -208,6 +211,7 @@
             else imagePositions[path] = { base: base, value: value };
             previewImagePosition(path, value);
             chrome();
+            if(S.adapter && S.adapter.framingStaged)S.adapter.framingStaged(path);
         }
     };
     async function publishImagePositions() {
@@ -260,15 +264,36 @@
         pop.hidden = true; pop.innerHTML = '';
         var cb = popOnClose; popOnClose = null; if (cb) cb();
     }
+    function placePop(x, y) {
+        var pdfManager = pop.classList.contains('ve-pop-pdfs');
+        var header = pdfManager && D.querySelector('.ve-top');
+        var top = header ? Math.max(8, header.getBoundingClientRect().bottom + 8) : 8;
+        // Long PDF lists scroll within the available canvas, leaving Publish reachable.
+        pop.style.maxHeight = pdfManager ? Math.max(0, window.innerHeight - top - 8) + 'px' : '';
+        var w = pop.offsetWidth, hgt = pop.offsetHeight;
+        pop.style.left = Math.max(8, Math.min(x, window.innerWidth - w - 8)) + 'px';
+        pop.style.top = Math.max(top, Math.min(y, window.innerHeight - hgt - 8)) + 'px';
+    }
+    function repositionPdfPop() {
+        if (!pop.hidden && pop.classList.contains('ve-pop-pdfs')) placePop(parseFloat(pop.style.left) || 8, parseFloat(pop.style.top) || 8);
+    }
+    window.addEventListener('resize', repositionPdfPop);
+    // Showing Cancel or draft actions can wrap the toolbar without a window resize.
+    var popHeader = D.querySelector('.ve-top');
+    if (window.ResizeObserver && popHeader) new ResizeObserver(repositionPdfPop).observe(popHeader);
     /** Open the popover near (x, y) in page coordinates. */
     function openPop(content, x, y, onClose, wide) {
         closePop();
         pop.innerHTML = ''; pop.appendChild(content);
         pop.classList.toggle('ve-pop-wide', !!wide);
+        pop.classList.toggle('ve-pop-pdfs', content.classList.contains('ve-tuition-pdfs'));
         pop.hidden = false; popOnClose = onClose || null;
-        var w = pop.offsetWidth, hgt = pop.offsetHeight;
-        pop.style.left = Math.max(8, Math.min(x, window.innerWidth - w - 8)) + 'px';
-        pop.style.top = Math.max(8, Math.min(y, window.innerHeight - hgt - 8)) + 'px';
+        // A thumbnail's floating crop control must not cover the form's actions.
+        [D, S.doc].forEach(function (doc) {
+            var trigger = doc && doc.querySelector('.image-frame-trigger');
+            if (trigger) trigger.hidden = true;
+        });
+        placePop(x, y);
         var first = pop.querySelector('input,textarea,select'); if (first) first.focus();
     }
     function popBelowToolbar(content, onClose, wide) {
@@ -2737,7 +2762,56 @@
         };
         var tab = 'banner';   // which strip is showing (kept while the preview reloads)
         var slideReplacements = {};
-        function replacementKey(L, slide) { return L.itemType + ':' + slide.item_id; }
+        var slideTextEdits = {};
+        function slidesFor(L) { return L.itemType==='facility' && pRows.facility ? pRows.facility : L.data.slides; }
+        function facilityWorkingRows() {
+            var L=LISTS.facility;
+            if(!pRows.facility)pRows.facility=L.data.slides.map(function(row){return Object.assign({},row);});
+            pRows.facility.forEach(function(row){
+                var key=replacementKey(L,row),text=slideTextEdits[key],replacement=slideReplacements[key];
+                if(text){row.title=text.title;row.body=text.body;delete slideTextEdits[key];}
+                if(replacement){row.file=replacement.file;row.image_url=replacement.url;delete slideReplacements[key];}
+            });
+            return pRows.facility;
+        }
+        function persistFacilityDraft() {
+            select(null);
+            renderFacilityPreview();renderStrip();chrome();
+            if(drafts && drafts.supported())return savePageDraft();
+            toast('Facility changes are unpublished. Save draft or Publish when ready.','ok');
+        }
+        function renderFacilityPreview() {
+            if(!S.doc||!LISTS.facility.data||!pRows.facility)return;
+            var section=S.doc.getElementById('facilities'),container=section&&section.querySelector('.container');
+            if(!container)return;
+            var old=container.querySelector('#facilityCarousel'),empty=container.querySelector('.ve-fac-empty');
+            if(old){old.dispatchEvent(new S.win.MouseEvent('mouseenter'));old.remove();}
+            if(empty)empty.remove();
+            var rows=pRows.facility,wrap=h('div',{class:'fcar',id:'facilityCarousel','aria-label':'Facilities','aria-roledescription':'carousel'});
+            var stage=h('div',{class:'fcar-stage',id:'fcarStage',tabindex:'0'}),dots=h('div',{class:'fcar-dots',id:'fcarDots',role:'tablist','aria-label':'Choose facility'}),cards=[],buttons=[],at=0;
+            function go(index){if(!rows.length)return;at=(index+rows.length)%rows.length;S.win.GNCFacilityCoverflow.layout(cards,buttons,at);}
+            rows.forEach(function(row,index){
+                if(row.file&&row.framing&&window.GNCImageFraming)window.GNCImageFraming.setFileSettings(row.file,row.framing);
+                var img=h('img',{src:row.image_url||'',alt:row.title||'',loading:'eager',draggable:'false','data-ve-img':'program-picture'});
+                var card=h('button',{type:'button',class:'fcar-slide','data-index':index,'aria-label':row.title||''},[img,h('span',{class:'fcar-caption',text:row.title||''})]);
+                var dot=h('button',{type:'button',class:'fcar-dot',role:'tab','data-index':index,'aria-label':'Show '+(row.title||'facility'),on:{click:function(){go(index);}}});
+                cards.push(card);buttons.push(dot);stage.appendChild(card);dots.appendChild(dot);
+            });
+            wrap.appendChild(stage);
+            if(rows.length>1){
+                wrap.appendChild(h('button',{type:'button',id:'fcarPrev',class:'fcar-arrow fcar-prev','aria-label':'Previous facility',on:{click:function(){go(at-1);}}},[icon('chevron-left')]));
+                wrap.appendChild(h('button',{type:'button',id:'fcarNext',class:'fcar-arrow fcar-next','aria-label':'Next facility',on:{click:function(){go(at+1);}}},[icon('chevron-right')]));
+                wrap.appendChild(dots);
+            }
+            if(!rows.length)wrap.appendChild(h('div',{class:'ve-fac-empty'},[h('strong',{text:'No facility slides yet'}),h('button',{type:'button',class:'ve-fac-btn',text:'Add slides',on:{click:function(){tab='facility';addSlides();}}})]));
+            stage.addEventListener('keydown',function(event){if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();go(at+(event.key==='ArrowLeft'?-1:1));}});
+            var start=null;stage.addEventListener('pointerdown',function(event){start=event.clientX;});stage.addEventListener('pointerup',function(event){if(start!==null&&Math.abs(event.clientX-start)>40)go(at+(event.clientX<start?1:-1));start=null;});
+            container.appendChild(wrap);go(0);
+            var count=container.querySelector('.ve-fac-count');if(count)count.textContent=rows.length+' slide'+(rows.length===1?'':'s');
+            if(window.GNCImageFraming)window.GNCImageFraming.watch(S.doc);
+        }
+        function slideText(L, slide) { return slideTextEdits[replacementKey(L, slide)] || slide; }
+        function replacementKey(L, slide) { return L.itemType + ':' + (slide.item_id||slide.draft_key); }
         function previewReplacement(L, index, change) {
             var node = S.doc.querySelectorAll(L.itemType === 'hero_slide' ? '.hero-slide' : L.itemType === 'uniform' ? '.template-uniform-card img' : '.fcar-slide img')[index];
             if (!node) return;
@@ -2761,10 +2835,15 @@
         }
         async function replaceSlide(L, index) {
             if (S.busy || !L.data || !await guardDrawer(L)) return;
-            var slide=L.data.slides[index], route=S.url;
+            var slide=slidesFor(L)[index], route=S.url;
             fileInput.multiple=false;
             pickFile(L.accept,function(file){
-                if(S.busy || S.url!==route || !L.data.slides.some(function(row){return row.item_id===slide.item_id;}))return;
+                if(S.busy || S.url!==route || slidesFor(L).indexOf(slide)===-1)return;
+                if(L.itemType==='facility'){
+                    var row=facilityWorkingRows()[index];row.file=file;row.image_url=previewUrl(file);
+                    row.framing=window.GNCImageFraming&&window.GNCImageFraming.fileSettings(file);
+                    persistFacilityDraft();return;
+                }
                 var problem=fileProblem(L,file);if(problem){toast('Choose another file: '+problem+'.','error');return;}
                 var key=replacementKey(L,slide), previous=slideReplacements[key];
                 slideReplacements[key]={file:file,url:previewUrl(file)};
@@ -2834,6 +2913,7 @@
         }
         /** One save, then show the result in the preview. */
         function commit(L, rows, okMsg) {
+            if(Object.keys(slideTextEdits).length){toast('Publish or discard the pending slide text edits before changing slide order or count.','error');return Promise.resolve();}
             if(Object.keys(slideReplacements).length){toast('Publish or discard the pending slide replacements before changing slide names, order or count.','error');return Promise.resolve();}
             return run('Saving slides…', function () {
                 return postRows(L, rows).then(function (res) {
@@ -2846,6 +2926,7 @@
         }
         /** Big files (videos): upload one at a time so a single request never gets too large for the server. */
         function commitSequential(L, base, newRows) {
+            if(Object.keys(slideTextEdits).length){toast('Publish or discard the pending slide text edits before adding slides.','error');return Promise.resolve();}
             if(Object.keys(slideReplacements).length){toast('Publish or discard the pending slide replacements before adding slides.','error');return Promise.resolve();}
             return run('Uploading…', function () {
                 var cur = base.slice(), done = 0, last = null;
@@ -2869,10 +2950,10 @@
 
         async function addSlides() {
             var L = LISTS[tab]; if (!L || !L.data) return;
-            if (L.data.slides.length >= L.data.limit) { toast('This slideshow is full (' + L.data.limit + ' slides). Delete one to add another.', 'error'); return; }
+            if (slidesFor(L).length >= L.data.limit) { toast('This slideshow is full (' + L.data.limit + ' slides). Delete one to add another.', 'error'); return; }
             if (!await guardDrawer(L)) return;
             pickFiles(L.accept, function (files) {
-                var base = rowsOf(L.data.slides), room = L.data.limit - base.length, fresh = [], skipped = [];
+                var base = rowsOf(slidesFor(L)), room = L.data.limit - base.length, fresh = [], skipped = [];
                 files.forEach(function (f) {
                     if (fresh.length >= room) { skipped.push(f.name + ' (the slideshow is full)'); return; }
                     var why = fileProblem(L, f);
@@ -2881,15 +2962,21 @@
                 });
                 if (skipped.length) toast('Skipped: ' + skipped.join(', ') + '.', 'error');
                 if (!fresh.length) return;
+                if(L.itemType==='facility'){
+                    var working=facilityWorkingRows();
+                    fresh.forEach(function(row){row.draft_key='facility-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);row.image_url=previewUrl(row.file);row.framing=window.GNCImageFraming&&window.GNCImageFraming.fileSettings(row.file);working.push(row);});
+                    persistFacilityDraft();return;
+                }
                 if (L.sequential) commitSequential(L, base, fresh);
                 else commit(L, base.concat(fresh), plural(fresh.length, 'slide') + ' added and live. Click a thumbnail to rename it.');
             });
         }
         async function moveSlide(from, to) {
             var L = LISTS[tab]; if (!L || !L.data) return;
-            var n = L.data.slides.length;
+            var n = slidesFor(L).length;
             if (from === to || from < 0 || to < 0 || from >= n || to >= n) return;
             if (!await guardDrawer(L)) return;
+            if(L.itemType==='facility'){var working=facilityWorkingRows(),row=working.splice(from,1)[0];working.splice(to,0,row);persistFacilityDraft();return;}
             var rows = rowsOf(L.data.slides), m = rows.splice(from, 1)[0]; rows.splice(to, 0, m);
             commit(L, rows, 'Order saved.');
         }
@@ -2906,26 +2993,43 @@
             } catch (e) {}
         }
         function openSlide(i, btn) {
-            var L = LISTS[tab], s = L && L.data ? L.data.slides[i] : null; if (!s) return;
+            var L = LISTS[tab], s = L && L.data ? slidesFor(L)[i] : null; if (!s) return;
             showSlide(L, i);
             var needName = L.itemType === 'facility';
-            var input = h('input', { class: 'form-control form-control-sm', type: 'text', value: s.title, maxlength: '255' });
+            var currentText = slideText(L, s);
+            var input = h('input', { class: 'form-control form-control-sm', type: 'text', value: currentText.title, maxlength: '255' });
             var description=needName?h('textarea',{class:'form-control form-control-sm',maxlength:'500',rows:'3','aria-label':'Facility description',placeholder:'Description (optional)'}):null;
-            if(description)description.value=s.body||'';
-            var go = async function () {
+            if(description)description.value=currentText.body||'';
+            var confirmName = async function (publish) {
+                if(S.busy)return;
                 var v = input.value.trim();
                 if (!v && needName) { input.focus(); return; }
-                if (v === s.title && (!description || description.value===(s.body||''))) { closePop(); return; }
+                if (!needName) {
+                    if (v === s.title) { closePop(); return; }
+                    if (!publish) { closePop(); return; }
+                    if (!await guardDrawer(L)) return;
+                    closePop();
+                    var rows = rowsOf(L.data.slides); rows[i].title = v;
+                    confirmPublish('Publish your changes to the live website?', function () { commit(L, rows, 'Published. Your changes are live now.'); });
+                    return;
+                }
                 if (!await guardDrawer(L)) return;
+                var row=facilityWorkingRows()[i];row.title=v;row.body=description.value;
                 closePop();
-                var rows = rowsOf(L.data.slides); rows[i].title = v;
-                if(description)rows[i].body=description.value;
-                confirmPublish('Publish your changes to the live website?', function () { commit(L, rows, 'Published. Your changes are live now.'); });
+                if(publish){renderFacilityPreview();renderStrip();chrome();A.runPrimary();}else persistFacilityDraft();
             };
-            input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+            input.addEventListener('keydown', function (e) {
+                if(e.isComposing)return;
+                if(e.key==='Enter'){e.preventDefault();e.stopPropagation();confirmName(!needName);}
+                else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closePop();}
+            });
             var del = h('button', { type: 'button', class: 'btn btn-sm btn-outline-danger', on: { click: async function () {
                 closePop();
                 if (!await guardDrawer(L)) return;
+                if(L.itemType==='facility'){
+                    if(!await window.AdminDialogs.confirm('Remove “'+(slideText(L,s).title||'this slide')+'” from the draft? The public website changes only after Publish.'))return;
+                    var working=facilityWorkingRows();working.splice(i,1);persistFacilityDraft();return;
+                }
                 if (!await window.AdminDialogs.confirm('Delete “' + (s.title || 'this slide') + '” for good?\n\nIt is removed from the website straight away. This cannot be undone.')) return;
                 var rows = rowsOf(L.data.slides); rows.splice(i, 1);
                 commit(L, rows, 'Slide deleted.');
@@ -2933,11 +3037,11 @@
             var r = btn.getBoundingClientRect();
             var reposition = null;
             var replace = h('button', {type:'button',class:'btn btn-sm btn-outline-secondary',text:'Replace slide',on:{click:function(){replaceSlide(L,i);}}});
-            if (window.GNCImageFraming && L.itemType === 'hero_slide') {
-                var bannerImage = S.doc.querySelectorAll('.hero-slide')[i];
-                if (bannerImage && bannerImage.tagName !== 'VIDEO') {
+            if (window.GNCImageFraming && (L.itemType === 'hero_slide' || L.itemType === 'facility')) {
+                var slideImage = S.doc.querySelectorAll(L.itemType === 'facility' ? '.fcar-slide img' : '.hero-slide')[i];
+                if (slideImage && slideImage.tagName !== 'VIDEO') {
                     reposition = h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Reposition image', on: { click: function () {
-                        closePop(); window.GNCImageFraming.edit(bannerImage);
+                        closePop(); window.GNCImageFraming.edit(slideImage).then(function(value){if(value&&L.itemType==='facility'){var row=facilityWorkingRows()[i];if(row&&row.file)row.framing=window.GNCImageFraming.fileSettings(row.file);persistFacilityDraft();}});
                     } } });
                 }
             }
@@ -2945,7 +3049,7 @@
                 h('label', { class: 've-pop-label', text: 'Slide ' + (i + 1) + (needName ? ' name' : ' name (optional)') }),
                 input,
                 description,
-                h('div', { class: 've-pop-row' }, [replace, reposition, h('button', { type: 'button', class: 'btn btn-sm btn-gnc', text: 'Publish', on: { click: go } }), del])
+                h('div', { class: 've-pop-row' }, [replace, reposition, h('button', { type: 'button', class: 'btn btn-sm btn-gnc', text: 'Publish', on: { click: function(){confirmName(true);} } }), del])
             ]), r.left, r.top - 150);
         }
 
@@ -2959,10 +3063,10 @@
             dock.appendChild(h('div', { class: 've-dock-label ve-dock-tabs', role: 'tablist' }, Object.keys(LISTS).filter(function (k) { return LISTS[k].data; }).map(function (k) {
                 return h('button', { type: 'button', role: 'tab', 'aria-selected': k === tab ? 'true' : 'false', class: 've-dock-tab' + (k === tab ? ' is-on' : ''),
                     on: { click: function () { if (tab !== k) { closePop(); tab = k; renderStrip(); } } } },
-                    [icon(LISTS[k].icon), h('span', { text: LISTS[k].label + ' (' + LISTS[k].data.slides.length + ')' })]);
+                    [icon(LISTS[k].icon), h('span', { text: LISTS[k].label + ' (' + slidesFor(LISTS[k]).length + ')' })]);
             })));
             var track = h('div', { class: 've-dock-track', role: 'list' });
-            L.data.slides.forEach(function (s, i) {
+            slidesFor(L).forEach(function (s, i) {
                 var change=slideReplacements[replacementKey(L,s)], mediaUrl=change?change.url:s.image_url;
                 var isVideo=change?/\.(mp4|webm)$/i.test(change.file.name):s.media_type==='video';
                 var media = isVideo ? h('span', { class: 've-thumb-img ve-thumb-video' }, [icon('camera-video')])
@@ -2971,7 +3075,7 @@
                     title: 'Click for slide options · drag to change the order',
                     on: { click: function () { openSlide(i, b); } } }, [
                     media, h('span', { class: 've-thumb-n', text: String(i + 1) }),
-                    h('span', { class: 've-thumb-t', text: (change?'* ':'')+clip(s.title || 'Untitled', 22) })]);
+                    h('span', { class: 've-thumb-t', text: (change||slideTextEdits[replacementKey(L,s)]?'* ':'')+clip(slideText(L,s).title || 'Untitled', 22) })]);
                 b.addEventListener('dragstart', function (e) { e.dataTransfer.setData('text/plain', String(i)); e.dataTransfer.effectAllowed = 'move'; b.classList.add('is-drag'); });
                 b.addEventListener('dragend', function () { b.classList.remove('is-drag'); $$('.ve-thumb', dock).forEach(function (x) { x.classList.remove('is-over'); }); });
                 b.addEventListener('dragover', function (e) { e.preventDefault(); b.classList.add('is-over'); });
@@ -2980,7 +3084,7 @@
                 track.appendChild(b);
             });
             dock.appendChild(track);
-            var full = L.data.slides.length >= L.data.limit;
+            var full = slidesFor(L).length >= L.data.limit;
             dock.appendChild(h('button', { type: 'button', class: 've-add-slide', disabled: full,
                 title: full ? 'This slideshow is full' : (L.itemType === 'hero_slide' ? 'Choose pictures or videos' : 'Choose one or more pictures'), on: { click: addSlides } },
                 [icon('plus-lg'), h('span', { text: 'Add slides' })]));
@@ -3010,7 +3114,7 @@
         var BD = null, bChange = {}, bFiles = {}, bLogos = {};
         var dChange = {}, dFiles = {}, dRemove = {};   // department + head of office: edited texts, new pictures, removed pictures
         var pChange = {}, pMeta = {}, pRows = {}, pPdf = null, pMedia = {};       // program: edited texts, name/colour/visibility, edited cards by list
-        function resetPending() { pPdf=null;pMedia={};slideReplacements={};departmentPrograms = {}; nextProgramDraft = 0; textChanges = {}; officeChange = null; dChange = {}; dFiles = {}; dRemove = {}; pChange = {}; pMeta = {}; pRows = {}; bChange = {}; bFiles = {}; bLogos = {}; }
+        function resetPending() { pPdf=null;pMedia={};slideReplacements={};slideTextEdits={};departmentPrograms = {}; nextProgramDraft = 0; textChanges = {}; officeChange = null; dChange = {}; dFiles = {}; dRemove = {}; pChange = {}; pMeta = {}; pRows = {}; bChange = {}; bFiles = {}; bLogos = {}; }
 
         var DFIELD = { 'dept-name': 'dept_name', 'dept-hero': 'hero_text', 'dept-about': 'about_text', 'dept-office-label': 'office_label',
             'dean-name': 'dean_name', 'dean-title': 'dean_title', 'dean-bio': 'dean_bio', 'dean-phone': 'dean_phone',
@@ -3034,14 +3138,14 @@
         function cardRowsOf(type) { return pRows[type] || (pRows[type] = PD.items[type].map(function (r) { return JSON.parse(JSON.stringify(r)); })); }
         function rowsChanged(type) {
             var rows = pRows[type]; if (!rows) return false;
-            var base = PD.items[type];
+            var base = type==='facility' ? LISTS.facility.data.slides : PD.items[type];
             if (rows.length !== base.length) return true;
-            return rows.some(function (r, i) { return r.file || r.removeImg || ((type==='badge'||type==='career') && Number(r.item_id||0)!==Number(base[i].item_id||0)) || ITEM_FIELDS.some(function (f) { return String(r[f] || '') !== String(base[i][f] || ''); }); });
+            return rows.some(function (r, i) { return r.file || r.removeImg || ((type==='badge'||type==='career'||type==='why'||type==='facility') && Number(r.item_id||0)!==Number(base[i].item_id||0)) || ITEM_FIELDS.some(function (f) { return String(r[f] || '') !== String(base[i][f] || ''); }); });
         }
         function pruneRows() { Object.keys(pRows).forEach(function (t) { if (!rowsChanged(t)) delete pRows[t]; }); }
         function listDirty() { return Object.keys(pRows).filter(rowsChanged).length; }
         function pendingCount() {
-            var n = Object.keys(slideReplacements).length + Object.keys(bChange).length + Object.keys(bFiles).length + Object.keys(bLogos).length;
+            var n = Object.keys(slideReplacements).length + Object.keys(slideTextEdits).length + Object.keys(bChange).length + Object.keys(bFiles).length + Object.keys(bLogos).length;
             if (departmentOrder && departmentOrder.dirty()) n++;
             n += Object.keys(textChanges).length;
             n += Object.keys(departmentPrograms).filter(programCardDirty).length;
@@ -3116,8 +3220,6 @@
                             if (other !== e) { other.textContent = other.getAttribute('data-ve-key') === 'short-name' ? shortName(name) : name; markEmpty(other); }
                         });
                     });
-                } else if (PD && f === 'prog-description') {
-                    makeField(el, function (e, val) { pMetaSet('description', val, PD.description); });
                 } else if (PD && f === 'prog-text') {
                     var key = el.getAttribute('data-ve-key');
                     if (PD.fields[key]) makeField(el, function (e, val) { pSet(key, val); });
@@ -3473,8 +3575,12 @@
             cards.forEach(function (key) {
                 p = p.then(function () {
                     var row = departmentPrograms[key];
-                    return send(PROG_URL, { action: 'save_department_program_card', dept_id: DD.dept_id, program_id: row.program_id,
-                        program_name: row.program_name, description: row.description, remove_image: row.removeImage ? '1' : '' }, row.file ? { image: row.file } : {}).then(function (response) {
+                    var fields = { action: 'save_department_program_card', dept_id: DD.dept_id, program_id: row.program_id,
+                        remove_image: row.removeImage ? '1' : '' };
+                    // Send only edited text: another card edit must not replay an old description.
+                    if (!row.program_id || row.program_name !== row.baseName) fields.program_name = row.program_name;
+                    if (!row.program_id || row.description !== row.baseDescription) fields.description = row.description;
+                    return send(PROG_URL, fields, row.file ? { image: row.file } : {}).then(function (response) {
                         if (response.ok) {
                             did++; row.program_id = response.program.program_id;
                             row.baseName = row.program_name; row.baseDescription = row.description;
@@ -3643,13 +3749,49 @@
             $$('[data-ve-item^="career:"]',group).forEach(function(card){if(keep.indexOf(card)===-1)card.remove();});
             if(keep.length&&keep.indexOf(active)===-1)keep[0].classList.add('is-open');
         }
-        /** Badge and career structure stays in the draft with other page edits. */
+        function renderReasons() {
+            if (!PD) return;
+            var group = S.doc.querySelector('.why-list'), add = group && group.querySelector('[data-ve-add="item"][data-ve-type="why"]');
+            if (!group || !add) return;
+            var existing = {}, keep = [], anchor = add.closest('li');
+            $$('[data-ve-item^="why:"]', group).forEach(function (card) {
+                var index = Number(card.getAttribute('data-ve-item').split(':')[1]), base = PD.items.why[index];
+                var key = card.getAttribute('data-ve-reason-key') || (base && 'saved-' + base.item_id);
+                if (key) existing[key] = card;
+            });
+            curRows('why').forEach(function (row, index) {
+                var key = row.item_id ? 'saved-' + row.item_id : (row.draft_key || (row.draft_key = 'why-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2)));
+                var card = existing[key];
+                if (!card) card = h('li', {class: 'why-item'}, [
+                    h('span', {class: 'why-num', 'aria-hidden': 'true'}),
+                    h('div', {class: 'why-body'}, [h('h3', {class: 'why-title'}), h('div', {class: 'why-desc cms-rich'})])
+                ]);
+                card.setAttribute('data-ve-item', 'why:' + index);
+                card.setAttribute('data-ve-reason-key', key);
+                card.querySelector('.why-num').textContent = String(index + 1).padStart(2, '0');
+                ['title', 'body'].forEach(function (prop) {
+                    var field = card.querySelector(prop === 'title' ? '.why-title' : '.why-desc'), ref = 'why:' + index + ':' + prop;
+                    if (prop === 'body') {
+                        field.innerHTML = /<[a-z][\s\S]*>/i.test(row.body || '') ? cleanHtml(row.body) : plainToHtml(row.body || '');
+                        field.setAttribute('data-ve-rich', ''); field.setAttribute('data-ve-multiline', '');
+                    } else field.textContent = row.title || '';
+                    field.setAttribute('data-ve-field', 'prog-item'); field.setAttribute('data-ve-key', ref);
+                    field.setAttribute('data-ve-label', prop === 'title' ? 'Title' : 'Description');
+                    field.setAttribute('data-ve-ph', prop === 'title' ? 'Title' : 'Description');
+                    field.setAttribute('data-ve-max', prop === 'body' ? '2000' : '255');
+                    makeField(field, function (_, value) { setItemProp(ref, value); });
+                });
+                group.insertBefore(card, anchor); keep.push(card);
+            });
+            $$('[data-ve-item^="why:"]', group).forEach(function (card) { if (keep.indexOf(card) === -1) card.remove(); });
+        }
+        /** Badge, career and reason structure stays in the draft with other page edits. */
         async function structural(type, rows, msg) {
-            if(type==='badge'||type==='career'){
+            if(type==='badge'||type==='career'||type==='why'){
                 if(S.busy)return;
                 pRows[type]=rows;pruneRows();select(null);
-                if(type==='badge')renderBadges();else renderCareers();
-                chrome();toast((type==='badge'?'Badges':'Career opportunities')+' updated. Save draft or Publish when ready.','ok');return;
+                if(type==='badge')renderBadges();else if(type==='why')renderReasons();else renderCareers();
+                chrome();toast((type==='badge'?'Badges':type==='why'?'Reasons':'Career opportunities')+' updated. Save draft or Publish when ready.','ok');return;
             }
             if (!await okToReload(rowsChanged(type) ? 1 : 0)) return;
             run('Saving…', function () {
@@ -3675,7 +3817,7 @@
         }
         async function deleteItem(r) {
             var rows = cardRowsOf(r.type).slice(), row = rows[r.i];
-            if (!await window.AdminDialogs.confirm(r.type==='badge'||r.type==='career'?'Remove “'+(row&&row.title||'this card')+'”?\n\nThis stays in the draft until Publish.':'Delete “' + (row && row.title || 'this card') + '” for good?\n\nIt is removed from the website straight away. This cannot be undone.')) return;
+            if (!await window.AdminDialogs.confirm(r.type==='badge'||r.type==='career'||r.type==='why'?'Remove “'+(row&&row.title||'this card')+'”?\n\nThis stays in the draft until Publish.':'Delete “' + (row && row.title || 'this card') + '” for good?\n\nIt is removed from the website straight away. This cannot be undone.')) return;
             rows.splice(r.i, 1);
             structural(r.type, rows, 'Deleted.');
         }
@@ -3804,12 +3946,13 @@
             var errs = [], did = 0, p = Promise.resolve();
             Object.keys(LISTS).forEach(function(key){
                 var L=LISTS[key];if(!L.data)return;
+                if(key==='facility'&&pRows.facility)return;
                 var rows=rowsOf(L.data.slides),changes=[];
-                rows.forEach(function(row){var id=replacementKey(L,row);if(slideReplacements[id]){row.file=slideReplacements[id].file;changes.push(id);}});
+                rows.forEach(function(row){var id=replacementKey(L,row);if(slideReplacements[id])row.file=slideReplacements[id].file;if(slideTextEdits[id]){row.title=slideTextEdits[id].title;row.body=slideTextEdits[id].body;}if(slideReplacements[id]||slideTextEdits[id])changes.push(id);});
                 if(!changes.length)return;
                 p=p.then(function(){return postRows(L,rows).then(function(result){
                     if(!result.ok){errs.push(L.label+': '+result.error);return;}
-                    did++;afterSave(L,result);changes.forEach(function(id){delete slideReplacements[id];});
+                    did++;afterSave(L,result);changes.forEach(function(id){delete slideReplacements[id];delete slideTextEdits[id];});
                     if(result.items)L.data.slides=result.items;
                 });});
             });
@@ -3831,7 +3974,7 @@
             Object.keys(pRows).filter(rowsChanged).forEach(function (type) {
                 p = p.then(function () {
                     return postItems(type, pRows[type]).then(function (r) {
-                        if (r.ok) { did++; delete pRows[type];if((type==='badge'||type==='career')&&Array.isArray(r.items)){PD.items[type]=r.items;if(type==='badge')renderBadges();else renderCareers();} } else errs.push((ITEM_LABEL[type] || 'Cards') + ' list: ' + r.error);
+                        if (r.ok) { did++; delete pRows[type];if(type==='facility'&&Array.isArray(r.items)){PD.items.facility=r.items;LISTS.facility.data.slides=r.items;afterSave(LISTS.facility,r);renderStrip();}else if((type==='badge'||type==='career'||type==='why')&&Array.isArray(r.items)){PD.items[type]=r.items;if(type==='badge')renderBadges();else if(type==='why')renderReasons();else renderCareers();} } else errs.push((ITEM_LABEL[type] || 'Cards') + ' list: ' + r.error);
                     });
                 });
             });
@@ -3842,12 +3985,24 @@
         }
 
         var A = {
+            framingStaged:function(path){
+                var images=S.doc&&S.doc.querySelectorAll('.fcar-slide img');
+                if(!images||!Array.prototype.some.call(images,function(img){return new URL(img.src,location.origin).pathname===path;}))return;
+                setTimeout(function(){if(!S.busy)persistFacilityDraft();},0);
+            },
+            fileFramingStaged:function(target,file,value){
+                if(!target||!target.closest('.fcar-slide'))return;
+                var rows=facilityWorkingRows(),row=rows.find(function(row){return row.file===file;});
+                if(row){row.framing=value;setTimeout(function(){if(!S.busy)persistFacilityDraft();},0);}
+            },
             draftState: function(value){
-                if(!value)return {textChanges:textChanges,departmentPrograms:departmentPrograms,nextProgramDraft:nextProgramDraft,officeChange:officeChange,bChange:bChange,bFiles:bFiles,bLogos:bLogos,dChange:dChange,dFiles:dFiles,dRemove:dRemove,pChange:pChange,pMeta:pMeta,pRows:pRows,slideReplacements:slideReplacements,pPdf:pPdf,pMedia:pMedia,departmentOrder:departmentOrder&&departmentOrder.order()};
-                textChanges=value.textChanges;departmentPrograms=value.departmentPrograms;nextProgramDraft=value.nextProgramDraft;officeChange=value.officeChange;bChange=value.bChange;bFiles=value.bFiles;bLogos=value.bLogos;dChange=value.dChange;dFiles=value.dFiles;dRemove=value.dRemove;pChange=value.pChange;pMeta=value.pMeta;pRows=value.pRows;slideReplacements=value.slideReplacements||{};pPdf=value.pPdf||null;pMedia=value.pMedia||{};
+                if(!value)return {textChanges:textChanges,departmentPrograms:departmentPrograms,nextProgramDraft:nextProgramDraft,officeChange:officeChange,bChange:bChange,bFiles:bFiles,bLogos:bLogos,dChange:dChange,dFiles:dFiles,dRemove:dRemove,pChange:pChange,pMeta:pMeta,pRows:pRows,slideReplacements:slideReplacements,slideTextEdits:slideTextEdits,pPdf:pPdf,pMedia:pMedia,departmentOrder:departmentOrder&&departmentOrder.order()};
+                textChanges=value.textChanges;departmentPrograms=value.departmentPrograms;nextProgramDraft=value.nextProgramDraft;officeChange=value.officeChange;bChange=value.bChange;bFiles=value.bFiles;bLogos=value.bLogos;dChange=value.dChange;dFiles=value.dFiles;dRemove=value.dRemove;pChange=value.pChange;pMeta=value.pMeta;pRows=value.pRows;slideReplacements=value.slideReplacements||{};slideTextEdits=value.slideTextEdits||{};pPdf=value.pPdf||null;pMedia=value.pMedia||{};
                 Object.keys(departmentPrograms).forEach(function(key){if(!S.doc.querySelector('[data-ve-program-card="'+cssEsc(key)+'"]'))appendProgramCard(S.doc,false,key,departmentPrograms[key]);});
                 if(PD&&pRows.badge)renderBadges();
                 if(PD&&pRows.career)renderCareers();
+                if(PD&&pRows.why)renderReasons();
+                if(PD&&pRows.facility){facilityWorkingRows();renderFacilityPreview();renderStrip();}
                 bindEditing(S.doc);
             },
             draftRebind:function(){bindEditing(S.doc);restoreSlideReplacements();if(pMedia.seal&&pMedia.seal.file){var seal=S.doc.querySelector('.about-feature-seal-wrap img');if(seal)seal.src=previewUrl(pMedia.seal.file);}},
@@ -4079,10 +4234,14 @@
                 if (!departmentOrder && mode !== 'dept' && mode !== 'prog' && mode !== 'basic') { openDrawer(); return; }
                 if (!pendingCount()) return;
                 confirmPublish('Publish your changes to the live website?', function () {
+                    var reasonsChanged = mode === 'prog' && rowsChanged('why');
                     run('Publishing…', function () {
                         return (mode === 'prog' ? saveProg() : saveDept()).then(function (r) {
                             r.errs.forEach(function (m) { toast(m, 'error'); });
-                            if (r.did && !r.errs.length) reloadEditor('Published. Your changes are live now.', routeNow(), true);
+                            if (r.did && !r.errs.length) {
+                                if (reasonsChanged) toast('Published. Your changes are live now.', 'ok');
+                                else reloadEditor('Published. Your changes are live now.', routeNow(), true);
+                            }
                             else if (r.did) toast('Some changes were saved. Fix the problem above and publish again.', 'ok');
                         });
                     });
@@ -5281,7 +5440,7 @@
             if (!api) return;
             if(typeof x!=='number'||typeof y!=='number'){var rect=btnSecondary.getBoundingClientRect();x=rect.left;y=rect.bottom+8;}
             var category=api.selection().category, records=api.categories[category].documents;
-            var box=h('div',{class:'ve-pop-form'},[
+            var box=h('div',{class:'ve-pop-form ve-tuition-pdfs'},[
                 h('strong',{text:api.categories[category].label+' PDFs'}),
                 h('p',{class:'small text-muted',text:'Upload, rename, replace or remove schedules. Changes go live when you publish.'})
             ]);

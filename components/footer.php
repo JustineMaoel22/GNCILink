@@ -1,3 +1,4 @@
+<?php require_once __DIR__ . '/../includes/privacy.php'; ?>
 <?php include_once __DIR__ . '/image-framing-assets.php'; ?>
 <link rel="stylesheet" href="/assets/css/content-rich-text.css?v=<?= filemtime(__DIR__.'/../assets/css/content-rich-text.css') ?>">
 <?php include_once __DIR__ . '/office-map-modal.php'; ?>
@@ -180,7 +181,7 @@ try {
                         </a>
                         <iframe
                             title="Map showing Guagua National Colleges"
-                            src="https://maps.google.com/maps?q=Guagua+National+Colleges,+Pampanga&t=&z=16&ie=UTF8&iwloc=&output=embed"
+                            <?= gncPrivacyFrameSource('https://maps.google.com/maps?q=Guagua+National+Colleges,+Pampanga&t=&z=16&ie=UTF8&iwloc=&output=embed') ?>
                             allowfullscreen=""
                             loading="lazy"
                             referrerpolicy="no-referrer-when-downgrade">
@@ -196,15 +197,21 @@ try {
             <div class="gnc-footer-bottom-inner">
                 <p class="gnc-footer-copy">&copy; <?= date('Y') ?> Guagua National Colleges, Inc. All rights reserved.</p>
                 <nav class="gnc-footer-legal" aria-label="Legal">
-                    <a href="/coming-soon.php">Privacy Policy</a>
+                    <?php if (gncLegalPublished()): ?>
+                    <a href="/pages/legal/privacy-policy.php">Privacy Policy</a>
                     <span aria-hidden="true">&bull;</span>
-                    <a href="/coming-soon.php">Terms of Use</a>
+                    <a href="/pages/legal/terms-of-use.php">Terms of Use</a>
+                    <span aria-hidden="true">&bull;</span>
+                    <a href="/pages/legal/cookie-policy.php">Cookie Policy</a>
+                    <?php endif; ?>
+                    <button type="button" class="gnc-privacy-settings" data-privacy-action="manage">Privacy &amp; cookie settings</button>
                 </nav>
                 <a href="#" class="gnc-footer-totop" id="gncBackToTop" aria-label="Back to top"><i class="bi bi-arrow-up" aria-hidden="true"></i></a>
             </div>
         </div>
     </div>
 </footer>
+<?php include_once __DIR__ . '/privacy-controls.php'; ?>
 
 <?php include_once __DIR__ . '/../chatbot/widget.php'; ?>
 
@@ -223,6 +230,9 @@ try {
 <script>
 (function () {
     if (window.top !== window.self || new URLSearchParams(location.search).has('ce_preview')) return;
+    var inFlight=false;
+    function trackView() {
+    if (!window.GNCPrivacy || !GNCPrivacy.allows('analytics') || inFlight) return;
     var todayEl = document.getElementById('gncVisitorsToday');
     var totalEl = document.getElementById('gncVisitorsTotal');
 
@@ -243,6 +253,7 @@ try {
     body.set('path', path);
     body.set('title', document.title || '');
 
+    inFlight=true;
     fetch('/api/track-visit.php', {
         method: 'POST',
         credentials: 'same-origin',
@@ -256,6 +267,10 @@ try {
         if (todayEl) todayEl.textContent = Number(d.today).toLocaleString('en-US');
         if (totalEl) totalEl.textContent = Number(d.total).toLocaleString('en-US');
     })
-    .catch(function () {});
+    .catch(function () {}).finally(function(){inFlight=false;});
+    }
+    window.addEventListener('gnc:privacyready',trackView);
+    window.addEventListener('gnc:privacychange',trackView);
+    trackView();
 })();
 </script>

@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {spawn,execFileSync}=require('node:child_process');
-const markup=execFileSync('docker',['compose','exec','-T','web','php','tests/visitor-feedback-fixture.php'],{encoding:'utf8',windowsHide:true});
+const markup=execFileSync('php',['tests/visitor-feedback-fixture.php'],{encoding:'utf8',windowsHide:true});
 const profile=fs.mkdtempSync(path.join(os.tmpdir(),'gnci-feedback-browser-'));
 const browser=spawn(process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -31,6 +31,8 @@ let socket,send,apiCalls=0,formLoads=0,liveFormStatus=null;
  });
  await send('Fetch.enable',{patterns:[{urlPattern:'*/tests/feedback-fixture-page*'},{urlPattern:'*/admin/feedback-fixture-page*'},{urlPattern:'*/api/*'},{urlPattern:'https://docs.google.com/forms/*'}]});
  await send('Page.addScriptToEvaluateOnNewDocument',{source:`(()=>{
+  window.feedbackConsent=true;window.feedbackPrivacyRequests=0;
+  window.GNCPrivacy={allows:()=>window.feedbackConsent,manage:()=>window.feedbackPrivacyRequests++};
   let offset=0,hidden=false,focused=true,tick;const clock=performance.now.bind(performance),wall=Date.now.bind(Date),interval=window.setInterval.bind(window);
   Object.defineProperty(performance,'now',{value:()=>clock()+offset});Date.now=()=>wall()+offset;
   Object.defineProperty(document,'hidden',{get:()=>hidden});document.hasFocus=()=>focused;
@@ -43,6 +45,39 @@ let socket,send,apiCalls=0,formLoads=0,liveFormStatus=null;
  const open=()=>evaluate('document.getElementById("gncVisitorFeedback").open');
  async function advance(ms){await evaluate(`feedbackAdvance(${ms})`);await pause(80);}
  await navigate();await evaluate('localStorage.clear();document.getElementById("before").focus()');
+ for(const width of [1440,820,390,320]){
+  await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<500});
+  assert.equal(await evaluate('(()=>{const b=document.getElementById("gncFeedbackTrigger"),r=b.getBoundingClientRect();return !b.hidden&&getComputedStyle(b).position==="fixed"&&getComputedStyle(b).writingMode==="vertical-rl"&&r.left===0&&r.right<=innerWidth&&r.width>=44&&r.top>=0&&r.bottom<=innerHeight;})()'),true,'Fixed vertical feedback tab fits '+width);
+ }
+ await evaluate('scrollTo(0,200)');
+ assert.equal(await evaluate('Math.round(document.getElementById("gncFeedbackTrigger").getBoundingClientRect().top+document.getElementById("gncFeedbackTrigger").getBoundingClientRect().height/2)===Math.round(innerHeight/2)'),true,'Tab stays centered after scrolling');
+ await evaluate('feedbackConsent=false;document.getElementById("gncFeedbackTrigger").click()');
+ assert.equal(await evaluate('feedbackPrivacyRequests'),1,'Tab offers existing privacy settings before consent');
+ assert.equal(await open(),false,'Consent still required');
+ await evaluate('feedbackConsent=true;document.getElementById("gncFeedbackTrigger").focus();document.getElementById("gncFeedbackTrigger").click()');
+ await until(open,'Manual feedback did not open immediately');
+ await advance(30000);
+ await evaluate('document.querySelector(".gnc-feedback-close").click()');await pause(250);
+ assert.equal(await evaluate('document.activeElement.id'),'gncFeedbackTrigger','Focus returns to floating tab');
+ assert.equal(await evaluate('JSON.parse(localStorage.getItem("gnci_feedback_v1")).until'),0,'Manual dismissal does not suppress automatic popup');
+ await advance(28000);assert.equal(await open(),false,'Automatic popup still waits for one minute');
+ await advance(3000);await until(open,'Automatic popup still runs after manual dismissal');
+ await evaluate('document.querySelector(".gnc-feedback-close").click()');await pause(250);
+ await evaluate('document.getElementById("gncFeedbackTrigger").click()');await until(open,'Manual opening bypasses automatic dismissal cooldown');
+ await advance(2000);assert.equal(await open(),true,'Automatic cooldown does not close manual feedback');
+ await evaluate('document.getElementById("gncFeedbackSubmitted").click()');await pause(250);
+ await evaluate('document.getElementById("gncFeedbackTrigger").click()');await until(open,'Manual reopening works after acknowledgment');
+ assert.equal(await evaluate('document.getElementById("gncFeedbackTitle").textContent'),'You already submitted','Acknowledged visitor sees submission message');
+ assert.equal(await evaluate('document.getElementById("gncFeedbackGoogleForm").hidden&&!document.getElementById("gncFeedbackGoogleForm").hasAttribute("src")&&document.getElementById("gncFeedbackSubmitted").hidden'),true,'Acknowledged visitor cannot fill the form again');
+ assert.equal(await evaluate('document.querySelectorAll("#gncVisitorFeedback").length'),1,'Manual and automatic triggers reuse a single modal');
+ assert.equal(formLoads,1,'Reopening reuses the loaded Google Form');
+ await evaluate('document.querySelector(".gnc-feedback-close").click()');await pause(250);
+ await navigate('?page=acknowledged-reload');
+ await evaluate('document.getElementById("gncFeedbackTrigger").click()');await until(open,'Acknowledgment survives navigation');
+ assert.equal(await evaluate('document.getElementById("gncFeedbackTitle").textContent'),'You already submitted');
+ await evaluate('document.querySelector(".gnc-feedback-secondary").click()');await pause(250);
+ await evaluate('localStorage.clear()');await navigate('?page=automatic-regression');formLoads=0;
+ await evaluate('document.getElementById("before").focus()');
  assert.equal(await evaluate('document.getElementById("gncFeedbackGoogleForm").hasAttribute("src")'),false,'Google iframe is not loaded before popup eligibility');
  await advance(30000);assert.equal(await open(),false);
  await evaluate('feedbackVisible(false)');await advance(90000);assert.equal(await open(),false,'Background time excluded');

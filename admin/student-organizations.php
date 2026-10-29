@@ -89,12 +89,29 @@ function studentOrgCategories(): array {
     try { return getDB()->query('SELECT * FROM student_org_categories ORDER BY display_order,category_id')->fetchAll(PDO::FETCH_ASSOC); }
     catch (PDOException $e) { if ($e->getCode() !== '42S02') throw $e; return []; }
 }
+function studentOrgArchivesSupported(): bool {
+    static $supported = null;
+    if ($supported === null) {
+        try {
+            getDB()->query('SELECT archived_at FROM student_organizations LIMIT 0');
+            $supported = true;
+        } catch (PDOException $e) {
+            // Older hosting databases may not have the additive archive migration yet.
+            if ($e->getCode() !== '42S22') throw $e;
+            $supported = false;
+        }
+    }
+    return $supported;
+}
 function studentOrganizations(bool $includeDrafts = false): array {
     try {
-        return getDB()->query("SELECT o.*, c.name AS category_name,l.file_path AS logo_url,b.file_path AS cover_url
+        $canArchive = studentOrgArchivesSupported();
+        $archiveColumn = $canArchive ? '' : ', NULL AS archived_at';
+        $archiveFilter = $canArchive ? ' AND o.archived_at IS NULL' : '';
+        return getDB()->query("SELECT o.*{$archiveColumn}, c.name AS category_name,l.file_path AS logo_url,b.file_path AS cover_url
             FROM student_organizations o LEFT JOIN student_org_categories c ON c.category_id=o.category_id
             LEFT JOIN media_library l ON l.media_id=o.logo_media_id LEFT JOIN media_library b ON b.media_id=o.cover_media_id
-            " . ($includeDrafts ? '' : "WHERE o.status='published' AND o.archived_at IS NULL") . ' ORDER BY o.display_order,o.org_id')->fetchAll(PDO::FETCH_ASSOC);
+            " . ($includeDrafts ? '' : "WHERE o.status='published'{$archiveFilter}") . ' ORDER BY o.display_order,o.org_id')->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) { if ($e->getCode() !== '42S02') throw $e; return []; }
 }
 function studentOrganizationGallery(int $id): array {
@@ -133,6 +150,8 @@ function saveStudentOrganization(array $input, array $files = []): array {
     $status = $input['status'] ?? $current['status'] ?? 'draft';
     if (!in_array($status, ['draft','published'], true)) throw new InvalidArgumentException('Choose Published or Unpublished.');
     if (array_key_exists('archived',$input) && !in_array($input['archived'],[0,1,'0','1'],true)) throw new InvalidArgumentException('Invalid archive state.');
+    $canArchive = studentOrgArchivesSupported();
+    if (!$canArchive && !empty($input['archived'])) throw new RuntimeException('Organization archiving requires database/migrate-student-org-archive.php to be run on this server.');
     $archivedAt=$current['archived_at']??null;
     if (array_key_exists('archived',$input)) $archivedAt=(int)$input['archived']===1?($archivedAt??date('Y-m-d H:i:s')):null;
     $category = (int)($input['category_id'] ?? $current['category_id'] ?? 0);
@@ -176,8 +195,12 @@ function saveStudentOrganization(array $input, array $files = []): array {
             $stmt=$db->prepare('INSERT INTO student_organizations (slug,name,display_order) VALUES (?,?,(SELECT COALESCE(MAX(display_order),0)+1 FROM (SELECT display_order FROM student_organizations) ranked))');
             $stmt->execute([$slug,$data['name']]); $id=(int)$db->lastInsertId();
         }
-        $stmt=$db->prepare('UPDATE student_organizations SET name=?,category_id=?,description=?,about_text=?,vision=?,mission=?,facebook_url=?,logo_media_id=?,cover_media_id=?,status=?,archived_at=? WHERE org_id=?');
-        $stmt->execute([$data['name'],$category?:null,$data['description'],$data['about_text'],$data['vision'],$data['mission'],$data['facebook_url'],$data['logo_media_id'],$data['cover_media_id'],$status,$archivedAt,$id]);
+        $archiveUpdate = $canArchive ? ',archived_at=?' : '';
+        $values=[$data['name'],$category?:null,$data['description'],$data['about_text'],$data['vision'],$data['mission'],$data['facebook_url'],$data['logo_media_id'],$data['cover_media_id'],$status];
+        if ($canArchive) $values[]=$archivedAt;
+        $values[]=$id;
+        $stmt=$db->prepare('UPDATE student_organizations SET name=?,category_id=?,description=?,about_text=?,vision=?,mission=?,facebook_url=?,logo_media_id=?,cover_media_id=?,status=?'.$archiveUpdate.' WHERE org_id=?');
+        $stmt->execute($values);
         foreach ($gallery as $image) if (in_array((int)$image['image_id'],$remove,true)) {
             $db->prepare('DELETE FROM student_org_gallery WHERE image_id=? AND org_id=?')->execute([$image['image_id'],$id]); $retired[]=(int)$image['media_id'];
         }

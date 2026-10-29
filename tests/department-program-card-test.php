@@ -19,6 +19,15 @@ try {
     cardCheck($first['program_id'] !== $second['program_id'], 'Blank cards create separate programs with unique codes');
     $read = $db->prepare('SELECT * FROM programs WHERE program_id = ?');
     $read->execute([$first['program_id']]); $before = $read->fetch(PDO::FETCH_ASSOC);
+    saveDepartmentProgramCard(['dept_id' => $dept, 'program_id' => $second['program_id'], 'description' => 'Second description']);
+    $read->execute([$first['program_id']]);
+    cardCheck($read->fetch(PDO::FETCH_ASSOC)['description'] === 'First description', 'Editing program 2 preserves program 1 description');
+    saveDepartmentProgramCard(['dept_id' => $dept, 'program_id' => $first['program_id'], 'program_name' => 'Renamed card']);
+    $read->execute([$first['program_id']]);
+    cardCheck($read->fetch(PDO::FETCH_ASSOC)['description'] === 'First description', 'Omitted descriptions survive heading edits');
+    saveDepartmentProgramCard(['dept_id' => $dept, 'program_id' => $first['program_id']]);
+    $read->execute([$first['program_id']]);
+    cardCheck($read->fetch(PDO::FETCH_ASSOC)['description'] === 'First description', 'Omitted text survives media-only saves');
     $data['program_id'] = $first['program_id'];
     $data['program_name'] = 'Updated heading'; $data['description'] = '';
     saveDepartmentProgramCard($data);

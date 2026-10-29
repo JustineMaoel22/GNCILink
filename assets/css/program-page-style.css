@@ -2787,7 +2787,14 @@ html, body {
     }
 }
 
-/* Keep the seal ring inside the screen on small phones */
+/* Scale the complete seal on phones; keep the text ring outside the logo. */
 @media (max-width: 575px) {
-    .about-seal-ring { width: 112%; }
+    .about-feature-seal { max-width: 280px; padding: 30px; }
+    .about-feature { gap: .75rem; }
+    .about-heading { font-size: clamp(1.45rem, 6vw, 1.65rem); overflow-wrap: break-word; }
+    .about-body { text-align: start; font-size: .9rem; line-height: 1.75; }
+    .template-badges { grid-template-columns: minmax(0, max-content); justify-content: center; }
+    .template-badge { justify-content: flex-start; text-align: left; }
+    .template-badge, .template-badge div { min-width: 0; }
+    .template-badge div { overflow-wrap: anywhere; }
 }

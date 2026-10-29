@@ -178,6 +178,8 @@
 
   /* ------------------------------------------------------------ chat flow */
   function ask(text, isRetry) {
+    var privacyChoice=document.getElementById('gncbot-ai-choice');
+    if(!privacyChoice || !privacyChoice.checked){if(privacyChoice){privacyChoice.focus();privacyChoice.setCustomValidity('Please choose whether to send your messages to Google Gemini.');privacyChoice.reportValidity();privacyChoice.addEventListener('change',function(){privacyChoice.setCustomValidity('');},{once:true});}return;}
     text = String(text || '').replace(/\s+/g, ' ').trim();
     if (!text || state.busy) { return; }
     if (text.length > MAX_LEN) { addBubble('model', 'Your message is too long. Please keep it under ' + MAX_LEN + ' characters.', { error: true }); return; }
@@ -194,7 +196,7 @@
     fetch(endpoint, {
       method: 'POST', credentials: 'same-origin', signal: ctrl.signal,
       headers: { 'Content-Type': 'application/json', 'X-GNCI-Chat': '1' },
-      body: JSON.stringify({ message: text, history: history, page: pageContext() })
+      body: JSON.stringify({ message: text, history: history, page: pageContext(), ai_notice_accepted: true })
     }).then(function (res) {
       return res.text().then(function (t) { var d = null; try { d = JSON.parse(t); } catch (e) { /* non-JSON (e.g. PHP die) */ } return d; });
     }).then(function (d) {

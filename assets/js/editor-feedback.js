@@ -40,7 +40,7 @@
     function create(options) {
         const doc = options.document, ui = options.uiDocument, frame = options.frame;
         const records = new Map(), marked = new Set();
-        let disposed = false, scheduled = null;
+        let disposed = false, scheduled = null, hintFrame = null, hoverEvent = null;
         const view = ui.defaultView, state = options.state;
         const hint = ui.createElement('div');
         hint.className = 've-edit-feedback-hint'; hint.setAttribute('role','tooltip');hint.textContent = 'Click to edit';hint.hidden = true;
@@ -87,23 +87,32 @@
             if (scheduled !== null || disposed) return;
             scheduled = view.requestAnimationFrame(() => { scheduled=null;refresh(false); });
         }
-        function hide() { hint.hidden=true; }
+        function hide() { hint.hidden=true;hoverEvent=null;if(hintFrame!==null){view.cancelAnimationFrame(hintFrame);hintFrame=null;} }
         function show(event) {
             const status=state(), target=event.target;
-            if (disposed || status.preview || status.busy || !target.closest || target.closest(CONTROLS)) return hide();
+            if (disposed || status.preview || status.busy || ui.querySelector('#vePop:not([hidden])') || !target.closest || target.closest(CONTROLS+',.image-frame-trigger,.image-frame-dialog')) return hide();
             const el = target.closest(TARGETS);
             if (!el || el.closest('.ve-locked') || (el.matches(TEXT) && el.getAttribute('contenteditable')==='false')) return hide();
             const button = target.closest('button,input,textarea,select');
             if (button && !button.matches(TEXT+','+ICON+','+MEDIA+','+EXTRA)) return hide();
             if (el.matches('[data-ve-field],[data-ve-section]') && !el.__ve) return hide();
-            const r=el.getBoundingClientRect(),fr=frame.getBoundingClientRect();
+            const framing=doc.defaultView.GNCImageFraming;
+            const photo=!el.matches(TEXT+','+ICON) && framing && framing.findTargetAt(target,event.clientX,event.clientY);
+            const r=photo&&framing.visibleRect ? framing.visibleRect(photo) : el.getBoundingClientRect(),fr=frame.getBoundingClientRect();
             if (!r.width || !r.height || r.bottom<0 || r.top>doc.defaultView.innerHeight) return hide();
             hint.hidden=false;
             const sx=fr.width/(doc.defaultView.innerWidth || fr.width),sy=fr.height/(doc.defaultView.innerHeight || fr.height);
-            hint.style.left=Math.max(8,Math.min(fr.left+r.left*sx,view.innerWidth-hint.offsetWidth-8))+'px';
-            let top=fr.top+r.top*sy-hint.offsetHeight-7;
+            hint.style.left=Math.max(8,Math.min(fr.left+(r.left+(photo?6:0))*sx,view.innerWidth-hint.offsetWidth-8))+'px';
+            let top=photo ? fr.top+Math.max(6,r.top+6)*sy : fr.top+r.top*sy-hint.offsetHeight-7;
             if (top<fr.top+4) top=fr.top+r.bottom*sy+7;
             hint.style.top=Math.max(fr.top+4,Math.min(top,view.innerHeight-hint.offsetHeight-8))+'px';
+            if(photo){
+                const cropButton=doc.querySelector('.image-frame-trigger:not([hidden])');
+                if(cropButton){const b=cropButton.getBoundingClientRect();hint.style.top=(fr.top+b.top*sy)+'px';
+                    if(fr.left+b.left*sx < parseFloat(hint.style.left)+hint.offsetWidth+6)hint.hidden=true;
+                }
+            }
+            if(photo){hoverEvent=event;if(hintFrame===null)hintFrame=view.requestAnimationFrame(()=>{hintFrame=null;if(hoverEvent)show(hoverEvent);});}
         }
         const listeners=[['mouseover',show],['mouseleave',hide],['pointerdown',hide],['keydown',hide],['scroll',hide]];
         listeners.forEach(([name,fn])=>doc.addEventListener(name,fn,true));
@@ -117,6 +126,7 @@
         return {
             refresh:()=>refresh(false),hide,
             dispose() {
+                hide();
                 disposed=true;if(observer)observer.disconnect();
                 if(scheduled!==null)view.cancelAnimationFrame(scheduled);
                 listeners.forEach(([name,fn])=>doc.removeEventListener(name,fn,true));view.removeEventListener('resize',hide);

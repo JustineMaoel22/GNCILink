@@ -3,7 +3,7 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../admin/admin-functions.php';
 require_once __DIR__ . '/../components/contact-page-content.php';
 
-if (session_status() === PHP_SESSION_NONE) session_start();
+if (session_status() === PHP_SESSION_NONE) session_start(['use_strict_mode'=>1,'cookie_httponly'=>true,'cookie_secure'=>authIsHttps()||!authLocalDevelopment(),'cookie_samesite'=>'Lax']);
 $contactPreview = cePreviewActive();
 $contactFields = contactPageContent($contactPreview);
 $contactText = static fn(string $key): string => $contactFields[$key]['content'];
@@ -267,6 +267,7 @@ $showOpen = ($success === '' && !$errors);
                         <?php endif; ?>
 
                         <form method="post" action="#contact-form" id="contact-form" novalidate>
+                            <p class="small">Your name, email, subject and message are sent to the school’s published contact mailbox through its email service so it can respond. Submitted entries may be held temporarily in this session to show errors. Please do not send passwords, financial credentials or unnecessary student or health records.</p>
                             <input type="hidden" name="csrf" value="<?= e($_SESSION['csrf']) ?>">
                             <div class="gnc-hp" aria-hidden="true">
                                 <input type="text" name="gnc_hp_7f3a" value="" tabindex="-1" autocomplete="off" aria-hidden="true">

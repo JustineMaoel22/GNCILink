@@ -57,6 +57,7 @@ $gncbotMascot = rtrim(dirname($gncbotBase), '/') . '/assets/images/chatbot.png';
 
         <div class="gncbot-messages" role="log" aria-live="polite" aria-relevant="additions"></div>
         <div class="gncbot-suggestions" aria-label="Suggested questions"></div>
+        <label class="gncbot-privacy-choice"><input type="checkbox" id="gncbot-ai-choice"> I agree to send my question, recent chat turns and page context to Google Gemini to answer me. Do not include passwords, student records or other sensitive information.</label>
 
         <form class="gncbot-form" autocomplete="off">
             <label for="gncbot-input" class="gncbot-sr">Type your question</label>
@@ -65,7 +66,7 @@ $gncbotMascot = rtrim(dirname($gncbotBase), '/') . '/assets/images/chatbot.png';
                 <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3.4 20.4 21 12 3.4 3.6 3.3 10l12.6 2-12.6 2 .1 6.4Z"/></svg>
             </button>
         </form>
-        <p class="gncbot-note">AI can make mistakes. Please confirm important details with GNC.</p>
+        <p class="gncbot-note">AI can make mistakes. Please confirm important details with GNC. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google privacy</a>. Chat history stays in this tab until you clear it or close the tab; Google processes the messages you send.</p>
     </section>
 </div>
 <script src="<?= $gncbotBase ?>/chatbot.js?v=<?= $gncbotVer('chatbot.js') ?>" defer></script>
