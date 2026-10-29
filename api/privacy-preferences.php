@@ -9,4 +9,5 @@ if ($origin!==null && strcasecmp((string)parse_url($origin,PHP_URL_HOST).(parse_
     http_response_code(403);echo '{"ok":false}';exit;
 }
 if (!gncPrivacyAllows('analytics')) setcookie('gnc_vid','',['expires'=>time()-3600,'path'=>'/','httponly'=>true,'samesite'=>'Lax','secure'=>!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off']);
+if (!gncPrivacyAllows('personalization') || !gncPrivacyAllows('external')) setcookie('gnci_feedback_identity','',['expires'=>time()-3600,'path'=>'/','httponly'=>true,'samesite'=>'Lax','secure'=>!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off']);
 echo '{"ok":true}';

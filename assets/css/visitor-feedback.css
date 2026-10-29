@@ -1,4 +1,5 @@
 html.gnc-feedback-open { overflow: hidden; scrollbar-gutter: stable; }
+.gnc-feedback,.gnc-feedback * { box-sizing: border-box; }
 .gnc-feedback-trigger { position: fixed; z-index: 1030; left: 0; top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; display: flex; align-items: center; gap: 10px; min-width: 48px; min-height: 150px; padding: 20px 14px; border: 0; border-radius: 0 6px 6px 0; background: #0b4228; color: #fff; box-shadow: 2px 3px 12px #08231526; font: 700 13px/1.4 Inter,system-ui,sans-serif; letter-spacing: 1.5px; cursor: pointer; }
 .gnc-feedback-trigger[hidden] { display: none !important; }
 .gnc-feedback-trigger:hover { background: #1f5e2c; }
@@ -24,6 +25,15 @@ html.gnc-feedback-open { overflow: hidden; scrollbar-gutter: stable; }
 .gnc-feedback button:disabled { cursor: default; opacity: .55; }
 .gnc-feedback-form { display: block; width: 100%; height: min(540px,55dvh); min-height: 240px; margin: 20px 0 12px; border: 1px solid #dce5dc; border-radius: 10px; background: #fff; }
 .gnc-feedback .gnc-feedback-help { font-size: 12px; }
+.gnc-feedback-ratings { padding: 16px; overflow-y: auto; text-align: left; }
+.gnc-feedback-ratings fieldset { min-width: 0; margin: 0 0 18px; padding: 12px; border: 1px solid #dce5dc; border-radius: 9px; }
+.gnc-feedback-ratings legend { float: none; width: auto; max-width: 100%; margin: 0; padding: 0 4px; font-size: 14px; font-weight: 600; }
+.gnc-feedback-rating-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.gnc-feedback-rating-options label { display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 44px; min-height: 44px; padding: 6px; border: 1px solid #b8c9bd; border-radius: 7px; cursor: pointer; }
+.gnc-feedback-rating-options label:has(input:checked) { background: #eaf0e9; border-color: #0b4228; }
+.gnc-feedback-rating-options input { accent-color: #0b4228; }
+.gnc-feedback-ratings h3 { font-size: 16px; margin: 14px 0; }
+#gncFeedbackStatus { font-size: 13px; }
 .gnc-feedback-fallback { color: #1f5e2c; font-size: 12px; text-decoration: underline; }
 .gnc-feedback-fallback:focus-visible { outline: 3px solid #bd941c; outline-offset: 3px; }
 .gnc-feedback-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; }

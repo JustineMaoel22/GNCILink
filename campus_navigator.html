@@ -1465,8 +1465,11 @@
           if (e.pointerType === "mouse" && e.button !== 0) return;
           cancelAnimationFrame(raf); // user takes over from the route-follow camera
           ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-          // Receive release/cancel even if a finger or mouse leaves the SVG.
-          try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+          // Keep taps targeted at the building. Capturing on the SVG here
+          // retargets the eventual click to the map and bypasses its button.
+          // A real drag below transfers capture to the SVG for panning.
+          var captureTarget = e.target.closest('.bld') || svg;
+          try { captureTarget.setPointerCapture(e.pointerId); } catch (_) {}
           if (ptrs.size === 1) {
             drag = {
               x: e.clientX,
@@ -1655,9 +1658,11 @@
           apply(view);
         }
         apply(view);
-        if (window.ResizeObserver)
-          new ResizeObserver(resizeView).observe(wrap);
-        else
+        if (window.ResizeObserver) {
+          var viewportObserver = new ResizeObserver(resizeView);
+          viewportObserver.observe(wrap);
+          viewportObserver.observe(svg);
+        } else
           window.addEventListener("resize", resizeView);
       })();
     </script>

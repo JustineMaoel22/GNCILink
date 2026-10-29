@@ -59,6 +59,40 @@ let socket;
     assert.equal(await evaluate("current === 'beta' && document.getElementById('path').classList.contains('go')"), true, 'Building routes work without the external font');
     await send('Fetch.disable');
     await send('Network.setBlockedURLs', { urls: ['*fonts.googleapis.com*', '*fonts.gstatic.com*', '*cdn.jsdelivr.net*', '*facebook.com*', '*cloudflareinsights.com*', '*cdnjs.cloudflare.com*'] });
+    async function buildingPoint(id) {
+        await evaluate('fitView(false)');
+        return evaluate(`(() => {
+            const building=document.querySelector('#b-${id} .main'), b=building.getBBox();
+            for(const fy of [.5,.25,.75,.1,.9]) for(const fx of [.5,.25,.75,.1,.9]) {
+                const point=new DOMPoint(b.x+b.width*fx,b.y+b.height*fy).matrixTransform(building.getScreenCTM());
+                if(document.elementFromPoint(point.x,point.y)?.closest('.bld')?.dataset.id === '${id}') return {x:point.x,y:point.y};
+            }
+            throw Error('No visible clickable point for ${id}');
+        })()`);
+    }
+    // Real browser input exercises pointer capture; dispatching a synthetic click does not.
+    for (const id of ['beta','banzali','tanjangco','goseco','puno','limlingan','narciso','parking1','parking2']) {
+        const point=await buildingPoint(id);
+        await send('Input.dispatchMouseEvent', {type:'mouseMoved',...point});
+        await send('Input.dispatchMouseEvent', {type:'mousePressed',...point,button:'left',clickCount:1});
+        await send('Input.dispatchMouseEvent', {type:'mouseReleased',...point,button:'left',clickCount:1});
+        assert.equal(await evaluate('current'), id, 'Clicking the actual '+id+' building selects its route');
+    }
+    const dragStart=await buildingPoint('beta');
+    await evaluate('clear(true)');
+    await send('Input.dispatchMouseEvent', {type:'mousePressed',...dragStart,button:'left',clickCount:1});
+    await send('Input.dispatchMouseEvent', {type:'mouseMoved',x:dragStart.x+40,y:dragStart.y+20,button:'left',buttons:1});
+    await send('Input.dispatchMouseEvent', {type:'mouseReleased',x:dragStart.x+40,y:dragStart.y+20,button:'left',clickCount:1});
+    assert.equal(await evaluate('current'), null, 'Dragging from a building must not select it');
+    await send('Emulation.setDeviceMetricsOverride', {width:390,height:620,deviceScaleFactor:1,mobile:true});
+    await send('Emulation.setTouchEmulationEnabled', {enabled:true});
+    for (const id of ['tanjangco','banzali']) {
+        const point=await buildingPoint(id);
+        await send('Input.dispatchTouchEvent', {type:'touchStart',touchPoints:[point]});
+        await send('Input.dispatchTouchEvent', {type:'touchEnd',touchPoints:[]});
+        await until(()=>evaluate('current === '+JSON.stringify(id)), 'Touching the actual '+id+' building must select its route');
+    }
+    await send('Emulation.setTouchEmulationEnabled', {enabled:false});
     const interruptedDrag = await evaluate(`(() => {
         fitView(false);
         const map=document.getElementById('map'),r=map.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;
@@ -89,7 +123,7 @@ let socket;
         assert.equal(await evaluate("document.querySelector('.gnc-map-frame').contentWindow.current"), 'banzali', 'Resizing preserves the selected building');
         await evaluate("document.querySelector('.gnc-map-frame').style.width=''");
     }
-    console.log('PASS: stalled-font startup, interrupted-touch recovery, first-scroll visibility, building selection, resize and scroll-away/return work without refreshing on desktop and mobile.');
+    console.log('PASS: real building clicks and touch taps, drag suppression, stalled-font startup, interrupted-touch recovery, first-scroll visibility, resize and scroll-away/return on desktop and mobile.');
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
     if (socket) socket.close(); browser.kill();
     // Only remove this test-created, uniquely named directory under the OS temp root.
