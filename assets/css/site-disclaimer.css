@@ -1,0 +1,8 @@
+#gncSiteDisclaimer{box-sizing:border-box;width:min(460px,calc(100% - 32px));max-height:calc(100vh - 32px);overflow:auto;padding:26px;border:1px solid #d9e2dc;border-top:4px solid #eaba3b;border-radius:14px;background:#fff;color:#203b2a;box-shadow:0 18px 50px #0003;font:15px/1.6 Inter,Arial,sans-serif}
+#gncSiteDisclaimer::backdrop{background:#12341fa6}
+#gncSiteDisclaimer h2{margin:0 0 12px;color:#094024;font:700 23px/1.3 'Noto Serif',Georgia,serif}
+#gncSiteDisclaimer p{margin:0 0 22px}
+#gncSiteDisclaimer form{margin:0;text-align:right}
+#gncSiteDisclaimer button{min-height:44px;padding:10px 20px;border:0;border-radius:8px;background:#1f5e2c;color:#fff;font:600 15px/1.5 Inter,Arial,sans-serif;cursor:pointer}
+#gncSiteDisclaimer button:hover{background:#094024}
+#gncSiteDisclaimer button:focus-visible{outline:3px solid #eaba3b;outline-offset:3px}
