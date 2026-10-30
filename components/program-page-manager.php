@@ -422,7 +422,7 @@ foreach ($pgPrograms as $p):
                         <div class="col-lg-3"><?php $pgField('cta_icon', 'Icon', $c['cta_icon'], 'icon'); ?></div>
                         <div class="col-12"><?php $pgField('cta_text', 'Text', $c['cta_text'], 'text'); ?></div>
                         <div class="col-lg-4"><?php $pgField('cta_button', 'Button label', $c['cta_button'], 'text', '', 'Apply Now'); ?></div>
-                        <div class="col-lg-8"><?php $pgField('cta_link', 'Where the button goes', $c['cta_link'], 'text', 'Start with / for a page on this website (like /admissions/apply.php), or https:// for another website.', '/admissions/apply.php'); ?></div>
+                        <div class="col-lg-8"><p class="form-text">Apply buttons open Enrollment Procedures for every program.</p></div>
                     </div></div>
                 </details>
 

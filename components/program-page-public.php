@@ -186,7 +186,7 @@ function programPageContentDefaults(): array {
         'cta_title'     => 'Make a difference. Begin Your Journey with GNCI.',
         'cta_text'      => 'Join a community driven by purpose, dedicated to excellence, and built to make an impact.',
         'cta_button'    => 'Apply Now',
-        'cta_link'      => '/admissions/apply.php',
+        'cta_link'      => '/pages/admission/enrollment-procedures.php',
         'vision_icon'   => 'material:visibility',
         'mission_icon'  => 'material:shield_with_heart',
         'cta_icon'      => 'material:volunteer_activism',

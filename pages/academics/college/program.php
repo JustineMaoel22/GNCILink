@@ -232,8 +232,8 @@ if ($program !== null) {
     $showAbout   = $sealUrl !== null || trim($c['about_text']) !== '' || $showVision || $showMission;
     $showCore    = $program['core_enabled'] && (!empty($items['core_value']) || $cePreview);
 
-    $ctaLink = trim($c['cta_link']) !== '' ? trim($c['cta_link']) : $defaults['cta_link'];
-    if (!preg_match('#^(/|https?://)#i', $ctaLink)) $ctaLink = $defaults['cta_link'];
+    // Every program shares the enrollment destination, including older saved CTAs.
+    $ctaLink = $defaults['cta_link'];
 
     $pageTitle = $fullName;
     // Match the visible heading before the transition script runs during parsing.

@@ -331,7 +331,7 @@ $currentProgram = publicProgram(CURRENT_PROGRAM);
                     <p class="nursing-cta-desc">Join a community driven by purpose, dedicated to excellence, and built to make an impact.</p>
                 </div>
                 <div class="nursing-cta-action">
-                    <a href="/admissions/apply.php" class="nursing-cta-btn">Apply Now</a>
+                    <a href="/pages/admission/enrollment-procedures.php" class="nursing-cta-btn">Apply Now</a>
                 </div>
             </div>
         </div>
