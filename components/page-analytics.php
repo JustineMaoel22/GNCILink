@@ -183,10 +183,25 @@ if (!function_exists('gncPageNow')) {
     function gncPageTotals(PDO $db): array {
         try {
             $rows = $db->query('SELECT page_url, page_title, visit_count, last_visited FROM page_visits')->fetchAll(PDO::FETCH_ASSOC);
+            // Early tracking dropped the slug from shared department URLs. Recover
+            // only a unique title match to an explicitly identified department;
+            // never group unrelated pages merely because their titles match.
+            $departmentTitles = [];
+            foreach ($rows as $row) {
+                $path = gncPageNormalizePath($row['page_url']);
+                if ($path !== null && strpos($path, '/pages/academics/college/college-department.php?slug=') === 0) {
+                    $titleKey = gncPageCleanTitle($row['page_title'], $path);
+                    if ($titleKey !== '') $departmentTitles[$titleKey][$path] = true;
+                }
+            }
             $pages = [];
             foreach ($rows as $row) {
                 $path = gncPageNormalizePath($row['page_url']);
                 if ($path === null || strcasecmp(trim($row['page_title']), 'Program not found') === 0) continue;
+                if ($path === '/pages/academics/college/college-department.php') {
+                    $matches = $departmentTitles[gncPageCleanTitle($row['page_title'], $path)] ?? [];
+                    if (count($matches) === 1) $path = array_key_first($matches);
+                }
                 $row['page_url'] = $path;
                 $row['visit_count'] = (int) $row['visit_count'];
                 if (isset($pages[$path])) {

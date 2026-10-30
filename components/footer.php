@@ -216,7 +216,7 @@ if (!function_exists('gncResolvePopularUrl')) {
     // Count this page view at most once per page per 30 minutes (per browser tab session)
     var path = location.pathname;
     var pageParams = new URLSearchParams(location.search), entityParams = new URLSearchParams();
-    var entityKeys = /\/(program|college-department)\.php$/.test(path) ? ['slug'] : /\/(news-article|announcement-article|event)\.php$/.test(path) ? ['id', 'slug'] : [];
+    var entityKeys = /\/(program|college-department)(?:\.php)?\/?$/.test(path) ? ['slug'] : /\/(news-article|announcement-article|event)\.php$/.test(path) ? ['id', 'slug'] : [];
     entityKeys.forEach(function (key) { if (pageParams.has(key)) entityParams.set(key, pageParams.get(key)); });
     if (entityParams.toString()) path += '?' + entityParams.toString();
     var key  = 'gnc_pv:' + path;

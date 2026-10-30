@@ -61,4 +61,18 @@ analyticsCheck($summary['total_views'] === 262 && $summary['today_views'] === 26
 analyticsCheck($summary['unique_visitors'] === 7, 'Unique visitor counter remains independent');
 analyticsCheck(gncViewsByDate($db, 2)[$today] === 262, 'Daily chart must exclude Home and include aliases');
 analyticsCheck(count(gncViewsByDate($db, 2)) === 2, 'Keep zero-filled dates');
+
+// Hosted databases also contain shared department URLs recorded before the
+// tracker preserved query parameters. Reproduce the two CASED rows shown live.
+$db->pages = [
+    ['page_url'=>$canonical, 'page_title'=>'College of Arts and Sciences, and Education', 'visit_count'=>99, 'last_visited'=>"$today 09:00:00"],
+    ['page_url'=>'/pages/academics/college/college-department.php', 'page_title'=>'College of Arts and Sciences, and Education', 'visit_count'=>55, 'last_visited'=>"$today 08:00:00"],
+];
+$popular = gncPopularPages($db, 10);
+analyticsCheck(count($popular) === 1 && $popular[0]['visit_count'] === 154 && $popular[0]['page_url'] === $canonical, 'Hosted slugless CASED history must combine with identified CASED');
+// A title alone must never combine two explicitly identified departments.
+$db->pages[] = ['page_url'=>'/pages/academics/college/college-department.php?slug=another-department', 'page_title'=>'College of Arts and Sciences, and Education', 'visit_count'=>3, 'last_visited'=>"$today 07:00:00"];
+analyticsCheck(count(gncPopularPages($db, 10)) === 3, 'Ambiguous title matches must preserve separate identities');
+$db->pages[] = ['page_url'=>'/some-other-page', 'page_title'=>'College of Arts and Sciences, and Education', 'visit_count'=>2, 'last_visited'=>"$today 07:00:00"];
+analyticsCheck(count(gncPopularPages($db, 10)) === 4, 'Unrelated pages sharing a title must stay separate');
 echo "PASS: URL aliases, historical aggregation, Home recording exclusion, summary, daily charts and visitor counter.\n";
