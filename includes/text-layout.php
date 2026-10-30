@@ -34,6 +34,19 @@ function textLayoutRoute(string $route): string {
     ksort($query);
     return $path . ($query ? '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986) : '');
 }
+function textLayoutRuns($runs): array {
+    if(!is_array($runs)||!array_is_list($runs)||count($runs)>512)throw new InvalidArgumentException('Too many selected-text styles.');
+    $out=[];$end=0;
+    foreach($runs as $run){
+        if(!is_array($run)||array_diff(array_keys($run),['start','end','text','size','color'])||!is_int($run['start']??null)||!is_int($run['end']??null)||$run['start']<$end||$run['end']<=$run['start']||$run['end']>1000000||!is_string($run['text']??null)||strlen($run['text'])>50000)throw new InvalidArgumentException('Invalid selected text. Select the text again.');
+        if(strlen(mb_convert_encoding($run['text'],'UTF-16LE','UTF-8'))/2!==($run['end']-$run['start']))throw new InvalidArgumentException('Invalid selected text length.');
+        $safe=['start'=>$run['start'],'end'=>$run['end'],'text'=>$run['text']];
+        if(isset($run['size'])){if((!is_int($run['size'])&&!is_float($run['size']))||!is_finite((float)$run['size'])||$run['size']<8||$run['size']>200)throw new InvalidArgumentException('Font size must be between 8 and 200 pixels.');$safe['size']=round((float)$run['size'],2);}
+        if(isset($run['color'])){if(!is_string($run['color'])||!preg_match('/\A#[a-fA-F0-9]{6}\z/D',$run['color']))throw new InvalidArgumentException('Use a HEX text color such as #176B42.');$safe['color']=strtoupper($run['color']);}
+        if(count($safe)===3)throw new InvalidArgumentException('Choose a text size or color.');
+        $out[]=$safe;$end=$run['end'];
+    }return $out;
+}
 function textLayoutNormalize(array $entries): array {
     if (count($entries) > 400) throw new InvalidArgumentException('Too many text placements.');
     $out = [];
@@ -43,9 +56,10 @@ function textLayoutNormalize(array $entries): array {
         foreach ($devices as $device => $box) {
             if (!in_array($device, ['desktop','tablet','mobile'], true)) throw new InvalidArgumentException('Invalid device.');
             if ($box === null) { $out[$key][$device] = null; continue; }
-            if (!is_array($box) || !$box || array_diff(array_keys($box), ['x','y','w','h','fontSize','fontFamily','centerX'])) throw new InvalidArgumentException('Invalid text box.');
+            if (!is_array($box) || !$box || array_diff(array_keys($box), ['x','y','w','h','fontSize','fontFamily','centerX','runs'])) throw new InvalidArgumentException('Invalid text box.');
             $positioned = (bool)array_intersect(array_keys($box), ['x','y','w','h']);
-            if (!$positioned && !array_key_exists('fontFamily', $box)) throw new InvalidArgumentException('Invalid text box.');
+            if (!$positioned && !array_key_exists('fontFamily', $box) && !array_key_exists('runs',$box)) throw new InvalidArgumentException('Invalid text box.');
+            if (array_key_exists('runs',$box)) $out[$key][$device]['runs']=textLayoutRuns($box['runs']);
             foreach ($positioned ? ['x'=>[-100,100], 'y'=>[-100,100], 'w'=>[1,100], 'h'=>[0,3000]] : [] as $prop => [$min,$max]) {
                 $n = $box[$prop] ?? null;
                 if ((!is_int($n) && !is_float($n)) || !is_finite((float)$n) || $n < $min || $n > $max) throw new InvalidArgumentException('Text position or size is out of range.');

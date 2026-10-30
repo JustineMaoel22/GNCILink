@@ -20,6 +20,7 @@ if (!$dept) {
 $dean       = $dept ? publicDepartmentDean($dept) : ['photo_url' => null, 'name' => '', 'title' => '', 'bio' => '', 'phone' => '', 'email' => '', 'office' => '', 'hours' => ''];
 $programs   = $dept ? publicDepartmentPrograms((int)$dept['dept_id']) : [];
 $fbEmbedUrl = $dept ? publicDepartmentFacebookEmbedUrl((string)($dept['facebook_url'] ?? '')) : null;
+$useFacebookLinkCard = ($dept['slug'] ?? '') === 'cased';
 $logoUrl    = $dept['logo_url'] ?? null;
 $pageTitle  = $dept ? (string)$dept['dept_name'] : 'Department Not Found';
 $isGraduateSchool = ($dept['slug'] ?? '') === 'graduate-school';
@@ -120,7 +121,7 @@ function cd_banner_summary(?string $text, int $max = 220): string {
 $aboutSource = $dept ? (trim((string)($dept['about_text'] ?? '')) !== '' ? $dept['about_text'] : ($dept['description'] ?? '')) : '';
 $aboutHtml   = cd_overview_html($aboutSource);
 $deanTitle   = trim((string)$dean['title']);
-// Banner line = "Line under the page title" (hero_text); if empty, a one-sentence summary.
+// Graduate School permits an intentionally empty banner line; other departments retain their legacy summary fallback.
 $heroTitle = $isBasicEducation ? $pageContent['hero_title']['value'] : $pageTitle;
 $heroTitleHtml = cd_h($heroTitle);
 $heroThemeStyle = '';
@@ -133,7 +134,7 @@ if ($isCollegeHeader) {
 $heroBlurb = $dept
     ? (trim((string)($dept['hero_text'] ?? '')) !== ''
         ? trim((string)$dept['hero_text'])
-        : cd_banner_summary($dept['description'] ?? ''))
+        : ($isGraduateSchool ? '' : cd_banner_summary($dept['description'] ?? '')))
     : '';
 $hasContact = trim((string)$dean['phone']) !== '' || trim((string)$dean['email']) !== ''
     || trim((string)$dean['office']) !== '' || trim((string)$dean['hours']) !== ''
@@ -206,6 +207,13 @@ $cdText = function (?string $v) use ($cePreview): string {
             background: transparent;
             border-radius: inherit;
         }
+        .dept-fb-link { display:flex; align-items:center; gap:16px; padding:22px; text-align:left; background:#fff; border:1px solid var(--gnc-green, #094024); border-radius:8px; color:var(--gnc-green, #094024); text-decoration:none; }
+        .dept-fb-link:hover { color:var(--gnc-green, #094024); background:#f4f7f4; }
+        .dept-fb-link:focus-visible { outline:3px solid #eaba3b; outline-offset:4px; }
+        .dept-fb-icon { flex:0 0 44px; font-size:36px; line-height:1; }
+        .dept-fb-copy { min-width:0; overflow-wrap:anywhere; }
+        .dept-fb-copy strong { display:block; font:700 17px/1.4 'Noto Serif',Georgia,serif; }
+        .dept-fb-copy span { display:block; margin-top:8px; font:600 14px/1.5 Inter,Arial,sans-serif; text-decoration:underline; }
     </style>
     <script>document.documentElement.classList.add('js-anim');</script>
 </head>
@@ -241,7 +249,7 @@ $cdText = function (?string $v) use ($cePreview): string {
                     <div class="dept-hero-copy<?= $isCollegeHeader && $pageContent['header_text_hidden']['value'] === '1' ? ' dept-header-hidden' : '' ?>"<?= $isCollegeHeader ? ' data-dept-header-text' : '' ?>>
                     <h1 class="dept-hero-title"<?= $isCollegeHeader ? ceTextLayoutMark('data-ve-field="dept-name"') . ' data-gnc-layout-group' : ($dept ? ($isBasicEducation ? departmentPageField($dept, 'hero_title') : ceField('dept-name', ['max' => 255, 'label' => 'Department name'])) : '') ?>><?= $heroTitleHtml ?></h1>
                     <?php if ((!$isCollegeHeader || strcasecmp(trim($heroBlurb), trim($heroTitle)) !== 0) && ($heroBlurb !== '' || ($cePreview && $dept))): ?>
-                    <p class="dept-hero-blurb"<?= $dept ? ceField('dept-hero', ['max' => 255, 'label' => 'Line under the title', 'ph' => 'Add a line under the title']) : '' ?>><?= cd_h($heroBlurb) ?></p>
+                    <p class="dept-hero-blurb"<?= $dept ? ceField('dept-hero', ['max' => 255, 'label' => 'Line under the title', 'ph' => 'Add a line under the title', 'allow_empty' => $isGraduateSchool]) : '' ?>><?= cd_h($heroBlurb) ?></p>
                     <?php endif; ?>
                     <?php if ($isCollegeHeader && ($cePreview || trim($pageContent['header_extra_text']['value']) !== '')): ?>
                     <p class="dept-header-extra" data-dept-header-extra<?= departmentPageField($dept, 'header_extra_text') ?><?= trim($pageContent['header_extra_text']['value']) === '' ? ' hidden' : '' ?>><?= departmentPageText($dept, 'header_extra_text') ?></p>
@@ -301,7 +309,7 @@ $cdText = function (?string $v) use ($cePreview): string {
             </div>
         </section>
 
-        <?php if (!$isBasicEducation && !$isGraduateSchool): ?>
+        <?php if (!$isBasicEducation): ?>
         <?php $departmentStatements = array_filter(['vision', 'mission'], static fn($key) => $cePreview || trim(strip_tags($pageContent[$key . '_text']['value'])) !== ''); ?>
         <?php if ($departmentStatements): ?>
         <section class="dept-programs" aria-label="Department vision and mission">
@@ -464,17 +472,24 @@ $cdText = function (?string $v) use ($cePreview): string {
 
         <!-- ═══ 4 · Connect with Us (from departments.facebook_url) ═══ -->
         <?php if ($fbEmbedUrl !== null || $cePreview): ?>
-        <section class="dept-programs dept-facebook">
+        <section class="dept-programs dept-facebook"<?= $useFacebookLinkCard ? ' data-facebook-display="link"' : '' ?>>
             <div class="dept-programs-inner">
                 <span class="dept-eyebrow" data-reveal="right"<?= departmentPageField($dept, 'facebook_label') ?>><?= departmentPageText($dept, 'facebook_label') ?></span>
                 <h2 data-reveal="right" style="--d: 80ms"<?= departmentPageField($dept, 'facebook_title') ?>><?= departmentPageText($dept, 'facebook_title') ?></h2>
                 <div class="dept-fb-lead cms-rich" data-reveal="right" style="--d: 120ms"<?= departmentPageField($dept, 'facebook_intro') ?>><?= departmentPageText($dept, 'facebook_intro') ?></div>
                 <?php if ($fbEmbedUrl !== null): ?>
                 <div class="dept-fb-box" data-reveal="scale" style="--d: 200ms<?= $cePreview ? '; position: relative' : '' ?>">
+                    <?php if ($useFacebookLinkCard): ?>
+                    <a class="dept-fb-link" href="<?= cd_h($dept['facebook_url']) ?>" target="_blank" rel="noopener noreferrer">
+                        <i class="bi bi-facebook dept-fb-icon" aria-hidden="true"></i>
+                        <div class="dept-fb-copy"><strong><?= cd_h(trim($pageContent['facebook_page_name']['value']) ?: 'Facebook page') ?></strong><span>Visit on Facebook <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></span></div>
+                    </a>
+                    <?php else: ?>
                     <iframe <?= gncPrivacyFrameSource($fbEmbedUrl) ?> width="500" height="130" scrolling="no" frameborder="0"
                             allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
                             allowfullscreen loading="lazy"
                             title="<?= cd_h($pageTitle) ?> Facebook page"></iframe>
+                    <?php endif; ?>
                     <?php if ($cePreview): ?>
                     <?php /* The Facebook plugin is another website's frame: clicks inside it never reach the editor, so a see-through cover takes the click. */ ?>
                     <div data-ve-pick="dept-facebook" data-ve-label="Facebook page" title="Click to change the Facebook page" style="position:absolute;inset:0;z-index:2;cursor:pointer"></div>

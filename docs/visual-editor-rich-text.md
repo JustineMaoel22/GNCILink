@@ -3,7 +3,8 @@
 Click a paragraph or description to show the shared formatting toolbar. It
 supports headings, bold, italic, underline, ordered and unordered lists, links,
 quotes, alignment, and clearing formatting. Titles, names, labels, contact
-values, and addresses keep their existing plain-text behavior.
+values, and addresses keep their existing plain-text storage and support the
+selected-word size and color controls described below.
 
 This applies to homepage introductions and the president's message,
 administration descriptions, academic listings, department biographies and
@@ -11,10 +12,29 @@ introductions, program descriptions and item bodies, and organization pages
 including leadership callouts. Existing section editors, news, and announcement
 editors retain their rich-text tools. Changes use the existing Publish workflow.
 
+Select words in any editable text field, then choose **Font size** or **Font color**.
+Sizes include 12, 14, 16, 18, 20, 24, 32, 36 and 48px, plus custom values from
+8–200px. Colors include presets, a color picker and custom HEX values. **Default
+size** and **Default text color** remove only that setting from the selected
+words. Unselected text, bold/italic/underline, links and paragraph alignment stay
+intact. Choosing a style without selecting words shows a selection reminder.
+
+Selected-word styles apply to desktop, tablet and mobile; large sizes are capped
+at 20vw on narrow screens and styled words can wrap to avoid horizontal overflow.
+The existing whole-field Google Font and positioning controls remain available.
+Styles use validated character ranges in the existing `text_layout_settings`
+JSON, including for plain-text names and labels, so their content remains plain
+text. Private snapshots preserve the styles, and the existing approval and Publish
+workflow makes them public. No additional database migration is required if text
+layout storage is already installed. If content changes outside the editor, a
+range whose saved text no longer matches is ignored rather than styling different
+words. Enrollment steps use their persistent IDs so reordering retains styles.
+
 Select editable text and use **Google Font** to choose Inter, Lora, Montserrat,
 Noto Serif, Open Sans, Poppins, Roboto, or Rubik. **Default font** restores the
 page's original font. The choice applies to the whole selected field for the
-current desktop, tablet, or mobile view, like the existing text-size controls.
+current desktop, tablet, or mobile view. Size and color apply to selected words
+across all three views.
 Font-only changes keep the text in normal document flow. They use the existing
 layout draft and publish workflow and `text_layout_settings` JSON storage; no
 additional migration is needed. Only selected Google Fonts are requested, using

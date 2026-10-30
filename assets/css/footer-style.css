@@ -2,11 +2,13 @@
 FOOTER
 ============================================= */
 .gnc-footer {
+    --gf-fade-color: var(--gnc-cream, #f9f6f1);
+    --gf-fade-height: clamp(160px, 12vw, 220px);
     --gf-green:      var(--gnc-green, #094024);
     --gf-green-deep: var(--gnc-green-dark, #062018);
     --gf-gold:       var(--gnc-gold, #EABA3B);
     --gf-text:       rgba(255, 255, 255, 0.82);
-    --gf-muted:      rgba(255, 255, 255, 0.62);
+    --gf-muted:      rgba(255, 255, 255, 0.74);
     --gf-line:       rgba(255, 255, 255, 0.12);
     --gf-card:       rgba(255, 255, 255, 0.06);
     --gf-card-hover: rgba(255, 255, 255, 0.11);
@@ -15,10 +17,30 @@ FOOTER
     position: relative;
     color: var(--gf-text);
     background:
+        linear-gradient(180deg,
+            var(--gf-fade-color) 0%,
+            color-mix(in srgb, var(--gf-fade-color) 98%, transparent) 10%,
+            color-mix(in srgb, var(--gf-fade-color) 90%, transparent) 20%,
+            color-mix(in srgb, var(--gf-fade-color) 78%, transparent) 30%,
+            color-mix(in srgb, var(--gf-fade-color) 64%, transparent) 40%,
+            color-mix(in srgb, var(--gf-fade-color) 50%, transparent) 50%,
+            color-mix(in srgb, var(--gf-fade-color) 36%, transparent) 60%,
+            color-mix(in srgb, var(--gf-fade-color) 22%, transparent) 70%,
+            color-mix(in srgb, var(--gf-fade-color) 10%, transparent) 80%,
+            color-mix(in srgb, var(--gf-fade-color) 2%, transparent) 90%,
+            transparent 100%) top / 100% var(--gf-fade-height) no-repeat,
         radial-gradient(50% 40% at 100% 0%, rgba(234, 186, 59, 0.08), transparent 70%),
         radial-gradient(45% 40% at 0% 100%, rgba(40, 120, 56, 0.22), transparent 70%),
         linear-gradient(180deg, var(--gf-green) 0%, var(--gf-green-deep) 100%);
-    overflow-x: clip;   /* clip sideways overflow without hiding the seal that hangs over the banner */
+    overflow-x: clip;
+}
+
+/* Reserve space for the fade; painting it on the footer avoids clipped blur edges. */
+.gnc-footer::before {
+    content: "";
+    display: block;
+    height: var(--gf-fade-height);
+    pointer-events: none;
 }
 
 .gnc-footer *,
@@ -27,64 +49,34 @@ FOOTER
 
 .gnc-footer a { transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .25s var(--gf-ease); }
 
-/* ---------- Banner + seal ---------- */
-.gnc-footer-banner {
-    position: relative;
-    height: 240px;
-    background-image: url('/assets/images/Footer-Header-V2.png');
-    background-size: cover;
-    background-position: center;
-    overflow: visible;
-}
-
-/* soft fade from the photo into the footer colour */
-.gnc-footer-banner-overlay {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(6, 32, 24, 0) 35%, rgba(9, 64, 36, 0.85) 100%);
-    pointer-events: none;
-}
-
-/* thin gold line along the bottom edge of the banner */
-.gnc-footer-banner::after {
-    content: "";
-    position: absolute;
-    left: 0; right: 0; bottom: 0;
-    height: 3px;
-    background: linear-gradient(90deg, transparent, var(--gf-gold) 20%, var(--gf-gold) 80%, transparent);
-    z-index: 2;
-}
-
-.gnc-footer-seal-wrap {
-    position: absolute;
-    left: 50%;
-    bottom: -52px;
-    transform: translateX(-50%);
-    width: 144px;
-    height: 144px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #fff;
-    box-shadow:
-        0 0 0 4px var(--gf-gold),
-        0 0 0 10px rgba(234, 186, 59, 0.22),
-        0 16px 34px rgba(0, 0, 0, 0.35);
-    z-index: 3;
-}
-
-.gnc-footer-seal {
-    width: 118px;
-    height: 118px;
-    object-fit: contain;
-}
-
 /* ---------- Main area ---------- */
 .gnc-footer-top {
     position: relative;
     z-index: 1;
-    padding: 6.25rem 0 3.25rem;
+    padding: 1.5rem 0 3.5rem;
+}
+
+.gnc-footer-intro {
+    max-width: 760px;
+    margin: 0 auto 2.75rem;
+    text-align: center;
+}
+
+.gnc-footer-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.3fr;
+    gap: clamp(1.5rem, 3vw, 3rem);
+    padding: clamp(1.25rem, 3vw, 2.75rem);
+    border: 1px solid rgba(255, 255, 255, .14);
+    border-radius: 24px;
+    background: rgba(255, 255, 255, .04);
+}
+
+.gnc-footer-grid > * { min-width: 0; }
+
+.gnc-footer :is(a,button):focus-visible {
+    outline: 2px solid var(--gf-gold);
+    outline-offset: 4px;
 }
 
 /* ---------- Brand column ---------- */
@@ -92,7 +84,7 @@ FOOTER
     font-family: 'Noto Serif', serif;
     color: #fff;
     font-weight: 700;
-    font-size: 1.45rem;
+    font-size: clamp(1.8rem, 3vw, 2.6rem);
     line-height: 1.2;
     letter-spacing: -0.01em;
     margin-bottom: .3rem;
@@ -100,20 +92,19 @@ FOOTER
 
 .gnc-footer-tagline {
     color: var(--gf-gold);
-    font-size: .88rem;
+    font-size: .9rem;
     font-style: italic;
     letter-spacing: .02em;
-    margin-bottom: 1.1rem;
+    margin-bottom: 0;
 }
 
 .gnc-footer-desc {
-    font-size: .8rem;
-    font-style: italic;
+    font-size: .84rem;
     line-height: 1.75;
     color: var(--gf-muted);
-    margin-bottom: 1.75rem;
-    padding-left: .9rem;
-    border-left: 2px solid rgba(234, 186, 59, 0.55);
+    margin: 1rem 0 0;
+    max-width: 68ch;
+    margin-inline: auto;
 }
 
 /* ---------- Column headings ---------- */
@@ -125,7 +116,6 @@ FOOTER
     letter-spacing: .16em;
     text-transform: uppercase;
     padding-bottom: .75rem;
-    border-bottom: 1px solid var(--gf-line);
     margin-bottom: 1.15rem;
 }
 
@@ -195,9 +185,9 @@ FOOTER
 }
 
 .gnc-footer-socials a {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
     background-color: var(--gf-card);
     border: 1px solid var(--gf-line);
     color: #fff;
@@ -254,13 +244,21 @@ FOOTER
 /* ---------- Map ---------- */
 .gnc-footer-map {
     position: relative;
-    height: 100%;
-    min-height: 320px;
+    height: 320px;
     border-radius: 16px;
     overflow: hidden;
     border: 1px solid var(--gf-line);
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
     background: var(--gf-card);
+}
+
+.gnc-footer-campus-note {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin: 1rem 0 0;
+    font-size: .8rem;
+    color: var(--gf-muted);
 }
 
 .gnc-footer-map iframe {
@@ -271,6 +269,23 @@ FOOTER
     height: 100%;
     border: 0;
 }
+
+.gnc-footer-map .gnc-privacy-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .75rem;
+    height: 100%;
+    padding: 4.5rem 1.5rem 1.5rem;
+    border-radius: 0;
+    background: transparent;
+    color: var(--gf-text);
+    font-size: .88rem;
+    line-height: 1.65;
+}
+
+.gnc-footer-map .gnc-privacy-placeholder p { margin: 0; }
 
 .gnc-footer-map-link {
     position: absolute;
@@ -320,6 +335,7 @@ FOOTER
 
 .gnc-footer-legal {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: .75rem;
     margin-left: auto;
@@ -335,8 +351,9 @@ FOOTER
 .gnc-footer-bottom a:hover { color: var(--gf-gold); }
 
 .gnc-footer-totop {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;
@@ -421,30 +438,34 @@ FOOTER - VISITOR COUNTER
 }
 
 /* =============================================
-FOOTER - POPULAR PAGES (Responsive Grid)
+FOOTER - SUGGESTED PAGES (Responsive Grid)
 ============================================= */
-.gnc-footer-popular {
-    margin-bottom: 3rem;
-    padding-bottom: 2.5rem;
-    border-bottom: 1px solid var(--gf-line);
+.gnc-footer-suggestions {
+    margin-bottom: 2rem;
+    padding: 1.25rem 0;
+    border-block: 1px solid var(--gf-line);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem 2rem;
+    align-items: center;
 }
 
-.gnc-footer-popular-head {
+.gnc-footer-suggestions-head {
     display: flex;
     align-items: center;
     gap: .65rem;
-    margin-bottom: 1.2rem;
+    margin-bottom: 0;
 }
 
-.gnc-footer-popular-head::after {
-    content: "";
+.gnc-footer-suggestions-head::after {
+    content: none;
     flex: 1;
     height: 1px;
     margin-left: .5rem;
     background: linear-gradient(90deg, rgba(234, 186, 59, 0.5), transparent);
 }
 
-.gnc-footer-popular-head i {
+.gnc-footer-suggestions-head i {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -456,7 +477,7 @@ FOOTER - POPULAR PAGES (Responsive Grid)
     font-size: 1rem;
 }
 
-.gnc-footer-popular-head h6 {
+.gnc-footer-suggestions-head h6 {
     margin: 0;
     font-family: 'Noto Serif', serif;
     font-weight: 700;
@@ -465,61 +486,55 @@ FOOTER - POPULAR PAGES (Responsive Grid)
     color: #fff;
 }
 
-.gnc-footer-popular-grid {
+.gnc-footer-suggestions-grid {
     display: grid;
     gap: .9rem;
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
-.gnc-footer-popular-grid[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.gnc-footer-popular-grid[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.gnc-footer-popular-grid[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
+.gnc-footer-suggestions-grid[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.gnc-footer-suggestions-grid[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.gnc-footer-suggestions-grid[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
 
-.gnc-popular-link {
-    display: flex;
+.gnc-suggestion-link {
+    display: grid;
+    grid-template-columns: 1fr auto;
     align-items: center;
     gap: .85rem;
-    min-height: 66px;
-    padding: .85rem 1rem;
-    border-radius: 14px;
+    min-height: 128px;
+    padding: 1.25rem;
+    border-radius: 16px;
     text-decoration: none;
     color: #fff;
-    background: var(--gf-card);
+    background: rgba(255, 255, 255, .055);
     border: 1px solid var(--gf-line);
     transition: background .25s ease, border-color .25s ease, transform .25s var(--gf-ease), box-shadow .25s ease;
 }
 
-.gnc-popular-link:hover,
-.gnc-popular-link:focus-visible {
-    background: var(--gf-card-hover);
+.gnc-suggestion-link:hover,
+.gnc-suggestion-link:focus-visible {
+    background: rgba(255, 255, 255, .09);
     border-color: var(--gf-gold);
     color: #fff;
     transform: translateY(-3px);
-    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .15);
     outline: none;
 }
 
-.gnc-popular-link:focus-visible {
+.gnc-suggestion-link:focus-visible {
     outline: 3px solid var(--gf-gold);
     outline-offset: 2px;
 }
 
-.gnc-popular-rank {
-    flex: 0 0 auto;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Noto Serif', serif;
-    font-size: .9rem;
-    font-weight: 700;
-    color: var(--gf-green);
-    background: var(--gf-gold);
-    box-shadow: 0 0 0 4px rgba(234, 186, 59, 0.18);
+.gnc-suggestion-category {
+    grid-column: 1 / -1;
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--gf-gold);
 }
 
-.gnc-popular-title {
+.gnc-suggestion-title {
     flex: 1;
     min-width: 0;
     font-size: .9rem;
@@ -531,53 +546,56 @@ FOOTER - POPULAR PAGES (Responsive Grid)
     overflow: hidden;
 }
 
-.gnc-popular-link > i {
+.gnc-suggestion-link > i {
     flex: 0 0 auto;
     color: var(--gf-gold);
     transition: transform .25s var(--gf-ease);
 }
 
-.gnc-popular-link:hover > i { transform: translateX(4px); }
+.gnc-suggestion-link:hover > i { transform: translateX(4px); }
 
 /* =============================================
 FOOTER - RESPONSIVE
 ============================================= */
 @media (max-width: 991.98px) {
-    /* Tablets: popular pages drop to 2 columns */
-    .gnc-footer-popular-grid,
-    .gnc-footer-popular-grid[data-count="3"] {
+    .gnc-footer-grid { grid-template-columns: 1fr 1fr; }
+    .gnc-footer-campus { grid-column: 1 / -1; }
+    .gnc-footer-suggestions { grid-template-columns: 1fr; }
+    .gnc-footer-intro { gap: 2rem; }
+    /* Tablets: suggested cards drop to 2 columns */
+    .gnc-footer-suggestions-grid,
+    .gnc-footer-suggestions-grid[data-count="3"] {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .gnc-footer-map { min-height: 300px; }
 }
 
 @media (max-width: 767.98px) {
-    .gnc-footer-banner { height: 200px; }
-    .gnc-footer-seal-wrap { width: 124px; height: 124px; bottom: -44px; }
-    .gnc-footer-seal { width: 100px; height: 100px; }
-    .gnc-footer-top { padding: 5.5rem 0 2.5rem; }
+    .gnc-footer-top { padding: 1rem 0 2.5rem; }
+    .gnc-footer-intro { grid-template-columns: 1fr; gap: 1.25rem; }
 
     .gnc-footer-bottom-inner { justify-content: center; text-align: center; }
-    .gnc-footer-legal { margin-left: 0; }
+    .gnc-footer-legal { margin-left: 0; justify-content: center; }
 }
 
 @media (max-width: 575.98px) {
-    /* Mobile: popular pages in 1 column, tighter spacing */
-    .gnc-footer-popular { margin-bottom: 2.25rem; padding-bottom: 2rem; }
-    .gnc-footer-popular-grid,
-    .gnc-footer-popular-grid[data-count="3"],
-    .gnc-footer-popular-grid[data-count="2"] {
+    .gnc-footer-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+    .gnc-footer-grid { border-radius: 18px; }
+    /* Mobile: suggested cards in 1 column, tighter spacing */
+    .gnc-footer-suggestions { margin-bottom: 1.5rem; }
+    .gnc-footer-suggestions-grid,
+    .gnc-footer-suggestions-grid[data-count="3"],
+    .gnc-footer-suggestions-grid[data-count="2"] {
         grid-template-columns: 1fr;
     }
 
-    .gnc-footer-brand { font-size: 1.3rem; }
     .gnc-visitor-num { font-size: 1.25rem; }
     .gnc-footer-map { min-height: 280px; border-radius: 14px; }
 }
 
 /* Touch devices: no sticky hover lift after tapping */
 @media (hover: none) {
-    .gnc-popular-link:hover,
+    .gnc-suggestion-link:hover,
     .gnc-visitor-stat:hover,
     .gnc-footer-socials a:hover,
     .gnc-footer-totop:hover,
@@ -587,14 +605,16 @@ FOOTER - RESPONSIVE
 
 @media (prefers-reduced-motion: reduce) {
     .gnc-footer a,
-    .gnc-popular-link,
-    .gnc-popular-link > i,
+    .gnc-suggestion-link,
+    .gnc-suggestion-link > i,
     .gnc-visitor-stat { transition: none; }
-    .gnc-popular-link:hover,
-    .gnc-popular-link:hover > i,
+    .gnc-suggestion-link:hover,
+    .gnc-suggestion-link:hover > i,
     .gnc-visitor-stat:hover,
     .gnc-footer-socials a:hover,
     .gnc-footer-totop:hover,
     .gnc-footer-map-link:hover,
     .gnc-footer-links a:hover { transform: none; }
 }
+
+.gnc-footer-suggestions[hidden] { display: none; }

@@ -6,6 +6,7 @@ $enrollmentPreview = cePreviewActive();
 $basicEnrollmentSteps = basicEnrollmentSteps();
 $enrollmentImages = enrollmentIllustrations($basicEnrollmentSteps);
 $basicEnrollment = basicEnrollmentDefaults();
+$enrollmentTextIds=[];foreach(['title','location','instruction'] as $fieldKey)$enrollmentTextIds[$fieldKey]=substr(hash('sha256','enrollment-step-text:'.$fieldKey),0,24);
 foreach ($basicEnrollment as $key => &$field) {
     $field['content'] = getSectionContent('enrollment-procedures', $key, $enrollmentPreview) ?? $field['content'];
 }
@@ -204,12 +205,12 @@ unset($field);
                     <?php if ($basicEnrollmentSteps || cePreviewCanManage()): ?>
                     <div class="enrollment-steps-grid"<?= ceManageMark('data-ve-enrollment-grid') ?>>
                         <?php foreach ($basicEnrollmentSteps as $index => $step): ?>
-                        <div class="enrollment-step-card">
+                        <div class="enrollment-step-card" data-gnc-layout-scope="<?= htmlspecialchars($step['step_id'], ENT_QUOTES, 'UTF-8') ?>">
                             <div class="enrollment-step-label">STEP <?= $index + 1 ?></div>
-                            <div class="enrollment-step-title"><?= htmlspecialchars($step['title'], ENT_QUOTES, 'UTF-8') ?></div>
-                            <?php if ($step['location'] !== ''): ?><div class="enrollment-step-sub"><?= htmlspecialchars($step['location'], ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
+                            <div class="enrollment-step-title" data-gnc-text="<?= $enrollmentTextIds['title'] ?>"><?= htmlspecialchars($step['title'], ENT_QUOTES, 'UTF-8') ?></div>
+                            <?php if ($step['location'] !== ''): ?><div class="enrollment-step-sub" data-gnc-text="<?= $enrollmentTextIds['location'] ?>"><?= htmlspecialchars($step['location'], ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
                             <?= enrollmentIllustration($enrollmentImages, 'basic-' . $step['step_id'], $step['title']) ?>
-                            <p class="enrollment-step-desc"><?= nl2br(htmlspecialchars($step['instruction'], ENT_QUOTES, 'UTF-8')) ?></p>
+                            <p class="enrollment-step-desc" data-gnc-text="<?= $enrollmentTextIds['instruction'] ?>"><?= nl2br(htmlspecialchars($step['instruction'], ENT_QUOTES, 'UTF-8')) ?></p>
                             <div class="enrollment-step-bar enrollment-step-bar--<?= $index % 2 ? 'gold' : 'green' ?>"></div>
                         </div>
                         <?php endforeach; ?>
@@ -225,6 +226,7 @@ unset($field);
         </div>
     </section>
 
+    <script>window.GNC_ENROLLMENT_TEXT_IDS=<?= json_encode($enrollmentTextIds,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;</script>
     <?php if (cePreviewCanManage()): ?>
     <script type="application/json" id="veEnrollmentIllustrations"><?= json_encode($enrollmentImages, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
     <script type="application/json" id="veEnrollmentSteps"><?= json_encode(['steps'=>$basicEnrollmentSteps,'revision'=>basicEnrollmentRevision($basicEnrollmentSteps)], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>

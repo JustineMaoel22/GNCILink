@@ -352,7 +352,7 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
 <?php include_once __DIR__ . '/image-framing-assets.php'; ?>
 <link rel="stylesheet" href="/assets/css/page-entrance.css?v=<?= filemtime(__DIR__ . '/../assets/css/page-entrance.css') ?>">
 <?php if (empty($skipPageEntrance)): ?>
-<div id="gncPageEntrance" aria-hidden="true"<?= $isHome ? ' data-opening-title="Guagua National Colleges"' : '' ?>>
+<div id="gncPageEntrance" aria-hidden="true"<?= $isHome ? ' data-opening-title="Guagua National Colleges"' : (isset($pageEntranceTitle) ? ' data-opening-title="' . htmlspecialchars((string)$pageEntranceTitle, ENT_QUOTES, 'UTF-8') . '"' : '') ?>>
     <i style="--n:0"></i><i style="--n:1"></i><i style="--n:2"></i><i style="--n:3"></i><i style="--n:4"></i><i style="--n:5"></i>
     <div class="gnc-page-entrance-label"><img src="/assets/images/logos/gnc-logo-v1.svg" alt=""><span></span></div>
 </div>

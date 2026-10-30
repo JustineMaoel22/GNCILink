@@ -58,65 +58,36 @@ if (!function_exists('gncResolvePopularUrl')) {
     }
 }
 
-// "Popular Pages": the most visited pages from page_visits (page-analytics.php).
-// The homepage and the page being viewed are left out. Empty list = section hidden.
-$gncPopularPages = [];
-try {
-    require_once __DIR__ . '/page-analytics.php';
-    $gncExclude  = ['/'];
-    $gncCurrent  = gncPageNormalizePath((string) ($_SERVER['REQUEST_URI'] ?? ''));
-    if ($gncCurrent !== null) $gncExclude[] = $gncCurrent;
-    // Ask for extra rows so pages dropped for dead links can be replaced.
-    foreach (gncPopularPages(getDB(), 12, $gncExclude) as $p) {
-        if (count($gncPopularPages) >= 4) break;
-        if ((int) $p['visit_count'] <= 0 || $p['page_title'] === '') continue;
-        $href = gncResolvePopularUrl((string) $p['page_url']);
-        if ($href === null) continue;
-        $p['page_url'] = $href;
-        $gncPopularPages[] = $p;
-    }
-} catch (Throwable $e) {
-    // Footer still renders without the section if analytics is unavailable.
-}
 ?>
 <?php include_once __DIR__ . '/visitor-feedback.php'; ?>
 <?php include_once __DIR__ . '/recommendations.php'; ?>
+<?php if (!defined('GNC_RECOMMENDATIONS_RENDERED')): ?>
+<script src="/assets/js/recommendation-engine.js?v=1" defer></script>
+<?php endif; ?>
+<script src="/assets/js/footer-suggestions.js?v=<?= filemtime(__DIR__.'/../assets/js/footer-suggestions.js') ?>" defer></script>
 <footer class="gnc-footer">
-    <div class="gnc-footer-banner">
-        <div class="gnc-footer-banner-overlay"></div>
-        <div class="gnc-footer-seal-wrap">
-            <img src="/assets/images/logos/gnc-logo-v1.svg" alt="Guagua National Colleges Seal" class="gnc-footer-seal">
-        </div>
-    </div>
-
     <div class="gnc-footer-top">
         <div class="container">
-            <?php if ($gncPopularPages): ?>
-            <nav class="gnc-footer-popular" aria-label="Popular pages">
-                <div class="gnc-footer-popular-head">
-                    <i class="bi bi-fire" aria-hidden="true"></i>
-                    <h6>Popular Pages</h6>
-                </div>
-                <div class="gnc-footer-popular-grid" data-count="<?= count($gncPopularPages) ?>">
-                    <?php foreach ($gncPopularPages as $i => $gncPage): ?>
-                    <a href="<?= htmlspecialchars($gncPage['page_url']) ?>" class="gnc-popular-link">
-                        <span class="gnc-popular-rank"><?= $i + 1 ?></span>
-                        <span class="gnc-popular-title"><?= htmlspecialchars($gncPage['page_title']) ?></span>
-                        <i class="bi bi-arrow-right" aria-hidden="true"></i>
-                    </a>
-                    <?php endforeach; ?>
-                </div>
-            </nav>
-            <?php endif; ?>
-
-            <div class="row gy-5">
-                <div class="col-lg-4 col-md-6">
-                    <h5 class="gnc-footer-brand">Guagua National Colleges</h5>
+            <div class="gnc-footer-intro">
+                <div>
+                    <h2 class="gnc-footer-brand">Guagua National Colleges</h2>
                     <p class="gnc-footer-tagline">Fides, Scientia et. Patria</p>
-                    <p class="gnc-footer-desc">
-                        "Our graduates will be globally competitive citizens. They will uphold our founding values. Fides – faith in God, Scientia – search for truth &amp; knowledge, Patria – love for country."
-                    </p>
+                </div>
+                <p class="gnc-footer-desc">
+                    "Our graduates will be globally competitive citizens. They will uphold our founding values. Fides – faith in God, Scientia – search for truth &amp; knowledge, Patria – love for country."
+                </p>
+            </div>
 
+            <nav class="gnc-footer-suggestions" id="gncFooterSuggestions" aria-label="Suggested pages" hidden>
+                <div class="gnc-footer-suggestions-head">
+                    <i class="bi bi-compass" aria-hidden="true"></i>
+                    <h6>Suggested Pages</h6>
+                </div>
+                <div class="gnc-footer-suggestions-grid" id="gncFooterSuggestionLinks"></div>
+            </nav>
+
+            <div class="gnc-footer-grid">
+                <div class="gnc-footer-contact">
                     <h6 class="gnc-footer-heading">Contact Us</h6>
                     <ul class="gnc-footer-contact-list">
                         <li>
@@ -146,8 +117,17 @@ try {
                     </div>
                 </div>
 
-                <div class="col-lg-3 col-md-6">
-                    <h6 class="gnc-footer-heading">Visitor Counter</h6>
+                <div class="gnc-footer-resources">
+                    <h6 class="gnc-footer-heading">Student Resources</h6>
+                    <ul class="gnc-footer-links">
+                        <li><a href="http://library.gncipampanga.com/" target="_blank" rel="noopener noreferrer">GNCI Library <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+                        <li><a href="/index.php#events">Calendar <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+                        <li><a href="/coming-soon.php" target="_blank" rel="noopener noreferrer">Student Portal <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+                        <li><a href="https://osa.gncipampanga.com/" target="_blank" rel="noopener noreferrer">OSA Student Grievance <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+                        <li><a href="/pages/faq.php">Frequently Asked Questions <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+                    </ul>
+
+                    <h6 class="gnc-footer-heading gnc-footer-heading-spaced">Visitor Counter</h6>
                     <div class="gnc-visitor-stats">
                         <div class="gnc-visitor-stat">
                             <i class="bi bi-person-check-fill" aria-hidden="true"></i>
@@ -164,18 +144,10 @@ try {
                             </div>
                         </div>
                     </div>
-
-                    <h6 class="gnc-footer-heading gnc-footer-heading-spaced">Student Resources</h6>
-                    <ul class="gnc-footer-links">
-                        <li><a href="http://library.gncipampanga.com/" target="_blank" rel="noopener noreferrer">GNCI Library <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
-                        <li><a href="/index.php#events">Calendar <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
-                        <li><a href="/coming-soon.php" target="_blank" rel="noopener noreferrer">Student Portal <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
-                        <li><a href="https://osa.gncipampanga.com/" target="_blank" rel="noopener noreferrer">OSA Student Grievance <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
-                        <li><a href="/pages/faq.php">Frequently Asked Questions <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
-                    </ul>
                 </div>
 
-                <div class="col-lg-5 col-12">
+                <div class="gnc-footer-campus">
+                    <h6 class="gnc-footer-heading">Visit Our Campus</h6>
                     <div class="gnc-footer-map">
                         <a href="https://www.google.com/maps/search/?api=1&amp;query=Guagua+National+Colleges,+Pampanga"
                         target="_blank" rel="noopener noreferrer" class="gnc-footer-map-link">
@@ -189,8 +161,11 @@ try {
                             referrerpolicy="no-referrer-when-downgrade">
                         </iframe>
                     </div>
+                    <p class="gnc-footer-campus-note">Guagua, Pampanga <span aria-hidden="true">&middot;</span> Philippines</p>
                 </div>
             </div>
+
+
         </div>
     </div>
 

@@ -1,0 +1,24 @@
+.gnc-cal-cell[data-calendar-date] { cursor: pointer; }
+/* Lock the viewport without making body a new scroll ancestor for sticky navigation.
+   Wait for modal-open so Bootstrap measures/compensates the original scrollbar first. */
+html.gnc-calendar-day-open:has(body.modal-open) { overflow: hidden; }
+html.gnc-calendar-day-open body.modal-open { overflow: clip !important; }
+.gnc-cal-cell[data-calendar-date]:focus-visible { outline: 3px solid var(--gnc-green, #094024); outline-offset: -3px; }
+.gnc-day-modal .modal-content { border: 1px solid #e1e6e2; border-radius: 1rem; overflow: hidden; }
+.gnc-day-modal .modal-header { background: var(--gnc-cream, #f9f6f1); padding: 1.25rem; }
+.gnc-day-modal .modal-title { font-size: 1.25rem; font-weight: 700; color: var(--gnc-green, #094024); }
+.gnc-day-modal .btn-close { flex-shrink: 0; min-width: 24px; min-height: 24px; }
+.gnc-day-modal .modal-body { padding: 1.25rem; }
+.gnc-day-count, .gnc-day-meta { color: #526258; font-size: .875rem; }
+.gnc-day-event { border: 1px solid #e1e6e2; border-left: 4px solid var(--event-color); border-radius: .6rem; padding: 1rem; margin-bottom: 1rem; overflow-wrap: anywhere; }
+.gnc-day-event:last-child { margin-bottom: 0; }
+.gnc-day-category { display: inline-block; color: #263c2e; background: color-mix(in srgb, var(--event-color) 8%, white); border: 1px solid var(--event-color); border-radius: 1rem; padding: .15rem .65rem; font-size: .75rem; font-weight: 600; margin-bottom: .65rem; }
+.gnc-day-event-title { font-size: 1.125rem; font-weight: 700; margin-bottom: .5rem; }
+.gnc-day-meta { margin-bottom: .5rem; }
+.gnc-day-description { white-space: pre-wrap; margin: 1rem 0 0; line-height: 1.65; }
+.gnc-day-message { color: #526258; padding: 1rem 0; margin: 0; }
+@media (max-width: 575.98px) {
+    .gnc-day-modal .modal-header, .gnc-day-modal .modal-body { padding: 1rem; }
+    .gnc-day-modal .modal-title { font-size: 1.1rem; }
+    .gnc-day-event { padding: .8rem; }
+}

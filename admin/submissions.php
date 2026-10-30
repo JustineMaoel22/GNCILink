@@ -69,7 +69,7 @@ $counts=array_count_values(array_column($rows,'status'));
  <details class="approval-preview"<?= $selected?' open':'' ?>><summary><span><i class="bi bi-file-earmark-text" aria-hidden="true"></i> Proposed content</span><span class="approval-preview-hint">View details</span></summary><dl class="approval-fields">
  <?php foreach($payload['post']??[] as $field=>$value):
     // Transport fields and crop metadata belong to the saved request, not its content preview.
-    if(str_starts_with($field,'_')||str_ends_with($field,'_id')||in_array($field,['action','ajax_action','csrf_token','status','allow_incomplete','facebook_confirmed','facebook_request_key','image_framing','image_framing_json','publish_destination'],true))continue;
+    if(str_starts_with($field,'_')||str_ends_with($field,'_id')||in_array($field,['action','ajax_action','csrf_token','status','allow_incomplete','facebook_confirmed','facebook_request_key','image_framing','image_framing_json','publish_destination','import_token'],true))continue;
     if(is_array($value)){
         $items=[];array_walk_recursive($value,static function($item)use(&$items){if(is_scalar($item))$items[]=(string)$item;});
         $value=implode(', ',$items);
@@ -77,6 +77,9 @@ $counts=array_count_values(array_column($rows,'status'));
     $preview=trim(strip_tags((string)$value));if($preview==='')continue;
  ?><dt><?= $e(ucwords(str_replace('_',' ',$field))) ?></dt><dd style="white-space:pre-wrap;overflow-wrap:anywhere"><?= $e(mb_substr($preview,0,12000)) ?></dd><?php endforeach;?>
  </dl>
+ <?php if(($row['route']??'')==='/admin/events.php'&&($payload['post']['ajax_action']??'')==='import_confirm'):
+    include __DIR__.'/partials/calendar-import-review.php';
+ endif;?>
  <?php foreach($payload['files']??[] as $field=>$file):$media='/admin/submissions.php?'.http_build_query(['media'=>$id,'field'=>$field]);?>
  <div class="approval-attachment"><?php if(str_starts_with($file['mime'],'image/')):?><img src="<?= $e($media) ?>" alt="Submitted image" loading="lazy"><?php else:?><i class="bi bi-paperclip" aria-hidden="true"></i><?php endif;?><a href="<?= $e($media) ?>" target="_blank" rel="noopener"><?= $e($file['name']) ?><span class="visually-hidden"> (opens in a new tab)</span></a></div>
  <?php endforeach;?></details>

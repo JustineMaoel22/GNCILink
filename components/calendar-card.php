@@ -3,6 +3,8 @@ $calendarMonthUrl = static fn($month, $year) => '?' . http_build_query(array_mer
     'evt_month'=>$month, 'evt_year'=>$year,
 ])) . '#events';
 ?>
+<link rel="stylesheet" href="/assets/css/calendar-day.css?v=<?= filemtime(__DIR__.'/../assets/css/calendar-day.css') ?>">
+<script src="/assets/js/calendar-day.js?v=<?= filemtime(__DIR__.'/../assets/js/calendar-day.js') ?>" defer></script>
 <div class="gnc-cal-card">
     <div class="gnc-cal-header">
         <a href="<?= htmlspecialchars($calendarMonthUrl($evtPrevMonth, $evtPrevYear)) ?>" class="gnc-cal-nav" aria-label="Previous month">
@@ -18,7 +20,7 @@ $calendarMonthUrl = static fn($month, $year) => '?' . http_build_query(array_mer
         <?php endif; ?>
     </div>
 
-    <div class="gnc-cal-grid">
+    <div class="gnc-cal-grid" data-calendar-scope="<?= htmlspecialchars(http_build_query(array_filter(['department'=>$calendarFilters['department']??null,'program'=>$calendarFilters['program']??null,'category'=>$calendarCategory??null],static fn($value)=>$value!==null)),ENT_QUOTES,'UTF-8') ?>">
         <?php foreach (['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as $dow): ?>
             <div class="gnc-cal-dow"><?= $dow ?></div>
         <?php endforeach; ?>
@@ -38,7 +40,7 @@ $calendarMonthUrl = static fn($month, $year) => '?' . http_build_query(array_mer
             $visibleEvents = array_slice($dayEvents, 0, 2);
             $extraCount = count($dayEvents) - count($visibleEvents);
         ?>
-            <div class="gnc-cal-cell<?= $isToday ? ' gnc-cal-today' : '' ?><?= $dayHasEvent ? ' gnc-cal-hasevent' : '' ?>"
+            <div class="gnc-cal-cell<?= $isToday ? ' gnc-cal-today' : '' ?><?= $dayHasEvent ? ' gnc-cal-hasevent' : '' ?>" role="button" tabindex="0" aria-haspopup="dialog" data-calendar-date="<?= sprintf('%04d-%02d-%02d',$evtYear,$evtMonth,$day) ?>" aria-label="<?= htmlspecialchars(date('F j, Y',mktime(0,0,0,$evtMonth,$day,$evtYear)).' — '.count($dayEvents).' '.(count($dayEvents)===1?'event':'events'),ENT_QUOTES,'UTF-8') ?>"
                  <?= $dayHasEvent ? 'title="' . htmlspecialchars($dayTitles) . '"' : '' ?>>
                 <span class="gnc-cal-daynum"><?= $day ?></span>
                 <?php if ($dayHasEvent): ?>

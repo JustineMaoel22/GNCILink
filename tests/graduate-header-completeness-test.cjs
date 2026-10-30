@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync('assets/js/content-completeness.js','utf8');
+const context=vm.createContext({fieldLabel:()=> 'Line under the title'});
+vm.runInContext(source.slice(source.indexOf('    function optional('),source.indexOf('    function inspect(')),context);
+const field={dataset:{warningAllowEmpty:'true',veField:'dept-hero'},closest:()=>null,matches:()=>false,hasAttribute:()=>false};
+assert.equal(context.optional(field,true),true,'A deliberately optional header is not a publishing warning even during full review');
+assert.equal(context.optional(field,false),true);
+delete field.dataset.warningAllowEmpty;
+assert.equal(context.optional(field,true),false,'Unmarked content still receives normal completeness checks');
+field.hasAttribute=name=>name==='data-warning-required';
+assert.equal(context.optional(field,true),false,'Required content remains checked');
+console.log('PASS: optional Graduate School header does not block review; normal and required content checks remain active.');

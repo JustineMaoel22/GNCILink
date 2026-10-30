@@ -6,6 +6,11 @@ RUN a2enmod rewrite \
 
 RUN docker-php-ext-install pdo pdo_mysql
 
+# DOCX calendar imports read bounded ZIP entries without extracting uploads.
+RUN apt-get update && apt-get install -y --no-install-recommends libzip-dev \
+    && docker-php-ext-install zip \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Image uploads are automatically optimized to the application's 5 MB limit.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagickwand-dev libjpeg62-turbo-dev libpng-dev libwebp-dev libonig-dev libsqlite3-dev \

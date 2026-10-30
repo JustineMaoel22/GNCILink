@@ -13,7 +13,7 @@ try {
     const fixture=path.join(folder,'fonts.html');
     fs.writeFileSync(fixture,`<!doctype html><style>body{font:16px Arial;margin:20px}section{width:90%;min-height:300px}h1{font-family:Georgia;font-size:32px}#toolbar{padding:12px;background:#eee}button,select{margin:4px}</style>
     <section><h1 data-gnc-text="aaaaaaaaaaaaaaaaaaaaaaaa">Editable heading</h1><p>Neighboring content</p><img data-gnc-text="bbbbbbbbbbbbbbbbbbbbbbbb" data-gnc-layout-media width="40" height="40"><div id="rich" data-gnc-text="cccccccccccccccccccccccc"><h2 style="font-family:Georgia">Rich heading</h2><span class="material-symbols-outlined" style="font-family:'Material Symbols Outlined'">info</span></div></section><div id="toolbar"></div>
-    <script>window.GNC_TEXT_FONTS=${JSON.stringify(fonts)};</script><script>${controller}</script><script>
+    <script>window.addEventListener('error',event=>{document.body.appendChild(Object.assign(document.createElement('pre'),{id:'fixture-error',textContent:event.message}));});window.GNC_TEXT_FONTS=${JSON.stringify(fonts)};</script><script>${controller}</script><script>
     const checks={},target=document.querySelector('h1'),staged={};
     const api=window.GNCTextLayout;
     const layout=api.create({state:()=>({busy:false,preview:false}),stage:(id,device,value,base)=>{
@@ -25,7 +25,7 @@ try {
         else if(value===true)el.setAttribute(key,'');
         else if(value!==false&&value!=null)el.setAttribute(key,value);
     });children.filter(child=>child!=null).forEach(child=>el.append(child));return el;};
-    const render=new Function('h','icon','S','textLayout','tb','richTextTools','placeTb',${JSON.stringify(toolbar+';return renderToolbar;')})(h,()=>document.createElement('span'),{sel:{el:target},adapter:{toolbar:()=>[]},win:window,doc:document},layout,document.getElementById('toolbar'),()=>[],()=>{});
+    const render=new Function('h','icon','S','textLayout','tb','richTextTools','placeTb','backgroundTarget',${JSON.stringify(toolbar+';return renderToolbar;')})(h,()=>document.createElement('span'),{sel:{el:target},adapter:{toolbar:()=>[]},win:window,doc:document},layout,document.getElementById('toolbar'),()=>[],()=>{},()=>null);
     render();
     const select=()=>document.querySelector('#toolbar select');
     const choose=value=>{select().value=value;select().dispatchEvent(new Event('change'));};
@@ -81,7 +81,7 @@ try {
         '--window-size=1440,900','--virtual-time-budget=1500','--dump-dom','file:///'+fixture.replaceAll('\\','/')
     ],{encoding:'utf8',windowsHide:true,maxBuffer:4000000});
     if(run.error)throw run.error;
-    const result=run.stdout.match(/<pre id="test-result">([^<]+)<\/pre>/);assert.ok(result,'Browser did not return results: '+run.stderr);
+    const result=run.stdout.match(/<pre id="test-result">([^<]+)<\/pre>/);assert.ok(result,'Browser did not return results: '+run.stderr+' '+(run.stdout.match(/<pre id="fixture-error">([^<]+)<\/pre>/)?.[1]||''));
     for(const [name,value] of Object.entries(JSON.parse(result[1])))assert.equal(value,true,name);
     console.log('PASS: text/logo centering, responsive recentering, manual override, font/size preservation, device isolation, draft/publish state and font controls.');
 }finally{

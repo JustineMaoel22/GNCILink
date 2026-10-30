@@ -24,6 +24,7 @@ require_once __DIR__.'/components/recommendation-catalog.php';
         <p><time datetime="<?= eventEscape($event['start_date']) ?>"><?= eventEscape(date('F j, Y · g:i a', strtotime($event['start_date']))) ?></time>
         <?php if ($event['end_date']): ?> – <?= eventEscape(date('F j, Y · g:i a', strtotime($event['end_date']))) ?><?php endif; ?></p>
         <?php if ($event['location']): ?><p><strong>Location:</strong> <?= eventEscape($event['location']) ?></p><?php endif; ?>
+        <?php if (!empty($event['description'])): ?><p style="white-space:pre-wrap"><?= eventEscape($event['description']) ?></p><?php endif; ?>
         <?php if ($event['image']): ?><img class="img-fluid rounded mt-3" src="<?= eventEscape(gncRecImage($event['image'])) ?>" alt="" style="max-height:500px;object-fit:contain"><?php endif; ?>
     </article>
     <?php else: ?><h1 class="mt-4">Event not found</h1><p>This event is not available.</p><?php endif; ?>

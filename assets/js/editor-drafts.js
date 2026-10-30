@@ -129,7 +129,7 @@
         var revision=0, checkpoint='', route='', available=true, loading=false, fileIds=new WeakMap(), serial=0;
         function identity(blob){if(!fileIds.has(blob))fileIds.set(blob,++serial);return {$file:fileIds.get(blob)};}
         function state(){return options.adapter().draftState ? options.adapter().draftState() : {};}
-        function fingerprint(){return JSON.stringify(plain({state:state(), positions:options.positions(),textPlacements:options.textPlacements?options.textPlacements():{}},identity));}
+        function fingerprint(){return JSON.stringify(plain({state:state(), positions:options.positions(),textPlacements:options.textPlacements?options.textPlacements():{},backgrounds:options.backgrounds?options.backgrounds():{}},identity));}
         function saved(){return !!checkpoint && checkpoint===fingerprint();}
         function fields(action){return {action:action,page:options.page,route:route,revision:revision};}
         async function request(action, extra){var result=await options.send(Object.assign(fields(action),extra));if(!result.ok)throw Error(result.error);return result;}
@@ -142,19 +142,32 @@
             load:async function(url){
                 if(!options.adapter().draftState)return;
                 var target=new URL(url || '/',location.origin);['ce_preview','_','_ve','add_org'].forEach(function(key){target.searchParams.delete(key);});target.hash='';target.searchParams.sort();
+                var previousRoute=target.pathname+target.search;
+                // The directory is one ordered collection; page/filter changes share its draft.
+                if(options.page==='student-organizations'&&!(options.reviewing&&options.reviewing())&&/\/student-org(?:\.php)?$/.test(target.pathname))['p','category','archived'].forEach(function(key){target.searchParams.delete(key);});
                 route=target.pathname+target.search;revision=0;checkpoint='';loading=true;
                 var documentAtStart=options.document();
                 try{
                     var result=await request('load');
+                    // Carry an existing page-scoped organization draft into the shared directory draft.
+                    if(!result.draft&&options.page==='student-organizations'&&previousRoute!==route){
+                        var previous=await request('load',{route:previousRoute});
+                        if(previous.draft){
+                            var copied=await request('save',{revision:0,snapshot:JSON.stringify(previous.draft.snapshot)});
+                            result.draft={revision:copied.revision,snapshot:previous.draft.snapshot};
+                            await request('delete',{route:previousRoute,revision:previous.draft.revision});
+                        }
+                    }
                     if(options.document()!==documentAtStart)return;
                     if(result.draft){
                         revision=result.draft.revision;
                         var snapshot=decode(result.draft.snapshot);
                         options.adapter().draftState(snapshot.state);
                         options.setPositions(snapshot.state.imagePositions || {});
-                        if(options.setTextPlacements)options.setTextPlacements(snapshot.state.textPlacements||{});
                         restorePreview(options.document(),snapshot.preview,options.clean);
                         if(options.adapter().draftRebind)options.adapter().draftRebind();
+                        if(options.setTextPlacements)options.setTextPlacements(snapshot.state.textPlacements||{});
+                        if(options.setBackgrounds)options.setBackgrounds(snapshot.state.responsiveBackgrounds||{});
                         checkpoint=fingerprint();options.notify('Draft restored. These changes are not live.');
                     }
                     available=true;
@@ -162,7 +175,7 @@
                 finally{loading=false;options.refresh();}
             },
             save:async function(){
-                var snapshot={version:1,state:Object.assign({},state(),{imagePositions:options.positions(),textPlacements:options.textPlacements?options.textPlacements():{}}),preview:preview(options.document(),options.clean)};
+                var snapshot={version:1,state:Object.assign({},state(),{imagePositions:options.positions(),textPlacements:options.textPlacements?options.textPlacements():{},responsiveBackgrounds:options.backgrounds?options.backgrounds():{}}),preview:preview(options.document(),options.clean)};
                 var before=fingerprint();
                 var payload=await encode(snapshot);
                 if(payload.length>96*1024*1024)throw Error('This draft is too large. Save fewer media changes at a time.');

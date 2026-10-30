@@ -23,7 +23,7 @@
     }
     function save() {
         if (!window.GNCPrivacy?.allows('personalization')) return false;
-        try { localStorage.setItem(KEY,JSON.stringify({...state,version:1,updated:Date.now()})); return true; }
+        try { localStorage.setItem(KEY,JSON.stringify({...state,version:1,updated:Date.now()}));window.dispatchEvent(new CustomEvent('gnc:recommendation-profile-change')); return true; }
         catch (e) { $('gncRecStatus').textContent='Your browser cannot save this preference. Personalization works for this page only.'; return false; }
     }
     function visit() {

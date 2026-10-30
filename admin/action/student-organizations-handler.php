@@ -13,7 +13,9 @@ try {
             $row=saveStudentOrganization($_POST,$_FILES);
             $activity=array_key_exists('archived',$_POST)?($row['archived_at']?'ARCHIVE':'RESTORE'):'UPDATE';
             logActivity((int)$_SESSION['user_id'],$activity,'student_organizations',(int)$row['org_id'],'Saved organization: '.$row['name']);
-            $result=['organization'=>$row,'gallery'=>studentOrganizationGallery((int)$row['org_id'])]; break;
+            $result=['organization'=>$row];
+            if (!studentOrganizationArchiveOnly($_POST,$_FILES)) $result['gallery']=studentOrganizationGallery((int)$row['org_id']);
+            break;
         case 'delete':
             $id=(int)($_POST['org_id']??0); deleteStudentOrganization($id);
             logActivity((int)$_SESSION['user_id'],'DELETE','student_organizations',$id,'Deleted student organization'); break;
@@ -57,9 +59,15 @@ try {
         default: throw new InvalidArgumentException('Unknown organization action.');
     }
     echo json_encode(['success'=>true]+$result,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT);
+} catch (StudentOrganizationSetupException $e) {
+    http_response_code(409); echo json_encode(['success'=>false,'error'=>$e->getMessage()]);
 } catch (InvalidArgumentException|JsonException $e) {
     http_response_code(422); echo json_encode(['success'=>false,'error'=>$e->getMessage()]);
 } catch (Throwable $e) {
     error_log('Student organizations: '.$e->getMessage()); http_response_code(422);
-    echo json_encode(['success'=>false,'error'=>$e instanceof PDOException && $e->getCode()==='23000' ? 'That category name already exists or the record changed. Refresh and try again.' : 'Could not save the change. Check the uploaded files and try again.']);
+    $message = 'Could not save the organization change. Please try again or contact the administrator.';
+    if (isset($_POST['archived'])) $message=($_POST['archived']==='1'?'Could not archive':'Could not restore').' the organization. Please try again or contact the administrator.';
+    elseif ($e instanceof PDOException && $e->getCode()==='23000') $message='A conflicting record prevents saving this change. Refresh and try again.';
+    elseif (!empty($_FILES)) $message='Could not save the uploaded organization images. Check the files and try again.';
+    echo json_encode(['success'=>false,'error'=>$message]);
 }

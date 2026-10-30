@@ -48,6 +48,37 @@ Missing or unpublished detail routes
 return HTTP 404 to visitors. Draft previews and metadata require the existing
 `manage_page_content` permission. Slugs stay stable when names change.
 
+Cross-page ordering
+-------------------
+
+In the visual editor, each saved organization card has **Move to Page** beside
+its existing Move drag handle. Choose the destination page and final position,
+then **Move card**. The preview opens that page immediately. Other cards shift
+to fill their places, with six cards per page and the usual remainder on the last
+page. Drag-and-drop and the earlier/later arrows continue to swap cards within
+the visible page. The dropdown also works on mobile without a drag gesture.
+
+Pages are slices of the existing `display_order`, not stored assignments. With a
+category filter active, destination pages refer to that category and only its
+slots in the overall order are rearranged. Active and archived views retain their
+separate scopes; organization content, categories, status and images are unchanged.
+Unpublished cards are included in editor pagination; the public site continues to
+paginate published, non-archived organizations only, so page numbers can differ
+when unpublished organizations are present.
+
+Moving and browsing pagination/category links preserve the private pending order
+and content edits. **Save draft** persists one shared organization-directory draft
+across its pagination and filter views. An older draft scoped to the opened page
+is carried into the shared draft if no shared draft exists. **Publish** uses the
+existing order handler; Content Editors submit through the existing approval
+workflow. Visitors retain the old order until approval/publication. No organization
+or image is duplicated, removed or uploaded by moving cards. No migration is needed.
+
+Deploy `assets/js/content-edit.js`, `assets/js/editor-drafts.js` and the organization
+listing template together. `tests/student-org-order-browser-test.cjs` covers three
+destination pages, slot shifting, private preview navigation, cross-page draft
+restoration, explicit publication, same-page drag/arrows and mobile selection.
+
 All mutation requests are POST-only, check administrator permissions and CSRF,
 validate fields and relationships, and use prepared SQL. Media changes are
 cleaned up if a save fails. The four `student_org_*`/`student_organizations`

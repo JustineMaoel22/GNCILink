@@ -152,18 +152,20 @@ function gnc_get_global_events(string $program, int $limit): array
     $pdo = gnc_bulletin_get_verified_pdo();
     require_once __DIR__ . '/../includes/event-audience.php';
     $departmentScope = eventDepartmentsReady() ? " AND (dept_id IS NULL OR dept_id = (SELECT dept_id FROM programs WHERE program_code = :department_program LIMIT 1))" : '';
+    $groupScope=eventAudienceGroupsReady()?" AND (audience_group='all' OR EXISTS (SELECT 1 FROM programs gp JOIN departments gd ON gd.dept_id=gp.dept_id WHERE gp.program_code=:group_program AND gd.department_type=events.audience_group AND (events.audience_group<>'college' OR (COALESCE(gd.slug,'')<>'graduate-school' AND gd.dept_name<>'Graduate School'))))":'';
 
     $sql = "SELECT event_id, title, location, start_date, end_date
             FROM events
             WHERE status = 'published'
               AND start_date >= NOW()
-              AND (program = :program OR (program = 'ALL' {$departmentScope}))
+              AND (program = :program OR (program = 'ALL' {$departmentScope})) {$groupScope}
             ORDER BY start_date ASC
             LIMIT :limit";
 
     $stmt = $pdo->prepare($sql);
     $stmt->bindValue(':program', $program, PDO::PARAM_STR);
     if ($departmentScope !== '') $stmt->bindValue(':department_program', $program, PDO::PARAM_STR);
+    if ($groupScope !== '') $stmt->bindValue(':group_program', $program, PDO::PARAM_STR);
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
     $stmt->execute();
 

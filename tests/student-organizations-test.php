@@ -49,6 +49,11 @@ if($mode==='destroy_session'){
     session_id($id);session_start();session_destroy();exit;
 }
 if($mode==='seed'){echo json_encode(organizationFixture(),JSON_THROW_ON_ERROR);exit;}
+if($mode==='seed_pages'){
+    $fixture=organizationFixture();
+    for($i=9;$i<16;$i++)$fixture['records'][]=saveStudentOrganization(['name'=>$fixture['prefix'].' Organization '.$i,'category_id'=>$fixture['categories'][0],'description'=>'Cross-page order fixture','status'=>'published']);
+    echo json_encode($fixture,JSON_THROW_ON_ERROR);exit;
+}
 if($mode==='cleanup'){
     $prefix=$argv[2]??'';if(!preg_match('/^ORGTEST-[a-f0-9]{10}$/',$prefix))throw new RuntimeException('Invalid test fixture prefix');
     $media=$db->prepare('SELECT o.logo_media_id AS media_id FROM student_organizations o WHERE o.name LIKE ? UNION SELECT o.cover_media_id FROM student_organizations o WHERE o.name LIKE ? UNION SELECT g.media_id FROM student_org_gallery g JOIN student_organizations o ON o.org_id=g.org_id WHERE o.name LIKE ?');$media->execute([$prefix.'%',$prefix.'%',$prefix.'%']);$ids=$media->fetchAll(PDO::FETCH_COLUMN);

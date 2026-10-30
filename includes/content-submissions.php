@@ -34,11 +34,15 @@ function rbacContentRoutes(): array {
         '/admin/action/faqs-handler.php','/admin/action/image-framing-handler.php',
         '/admin/action/payment-guide-handler.php','/admin/action/scholarship-handler.php','/admin/action/student-achievements-handler.php',
         '/admin/action/student-organizations-handler.php','/admin/action/text-layout-handler.php',
+        '/admin/action/responsive-background-handler.php',
         '/admin/action/tuition-fees-handler.php','/admin/settings.php'];
 }
 function rbacShouldQueue(string $route,array $post): bool {
     if (!in_array($route,rbacContentRoutes(),true)) return false;
     $action=$post['action']??$post['ajax_action']??'';
+    // Calendar imports validate and store a canonical batch before explicitly
+    // submitting it to this same approval queue. Uploads never enter the queue.
+    if ($route==='/admin/events.php' && in_array($action,['import_preview','import_manage_preview','import_confirm','import_cancel'],true)) return false;
     // These are read-only lookups; all other POSTs to content handlers are proposals.
     return !in_array($action,['list','get','fetch_one','load','upload_environment','categories','get_content'],true);
 }

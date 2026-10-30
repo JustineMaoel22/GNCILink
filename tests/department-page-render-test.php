@@ -37,7 +37,7 @@ if (str_contains($html, 'id="veBasicData"')) throw new RuntimeException('Departm
 foreach (['id="veDeptProgramsData"', 'id="veDepartmentProgramTemplate"', 'data-ve-program-grid', 'data-ve-field="dept-program-name"', 'data-ve-program-image', 'data-ve-add="program"'] as $marker) {
     if (!str_contains($html, $marker)) throw new RuntimeException('Missing inline program card markup: ' . $marker);
 }
-if ($slug === 'cased') {
+if (in_array($slug,['cased','graduate-school'],true)) {
     foreach (['vision_title', 'vision_text', 'mission_title', 'mission_text'] as $key) {
         if (!str_contains($html, 'data-ve-key="' . $key . '"')) throw new RuntimeException('Missing editable department statement: ' . $key);
     }

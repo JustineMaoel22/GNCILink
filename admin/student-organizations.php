@@ -1,5 +1,20 @@
 <?php
 require_once __DIR__.'/../includes/content-publish-policy.php';
+class StudentOrganizationSetupException extends RuntimeException {}
+
+/** A state-only request must never touch content or media. Mixed edits still use full validation. */
+function studentOrganizationArchiveOnly(array $input, array $files = []): bool {
+    if (!array_key_exists('archived', $input) || empty($input['org_id'])) return false;
+    if (array_diff(array_keys($input), ['action','org_id','archived','status','csrf_token','allow_incomplete'])) return false;
+    foreach ($files as $file) {
+        if (!is_array($file) || !array_key_exists('error', $file)) return false;
+        $errors = is_array($file['error']) ? $file['error'] : [$file['error']];
+        $hasUpload = false;
+        array_walk_recursive($errors, static function ($error) use (&$hasUpload) { if ($error !== UPLOAD_ERR_NO_FILE) $hasUpload = true; });
+        if ($hasUpload) return false;
+    }
+    return true;
+}
 function studentOrganizationsUrl(?string $slug = null): string {
     $base = '/pages/student%20life/student%20organization%20and%20leadership%20program/';
     return $base . ($slug === null ? 'student-org.php' : 'dynamic-org.php?slug=' . rawurlencode($slug));
@@ -139,6 +154,15 @@ function saveStudentOrganization(array $input, array $files = []): array {
     $db = getDB(); $id = (int)($input['org_id'] ?? 0); $current = null;
     foreach (studentOrganizations(true) as $row) if ((int)$row['org_id'] === $id) $current = $row;
     if ($id < 0 || ($id && !$current)) throw new InvalidArgumentException('Organization not found.');
+    if (array_key_exists('archived',$input) && !in_array($input['archived'],[0,1,'0','1'],true)) throw new InvalidArgumentException('Invalid archive state.');
+    $canArchive = studentOrgArchivesSupported();
+    if (!$canArchive && array_key_exists('archived',$input)) throw new StudentOrganizationSetupException('Organization archiving is not set up on this server. Ask the administrator to run database/migrate-student-org-archive.php. Existing organizations and images are unchanged.');
+    if ($current && studentOrganizationArchiveOnly($input, $files) && (!isset($input['status']) || $input['status'] === $current['status'])) {
+        $archivedAt = (int)$input['archived'] === 1 ? ($current['archived_at'] ?? date('Y-m-d H:i:s')) : null;
+        $db->prepare('UPDATE student_organizations SET archived_at=? WHERE org_id=?')->execute([$archivedAt,$id]);
+        $current['archived_at'] = $archivedAt;
+        return $current;
+    }
     $data = [];
     foreach (studentOrganizationFields() as $key => [$label,$max]) {
         $value = $input[$key] ?? $current[$key] ?? '';
@@ -149,9 +173,6 @@ function saveStudentOrganization(array $input, array $files = []): array {
     if ($data['name'] === '' && !contentPublishAllowsIncomplete()) throw new InvalidArgumentException('Enter an organization name.');
     $status = $input['status'] ?? $current['status'] ?? 'draft';
     if (!in_array($status, ['draft','published'], true)) throw new InvalidArgumentException('Choose Published or Unpublished.');
-    if (array_key_exists('archived',$input) && !in_array($input['archived'],[0,1,'0','1'],true)) throw new InvalidArgumentException('Invalid archive state.');
-    $canArchive = studentOrgArchivesSupported();
-    if (!$canArchive && !empty($input['archived'])) throw new RuntimeException('Organization archiving requires database/migrate-student-org-archive.php to be run on this server.');
     $archivedAt=$current['archived_at']??null;
     if (array_key_exists('archived',$input)) $archivedAt=(int)$input['archived']===1?($archivedAt??date('Y-m-d H:i:s')):null;
     $category = (int)($input['category_id'] ?? $current['category_id'] ?? 0);

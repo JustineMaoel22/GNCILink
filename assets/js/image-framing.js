@@ -106,6 +106,7 @@
     }
     function apply(el, value) {
         if (!el || !el.isConnected || !activeDocument(el.ownerDocument)) return;
+        if(el.hasAttribute('data-responsive-background-active'))return;
         const frame = copy(value), src = sourceOf(el);
         if (!originalStyles.has(el)) {
             const saved={};['object-position','transform','transform-origin','clip-path','background-size','background-position'].forEach(key=>saved[key]=[el.style.getPropertyValue(key),el.style.getPropertyPriority(key)]);originalStyles.set(el,saved);
@@ -136,7 +137,7 @@
             const observer=backgroundObservers.get(el.ownerDocument);
             if(observer&&!observedBackgrounds.has(el)){observedBackgrounds.add(el);observer.observe(el);}
             natural(src).then(img => {
-                if (!el.isConnected || !activeDocument(el.ownerDocument) || sourceOf(el) !== src || framed.get(el) !== frame) return;
+                if (!el.isConnected || el.hasAttribute('data-responsive-background-active') || !activeDocument(el.ownerDocument) || sourceOf(el) !== src || framed.get(el) !== frame) return;
                 const w=el.clientWidth, h=el.clientHeight;
                 if (!w || !h) return;
                 const scale=Math.max(w/img.naturalWidth,h/img.naturalHeight)*frame.zoom;
@@ -149,6 +150,7 @@
         }
     }
     function applyKnown(el) {
+        if(el.hasAttribute('data-responsive-background-active'))return;
         const src=sourceOf(el), file=sources.get(src), value=previews.get(el) || file && files.get(file) || settings[pathOf(src)];
         const path=pathOf(src);
         if (!value && path && Object.keys(hashedSettings).length && !resolvedPaths.has(path)) {
@@ -214,6 +216,7 @@
         catch (_) { return null; }
     }
     async function dialog({src,target=null,ratio=16/9,file=null,fit=fitOf(target)}) {
+        if(!file&&target){try{const editor=visualEditor();if(editor&&editor.background&&editor.background(target))return null;}catch(_){}}
         const picture=await natural(src), original=current(target,src), value=copy(original), undo=snapshot(target);
         if (ratio === null) ratio = picture.naturalWidth / picture.naturalHeight;
         const editor = !file && visualEditor();

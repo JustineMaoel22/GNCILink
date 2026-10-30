@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/../includes/event-display.php';
 // The caller supplies an optional category and department/program scope.
 $calendarFilterSql = $calendarFilterSql ?? "";
 $evtMonth = isset($_GET['evt_month']) && is_scalar($_GET['evt_month']) ? max(1, min(12, (int)$_GET['evt_month'])) : (int)date('n');
@@ -19,12 +20,7 @@ if ($evtNextMonth > 12) { $evtNextMonth = 1; $evtNextYear++; }
 // Holiday = yellow, School Event = green, Emergency = red
 // ---------------------------------------------------------------
 function evt_categoryColor(?string $categoryColor, ?string $categoryName = null): string {
-    if (!empty($categoryColor)) return $categoryColor;
-    $name = strtolower(trim($categoryName ?? ''));
-    if (strpos($name, 'holiday') !== false)   return '#EABA3B';
-    if (strpos($name, 'emergency') !== false || strpos($name, 'suspension') !== false) return '#B3312D';
-    if (strpos($name, 'school') !== false)    return '#1F5E2C';
-    return '#6c757d';
+    return publicEventCategoryColor($categoryColor,$categoryName);
 }
 
 $evtRangeStart = sprintf('%04d-%02d-01 00:00:00', $evtYear, $evtMonth);

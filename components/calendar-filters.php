@@ -22,10 +22,18 @@ function publicCalendarFilters(array $query): array
             $condition=' AND e.program IN (SELECT program_code FROM programs WHERE dept_id = ?)';
             $params[]=$departmentId;
         }
+        if(eventAudienceGroupsReady()) {
+            $condition=' AND ('.substr($condition,5).' OR e.audience_group = ?)';
+            $params[]=eventDepartmentGroup($departments[$department]);
+        }
     } elseif ($program!==null) {
         $condition=' AND e.program = ?';$params[]=$program;
         if (eventDepartmentsReady()) {
             $condition=" AND (e.program = ? OR (e.program = 'ALL' AND e.dept_id = (SELECT dept_id FROM programs WHERE program_code = ? LIMIT 1)))";
+            $params[]=$program;
+        }
+        if(eventAudienceGroupsReady()) {
+            $condition=' AND ('.substr($condition,5)." OR EXISTS (SELECT 1 FROM programs gp JOIN departments gd ON gd.dept_id=gp.dept_id WHERE gp.program_code=? AND gd.department_type=e.audience_group AND (e.audience_group<>'college' OR (COALESCE(gd.slug,'')<>'graduate-school' AND gd.dept_name<>'Graduate School'))))";
             $params[]=$program;
         }
     }

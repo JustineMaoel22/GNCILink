@@ -7,6 +7,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../admin/admin-functions.php';
 require_once __DIR__ . '/../includes/event-audience.php';
+require_once __DIR__ . '/../includes/calendar-import.php';
 
 initSession();
 requireLogin();
@@ -40,7 +41,9 @@ function evt_verifyCsrfToken(PDO $db, int $userId, ?string $token): bool {
 }
 
 $db = getDB();
+$calendarImportReady = calendarImportReady($db);
 $eventDepartmentsReady = eventDepartmentsReady();
+$eventAudienceGroupsReady = eventAudienceGroupsReady();
 $eventDepartments = $db->query('SELECT dept_id, dept_name FROM departments ORDER BY dept_name')->fetchAll(PDO::FETCH_ASSOC);
 $eventDepartmentNames = array_column($eventDepartments, 'dept_name', 'dept_id');
 
@@ -72,6 +75,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
     }
 
     try {
+        if (in_array($action, ['import_preview', 'import_manage_preview', 'import_confirm', 'import_cancel'], true)) {
+            echo json_encode(calendarImportHandle($db, $action, (int)$userId));
+            exit;
+        }
         $existingEvent = null;
         if (in_array($action, ['update', 'delete', 'fetch_one'], true)) {
             $stmt = $db->prepare('SELECT * FROM events WHERE event_id = ?');
@@ -91,6 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
         if ($action === 'create' || $action === 'update') {
             $title       = trim($_POST['title'] ?? '');
             $location    = trim($_POST['location'] ?? '');
+            $description = trim((string)($_POST['description'] ?? ($existingEvent['description'] ?? '')));
+            if (mb_strlen($description) > 10000) throw new InvalidArgumentException('Description must be at most 10,000 characters.');
             // Date is required; time is optional. No time is stored as 00:00:00.
             $startD      = trim($_POST['start_date'] ?? '');
             $startT      = trim($_POST['start_time'] ?? '');
@@ -100,8 +109,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             $endDate     = null;
             $categoryId  = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
             $program     = normalizeProgramCategory($_POST['program'] ?? null);
-            $department = normalizeEventDepartment($_POST['dept_id'] ?? ($existingEvent['dept_id'] ?? null));
-            validateEventProgramDepartment($department, $program);
+            $audience=normalizeEventAudience($_POST['dept_id']??eventDepartmentSelection($existingEvent??[]),$program);
+            $department=$audience['dept_id'];
             $status      = in_array($_POST['status'] ?? '', ['draft','pending','published','archived'])
                             ? $_POST['status'] : $evtDefaultStatus;
             // Super Admins can't send content to themselves for approval
@@ -134,11 +143,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
 
             if ($action === 'create') {
                 $stmt = $db->prepare("
-                    INSERT INTO events (category_id, program, user_id, title, location, start_date, end_date, status" . ($eventDepartmentsReady ? ', dept_id' : '') . ")
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?" . ($eventDepartmentsReady ? ', ?' : '') . ")
+                    INSERT INTO events (category_id, program, user_id, title, location, start_date, end_date, status" . ($calendarImportReady ? ', description' : '') . ($eventDepartmentsReady ? ', dept_id' : '') . ($eventAudienceGroupsReady?', audience_group':'') . ")
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?" . ($calendarImportReady ? ', ?' : '') . ($eventDepartmentsReady ? ', ?' : '') . ($eventAudienceGroupsReady?', ?':'') . ")
                 ");
                 $values = [$categoryId, $program, $userId, $title, $location, $startDate, $endDate, $status];
+                if ($calendarImportReady) $values[] = $description;
                 if ($eventDepartmentsReady) $values[] = $department;
+                if ($eventAudienceGroupsReady) $values[] = $audience['audience_group'];
                 $stmt->execute($values);
                 $newId = $db->lastInsertId();
                 rbacCreatedRecord('event',(int)$newId);
@@ -158,11 +169,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 $stmt = $db->prepare("
                     UPDATE events
                     SET category_id = ?, program = ?, title = ?, location = ?,
-                        start_date = ?, end_date = ?, status = ?" . ($eventDepartmentsReady ? ', dept_id = ?' : '') . "
+                        start_date = ?, end_date = ?, status = ?" . ($calendarImportReady ? ', description = ?' : '') . ($eventDepartmentsReady ? ', dept_id = ?' : '') . ($eventAudienceGroupsReady?', audience_group = ?':'') . "
                     WHERE event_id = ?
                 ");
                 $values = [$categoryId, $program, $title, $location, $startDate, $endDate, $status];
+                if ($calendarImportReady) $values[] = $description;
                 if ($eventDepartmentsReady) $values[] = $department;
+                if ($eventAudienceGroupsReady) $values[] = $audience['audience_group'];
                 $values[] = $eventId;
                 $stmt->execute($values);
 
@@ -185,7 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 exit;
             }
             $stmt = $db->prepare("
-                SELECT event_id, category_id, program, title, location, start_date, end_date, status" . ($eventDepartmentsReady ? ', dept_id' : '') . "
+                SELECT event_id, category_id, program, title, location, start_date, end_date, status" . ($calendarImportReady ? ', description' : '') . ($eventDepartmentsReady ? ', dept_id' : '') . ($eventAudienceGroupsReady?', audience_group':'') . "
                 FROM events WHERE event_id = ?
             ");
             $stmt->execute([$eventId]);
@@ -275,8 +288,8 @@ foreach ($monthEvents as $ev) {
     $endTs   = !empty($ev['end_date']) ? strtotime($ev['end_date']) : $startTs;
     if ($endTs < $startTs) $endTs = $startTs; // guard against bad data
 
-    $spanStart = max($startTs, $firstOfMonth);
-    $spanEnd   = min($endTs, mktime(0, 0, 0, $month, $daysInMonth, $year));
+    $spanStart = max(strtotime(date('Y-m-d', $startTs)), $firstOfMonth);
+    $spanEnd   = min(strtotime(date('Y-m-d', $endTs)), mktime(0, 0, 0, $month, $daysInMonth, $year));
 
     for ($ts = $spanStart; $ts <= $spanEnd; $ts = strtotime('+1 day', $ts)) {
         $day = (int)date('j', $ts);
@@ -287,14 +300,13 @@ foreach ($monthEvents as $ev) {
 // All events list (most recent first) for the management table below
 try {
     $allEvents = $db->query("
-        SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, e.category_id, e.program," . ($eventDepartmentsReady ? 'e.dept_id,' : 'NULL AS dept_id,') . "
+        SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, e.category_id, e.program," . ($eventDepartmentsReady ? 'e.dept_id,' : 'NULL AS dept_id,') . ($eventAudienceGroupsReady?'e.audience_group,':"'all' AS audience_group,") . "
                c.category_name, c.category_color,
                CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,'')) AS author
         FROM events e
         LEFT JOIN categories c ON e.category_id = c.category_id
         LEFT JOIN users u ON e.user_id = u.user_id
         ORDER BY e.start_date DESC
-        LIMIT 50
     ")->fetchAll();
 } catch (Exception $e) {
     error_log('Get all events error: ' . $e->getMessage());
@@ -346,9 +358,14 @@ include __DIR__ . '/../components/header-admin.php';
         <h1>Events &amp; Calendar</h1>
         <p>Plan school events, holidays and class suspensions. Click a date on the calendar to add something on that day.</p>
     </div>
+    <div class="d-flex gap-2 flex-wrap">
+    <?php if (hasPermission('create_event')): ?>
+    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#calendarImportModal"><i class="bi bi-file-earmark-word"></i> Import Calendar</button>
+    <?php endif; ?>
     <button type="button" class="btn btn-gnc-gold" id="addEventBtnTop">
         <i class="bi bi-plus-lg"></i> Add Event
     </button>
+    </div>
 </div>
 
 <div class="row g-3">
@@ -542,8 +559,8 @@ include __DIR__ . '/../components/header-admin.php';
                                 <?php endif; ?>
                             </td>
                             <td data-label="For" style="font-size:.82rem">
-                                <?= htmlspecialchars($eventDepartmentNames[$ev['dept_id'] ?? ''] ?? '') ?>
-                                <?= !empty($ev['dept_id']) ? ' · ' : '' ?>
+                                <?= htmlspecialchars(['basic-education'=>'All Basic Education','college'=>'All College'][$ev['audience_group']??'all']??($eventDepartmentNames[$ev['dept_id'] ?? ''] ?? '')) ?>
+                                <?= !empty($ev['dept_id']) || ($ev['audience_group']??'all')!=='all' ? ' · ' : '' ?>
                                 <?= ($ev['program'] ?? 'ALL') !== 'ALL' ? htmlspecialchars($ev['program']) : (!empty($ev['dept_id']) ? 'All programs in department' : 'All programs') ?>
                             </td>
                             <td data-label="Status"><span class="status-badge <?= htmlspecialchars($ev['status']) ?>"><?= htmlspecialchars($evtStatusLabels[$ev['status']] ?? ucfirst($ev['status'])) ?></span></td>
@@ -563,7 +580,7 @@ include __DIR__ . '/../components/header-admin.php';
                 </table>
             </div>
             <?php if (count($allEvents) >= 50): ?>
-                <div class="evt-hint" style="border-top:1px solid rgba(128,128,128,.2)">Showing the 50 most recent events.</div>
+                <div class="evt-hint" style="border-top:1px solid rgba(128,128,128,.2)">Showing all events. Use search and status filters to find an activity.</div>
             <?php endif; ?>
         </div>
     </div>
@@ -595,6 +612,12 @@ include __DIR__ . '/../components/header-admin.php';
                         <input type="text" class="form-control" name="location" id="eventLocation" maxlength="500" placeholder="e.g. School Gymnasium">
                     </div>
 
+                    <?php if ($calendarImportReady): ?>
+                    <div class="mb-3">
+                        <label class="form-label" for="eventDescription">Description (optional)</label>
+                        <textarea class="form-control" id="eventDescription" name="description" maxlength="10000" rows="3"></textarea>
+                    </div>
+                    <?php endif; ?>
                     <div class="evt-section-label">When</div>
                     <div class="row">
                         <div class="col-12 col-sm-6 mb-2">
@@ -641,6 +664,8 @@ include __DIR__ . '/../components/header-admin.php';
                             <label class="form-label" for="eventDepartment">Department (optional)</label>
                             <select class="form-select" name="dept_id" id="eventDepartment"<?= !$eventDepartmentsReady ? ' disabled' : '' ?>>
                                 <option value="">All departments</option>
+                                <option value="group:basic-education"<?= !$eventAudienceGroupsReady?' disabled':'' ?>>All Basic Education</option>
+                                <option value="group:college"<?= !$eventAudienceGroupsReady?' disabled':'' ?>>All College</option>
                                 <?php foreach ($eventDepartments as $department): ?>
                                 <option value="<?= (int)$department['dept_id'] ?>"><?= htmlspecialchars($department['dept_name']) ?></option>
                                 <?php endforeach; ?>
@@ -680,6 +705,7 @@ include __DIR__ . '/../components/header-admin.php';
     </div>
 </div>
 
+<?php include __DIR__ . '/partials/calendar-import.php'; ?>
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteEventModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width:420px">
@@ -1039,7 +1065,7 @@ document.addEventListener('DOMContentLoaded', function () {
             option.hidden = Boolean(mismatch);
             option.disabled = Boolean(mismatch);
         }
-        select.querySelector('option[value="ALL"]').textContent = department ? 'All programs in this department' : 'Everyone (all programs)';
+        select.querySelector('option[value="ALL"]').textContent = department.startsWith('group:') ? 'All programs in this group' : department ? 'All programs in this department' : 'Everyone (all programs)';
         if (select.selectedOptions[0]?.disabled) select.value = 'ALL';
         document.getElementById('eventAudienceHelp').textContent = department
             ? 'Program is optional. Leave it on all programs to include the whole department.'
@@ -1186,6 +1212,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('eventId').value = ev.event_id;
                 document.getElementById('eventTitle').value = ev.title || '';
                 document.getElementById('eventLocation').value = ev.location || '';
+                const descriptionEl = document.getElementById('eventDescription');
+                if (descriptionEl) descriptionEl.value = ev.description || '';
                 // 00:00 means "no time set" -> leave the time inputs blank
                 const splitDT = (v) => {
                     if (!v) return ['', ''];
@@ -1200,7 +1228,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('eventEndTime').value = et;
                 document.getElementById('eventCategory').value = ev.category_id || '';
                 selectEventProgram(ev.program || 'ALL', true);
-                document.getElementById('eventDepartment').value = ev.dept_id || '';
+                document.getElementById('eventDepartment').value = ev.audience_group && ev.audience_group !== 'all' ? 'group:' + ev.audience_group : ev.dept_id || '';
                 updateEventAudience();
                 // If this role has no such option (e.g. an old "pending" event opened by a
                 // Super Admin), the select would go blank, so fall back to the default.

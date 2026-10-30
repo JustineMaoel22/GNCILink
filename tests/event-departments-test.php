@@ -45,11 +45,12 @@ try {
     audienceCheck(!in_array($ids[1],$bulletinIds,true), 'Other department excluded from program bulletin');
 } finally { $db->rollBack(); }
 
-$userId = (int)$db->query("SELECT user_id FROM users WHERE role='Super Admin' AND status='active' LIMIT 1")->fetchColumn();
+$testAdmin = $db->query("SELECT user_id,credential_version FROM users WHERE role='Super Admin' AND status='active' AND must_change_password=0 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+$userId = (int)($testAdmin['user_id'] ?? 0);
 audienceCheck($userId > 0, 'An active admin is required');
 $sessionId = 'gnc-events-test-' . bin2hex(random_bytes(12));
 session_id($sessionId); session_start();
-$_SESSION = ['user_id'=>$userId,'user_role'=>'Super Admin','_initiated'=>true,'last_activity'=>time()];
+$_SESSION = ['user_id'=>$userId,'user_role'=>'Super Admin','credential_version'=>(int)$testAdmin['credential_version'],'_initiated'=>true,'last_activity'=>time()];
 $cookie = session_name() . '=' . $sessionId; session_write_close();
 $request = static function (?array $body, string $cookie) {
     $curl = curl_init('http://localhost/admin/events.php');
@@ -73,6 +74,17 @@ try {
     [$status,$response] = $request(['ajax_action'=>'fetch_one','csrf_token'=>$token,'event_id'=>$createdId],$cookie);
     $saved = json_decode($response,true)['event'];
     audienceCheck((int)$saved['dept_id'] === (int)$first['dept_id'] && $saved['program'] === 'ALL', 'Department and optional program persist on edit');
+    if(eventAudienceGroupsReady()) {
+        foreach(['basic-education','college'] as $group) {
+            [$status,$response]=$request(array_merge($base,['ajax_action'=>'update','event_id'=>$createdId,'dept_id'=>'group:'.$group]),$cookie);
+            audienceCheck(!empty(json_decode($response,true)['success']),'Department group saves through normal Events editor');
+            [$status,$response]=$request(['ajax_action'=>'fetch_one','csrf_token'=>$token,'event_id'=>$createdId],$cookie);
+            $groupEvent=json_decode($response,true)['event'];
+            audienceCheck($groupEvent['dept_id']===null&&$groupEvent['audience_group']===$group&&$groupEvent['status']==='draft','Group persists without publishing or duplicating the event');
+            [$status,$response]=$request(['ajax_action'=>'update','csrf_token'=>$token,'event_id'=>$createdId,'title'=>$base['title'],'start_date'=>$base['start_date'],'status'=>'draft'],$cookie);
+            audienceCheck(!empty(json_decode($response,true)['success']),'Edits omitting audience preserve the saved group');
+        }
+    }
     [$status,$response] = $request(array_merge($base,['ajax_action'=>'update','event_id'=>$createdId,'dept_id'=>(string)$second['dept_id']]),$cookie);
     audienceCheck(!empty(json_decode($response,true)['success']), 'Department can be changed without choosing a program');
     [$status,$response] = $request(array_merge($base,['dept_id'=>(string)$second['dept_id'],'program'=>$program]),$cookie);
@@ -81,9 +93,15 @@ try {
     audienceCheck(empty(json_decode($response,true)['success']), 'Invalid department is rejected');
     [$status,$response] = $request(array_merge($base,['csrf_token'=>'invalid']),$cookie);
     audienceCheck(empty(json_decode($response,true)['success']), 'Invalid CSRF is rejected');
-    session_id($sessionId); session_start(); $_SESSION['user_role']='Office Staff'; session_write_close();
-    [$status,$response] = $request($base,$cookie);
-    audienceCheck($status === 403 && empty(json_decode($response,true)['success']), 'Unauthorized event creation rejected');
+    // Authorization refreshes identity from the database; changing only the
+    // session role cannot represent a restricted user on current auth code.
+    $restricted = $db->query("SELECT user_id,role,credential_version FROM users WHERE status='active' AND role IN ('The Mirror','Office Staff') AND must_change_password=0 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if ($restricted) {
+        session_id($sessionId); session_start();
+        $_SESSION['user_id']=(int)$restricted['user_id']; $_SESSION['user_role']=$restricted['role']; $_SESSION['credential_version']=(int)$restricted['credential_version']; session_write_close();
+        [$status,$response] = $request($base,$cookie);
+        audienceCheck($status === 403 && empty(json_decode($response,true)['success']), 'Unauthorized event creation rejected');
+    } else { echo "SKIP: restricted-role HTTP check requires an active The Mirror account.\n"; }
 } finally {
     if ($createdId) $db->prepare("DELETE FROM events WHERE event_id=? AND title='Temporary event department HTTP check'")->execute([$createdId]);
     if ($token) $db->prepare('DELETE FROM csrf_tokens WHERE user_id=? AND token=?')->execute([$userId,$token]);

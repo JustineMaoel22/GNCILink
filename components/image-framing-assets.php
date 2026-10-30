@@ -14,3 +14,10 @@ if (!$gncFramingAdmin) {
 <script>window.GNC_IMAGE_FRAMING_CONFIG = <?= json_encode(['admin' => $gncFramingAdmin, 'csrf' => $gncFramingAdmin ? generateCSRFToken() : '', 'settings' => $gncFramingSettings, 'hashedSettings' => $gncFramingHashes], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) ?>;</script>
 <script src="/assets/js/image-upload.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/image-upload.js'), 0, 16) ?>"></script>
 <script src="/assets/js/image-framing.js?v=<?= filemtime(__DIR__ . '/../assets/js/image-framing.js') ?>"></script>
+<?php
+require_once __DIR__.'/../includes/responsive-backgrounds.php';
+$gncResponsiveBackgrounds=[];
+try{$gncResponsiveBackgrounds=responsiveBackgroundLoad(getDB(),$_SERVER['REQUEST_URI']??'/');}catch(InvalidArgumentException $gncBackgroundError){}
+?>
+<script>window.GNC_RESPONSIVE_BACKGROUNDS=<?= json_encode($gncResponsiveBackgrounds,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_SLASHES) ?>;</script>
+<script src="/assets/js/responsive-backgrounds.js?v=<?= filemtime(__DIR__.'/../assets/js/responsive-backgrounds.js') ?>" defer></script>

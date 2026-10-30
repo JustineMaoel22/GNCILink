@@ -1,0 +1,51 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawn}=require('node:child_process');
+const profile=fs.mkdtempSync(path.join(os.tmpdir(),'gnci-calendar-day-'));
+const browser=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
+const delay=ms=>new Promise(r=>setTimeout(r,ms));let socket;
+async function until(fn,message){for(let end=Date.now()+30000;Date.now()<end;){if(await fn())return;await delay(70);}throw Error(message);}
+(async()=>{
+    await until(()=>fs.existsSync(path.join(profile,'DevToolsActivePort')),'Chrome start');const port=fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0];
+    const tabs=await(await fetch('http://127.0.0.1:'+port+'/json/list')).json();socket=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);await new Promise(r=>socket.addEventListener('open',r,{once:true}));
+    let serial=0;const pending=new Map();socket.addEventListener('message',e=>{const p=JSON.parse(e.data);if(pending.has(p.id)){pending.get(p.id)(p);pending.delete(p.id);}});
+    const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++serial;pending.set(id,p=>p.error?reject(Error(JSON.stringify(p.error))):resolve(p.result));socket.send(JSON.stringify({id,method,params}));});
+    const evaluate=async expression=>{const result=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));return result.result.value;};
+    await send('Page.enable');await send('Network.enable');await send('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*','*facebook.com*','*youtube.com*']});
+    await send('Page.addScriptToEvaluateOnNewDocument',{source:"try{sessionStorage.setItem('gncIntroSeen','1');sessionStorage.setItem('gnc_site_notice_v1','dismissed')}catch(_){}"});
+    for(const route of ['/','/pages/student%20life/campus-event.php'])for(const width of [1440,820,390]){
+        await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+        await send('Page.navigate',{url:'http://localhost:8080'+route+'?evt_month=11&evt_year=2026'});
+        await until(()=>evaluate('document.readyState==="complete"&&!!window.GNCCalendarDay&&!!window.bootstrap'),'Calendar load');
+        assert.equal(await evaluate('document.querySelectorAll("[data-calendar-date]").length'),30,'Every real day clickable');
+        await evaluate('document.querySelector(".gnc-cal-card").scrollIntoView({block:"center",behavior:"instant"});Array.from(document.querySelectorAll("button")).find(b=>b.textContent.trim()==="Reject optional")?.click()');await delay(1800);
+        await evaluate('document.querySelector("#gncSiteDisclaimer[open] button")?.click()');
+        const before=await evaluate('({scroll:scrollY,nav:document.getElementById("mainNavbar").getBoundingClientRect().toJSON()})');
+        await evaluate(`(()=>{const original=window.fetch;window.dayRequests=[];window.dayFailure=false;window.fetch=async(url,options)=>{if(!String(url).startsWith('/api/calendar-day.php'))return original(url,options);window.dayRequests.push(String(url));if(window.dayFailure)return {ok:false};const date=new URL(url,location.origin).searchParams.get('date');return {ok:true,json:async()=>({date,events:date.endsWith('-15')?[{id:1,title:'<img src=x onerror=window.dayXss=true>',category:'Holiday',color:'#EABA3B',start_date:'2026-11-14 00:00:00',end_date:'2026-11-16 00:00:00',location:'Main Gym',description:'Full details\\n'+('A complete event description. '.repeat(100))},{id:2,title:'Second activity',category:'School Event',color:'#1F5E2C',start_date:'2026-11-15 09:00:00',end_date:'2026-11-15 11:00:00',location:'Hall',description:'Details of second activity'}]:[]})};};})()`);
+        await evaluate("document.querySelector('[data-calendar-date=\"2026-11-15\"]').click()");
+        await until(()=>evaluate('document.querySelectorAll(".gnc-day-event").length===2&&document.querySelector("#gncCalendarDayModal.show")'),'Day details');await delay(350);
+        const during=await evaluate('({scroll:scrollY,nav:document.getElementById("mainNavbar").getBoundingClientRect().toJSON()})');
+        assert(Math.abs(during.nav.top-before.nav.top)<2&&during.nav.bottom>0,'Navbar stays at its original viewport position while modal opens');
+        assert(Math.abs(during.scroll-before.scroll)<2,'Opening modal preserves page scroll');
+        assert(await evaluate('!window.dayXss&&!document.querySelector(".gnc-day-event img")&&document.querySelector(".gnc-day-event").textContent.includes("Main Gym")&&document.querySelector(".gnc-day-event").textContent.includes("All day")&&document.querySelectorAll(".gnc-day-event")[1].textContent.includes("9:00 AM")'),'Full details, times and safe text');
+        assert(await evaluate('(()=>{const m=document.querySelector(".gnc-day-modal .modal-dialog"),b=document.querySelector(".gnc-day-modal .modal-body");return m.getBoundingClientRect().width<=innerWidth&&b.scrollHeight>b.clientHeight})()'),'Responsive modal scrolls');
+        if(route==='/')assert(!new URL(await evaluate('window.dayRequests.at(-1)'),'http://localhost:8080').searchParams.has('category'));
+        else assert.equal(new URL(await evaluate('window.dayRequests.at(-1)'),'http://localhost:8080').searchParams.get('category'),'School Event','Campus calendar restriction retained');
+        fs.writeFileSync(`cache/calendar-day-${width}.png`,Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+        await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+        await until(()=>evaluate('!document.querySelector(".modal.show")&&!document.body.classList.contains("modal-open")'),'Escape closes');
+        assert.equal(await evaluate('document.activeElement.dataset.calendarDate'),'2026-11-15','Focus restored');
+        const after=await evaluate('({scroll:scrollY,nav:document.getElementById("mainNavbar").getBoundingClientRect().toJSON(),locked:document.documentElement.classList.contains("gnc-calendar-day-open")})');
+        assert(!after.locked&&Math.abs(after.scroll-before.scroll)<2&&Math.abs(after.nav.top-before.nav.top)<2,'Closing restores scroll and navbar without a jump');
+        await evaluate("(()=>{const cell=document.querySelector('[data-calendar-date=\"2026-11-20\"]');cell.focus();cell.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));})()");
+        await until(()=>evaluate('document.querySelector(".gnc-day-message")?.textContent.includes("No events scheduled")'),'Empty date');
+        await until(()=>evaluate('bootstrap.Modal.getInstance(document.getElementById("gncCalendarDayModal"))._isTransitioning===false'),'Opening animation complete');
+        await send('Input.dispatchMouseEvent',{type:'mousePressed',x:width/2,y:880,button:'left',clickCount:1});await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:width/2,y:880,button:'left',clickCount:1});
+        await until(()=>evaluate('!document.querySelector(".modal.show")&&!document.body.classList.contains("modal-open")'),'Outside click closes');
+        await evaluate("window.dayFailure=true;document.querySelector('[data-calendar-date=\"2026-11-21\"]').click()");
+        await until(()=>evaluate('document.querySelector(".gnc-day-modal .modal-body button")?.textContent==="Try again"'),'Error retry');await until(()=>evaluate('bootstrap.Modal.getInstance(document.getElementById("gncCalendarDayModal"))._isTransitioning===false'),'Error modal animation');
+        await evaluate('window.dayFailure=false;document.querySelector(".gnc-day-modal .modal-body button").click()');await until(()=>evaluate('document.querySelector(".gnc-day-message")?.textContent.includes("No events scheduled")'),'Retry succeeds');
+        await evaluate('document.querySelector(".gnc-day-modal .btn-close").click()');await until(()=>evaluate('!document.querySelector(".modal.show")&&!document.body.classList.contains("modal-open")'),'Close button');
+        await evaluate(`document.querySelector('a.gnc-cal-nav[aria-label="Next month"]').click()`);await until(()=>evaluate(`!!document.querySelector('[data-calendar-date="2026-12-01"]')`),'Month navigation');
+        await evaluate(`document.querySelector('[data-calendar-date="2026-12-01"]').click()`);await until(()=>evaluate('window.dayRequests.at(-1).includes("date=2026-12-01")'),'Date handling survives AJAX replacement');
+        console.log('PASS calendar day modal:',route,width);
+    }
+})().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{socket?.close();browser.kill();await delay(500);if(path.dirname(profile)===os.tmpdir()&&path.basename(profile).startsWith('gnci-calendar-day-'))try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:3,retryDelay:200});}catch{}});

@@ -15,6 +15,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/knowledge.php';
+require_once __DIR__ . '/tuition.php';
 require_once __DIR__ . '/../../includes/website-developers.php';
 
 final class GncbotRetriever
@@ -33,6 +34,7 @@ final class GncbotRetriever
 
     /** @var string[] */
     private array $blocks = [];
+    private array $tuitionDocuments = [];
     /** @var array<string,array> url => [label,url] suggested link chips */
     private array $links = [];
     /** @var array<string,true> every URL that may legitimately appear in a reply */
@@ -101,6 +103,16 @@ final class GncbotRetriever
         }
 
         $i = $this->detectIntents($q, $program !== null);
+        // A short answer to "which program/year?" should keep the tuition topic.
+        if(!isset($i['tuition'])&&$this->looksLikeFollowUp($q)
+            &&!preg_match('/\b(events?|announcements?|news|contact|offices?|where|vision|mission|requirements?|curriculum|subjects?|weather)\b/u',$q)) {
+            foreach(array_reverse($history) as $turn) {
+                if(($turn['role']??'')!=='user')continue;
+                $previous=$this->detectIntents($this->norm((string)($turn['text']??'')),false);
+                if(isset($previous['tuition'])){$i['tuition']=true;unset($i['events'],$i['announcements']);}
+                break;
+            }
+        }
         $this->intents = $i;
 
         // Off-topic guard: nothing school-related at all and no conversation to follow up on.
@@ -128,6 +140,7 @@ final class GncbotRetriever
         }
 
         // ---- run the retrievers in priority order
+        if (isset($i['tuition']))          { $this->tuition($q, $program, $dept); }
         if (isset($i['developers']))       { $this->developers(); }
         if ($program !== null)              { $this->programDetail($program); }
         if (isset($i['programs']) && $program === null) { $this->programList($dept); }
@@ -142,7 +155,7 @@ final class GncbotRetriever
         if (isset($i['location']))          { $this->location(); }
         if (isset($i['basic_ed']))          { $this->link('basic_education'); }
         if (isset($i['grad']))              { $this->link('graduate_school'); }
-        if (isset($i['gaps']))              { $notes[] = 'NOTE: GNCILink does not currently store tuition/fee amounts, admission requirements, enrollment dates, class schedules, curriculum/subject lists or scholarship details. If asked, say so and refer to the offices listed (if any).'; }
+        if (isset($i['gaps']))              { $notes[] = 'NOTE: Only answer details actually retrieved here or in the attached published tuition PDFs. Missing admission requirements, enrollment dates, class schedules, curriculum/subject lists or scholarship details must not be invented. Tuition documents may contain amounts; do not claim that tuition information is unavailable without checking the attached schedules.'; }
 
         // ---- nothing matched? cheap keyword search across public content
         if (!$this->blocks) { $this->keywordSearch($q); }
@@ -159,7 +172,25 @@ final class GncbotRetriever
             'intents' => array_keys($i),
             'empty'   => $empty,
             'offTopic' => $this->offTopic,
+            'tuition_documents' => $this->tuitionDocuments,
         ];
+    }
+
+    private function tuition(string $q, ?string $program, ?int $dept): void
+    {
+        $category=null;
+        if(preg_match('/\b(senior high|shs|grade (11|12))\b/u',$q))$category='senior-high-school';
+        elseif(preg_match('/\b(graduate school|master\w*|doctor\w*|phd)\b/u',$q)||($dept!==null&&($this->departments[$dept]['slug']??'')==='graduate-school'))$category='graduate-school';
+        elseif(preg_match('/\b(basic education|elementary|grade school|junior high|jhs|kindergarten|montessori|grade [1-9]|grade 10)\b/u',$q))$category='basic-education';
+        elseif($program!==null||preg_match('/\bcollege\b/u',$q))$category='college';
+        $url=gncbot_url('/pages/admission/tuition-fees.php');$this->allowed[$url]=true;$this->addLink('Tuition and Fees',$url);
+        try{$this->tuitionDocuments=gncbot_tuition_documents($this->db,$q,$program,$this->programNames[$program??'']??'',$category);}
+        catch(Throwable $e){$this->dbFail($e);$this->addBlock('Tuition and Fees','The published tuition schedules could not be loaded. Refer to the Tuition and Fees page: '.$url);return;}
+        $lines=['Tuition and Fees page: '.$url.'. Read any attached published PDFs for exact amounts. Do not infer amounts from document titles.'];
+        foreach($this->tuitionDocuments as $doc){$source=gncbot_url($doc['file_path']);$this->allowed[$source]=true;$this->addLink('Fee schedule: '.$this->clean($doc['title'],80),$source);$lines[]='- '.$this->clean($doc['title'],180).' ('.$doc['category_key'].') URL: '.$source;}
+        if(!$this->tuitionDocuments)$lines[]='No matching published PDF is currently available. Ask which program/grade and school year the visitor needs, or refer to the tuition page and school office.';
+        $lines[]='Documents are ranked by relevance, not guaranteed current. State the school year, semester, year level and payment basis printed in the schedule. If the question is general, clarify the program/grade and year. Do not use a different program or add line items to invent a total.';
+        $this->addBlock('Published tuition and fee documents',implode("\n",$lines));
     }
 
     // ------------------------------------------------------ reference loading
@@ -288,6 +319,7 @@ final class GncbotRetriever
             'basic_ed'       => '/\b(basic education|elementary|junior high|senior high|grade school|high school|kindergarten|shs|jhs|montessori|grade \d+)\b/u',
             'grad'           => '/\b(graduate school|master\w*|doctor\w*|phd|thesis)\b/u',
             'gaps'           => '/\b(tuition|fees?|cost|how much|payments?|scholarships?|admission\w*|requirements?|enroll\w*|enrol\w*|apply|application|schedules?|curriculum|subjects?|deadline|entrance|exam\w*|price|magkano)\b/u',
+            'tuition'        => '/\b(tuition|fees?|matrikula|magkano|how much|how match|school costs?)\b/u',
         ];
         $out = [];
         foreach ($rules as $k => $re) {
@@ -377,7 +409,7 @@ final class GncbotRetriever
         }
         $lines[] = 'Program events page: ' . gncbot_program_events_url($code);
         $this->allowed[gncbot_program_events_url($code)] = true;
-        $lines[] = '(GNCILink stores no description, curriculum, tuition or admission details for this program.)';
+        $lines[] = '(This program catalog entry has no curriculum or admission details. Tuition amounts, when available, come from the separately retrieved published fee schedules.)';
         $this->addBlock("Program: $displayCode", implode("\n", $lines));
         $this->link('college_departments');
     }

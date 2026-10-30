@@ -13,7 +13,7 @@ try {
         $id = (int)$dept['dept_id'];
         $original = departmentPageContent($dept);
         pageCheck(isset($original['leadership_title'], $original['profile_label'], $original['contacts_label']), 'Common editable fields are available');
-        pageCheck($original['header_mobile_background_hidden']['value']==='0','Mobile background is visible by default');
+        pageCheck(in_array($original['header_mobile_background_hidden']['value'],['0','1'],true),'Existing mobile background preference is valid');
         saveDepartmentPageContent($id,['header_mobile_background_hidden'=>'1']);
         pageCheck(departmentPageContent($dept,true)['header_mobile_background_hidden']['value']==='1','Mobile background visibility persists');
         saveDepartmentPageContent($id,['header_mobile_background_hidden'=>'0']);

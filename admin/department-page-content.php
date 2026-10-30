@@ -70,6 +70,7 @@ function departmentPageContent(array $dept, bool $refresh = false): array {
         'email_label' => ['Email Address', 'Email label', 100],
         'hours_label' => ['Operating Hours', 'Hours label', 100],
         'facebook_label' => ['Stay Updated', 'Facebook label', 100],
+        'facebook_page_name' => ['', 'Facebook page display name', 255],
         'facebook_title' => ['Connect with Us', 'Facebook heading', 255],
         'facebook_intro' => ['If you have concerns or need assistance feel free to message our page.', 'Facebook introduction', 2000],
     ];

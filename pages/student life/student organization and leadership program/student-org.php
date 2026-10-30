@@ -11,6 +11,8 @@ $filtered = array_values(array_filter($organizations, fn($org) => (!$orgPreview 
 $total = count($filtered); $pages = max(1, (int)ceil($total / 6));
 $page = min($pages, max(1, (int)($_GET['p'] ?? 1)));
 $visible = array_slice($filtered, ($page - 1) * 6, 6);
+$renderCards = $orgPreview ? $organizations : $visible;
+$visibleIds = array_column($visible, 'org_id');
 $orgH = static fn($value) => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 $orgMark = static fn($key) => ceField('org-setting', ['key'=>$key,'max'=>$settings[$key]['max'],'label'=>$settings[$key]['label'],'multiline'=>$settings[$key]['max']>255,'rich'=>studentOrgPageIsRich($key)]);
 $orgField = static fn($key) => ceField('org-field', ['key'=>$key,'label'=>studentOrganizationFields()[$key][0],'max'=>studentOrganizationFields()[$key][1],'multiline'=>$key==='description','rich'=>$key==='description']);
@@ -69,8 +71,8 @@ $pageLink = static fn($number, $filter) => studentOrganizationsUrl() . '?' . htt
         <div class="student-org-empty"><i class="bi bi-people" aria-hidden="true"></i><h3><?= $archived?'No archived organizations':($category?'No organizations in this category':'No student organizations are published yet') ?></h3><p><?= $archived?'Organizations you archive will appear here after Publish.':($orgPreview?'Use Add organization below, then click its text and pictures to edit.':'Check back soon to discover ways to get involved on campus.') ?></p></div>
         <?php endif; ?>
         <div class="student-org-grid">
-            <?php foreach ($visible as $org): ?>
-            <article class="student-org-card" data-org-url="<?= $orgH(studentOrganizationsUrl($org['slug']).($orgPreview?'&ce_preview=1':'')) ?>"<?= ceManageMark('data-ve-org-card="'.(int)$org['org_id'].'" data-ve-label="'.$orgH($org['name']).'"') ?>>
+            <?php foreach ($renderCards as $org): ?>
+            <article class="student-org-card"<?= $orgPreview && !in_array($org['org_id'],$visibleIds,true)?' hidden':'' ?> data-org-url="<?= $orgH(studentOrganizationsUrl($org['slug']).($orgPreview?'&ce_preview=1':'')) ?>"<?= ceManageMark('data-ve-org-card="'.(int)$org['org_id'].'" data-ve-label="'.$orgH($org['name']).'"') ?>>
                 <div class="student-org-card-cover"><span class="org-cover-picture"<?= ceManageMark('data-ve-org-media="cover" data-warning-image data-warning-label="Organization cover"') ?>><?php if ($org['cover_url']): ?><img src="<?= $orgH($org['cover_url']) ?>" alt="" loading="lazy"><?php elseif ($orgPreview): ?><span>Add cover image</span><?php endif; ?></span>
                     <?php if ($org['category_name']): ?><span class="student-org-category"><?= $orgH($org['category_name']) ?></span><?php endif; ?>
                     <?php if ($orgPreview && ($org['status']!=='published' || $archived)): ?><span class="student-org-draft"><?= $archived?'Archived':'Unpublished' ?></span><?php endif; ?>
@@ -128,7 +130,7 @@ $pageLink = static fn($number, $filter) => studentOrganizationsUrl() . '?' . htt
         </div>
     </section>
     </main>
-    <?= ceData('veOrgData',['fields'=>$settings,'images'=>$leadershipImages,'icons'=>academicFeatureIconChoices(),'organization'=>null,'organizations'=>$visible,'categories'=>$categories,'listingUrl'=>studentOrganizationsUrl()]) ?>
+    <?= ceData('veOrgData',['fields'=>$settings,'images'=>$leadershipImages,'icons'=>academicFeatureIconChoices(),'organization'=>null,'organizations'=>$orgPreview?$organizations:$visible,'pageSize'=>6,'categories'=>$categories,'listingUrl'=>studentOrganizationsUrl()]) ?>
     <?php include __DIR__.'/../../../components/footer.php'; ?>
     <?php if (!$orgPreview): ?>
     <script src="/assets/js/student-org-filters.js?v=<?= filemtime(__DIR__.'/../../../assets/js/student-org-filters.js') ?>"></script>

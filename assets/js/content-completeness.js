@@ -27,6 +27,7 @@
         return scope.dataset.warningSection || text(heading && heading.textContent) || 'Page content';
     }
     function optional(el, includeOptional) {
+        if (el.dataset.warningAllowEmpty === 'true') return true;
         if (el.closest('[data-warning-active="false"],template,.ve-add-tile')) return true;
         if (el.disabled) return true;
         if (!includeOptional && el.closest('[data-warning-optional="true"],[hidden],.d-none')) return true;

@@ -236,9 +236,12 @@ if ($program !== null) {
     if (!preg_match('#^(/|https?://)#i', $ctaLink)) $ctaLink = $defaults['cta_link'];
 
     $pageTitle = $fullName;
+    // Match the visible heading before the transition script runs during parsing.
+    $pageEntranceTitle = mb_strtoupper($shortName);
     $themeStyle = programPageThemeStyle($program['theme_accent']);
 } else {
     $pageTitle = 'Program not found';
+    $pageEntranceTitle = $pageTitle;
     $themeStyle = programPageThemeStyle(null);
 }
 ?>

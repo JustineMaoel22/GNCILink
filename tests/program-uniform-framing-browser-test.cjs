@@ -39,13 +39,23 @@ let socket;
     await evaluate(fs.readFileSync('assets/js/image-upload.js', 'utf8'));
     await evaluate(fs.readFileSync('assets/js/image-framing.js', 'utf8'));
     const editor = fs.readFileSync('assets/js/content-edit.js', 'utf8');
-    await evaluate(`var tab='uniform', S={doc:document}, fileInput=document.getElementById('upload'); fileInput.click=()=>{};
+    await evaluate(`var tab='uniform', S={doc:document}, fileInput=document.getElementById('upload'); fileInput.click=()=>{};function backgroundTarget(){return null;}
         ${editor.slice(editor.indexOf('        function pickFiles(accept, cb)'), editor.indexOf('        /** Why a file cannot'))}
         ${editor.slice(editor.indexOf('    function pickFile(accept,'), editor.indexOf('    function pickPersonPhoto('))}
         window.makeFile=async(w,h,mime='image/png')=>{const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.fillStyle='#176b42';ctx.fillRect(0,0,w,h);ctx.fillStyle='white';ctx.fillRect(0,0,w/2,h/2);return new File([await new Promise(r=>c.toBlob(r,mime)),new Uint8Array(6*1024*1024)],'photo.'+mime.split('/')[1],{type:mime});};`);
     for (const width of [1440, 390]) {
         await send('Emulation.setDeviceMetricsOverride', {width, height:900, deviceScaleFactor:1, mobile:width < 500});
         if (width < 500) await evaluate('window.createImageBitmap=undefined');
+        // Homepage header pickers preserve the incoming image's orientation.
+        for(const [w,h]of [[240,400],[640,360],[300,300]]){
+            await evaluate(`(async()=>{window.headerAccepted=false;pickFile('image/*,video/*',()=>{headerAccepted=true;},false,null,false,false,'natural');const dt=new DataTransfer();dt.items.add(await makeFile(${w},${h}));fileInput.files=dt.files;fileInput.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+            await until(()=>evaluate('!!document.querySelector(".image-frame-dialog[open]")'),'Homepage crop unavailable');
+            const ratio=await evaluate('document.querySelector(".image-frame-preview").clientWidth/document.querySelector(".image-frame-preview").clientHeight');
+            assert(Math.abs(ratio-w/h)<.02,'Homepage photo keeps natural orientation at '+width+'px: '+w+'x'+h);
+            assert.equal(await evaluate('headerAccepted'),false,'Choosing a file waits for crop confirmation');
+            await evaluate('document.querySelector(".image-frame-actions button").click()');
+            assert.equal(await evaluate('headerAccepted'),false,'Cancelling does not stage a replacement');
+        }
         // Exercise the actual Uniform picker, including an empty uniform list.
         await evaluate(`(async()=>{tab='uniform';pickFiles('image/png',()=>{});window.uniformFile=await makeFile(240,400);
             const dt=new DataTransfer();dt.items.add(uniformFile);fileInput.files=dt.files;fileInput.dispatchEvent(new Event('change',{bubbles:true}));})()`);
@@ -92,7 +102,7 @@ let socket;
         await evaluate('document.querySelector(".image-frame-actions button").click()');
     }
     assert.equal(await evaluate('optimizationRequests'),0,'Large static PNGs never reach the unavailable hosting optimizer');
-    console.log('PASS: Facilities receives optimized PNG/JPG/WebP files after positioning; large Uniform uploads, both browser decoders, desktop/mobile framing and replacements. Server optimizer unavailable; no database writes.');
+    console.log('PASS: Homepage portrait/landscape/square uploads retain natural framing on desktop/mobile; cancel stays private. Facilities/Uniform ratios, optimized files and replacements remain intact. No database writes.');
 })().catch(error => {console.error(error); process.exitCode=1;}).finally(async () => {
     if (socket) socket.close(); browser.kill(); await delay(500);
     if (path.dirname(profile) === os.tmpdir() && path.basename(profile).startsWith('gnci-uniform-framing-')) {

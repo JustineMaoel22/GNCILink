@@ -52,6 +52,7 @@
     }
     function apply() {
         restore();
+        if(window.GNCInlineTextStyle)window.GNCInlineTextStyle.render(targets(),settings);
         targets().forEach((el,id) => {
             const box=settings[id]?.[mode()];
             if(!box || el.closest('[data-gnc-layout-ignore]') || (el.querySelector('[data-gnc-text]')&&!el.hasAttribute('data-gnc-layout-group')))return;
@@ -127,6 +128,7 @@
                 const typography={};
                 if(Number.isFinite(current?.fontSize))typography.fontSize=current.fontSize;
                 if(current?.fontFamily)typography.fontFamily=current.fontFamily;
+                if(current?.runs)typography.runs=current.runs;
                 value=Object.assign(typography,value);
             }
             options.stage(id,mode(),value,published[id]?.[mode()]||null);refresh();
@@ -224,7 +226,7 @@
         return controller;
     }
     function acceptChanges(changes){Object.entries(changes||{}).forEach(([id,devices])=>Object.entries(devices).forEach(([device,entry])=>{published[id]=published[id]||{};if(entry.value===null)delete published[id][device];else published[id][device]=entry.value;}));setChanges({});}
-    window.GNCTextLayout={create,apply,setChanges,acceptChanges,targets,device:mode,snapshot:()=>JSON.parse(JSON.stringify(settings))};
+    window.GNCTextLayout={create,apply,setChanges,acceptChanges,targets,device:mode,snapshot:()=>JSON.parse(JSON.stringify(settings)),baseline:()=>JSON.parse(JSON.stringify(published))};
     addEventListener('resize',schedule);addEventListener('load',schedule);
     if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply);else apply();
     if(document.fonts)document.fonts.ready.then(schedule);

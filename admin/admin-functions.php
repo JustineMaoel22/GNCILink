@@ -342,9 +342,7 @@ function uploadAnnouncementImage(?array $file): ?int {
         'image/webp' => 'webp',
     ];
 
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mime  = finfo_file($finfo, $file['tmp_name']);
-    finfo_close($finfo);
+    $mime = imageUploadMime($file['tmp_name']);
 
     if (!isset($allowed[$mime])) {
         throw new Exception('Invalid image type. Allowed: JPG, PNG, GIF, WEBP.');
@@ -868,9 +866,7 @@ function uploadNewsImage(?array $file): ?int {
         'image/webp' => 'webp',
     ];
 
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mime  = finfo_file($finfo, $file['tmp_name']);
-    finfo_close($finfo);
+    $mime = imageUploadMime($file['tmp_name']);
 
     if (!isset($allowed[$mime])) {
         throw new Exception('Invalid image type. Allowed: JPG, PNG, GIF, WEBP.');
@@ -2827,6 +2823,7 @@ function deleteMediaIfUnreferenced(int $mediaId): bool {
         ['programs',       'hero_media_id'],
         ['programs',       'seal_media_id'],
         ['program_items',  'image_media_id'],
+        ['responsive_background_settings', 'media_id'],
         ['departments',    'dean_media_id'],
         ['homepage_president', 'media_id'],
         ['admin_people',   'media_id'],
@@ -5602,6 +5599,7 @@ function ceField(string $name, array $o = []): string {
     if (!empty($o['multiline'])) $a .= ' data-ve-multiline="1"';
     if (!empty($o['rich'])) $a .= ' data-ve-rich="1"';
     if (!empty($o['optional'])) $a .= ' data-warning-optional="true"';
+    if (!empty($o['allow_empty'])) $a .= ' data-warning-allow-empty="true"';
     if (!empty($o['warning_required'])) $a .= ' data-warning-required="true"';
     if (!empty($o['section'])) $a .= ' data-warning-section="' . ceAttr($o['section']) . '"';
     return ceManageMark($a);
