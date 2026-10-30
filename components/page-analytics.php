@@ -46,7 +46,7 @@ if (!function_exists('gncPageNow')) {
     /**
      * Turns a raw URL/path into a stable page identifier, or null if it should
      * not be tracked (admin, api, assets, files, malformed input).
-     * Query strings are ignored, so /index.php?program=x counts as the homepage.
+     * Query strings are ignored except for entity identifiers. Home is excluded.
      */
     function gncPageNormalizePath(string $raw): ?string {
         $path = parse_url($raw, PHP_URL_PATH);
@@ -59,9 +59,10 @@ if (!function_exists('gncPageNow')) {
         if (!preg_match('#^[a-z0-9/_\-.~%]+$#', $path)) return null;
 
         // /index.php and /folder/index.php -> / and /folder
-        $path = preg_replace('#/index\.(php|html?)$#', '/', $path);
+        $path = preg_replace('#/index\.(php|html?)/?$#', '/', $path);
         if ($path !== '/') $path = rtrim($path, '/');
         if ($path === '') $path = '/';
+        if ($path === '/' || $path === '/index') return null;
 
         // Only pages, not files (images, css, pdf...)
         $base = basename($path);
@@ -73,6 +74,13 @@ if (!function_exists('gncPageNow')) {
         // Preserve entity identity for dynamic pages while dropping tracking and editor parameters.
         $query = [];
         parse_str((string)(parse_url($raw, PHP_URL_QUERY) ?? ''), $query);
+        // Legacy department wrappers render the same database-managed department.
+        $departmentAliases = ['cased'=>'cased', 'cba'=>'cba', 'coa'=>'coa', 'coe'=>'coe', 'comlsp'=>'camp', 'conursing'=>'conursing'];
+        if (preg_match('~^/pages/academics/college/departments/([a-z0-9-]+)(?:\.php)?$~D', $path, $alias)
+            && isset($departmentAliases[$alias[1]])) {
+            $path = '/pages/academics/college/college-department.php';
+            $query['slug'] = $departmentAliases[$alias[1]];
+        }
         // Keep historical counts and entity identity for clean academic URLs.
         if (preg_match('~^/pages/academics/college/(program|college-department)/([a-z0-9-]+)$~D', $path, $programMatch)) {
             $query['slug'] = $programMatch[2];
@@ -89,6 +97,8 @@ if (!function_exists('gncPageNow')) {
             if ($key === 'slug' && !preg_match('/^[a-zA-Z0-9_-]{1,180}$/', $query[$key])) continue;
             $keep[$key] = $query[$key];
         }
+        // Static clean URLs and their PHP URLs share a single analytics identity.
+        if (!$keys) $path = preg_replace('/\.php$/', '', $path);
         $result = $path . ($keep ? '?' . http_build_query($keep, '', '&', PHP_QUERY_RFC3986) : '');
         return strlen($result) <= 255 ? $result : null;
     }
@@ -162,28 +172,36 @@ if (!function_exists('gncPageNow')) {
      * @param string[] $excludeUrls e.g. ['/'] to leave the homepage out
      */
     function gncPopularPages(PDO $db, int $limit = 5, array $excludeUrls = []): array {
-        $limit = max(1, min(100, $limit));
-        // Hide previously recorded missing-program pages in public and admin lists.
-        $where = 'WHERE LOWER(TRIM(page_title)) <> :missingProgramTitle';
-        $params = [':missingProgramTitle' => 'program not found'];
-        if ($excludeUrls) {
-            $ph = [];
-            foreach (array_values($excludeUrls) as $i => $u) {
-                $ph[] = ":x$i";
-                $params[":x$i"] = $u;
-            }
-            $where .= ' AND page_url NOT IN (' . implode(',', $ph) . ')';
-        }
+        $excludeUrls = array_map('gncPageNormalizePath', $excludeUrls);
+        $rows = array_filter(gncPageTotals($db), function (array $row) use ($excludeUrls): bool {
+            return !in_array($row['page_url'], $excludeUrls, true);
+        });
+        return array_slice(array_values($rows), 0, max(1, min(100, $limit)));
+    }
+
+    /** Combine historical URL aliases without changing or deleting stored counts. */
+    function gncPageTotals(PDO $db): array {
         try {
-            $stmt = $db->prepare("
-                SELECT page_url, page_title, visit_count, last_visited
-                FROM page_visits
-                $where
-                ORDER BY visit_count DESC, last_visited DESC
-                LIMIT $limit
-            ");
-            $stmt->execute($params);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $rows = $db->query('SELECT page_url, page_title, visit_count, last_visited FROM page_visits')->fetchAll(PDO::FETCH_ASSOC);
+            $pages = [];
+            foreach ($rows as $row) {
+                $path = gncPageNormalizePath($row['page_url']);
+                if ($path === null || strcasecmp(trim($row['page_title']), 'Program not found') === 0) continue;
+                $row['page_url'] = $path;
+                $row['visit_count'] = (int) $row['visit_count'];
+                if (isset($pages[$path])) {
+                    $count = $pages[$path]['visit_count'] + $row['visit_count'];
+                    if ($row['last_visited'] > $pages[$path]['last_visited']) $pages[$path] = $row;
+                    $pages[$path]['visit_count'] = $count;
+                } else {
+                    $pages[$path] = $row;
+                }
+            }
+            $pages = array_values($pages);
+            usort($pages, function (array $a, array $b): int {
+                return ($b['visit_count'] <=> $a['visit_count']) ?: strcmp($b['last_visited'], $a['last_visited']);
+            });
+            return $pages;
         } catch (Throwable $e) {
             return [];
         }
@@ -193,13 +211,9 @@ if (!function_exists('gncPageNow')) {
     function gncAnalyticsSummary(PDO $db): array {
         $out = ['total_views' => 0, 'unique_visitors' => 0, 'today_views' => 0, 'most_visited' => null];
         try {
-            $out['total_views'] = (int) $db->query("SELECT COALESCE(SUM(visit_count),0) FROM page_visits")->fetchColumn();
-
-            $stmt = $db->prepare("SELECT COALESCE(SUM(views),0) FROM page_visits_daily WHERE visit_date = :d");
-            $stmt->execute([':d' => gncVisitorToday()]);
-            $out['today_views'] = (int) $stmt->fetchColumn();
-
-            $top = gncPopularPages($db, 1);
+            $top = gncPageTotals($db);
+            $out['total_views'] = (int) array_sum(array_column($top, 'visit_count'));
+            $out['today_views'] = (int) array_sum(gncViewsByDate($db, 1));
             $out['most_visited'] = $top[0] ?? null;
         } catch (Throwable $e) {}
         try {
@@ -217,14 +231,16 @@ if (!function_exists('gncPageNow')) {
         $rows = [];
         try {
             $stmt = $db->prepare("
-                SELECT visit_date, SUM(views) AS views
-                FROM page_visits_daily
-                WHERE visit_date >= :from
-                GROUP BY visit_date
+                SELECT d.visit_date, p.page_url, SUM(d.views) AS views
+                FROM page_visits_daily d
+                INNER JOIN page_visits p ON p.page_id = d.page_id
+                WHERE d.visit_date >= :from AND LOWER(TRIM(p.page_title)) <> 'program not found'
+                GROUP BY d.visit_date, p.page_url
             ");
             $stmt->execute([':from' => $from->format('Y-m-d')]);
             foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                $rows[$r['visit_date']] = (int) $r['views'];
+                if (gncPageNormalizePath($r['page_url']) === null) continue;
+                $rows[$r['visit_date']] = ($rows[$r['visit_date']] ?? 0) + (int) $r['views'];
             }
         } catch (Throwable $e) {}
 

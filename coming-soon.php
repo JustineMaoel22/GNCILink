@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Something great is coming to GNCI Link. A new experience for the Guagua National Colleges community is on its way.">
     <meta name="theme-color" content="#0b4228">
-    <title>Coming Soon | GNCI Link</title>
+    <title>Coming Soon</title>
     <link rel="icon" type="image/svg+xml" href="/assets/images/logos/gnc-logo-v1.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -45,6 +45,5 @@
             </a>
         </footer>
     </div>
-    <?php include_once __DIR__ . '/chatbot/widget.php'; ?>
 </body>
 </html>
