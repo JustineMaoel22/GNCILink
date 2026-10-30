@@ -30,7 +30,7 @@
         const selector=selectorFor(node)+pseudo;
         const source=kind==='image'?localImage(node.getAttribute('src')||''):sourceOf(css.backgroundImage)||localImage(node.getAttribute('data-bg')||'');
         const configured=published[selector]||changes[selector];
-        const emptyEditable=node.matches('.career-panel-bg,[data-ve-sports-background-area]');
+        const emptyEditable=node.matches('.career-panel-bg,[data-ve-sports-background-area]')||(kind==='image'&&node.parentElement?.matches('[data-dept-banner-image]'));
         if((!source&&!configured&&!emptyEditable)||(kind==='image'&&!imageBackground(node)))return null;
         if(!targets.has(selector)||targets.get(selector).node!==node)targets.set(selector,{selector,node,pseudo,kind,source,layers:css.backgroundImage==='none'&&source?'url('+JSON.stringify(source)+')':css.backgroundImage,position:kind==='image'?css.objectPosition:css.backgroundPosition,fit:kind==='image'?css.objectFit:css.backgroundSize});
         return targets.get(selector);
@@ -70,7 +70,9 @@
     function buildRules(selector,setting){
         const t=resolve(selector);if(!t||!setting)return '';
         const src=setting.path,position=setting.x+'% '+setting.y+'%';
-        if(t.kind==='image')return selector+'{content:url('+JSON.stringify(src)+')!important;object-fit:'+setting.fit+'!important;object-position:'+position+'!important;}';
+        // Empty legacy headers keep their image hidden. An override must show
+        // it only on its own device; removing the rule restores that fallback.
+        if(t.kind==='image')return selector+'{content:url('+JSON.stringify(src)+')!important;'+(t.node.hidden?'display:block!important;':'')+'object-fit:'+setting.fit+'!important;object-position:'+position+'!important;}';
         const layers=t.layers.includes('url(')?t.layers.replace(/url\(["']?[^"')]+["']?\)/g,'url('+JSON.stringify(src)+')'):'url('+JSON.stringify(src)+')'+(t.layers!=='none'?','+t.layers:'');
         const selectors=t.node.matches('.slide-bg')?Array.from(t.node.parentElement.querySelectorAll('.slide-bg')).map(selectorFor):[selector];
         return selectors.map(key=>key+'{background-image:'+layers+'!important;background-position:'+position+'!important;background-size:'+setting.fit+'!important;background-repeat:no-repeat!important;}').join('');
