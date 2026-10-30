@@ -34,6 +34,16 @@ try {
         pageCheck(($unchanged['logo_media_id'] ?? null) === ($dept['logo_media_id'] ?? null) && $unchanged['dept_name'] === $dept['dept_name'], 'Header removal preserves shared logo and department name');
         saveDepartmentPageContent($id, ['header_logo_hidden' => '0', 'header_text_hidden' => '0']);
         pageCheck(departmentPageContent($dept, true)['header_logo_hidden']['value'] === '0', 'Header logo can be restored');
+        foreach (['prefix', 'subject', 'blurb'] as $part) {
+            $key = 'header_' . $part . '_hidden';
+            saveDepartmentPageContent($id, [$key => '1']);
+            pageCheck(departmentPageContent($dept, true)[$key]['value'] === '1', 'Individual header box visibility persists');
+            pageCheck(getDepartmentById($id)['dept_name'] === $dept['dept_name'], 'Removing one header box preserves department identity');
+            saveDepartmentPageContent($id, [$key => '0']);
+            pageCheck(departmentPageContent($dept, true)[$key]['value'] === '0', 'Individual header box can be restored');
+            try { saveDepartmentPageContent($id, [$key => 'yes']); throw new RuntimeException('Invalid individual visibility accepted'); }
+            catch (InvalidArgumentException $expected) {}
+        }
         foreach (['yes', '', '2'] as $invalidVisibility) {
             try { saveDepartmentPageContent($id, ['header_logo_hidden' => $invalidVisibility]); throw new RuntimeException('Invalid visibility accepted'); }
             catch (InvalidArgumentException $expected) {}

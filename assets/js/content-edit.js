@@ -3261,7 +3261,7 @@
                 var extraText = own(textChanges, 'header_extra_text') ? textChanges.header_extra_text : TD.fields.header_extra_text.value;
                 extraHeader.hidden = !extraText.trim();
             }
-            if (TD) ['text', 'logo'].forEach(function (part) {
+            if (TD) ['text', 'logo', 'prefix', 'subject', 'blurb'].forEach(function (part) {
                 var element = doc.querySelector('[data-dept-header-' + part + ']');
                 if (element) element.classList.toggle('dept-header-hidden', headerHidden('header_' + part + '_hidden'));
             });
@@ -3602,6 +3602,11 @@
             bindEditing(S.doc);select({kind:'field',el:el});el.focus();chrome();
         }
         function removeHeaderTextBox(el) {
+            var part = el.hasAttribute('data-dept-header-prefix') ? 'prefix'
+                : el.hasAttribute('data-dept-header-subject') ? 'subject'
+                : el.hasAttribute('data-dept-header-blurb') ? 'blurb' : null;
+            if (part) { toggleHeaderPart(part); return; }
+            if (!el.hasAttribute('data-dept-header-extra')) return;
             if (TD.fields.header_extra_text.value === '') delete textChanges.header_extra_text;
             else textChanges.header_extra_text = '';
             el.textContent = '';el.hidden = true;select(null);chrome();
@@ -3654,6 +3659,10 @@
                 headerControls.push(h('div',{class:'ve-pop-label',text:'Card and header colour'}));
                 headerControls.push(h('div',{class:'ve-pop-row'},[color,h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Use default colour',on:{click:function(){dSet('theme_color','');color.value='#1F5E2C';previewDepartmentColor(S.doc);chrome();}}})]));
                 if (TD.fields.header_extra_text) headerControls.push(h('button', {type:'button',class:'btn btn-sm btn-outline-success',text:'Add header text box',on:{click:addHeaderText}}));
+                [['prefix', 'header prefix'], ['subject', 'header title'], ['blurb', 'line under the title']].forEach(function (entry) {
+                    if (!headerHidden('header_' + entry[0] + '_hidden')) return;
+                    headerControls.push(h('button', {type:'button',class:'btn btn-sm btn-outline-secondary',text:'Restore ' + entry[1],on:{click:function(){toggleHeaderPart(entry[0]);deptOptions(x,y);}}}));
+                });
                 ['text', 'logo'].forEach(function (part) {
                     headerControls.push(h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary',
                         text: (headerHidden('header_' + part + '_hidden') ? 'Restore' : 'Remove') + ' header ' + part,
@@ -4245,6 +4254,7 @@
                     if (TD && sel.el.closest('[data-dept-header-text]')) {
                         if (sel.el.hasAttribute('data-dept-header-extra')) it.push({icon:'trash',label:'Remove text box',danger:true,run:function(){removeHeaderTextBox(sel.el);}});
                         else {
+                            if (sel.el.matches('[data-dept-header-prefix], [data-dept-header-subject], [data-dept-header-blurb]')) it.push({icon:'trash',label:'Remove this text box',danger:true,run:function(){removeHeaderTextBox(sel.el);}});
                             if (TD.fields.header_extra_text) it.push({icon:'plus-lg',label:'Add header text box',run:addHeaderText});
                             it.push({ icon: 'trash', label: 'Remove header text', danger: true, run: function () { toggleHeaderPart('text'); } });
                         }

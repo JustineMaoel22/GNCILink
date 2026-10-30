@@ -41,6 +41,9 @@ function departmentPageContent(array $dept, bool $refresh = false): array {
     $headerParts = preg_match('/^(College\s+of)\s+(.+)$/iu', $name, $parts) ? [$parts[1], $parts[2]] : ['', $name];
     $defaults = [
         'header_text_hidden' => ['0', 'Header text visibility', 1],
+        'header_prefix_hidden' => ['0', 'Header prefix visibility', 1],
+        'header_subject_hidden' => ['0', 'Header title visibility', 1],
+        'header_blurb_hidden' => ['0', 'Header subtitle visibility', 1],
         'header_logo_hidden' => ['0', 'Header logo visibility', 1],
         'header_mobile_background_hidden' => ['0', 'Hide header background on mobile', 1],
         'header_prefix' => [$headerParts[0], 'Header prefix', 100],
@@ -119,7 +122,7 @@ function saveDepartmentPageContent(int $id, array $changes): array {
     $fields = departmentPageContent($dept);
     foreach ($changes as $key => &$text) {
         if (!isset($fields[$key]) || !is_string($text)) throw new InvalidArgumentException('Unknown department text field.');
-        if (in_array($key, ['header_text_hidden', 'header_logo_hidden', 'header_mobile_background_hidden'], true) && !in_array($text, ['0', '1'], true)) {
+        if (in_array($key, ['header_text_hidden', 'header_prefix_hidden', 'header_subject_hidden', 'header_blurb_hidden', 'header_logo_hidden', 'header_mobile_background_hidden'], true) && !in_array($text, ['0', '1'], true)) {
             throw new InvalidArgumentException('Invalid header visibility.');
         }
         if (in_array($key, ['vision_icon', 'mission_icon'], true)) {

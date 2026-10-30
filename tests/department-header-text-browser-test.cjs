@@ -53,12 +53,24 @@ async function until(work,message){for(let end=Date.now()+30000;Date.now()<end;)
     await evaluate("[...document.querySelectorAll('#veTb button')].find(button=>button.textContent==='Snap to center').click()");
     const centered=()=>evaluate("(()=>{const el=VE.state.doc.querySelector('[data-dept-header-extra]'),r=el.getBoundingClientRect(),b=el.closest('section').getBoundingClientRect();return Math.abs(r.left+r.width/2-b.left-b.width/2)<1})()");
     assert.equal(await centered(),true,'Snap to center centers the header box in its section: '+JSON.stringify(await evaluate("(()=>{const el=VE.state.doc.querySelector('[data-dept-header-extra]'),r=el.getBoundingClientRect(),b=el.closest('section').getBoundingClientRect();return {x:r.left,w:r.width,bx:b.left,bw:b.width,style:el.getAttribute('style')}})()")));
+    for(const part of ['prefix','subject','blurb']) {
+        await evaluate(`VE.state.doc.querySelector('[data-dept-header-${part}]').click();[...document.querySelectorAll('#veTb button')].find(b=>b.textContent==='Remove this text box').click()`);
+        assert.equal(await evaluate(`VE.state.doc.querySelector('[data-dept-header-${part}]').classList.contains('dept-header-hidden')`),true,'Only selected box is removed');
+        assert.equal(await evaluate("VE.state.doc.querySelector('[data-dept-header-text]').classList.contains('dept-header-hidden')"),false,'Other header text stays visible');
+        if(part !== 'blurb') {
+            await evaluate(`document.getElementById('vePageOpts').click();[...document.querySelectorAll('#vePop button')].find(b=>b.textContent===${JSON.stringify('Restore header '+(part==='subject'?'title':'prefix'))}).click()`);
+            assert.equal(await evaluate(`VE.state.doc.querySelector('[data-dept-header-${part}]').classList.contains('dept-header-hidden')`),false,'Removed box can be restored');
+        }
+    }
     await evaluate("document.getElementById('veSaveDraft').click()");await until(()=>evaluate("!VE.state.busy&&document.getElementById('veStatus').textContent.includes('Draft saved')"),'Draft save failed');
     await send('Page.reload');await pause(800);await until(ready,'Draft restore failed');
     assert.equal(await evaluate("VE.state.doc.querySelector('[data-ve-key=header_prefix]').textContent"),'School of');
     assert.equal(await evaluate("VE.state.doc.querySelector('[data-ve-key=header_subject]').textContent"),'Header subject test');
     assert.equal(await evaluate("VE.state.doc.querySelector('[data-dept-header-extra]').textContent"),'Extra header test');
     assert.equal(await evaluate("VE.state.doc.querySelector('[data-dept-header-extra]').hidden"),false,'Extra box restores visibly');
+    assert.equal(await evaluate("VE.state.doc.querySelector('[data-dept-header-blurb]').classList.contains('dept-header-hidden')"),true,'Individual removal survives draft reload');
+    await evaluate("document.getElementById('vePageOpts').click();[...document.querySelectorAll('#vePop button')].find(b=>b.textContent==='Restore line under the title').click()");
+    assert.equal(await evaluate("VE.state.doc.querySelector('[data-dept-header-blurb]').classList.contains('dept-header-hidden')"),false,'Subtitle can be restored after reload');
     assert.equal(await centered(),true,'Centered placement survives draft reload');
     assert.equal(await evaluate("VE.adapter().draftState().dChange.theme_color"),'#5C198B','Colour survives draft reload');
     assert.equal(await evaluate("VE.state.doc.querySelector('.dept-intro-program').classList.contains('dept-mobile-background-hidden')"),true,'Mobile background choice survives draft reload');
