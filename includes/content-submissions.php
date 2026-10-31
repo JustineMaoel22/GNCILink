@@ -163,8 +163,22 @@ function rbacFlattenFields(array $data,string $prefix=''): array {
 function rbacExecuteRequest(array $submission,array $payload): array {
     if(!rbacIsSuper()||!in_array($submission['route'],rbacContentRoutes(),true))throw new RuntimeException('Invalid approval route.');
     if(!function_exists('curl_init'))throw new RuntimeException('PHP cURL is required to apply approved submissions.');
-    $origin=(string)env('RBAC_INTERNAL_ORIGIN','http://127.0.0.1');$parts=parse_url($origin);
-    if(!in_array($parts['host']??'',['127.0.0.1','localhost','::1'],true)||!in_array($parts['scheme']??'',['http','https'],true)||isset($parts['user'])||isset($parts['pass'])||!in_array($parts['path']??'',['','/'],true)||isset($parts['query'])||isset($parts['fragment']))throw new RuntimeException('Invalid internal approval origin. Use a loopback HTTP(S) origin.');
+    $origin=(string)env('RBAC_INTERNAL_ORIGIN','');$resolve=[];
+    if($origin===''){
+        // Hosted sites serve the app by hostname, so 127.0.0.1 alone hits the wrong (404) virtual host.
+        // Keep the request on this server: use the public hostname but pin its address to loopback.
+        $origin='http://127.0.0.1';
+        try{
+            $public=parse_url(authPublicOrigin());
+            if(!empty($public['host'])&&!in_array(strtolower($public['host']),['127.0.0.1','localhost','::1'],true)){
+                $port=(int)($public['port']??($public['scheme']==='https'?443:80));
+                $origin=$public['scheme'].'://'.$public['host'].(isset($public['port'])?':'.$public['port']:'');
+                $resolve=[$public['host'].':'.$port.':127.0.0.1'];
+            }
+        }catch(Throwable $e){}
+    }
+    $parts=parse_url($origin);
+    if((!$resolve&&!in_array($parts['host']??'',['127.0.0.1','localhost','::1'],true))||!in_array($parts['scheme']??'',['http','https'],true)||isset($parts['user'])||isset($parts['pass'])||!in_array($parts['path']??'',['','/'],true)||isset($parts['query'])||isset($parts['fragment']))throw new RuntimeException('Invalid internal approval origin. Use a loopback HTTP(S) origin.');
     $reviewer=(int)$_SESSION['user_id'];$original=session_id();$nonce=bin2hex(random_bytes(32));$workerId=bin2hex(random_bytes(24));$csrf=bin2hex(random_bytes(32));$temporary=[];$workerData=[];
     $post=$payload['post'];$post['csrf_token']=$csrf;
     if(in_array($submission['route'],['/admin/action/create-announcement.php','/admin/action/create-news.php','/admin/events.php'],true)&&in_array($post['action']??$post['ajax_action']??'',['create','update'],true))$post['status']='published';
@@ -180,7 +194,7 @@ function rbacExecuteRequest(array $submission,array $payload): array {
     try {
         $fields=rbacFlattenFields($post);
         foreach($payload['files']??[] as $field=>$file){$bytes=base64_decode($file['data'],true);if($bytes===false)throw new RuntimeException('Stored media could not be read.');$path=tempnam(sys_get_temp_dir(),'gnc-review-');$temporary[]=$path;file_put_contents($path,$bytes);$fields[$field]=new CURLFile($path,$file['mime'],$file['name']);}
-        $curl=curl_init(rtrim($origin,'/').$submission['route']);
+        $curl=curl_init(rtrim($origin,'/').$submission['route']);if($resolve)curl_setopt($curl,CURLOPT_RESOLVE,$resolve);
         curl_setopt_array($curl,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>$fields,CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_TIMEOUT=>90,
             CURLOPT_HTTPHEADER=>['Cookie: '.session_name().'='.$workerId,'X-GNCI-Review: '.$nonce,'Accept: application/json']]);
         $raw=curl_exec($curl);$http=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE);curl_close($curl);
