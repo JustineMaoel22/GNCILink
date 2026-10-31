@@ -1,11 +1,12 @@
 <?php
 /** Bounded, read-only DOCX reader using PHP's libzip and libxml libraries. */
 function calendarDocxXml(string $path): string {
-    if (!class_exists('ZipArchive') || !class_exists('DOMDocument') || !class_exists('finfo')) {
-        throw new InvalidArgumentException('Calendar import requires PHP ZIP, DOM/XML and Fileinfo. Ask your hosting administrator to enable them.');
+    if (!class_exists('ZipArchive') || !class_exists('DOMDocument')) {
+        throw new InvalidArgumentException('Calendar import requires PHP ZIP and DOM/XML. Ask your hosting administrator to enable them.');
     }
     if (!is_file($path) || filesize($path) > 5 * 1024 * 1024 || filesize($path) < 4) throw new InvalidArgumentException('Upload a DOCX file up to 5 MB.');
-    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($path);
+    // Without Fileinfo, fall back to the ZIP signature; ZipArchive validation below still applies.
+    $mime = class_exists('finfo') ? (new finfo(FILEINFO_MIME_TYPE))->file($path) : ((string)@file_get_contents($path, false, null, 0, 4) === "PK\x03\x04" ? 'application/zip' : '');
     if (!in_array($mime, ['application/zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/octet-stream'], true)) throw new InvalidArgumentException('This file is not a Word DOCX document.');
     $zip = new ZipArchive();
     if ($zip->open($path, ZipArchive::RDONLY) !== true) throw new InvalidArgumentException('The Word document could not be opened.');

@@ -97,7 +97,8 @@ function rbacCollectUploads(array $files): array {
         if($error===UPLOAD_ERR_NO_FILE)return;
         if($error!==UPLOAD_ERR_OK||!is_uploaded_file($tmp))throw new InvalidArgumentException('An uploaded file was not received correctly.');
         $total+=filesize($tmp);if($total>60*1024*1024)throw new LengthException('Submit at most 60 MB of files at a time.');
-        $mime=(new finfo(FILEINFO_MIME_TYPE))->file($tmp);
+        // Shared helper falls back to byte inspection when the host lacks the Fileinfo extension.
+        $mime=imageUploadMime($tmp);
         if(!in_array($mime,['image/jpeg','image/png','image/gif','image/webp','application/pdf','video/mp4','video/webm'],true))throw new InvalidArgumentException('This file type cannot be submitted for approval.');
         $out[$field]=['name'=>basename($name),'mime'=>$mime,'data'=>base64_encode(file_get_contents($tmp))];
     };
@@ -187,7 +188,16 @@ function rbacExecuteRequest(array $submission,array $payload): array {
         session_id($workerId);session_start(['use_cookies'=>0,'use_only_cookies'=>0]);$workerData=$_SESSION;$_SESSION=[];session_destroy();
         $json=json_decode($raw,true);
         $ok=$http>=200&&$http<400&&empty($workerData['flash_errors'])&&($http===302?!empty($workerData['flash_success']):(is_array($json)&&($json['success']??false)===true));
-        return ['state'=>$ok?'approved':(in_array($http,[401,403],true)?'failed':'uncertain'),'created'=>$workerData['_rbac_created']??null,'message'=>$ok?'Approved and applied.':'The existing handler did not confirm this change. Review the content before another attempt.'];
+        $message='Approved and applied.';
+        if(!$ok){
+            // Surface why the existing handler refused so the reviewer can act on it (admin-only, truncated).
+            $why=[];
+            foreach((array)($workerData['flash_errors']??[]) as $err)if(is_string($err)&&$err!=='')$why[]=$err;
+            if(!$why&&is_array($json)&&is_string($json['error']??null))$why[]=$json['error'];
+            $detail=$why?' Reason: '.mb_substr(trim(strip_tags(implode(' ',$why))),0,400):' (HTTP '.$http.', no error message returned).';
+            $message='The existing handler did not confirm this change.'.$detail.' Review the content before another attempt.';
+        }
+        return ['state'=>$ok?'approved':(in_array($http,[401,403],true)?'failed':'uncertain'),'created'=>$workerData['_rbac_created']??null,'message'=>$message];
     }finally{
         foreach($temporary as $path)if(is_file($path))unlink($path);
         if(session_status()===PHP_SESSION_ACTIVE)session_write_close();

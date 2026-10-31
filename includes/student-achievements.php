@@ -98,7 +98,7 @@ function uploadStudentAchievementImage(array $file): string {
     if (!isset($file['error'],$file['tmp_name']) || !is_int($file['error']) || $file['error'] !== UPLOAD_ERR_OK || !is_string($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) throw new InvalidArgumentException('The picture upload failed. Please try again.');
     $size = filesize($file['tmp_name']);
     $types = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','image/gif'=>'gif'];
-    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+    try { $mime = imageUploadMime($file['tmp_name']); } catch (Throwable $e) { $mime = ''; }
     if (!$size || $size > 5*1024*1024 || !isset($types[$mime]) || !getimagesize($file['tmp_name'])) throw new InvalidArgumentException('Upload a JPG, PNG, WebP or GIF picture of up to 5 MB.');
     $folder = dirname(__DIR__) . '/uploads/student-achievements';
     if (!is_dir($folder) && !mkdir($folder,0755,true) && !is_dir($folder)) throw new RuntimeException('Could not create the achievement upload folder.');

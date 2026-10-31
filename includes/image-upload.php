@@ -32,7 +32,11 @@ function imageUploadMime(string $path): string {
         IMAGETYPE_WEBP => 'image/webp', IMAGETYPE_GIF => 'image/gif'];
     if ($info && $info[0] > 0 && $info[1] > 0 && isset($types[$info[2]])) return $types[$info[2]];
     if (uploadPdfSignatureValid($path)) return 'application/pdf';
-    throw new RuntimeException('Choose a valid JPG, PNG, WebP, GIF or PDF file. Video uploads require the PHP Fileinfo extension in your hosting PHP settings.');
+    // MP4/WebM by container signature (ISO base media 'ftyp' box, or EBML header).
+    $head = (string)@file_get_contents($path, false, null, 0, 16);
+    if (strlen($head) >= 12 && substr($head, 4, 4) === 'ftyp') return 'video/mp4';
+    if (strncmp($head, "\x1A\x45\xDF\xA3", 4) === 0) return 'video/webm';
+    throw new RuntimeException('Choose a valid JPG, PNG, WebP, GIF, PDF, MP4 or WebM file.');
 }
 
 /** Admin-only diagnostics: no credentials, paths, or uploaded content. */

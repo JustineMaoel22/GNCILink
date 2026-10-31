@@ -157,7 +157,7 @@ function facebookPublishingPhoto(string $path): CURLFile {
     if (!$root || !$file || !str_starts_with(str_replace('\\', '/', $file), str_replace('\\', '/', $root) . '/')) {
         throw new FacebookPublishingError('An announcement photo is missing or outside announcement upload storage.');
     }
-    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file);
+    try { $mime = imageUploadMime($file); } catch (Throwable $e) { $mime = ''; }
     if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true) || filesize($file) > 5 * 1024 * 1024) {
         throw new FacebookPublishingError('A Facebook photo has an unsupported type or exceeds 5 MB.');
     }
