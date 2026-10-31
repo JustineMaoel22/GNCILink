@@ -27,7 +27,8 @@ function authEnforceTransport(): void {
     if(authIsHttps()){header('Strict-Transport-Security: max-age=31536000');return;}
     // Approval replay authenticates the private worker session and nonce at the RBAC boundary.
     $worker=$_SESSION['_rbac_worker']??null;
-    if(in_array(authIp(),['127.0.0.1','::1'],true)&&is_array($worker)&&rbacIsSuper()&&($worker['expires']??0)>=time()&&($worker['route']??'')===rbacRequestRoute()&&empty($worker['used'])&&is_string($_SERVER['HTTP_X_GNCI_REVIEW']??null)&&hash_equals($worker['nonce']??'',$_SERVER['HTTP_X_GNCI_REVIEW']))return;
+    $localWorker=in_array(authIp(),['127.0.0.1','::1'],true)||(isset($_SERVER['SERVER_ADDR'])&&authIp()===$_SERVER['SERVER_ADDR']);
+    if($localWorker&&is_array($worker)&&rbacIsSuper()&&($worker['expires']??0)>=time()&&($worker['route']??'')===rbacRequestRoute()&&empty($worker['used'])&&is_string($_SERVER['HTTP_X_GNCI_REVIEW']??null)&&hash_equals($worker['nonce']??'',$_SERVER['HTTP_X_GNCI_REVIEW']))return;
     if(authLocalDevelopment())return;
     if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET'){http_response_code(403);exit('HTTPS is required. Open the secure login page and try again.');}
     try{$origin=authPublicOrigin();if(!str_starts_with($origin,'https://'))throw new RuntimeException('HTTPS origin required.');}catch(Throwable $e){http_response_code(503);exit('Secure authentication is not configured.');}

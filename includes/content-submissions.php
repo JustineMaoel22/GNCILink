@@ -163,19 +163,18 @@ function rbacFlattenFields(array $data,string $prefix=''): array {
 function rbacExecuteRequest(array $submission,array $payload): array {
     if(!rbacIsSuper()||!in_array($submission['route'],rbacContentRoutes(),true))throw new RuntimeException('Invalid approval route.');
     if(!function_exists('curl_init'))throw new RuntimeException('PHP cURL is required to apply approved submissions.');
-    $origin=(string)env('RBAC_INTERNAL_ORIGIN','');$resolve=[];
+    $origin=(string)env('RBAC_INTERNAL_ORIGIN','');$resolve=[];$hostHeader='';
     if($origin===''){
         // Hosted sites serve the app by hostname, so 127.0.0.1 alone hits the wrong (404) virtual host.
-        // Keep the request on this server: use the public hostname but pin its address to loopback.
+        // Keep the request on this server: use the active/configured hostname and try local HTTP first.
         $origin='http://127.0.0.1';
-        try{
-            $public=parse_url(authPublicOrigin());
-            if(!empty($public['host'])&&!in_array(strtolower($public['host']),['127.0.0.1','localhost','::1'],true)){
-                $port=(int)($public['port']??($public['scheme']==='https'?443:80));
-                $origin=$public['scheme'].'://'.$public['host'].(isset($public['port'])?':'.$public['port']:'');
-                $resolve=[$public['host'].':'.$port.':127.0.0.1'];
-            }
-        }catch(Throwable $e){}
+        $reqHost=strtolower(trim((string)parse_url('http://'.($_SERVER['HTTP_HOST']??''),PHP_URL_HOST)));
+        if($reqHost===''||in_array($reqHost,['127.0.0.1','localhost','::1'],true)){
+            try{$reqHost=strtolower((string)(parse_url(authPublicOrigin(),PHP_URL_HOST)??''));}catch(Throwable $e){$reqHost='';}
+        }
+        if($reqHost!==''&&!in_array($reqHost,['127.0.0.1','localhost','::1'],true)&&preg_match('/^[a-z0-9.-]+$/D',$reqHost)){
+            $hostHeader=$reqHost;
+        }
     }
     $parts=parse_url($origin);
     if((!$resolve&&!in_array($parts['host']??'',['127.0.0.1','localhost','::1'],true))||!in_array($parts['scheme']??'',['http','https'],true)||isset($parts['user'])||isset($parts['pass'])||!in_array($parts['path']??'',['','/'],true)||isset($parts['query'])||isset($parts['fragment']))throw new RuntimeException('Invalid internal approval origin. Use a loopback HTTP(S) origin.');
@@ -194,10 +193,27 @@ function rbacExecuteRequest(array $submission,array $payload): array {
     try {
         $fields=rbacFlattenFields($post);
         foreach($payload['files']??[] as $field=>$file){$bytes=base64_decode($file['data'],true);if($bytes===false)throw new RuntimeException('Stored media could not be read.');$path=tempnam(sys_get_temp_dir(),'gnc-review-');$temporary[]=$path;file_put_contents($path,$bytes);$fields[$field]=new CURLFile($path,$file['mime'],$file['name']);}
-        $curl=curl_init(rtrim($origin,'/').$submission['route']);if($resolve)curl_setopt($curl,CURLOPT_RESOLVE,$resolve);
-        curl_setopt_array($curl,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>$fields,CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_TIMEOUT=>90,
-            CURLOPT_HTTPHEADER=>['Cookie: '.session_name().'='.$workerId,'X-GNCI-Review: '.$nonce,'Accept: application/json']]);
-        $raw=curl_exec($curl);$http=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE);curl_close($curl);
+        $headers=['Cookie: '.session_name().'='.$workerId,'X-GNCI-Review: '.$nonce,'Accept: application/json'];
+        $send=static function(string $baseUrl,string $route,array $fields,array $headers,array $resolve=[]){
+            $curl=curl_init(rtrim($baseUrl,'/').$route);
+            if($resolve)curl_setopt($curl,CURLOPT_RESOLVE,$resolve);
+            curl_setopt_array($curl,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>$fields,CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_TIMEOUT=>90,CURLOPT_HTTPHEADER=>$headers]);
+            $raw=curl_exec($curl);$http=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE);curl_close($curl);
+            return [$raw,$http];
+        };
+        $reqHeaders=$hostHeader?array_merge($headers,['Host: '.$hostHeader]):$headers;
+        [$raw,$http]=$send($origin,$submission['route'],$fields,$reqHeaders,$resolve);
+        // Shared cPanel hosts often bind virtual hosts to SERVER_ADDR or require HTTPS on the public hostname.
+        if(($raw===false||$http===404)&&$hostHeader!==''){
+            $serverIp=filter_var($_SERVER['SERVER_ADDR']??'',FILTER_VALIDATE_IP)?$_SERVER['SERVER_ADDR']:'';
+            if($serverIp!==''&&!in_array($serverIp,['127.0.0.1','::1'],true)){
+                [$raw,$http]=$send('http://'.$serverIp,$submission['route'],$fields,$reqHeaders);
+            }
+            if($raw===false||$http===404){
+                $pinIp=$serverIp!==''?$serverIp:'127.0.0.1';
+                [$raw,$http]=$send('https://'.$hostHeader,$submission['route'],$fields,$headers,[$hostHeader.':443:'.$pinIp]);
+            }
+        }
         if($raw===false) return ['state'=>'uncertain','message'=>'The approved request did not confirm completion. Check the content before another attempt.'];
         session_id($workerId);session_start(['use_cookies'=>0,'use_only_cookies'=>0]);$workerData=$_SESSION;$_SESSION=[];session_destroy();
         $json=json_decode($raw,true);
@@ -211,7 +227,9 @@ function rbacExecuteRequest(array $submission,array $payload): array {
             $detail=$why?' Reason: '.mb_substr(trim(strip_tags(implode(' ',$why))),0,400):' (HTTP '.$http.', no error message returned).';
             $message='The existing handler did not confirm this change.'.$detail.' Review the content before another attempt.';
         }
-        return ['state'=>$ok?'approved':(in_array($http,[401,403],true)?'failed':'uncertain'),'created'=>$workerData['_rbac_created']??null,'message'=>$message];
+        // If the internal endpoint returned 404 without consuming the one-use worker token, the handler never ran (safe to retry).
+        $notExecuted=($http===404&&empty($workerData['_rbac_worker']['used']));
+        return ['state'=>$ok?'approved':((in_array($http,[401,403],true)||$notExecuted)?'failed':'uncertain'),'created'=>$workerData['_rbac_created']??null,'message'=>$message];
     }finally{
         foreach($temporary as $path)if(is_file($path))unlink($path);
         if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
