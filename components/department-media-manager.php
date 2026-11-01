@@ -75,7 +75,7 @@ if (empty($csrfToken)) {
             <div class="col-lg-7">
                 <label class="dept-label" for="create-description">Short description <span class="dept-opt">(optional)</span></label>
                 <input type="text" class="form-control" id="create-description" maxlength="2000"
-                       placeholder="One or two sentences about the department...">
+                       placeholder="e.g. Prepares students for careers in hotel, restaurant, and tourism management.">
                 <div class="dept-help">You can write the full text later, in “About this department”.</div>
             </div>
         </div>
@@ -187,7 +187,7 @@ if (empty($csrfToken)) {
                                 <div class="col-12">
                                     <label class="dept-label">Department name <span class="dept-req">*</span></label>
                                     <input type="text" class="form-control details-name-input" maxlength="255" autocomplete="off"
-                                           placeholder="Department name">
+                                           placeholder="e.g. College of Business Administration">
                                     <div class="dept-help">The title shown for this department everywhere on the website.</div>
                                 </div>
                                 <div class="col-12">
@@ -210,13 +210,13 @@ if (empty($csrfToken)) {
                                     <div class="dept-help"><?= $departmentManagerIsBasic ? 'The color of this department\'s list button.' : 'Used for this department\'s list button and landing-page header text. Other page sections keep the standard site colors.' ?></div>
                                     <details class="dept-tip">
                                         <summary>I have a color code (like #1F5E2C)</summary>
-                                        <input type="text" class="form-control details-theme-input mt-2" maxlength="7" placeholder="#1F5E2C" aria-label="Color code">
+                                        <input type="text" class="form-control details-theme-input mt-2" maxlength="7" placeholder="e.g. #1F5E2C" aria-label="Color code">
                                     </details>
                                 </div>
                                 <div class="col-12">
                                     <label class="dept-label">Short description <span class="dept-opt">(optional)</span></label>
                                     <textarea class="form-control details-description-input" rows="2" maxlength="2000"
-                                              placeholder="A short summary for the department list..."></textarea>
+                                              placeholder="e.g. Developing future business leaders and entrepreneurs in Pampanga."></textarea>
                                     <div class="dept-help">The list card shows the first sentences of <b>“About this department”</b> below. This short description is used on the card <b>only when About is empty</b>.</div>
                                 </div>
                             </div>
@@ -243,7 +243,7 @@ if (empty($csrfToken)) {
                         <div class="col-12">
                             <label class="dept-label">About this department</label>
                             <textarea class="form-control details-about-input" rows="6"
-                                      placeholder="The full overview shown on the department page..."></textarea>
+                                      placeholder="e.g. The College of Business Administration equips students with practical skills in management, finance, and marketing..."></textarea>
                             <div class="dept-help">The website shows this exactly as you type it. Press Enter for a new line, and leave an empty line between paragraphs.</div>
                             <details class="dept-tip">
                                 <summary>How do I make a heading or a bullet list?</summary>
@@ -265,7 +265,7 @@ Modern facilities</pre>
                         <div class="col-lg-6">
                             <label class="dept-label">Facebook page link <span class="dept-opt">(optional)</span></label>
                             <input type="text" class="form-control details-facebook-input" maxlength="255"
-                                   placeholder="https://www.facebook.com/your-page">
+                                   placeholder="e.g. https://www.facebook.com/your-page">
                             <div class="dept-help">Paste the link to the department's Facebook page. Leave empty to hide the Facebook box.</div>
                         </div>
                     </div>
@@ -389,7 +389,7 @@ Modern facilities</pre>
                                 </div>
                                 <div class="col-12">
                                     <label class="dept-label">Short introduction</label>
-                                    <textarea class="form-control dean-bio-input" rows="4" placeholder="A short introduction..."></textarea>
+                                    <textarea class="form-control dean-bio-input" rows="4" placeholder="e.g. Welcome to our department! We are dedicated to mentoring students toward academic and professional excellence."></textarea>
                                     <div class="dept-help">Shown next to the photo, under "Meet the Dean".</div>
                                 </div>
                             </div>
@@ -402,19 +402,19 @@ Modern facilities</pre>
                             <div class="row g-3">
                                 <div class="col-sm-6 col-lg-3">
                                     <label class="dept-label">Phone number</label>
-                                    <input type="text" class="form-control dean-phone-input" placeholder="(045) 900-4473 Loc. 120">
+                                    <input type="text" class="form-control dean-phone-input" placeholder="e.g. (045) 900-4473 Loc. 120">
                                 </div>
                                 <div class="col-sm-6 col-lg-3">
                                     <label class="dept-label">Email address</label>
-                                    <input type="email" class="form-control dean-email-input" placeholder="info@gnc.edu.ph">
+                                    <input type="email" class="form-control dean-email-input" placeholder="e.g. info@gnc.edu.ph">
                                 </div>
                                 <div class="col-sm-6 col-lg-3">
                                     <label class="dept-label">Office location</label>
-                                    <input type="text" class="form-control dean-office-input" placeholder="Limlingan Hall, Floor 2, Room 202">
+                                    <input type="text" class="form-control dean-office-input" placeholder="e.g. Limlingan Hall, Floor 2, Room 202">
                                 </div>
                                 <div class="col-sm-6 col-lg-3">
                                     <label class="dept-label">Office hours</label>
-                                    <input type="text" class="form-control dean-hours-input" placeholder="Monday - Friday, 8:00AM - 4:00PM">
+                                    <input type="text" class="form-control dean-hours-input" placeholder="e.g. Monday - Friday, 8:00AM - 4:00PM">
                                 </div>
                             </div>
                             <div class="dept-help mt-2">Leave a box empty and it simply won't be shown.</div>

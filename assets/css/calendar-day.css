@@ -1,4 +1,86 @@
-.gnc-cal-cell[data-calendar-date] { cursor: pointer; }
+/* Unified smooth hover animation on all calendar date cells */
+.gnc-cal-sec .gnc-cal-cell[data-calendar-date],
+.gnc-cal-cell[data-calendar-date] {
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+    transition: transform 0.22s cubic-bezier(0.25, 1, 0.5, 1),
+                background-color 0.22s ease,
+                box-shadow 0.22s ease,
+                border-color 0.22s ease;
+    will-change: transform;
+}
+.gnc-cal-sec .gnc-cal-cell[data-calendar-date] .gnc-cal-daynum,
+.gnc-cal-cell[data-calendar-date] .gnc-cal-daynum {
+    display: inline-block;
+    transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), color 0.2s ease;
+}
+.gnc-cal-sec .gnc-cal-cell[data-calendar-date]:hover,
+.gnc-cal-cell[data-calendar-date]:hover,
+.gnc-cal-sec .gnc-cal-hasevent:hover {
+    z-index: 10 !important;
+    background-color: #f0f7f2 !important;
+    transform: translateY(-3px) scale(1.02) !important;
+    box-shadow: 0 8px 20px rgba(9, 64, 36, 0.15) !important;
+}
+.gnc-cal-sec .gnc-cal-cell[data-calendar-date]:hover .gnc-cal-daynum,
+.gnc-cal-cell[data-calendar-date]:hover .gnc-cal-daynum {
+    transform: scale(1.08);
+    color: var(--gnc-green, #094024);
+}
+.gnc-cal-sec .gnc-cal-cell[data-calendar-date].gnc-cal-today:hover,
+.gnc-cal-cell[data-calendar-date].gnc-cal-today:hover {
+    background-color: #c4d7c7 !important;
+}
+.gnc-cal-sec .gnc-cal-cell[data-calendar-date]:active,
+.gnc-cal-cell[data-calendar-date]:active {
+    transform: translateY(0) scale(1) !important;
+    box-shadow: 0 2px 6px rgba(9, 64, 36, 0.08) !important;
+    transition-duration: 0.08s;
+}
+
+/* Gold diamond spinning animation on hover (synchronized on all pages) */
+.gnc-cal-sec .gnc-cal-hasevent .gnc-cal-daynum::after {
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.gnc-cal-sec .gnc-cal-hasevent:hover .gnc-cal-daynum::after {
+    transform: rotate(225deg) scale(1.4);
+}
+
+/* Event chips subtle shift on hover */
+.gnc-cal-sec .gnc-cal-event-chip {
+    transition: transform 0.2s ease, filter 0.2s ease;
+}
+.gnc-cal-sec .gnc-cal-event-chip:hover {
+    transform: translateX(2px);
+    filter: brightness(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gnc-cal-cell[data-calendar-date],
+    .gnc-cal-cell[data-calendar-date] .gnc-cal-daynum,
+    .gnc-cal-sec .gnc-cal-hasevent .gnc-cal-daynum::after,
+    .gnc-cal-sec .gnc-cal-event-chip {
+        transition: none !important;
+        transform: none !important;
+    }
+}
+.gnc-cal-hint {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .45rem 1.25rem;
+    font-size: .78rem;
+    color: #435b4b;
+    background: #f4f8f5;
+    border-top: 1px solid #e1e9e3;
+    border-bottom: 1px solid #e1e9e3;
+    font-weight: 500;
+}
+.gnc-cal-hint i {
+    color: #c89d2c;
+    font-size: .8rem;
+}
 /* Lock the viewport without making body a new scroll ancestor for sticky navigation.
    Wait for modal-open so Bootstrap measures/compensates the original scrollbar first. */
 html.gnc-calendar-day-open:has(body.modal-open) { overflow: hidden; }

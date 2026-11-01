@@ -4,7 +4,7 @@
     if(!section||!links||!engine||window.top!==window.self||new URLSearchParams(location.search).has('ce_preview'))return;
     const key='gnc_recommendations_v1',rotationKey='gnc_footer_suggestions_v1',day=86400000;
     let items=[],current=null;
-    const allowed=()=>!!window.GNCPrivacy?.allows('personalization')&&!navigator.globalPrivacyControl&&navigator.doNotTrack!=='1';
+    const allowed=()=>!!window.GNCPrivacy?.allows('personalization');
     function profile(){
         if(!allowed())return {history:{},shown:{}};
         try{

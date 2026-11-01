@@ -7,11 +7,34 @@ document.addEventListener('DOMContentLoaded', () => {
     let busy=false, dirty=false, finished=false, allowClose=false, asking=false, management='';
     const selected=new Set();
     const el=(tag,text,className)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;};
-    const show=(id,visible)=>$(id).classList.toggle('d-none',!visible);
+    const show=(id,visible)=>$(id)?.classList.toggle('d-none',!visible);
     const showError=message=>{$('calendarImportError').textContent=message;show('calendarImportError',true);$('calendarImportError').scrollIntoView({block:'nearest'});};
     const feedback=message=>{$('ciFeedback').textContent=message;};
     const categoryName=row=>categories.find(cat=>String(cat.category_id)===String(row.category_id))?.category_name||'Uncategorized';
     const dateValid=value=>/^\d{4}-\d{2}-\d{2}$/.test(value||'')&&Number(value.slice(0,4))>=1900&&Number(value.slice(0,4))<=2050&&!Number.isNaN(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;
+    const timeValid=value=>!value||/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+    const shortMonths=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const shortDays=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    function formatDateHuman(value, includeDay=true) {
+        if(!dateValid(value))return value||'';
+        const [y,m,d]=value.split('-').map(Number);
+        const dt=new Date(Date.UTC(y,m-1,d));
+        const base=`${shortMonths[m-1]} ${d}, ${y}`;
+        return includeDay?`${base} (${shortDays[dt.getUTCDay()]})`:base;
+    }
+    function formatTime(value) {
+        if(!value||!timeValid(value))return value||'';
+        const [hStr,mStr]=value.split(':');const h=Number(hStr);
+        return `${h%12||12}:${mStr} ${h>=12?'PM':'AM'}`;
+    }
+    function formatTimeRange(row) {
+        if(!row.start_time&&!row.end_time)return '';
+        if(row.start_time&&row.end_time)return `${formatTime(row.start_time)} – ${formatTime(row.end_time)}`;
+        return formatTime(row.start_time||row.end_time);
+    }
+    function reindexRows() {
+        rows.forEach((row,idx)=>{row.index=idx;});
+    }
     function critical(row) {
         if(row.action==='archive')return [];
         const issues=[];
@@ -22,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(row.dept_id?.startsWith?.('group:')){if(!groupsReady||!['group:basic-education','group:college'].includes(row.dept_id)||row.program!=='ALL')issues.push('Choose a valid department group with all programs.');}
         else if(row.dept_id&&(!departmentsReady||!departments.some(dept=>String(dept.dept_id)===String(row.dept_id))))issues.push('Choose an available department.');
         if(row.program&&row.program!=='ALL'&&!programs.some(program=>program.code===row.program&&(!row.dept_id||String(program.dept_id)===String(row.dept_id))))issues.push('Choose a program in the selected department.');
-        for(const key of ['start_time','end_time'])if(row[key]&&!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(row[key]))issues.push('Correct the event time.');
+        for(const key of ['start_time','end_time'])if(row[key]&&!timeValid(row[key]))issues.push('Correct the event time.');
         const start=`${row.start_date} ${row.start_time||'00:00'}`, end=row.end_date||(row.end_time?row.start_date:'');
         if(end&&`${end} ${row.end_time||'00:00'}`<start)issues.push('End must be after the start.');
         return issues;
@@ -31,51 +54,100 @@ document.addEventListener('DOMContentLoaded', () => {
         const issues=critical(row);if(row.reviewed)return issues;
         return [...new Set([...issues,...(row.warnings||[]).filter(message=>{
             if(/category needs review/i.test(message))return !row.category_id;
+            if(/title is missing/i.test(message))return !(row.title||'').trim();
             if(/date is missing|invalid date range/i.test(message))return !dateValid(row.start_date)||!!(row.end_date&&!dateValid(row.end_date));
-            if(/time is unclear|time range|several time/i.test(message))return !row.timeCorrected;
+            if(/time is unclear|time is tba|time range|several time/i.test(message))return !row.timeCorrected;
+            if(/location is marked as tba/i.test(message))return /^(?:tba|tbd|to be announced|to be determined|\?+)$/i.test((row.location||'').trim());
+            if(/several departments/i.test(message))return !row.dept_id&&(!row.program||row.program==='ALL');
             return true;
         })])];
+    }
+    function flaggedFields(row) {
+        if(row.action==='archive'||row.reviewed)return new Set();
+        const flags=new Set();
+        const w=warnings(row);
+        if(!(row.title||'').trim())flags.add('title');
+        if(!dateValid(row.start_date))flags.add('start_date');
+        if(row.end_date&&(!dateValid(row.end_date)||row.end_date<row.start_date))flags.add('end_date');
+        if(!timeValid(row.start_time)||w.some(m=>/time/i.test(m)))flags.add('start_time');
+        if(!timeValid(row.end_time))flags.add('end_time');
+        if(w.some(m=>/location/i.test(m)))flags.add('location');
+        if(!row.category_id)flags.add('category_id');
+        if(w.some(m=>/several departments/i.test(m)))flags.add('dept_id');
+        return flags;
     }
     const state=row=>row.excluded?'excluded':row.include?'approved':warnings(row).length?'needs':'ready';
     const label=row=>({excluded:'Excluded',approved:'Approved',needs:'Needs Review',ready:row.reviewed?'Reviewed · ready':'Ready'})[state(row)];
     function matches() {
         const q=$('ciSearch').value.trim().toLowerCase();
-        const result=rows.filter(row=>(!q||row.title.toLowerCase().includes(q))
-            &&(!$('ciMonth').value||row.start_date?.slice(5,7)===$('ciMonth').value)
-            &&(!$('ciYear').value||row.start_date?.slice(0,4)===$('ciYear').value)
-            &&(!$('ciCategory').value||($('ciCategory').value==='uncategorized'?!row.category_id:String(row.category_id)===$('ciCategory').value))
-            &&(!$('ciStatus').value||state(row)===$('ciStatus').value)
-            &&(!$('ciWarningsOnly').checked||warnings(row).length));
+        const deptFilter=$('ciDepartment')?$('ciDepartment').value:'';
+        const result=rows.filter(row=>{
+            const haystack=`${row.title||''} ${row.location||''} ${row.description||''} ${audienceName(row)||''}`.toLowerCase();
+            return (!q||haystack.includes(q))
+                &&(!$('ciMonth').value||row.start_date?.slice(5,7)===$('ciMonth').value)
+                &&(!$('ciYear').value||row.start_date?.slice(0,4)===$('ciYear').value)
+                &&(!deptFilter||(deptFilter==='general'?!row.dept_id:String(row.dept_id)===deptFilter))
+                &&(!$('ciCategory').value||($('ciCategory').value==='uncategorized'?!row.category_id:String(row.category_id)===$('ciCategory').value))
+                &&(!$('ciStatus').value||state(row)===$('ciStatus').value)
+                &&(!$('ciWarningsOnly').checked||warnings(row).length);
+        });
         const sort=$('ciSort').value;
-        return result.sort((a,b)=>(sort==='title'?a.title.localeCompare(b.title):sort==='category'?categoryName(a).localeCompare(categoryName(b)):(a.start_date||'9999').localeCompare(b.start_date||'9999'))||a.index-b.index);
+        return result.sort((a,b)=>(sort==='title'?(a.title||'').localeCompare(b.title||''):sort==='category'?categoryName(a).localeCompare(categoryName(b)):(a.start_date||'9999').localeCompare(b.start_date||'9999'))||a.index-b.index);
     }
     const pageSize=()=>Number($('ciPageSize').value);
     function pageRows(){const filtered=matches();page=Math.max(1,Math.min(page,Math.ceil(filtered.length/pageSize())||1));return filtered.slice((page-1)*pageSize(),page*pageSize());}
     function duplicateIssues(approved) {
         const keys=new Set(),targets=new Set();
         for(const row of approved){
-            const key=`${row.title.trim().toLowerCase().replace(/\s+/g,' ')}|${row.start_date}|${row.start_time||'00:00'}`;
+            const key=`${(row.title||'').trim().toLowerCase().replace(/\s+/g,' ')}|${row.start_date}|${row.start_time||'00:00'}`;
             if((row.event_id&&targets.has(Number(row.event_id)))||(row.action!=='archive'&&keys.has(key)))return true;
             if(row.event_id)targets.add(Number(row.event_id));if(row.action!=='archive')keys.add(key);
         }
         return false;
     }
     function updateSummary() {
-        const approved=rows.filter(row=>row.include), excluded=rows.filter(row=>row.excluded).length, pending=rows.length-approved.length-excluded;
-        const counts={Total:rows.length,Approved:approved.length,'Needs Review':rows.filter(row=>!row.include&&!row.excluded&&warnings(row).length).length,Excluded:excluded,Pending:pending};
-        $('calendarImportSummary').replaceChildren(...Object.entries(counts).map(([name,count])=>{const box=el('div');box.append(el('strong',count),el('span',name));return box;}));
-        $('calendarImportCount').textContent=`${approved.length} approved · ${pending} pending`;
-        $('ciFooterSummary').textContent=management?'Review all affected events before confirming.':token?`${approved.length} approved for import · ${selected.size} selected`:'';
+        const approved=rows.filter(row=>row.include), excluded=rows.filter(row=>row.excluded).length, needsReview=rows.filter(row=>!row.include&&!row.excluded&&warnings(row).length).length, ready=rows.filter(row=>!row.include&&!row.excluded&&!warnings(row).length).length, pending=rows.length-approved.length-excluded;
+        const summaryCards=[
+            {name:'All Activities',count:rows.length,filter:'',cls:'total'},
+            {name:'Approved',count:approved.length,filter:'approved',cls:'approved'},
+            {name:'Needs Review',count:needsReview,filter:'needs',cls:'needs'},
+            {name:'Ready',count:ready,filter:'ready',cls:'ready'},
+            {name:'Excluded',count:excluded,filter:'excluded',cls:'excluded'}
+        ];
+        const currentStatus=$('ciStatus').value;
+        $('calendarImportSummary').replaceChildren(...summaryCards.map(card=>{
+            const box=el('button',undefined,`ci-summary-card ${card.cls}${currentStatus===card.filter?' active':''}`);
+            box.type='button';
+            box.title=`Filter by ${card.name}`;
+            box.append(el('strong',card.count),el('span',card.name));
+            box.addEventListener('click',()=>{
+                $('ciStatus').value=(currentStatus===card.filter&&card.filter!=='')?'':card.filter;
+                page=1;
+                render();
+            });
+            return box;
+        }));
+        $('calendarImportCount').textContent=`${approved.length} approved · ${needsReview} need review · ${ready} ready`;
+        $('ciFooterSummary').textContent=management?'Review all affected events before confirming.':token?`${approved.length} of ${rows.length} approved for import${needsReview?` · ${needsReview} need review`:''}${selected.size?` · ${selected.size} selected`:''}`:'';
         $('ciSelectedCount').textContent=`${selected.size} selected`;
-        for(const [id,text] of [['ciApproveSelected','Approve selected'],['ciExcludeSelected','Exclude selected'],['ciApplyCategory','Assign category'],['ciApplyAudience','Assign department/program']]){$(id).textContent=`${text} (${selected.size})`;$(id).disabled=busy||!selected.size;}
+        for(const [id,text] of [['ciApproveSelected','Approve selected'],['ciExcludeSelected','Exclude selected'],['ciRemoveSelected','Remove selected'],['ciApplyCategory','Assign category'],['ciApplyAudience','Assign department/program']]){
+            if($(id)){$(id).textContent=`${text} (${selected.size})`;$(id).disabled=busy||!selected.size;}
+        }
+        if($('ciMergeSelected')){
+            const mergeable=rows.filter(row=>selected.has(row.index)&&row.action!=='archive').length;
+            $('ciMergeSelected').textContent=`Merge selected (${mergeable})`;
+            $('ciMergeSelected').disabled=busy||mergeable<2;
+        }
         $('ciSelectMatching').textContent=`Select all ${matches().length} matching`;
-        const activeFilters=['ciMonth','ciYear','ciCategory','ciStatus'].filter(id=>$(id).value).length+Number($('ciWarningsOnly').checked);
+        const activeFilters=['ciMonth','ciYear','ciDepartment','ciCategory','ciStatus'].filter(id=>$(id)?.value).length+Number($('ciWarningsOnly').checked)+Number(!!$('ciSearch').value.trim());
         $('ciToggleFilters').textContent=activeFilters?`Filters (${activeFilters})`:'Filters';
+        if($('ciResetFilters'))$('ciResetFilters').classList.toggle('d-none',!activeFilters);
         const valid=rows.filter(row=>!row.excluded&&!row.include&&!warnings(row).length&&row.action!=='archive').length;
         $('calendarImportSelectValid').textContent=`Approve all without warnings (${valid})`;
+        $('calendarImportSelectValid').disabled=busy||!valid;
         confirm.disabled=busy||(management?!$('calendarManageReviewed').checked:!approved.length||approved.some(row=>critical(row).length)||duplicateIssues(approved));
         const additions=approved.filter(row=>row.action!=='archive'&&!row.event_id).length, updates=approved.filter(row=>row.action!=='archive'&&row.event_id).length, removals=approved.filter(row=>row.action==='archive').length;
-        $('ciFinalSummary').textContent=`${approved.length} approved activities: ${additions} additions, ${updates} updates and ${removals} archives. ${excluded} excluded and ${pending} pending activities will be left out.`;
+        $('ciFinalSummary').textContent=`${approved.length} approved activities: ${additions} additions, ${updates} updates and ${removals} archives. ${excluded} excluded and ${pending} unapproved activities will be left out.`;
         for(const id of ['ciContinue','ciBack','calendarImportExtract'])$(id).disabled=busy;
         const visible=pageRows();$('ciSelectVisible').checked=visible.length>0&&visible.every(row=>selected.has(row.index));$('ciSelectVisible').indeterminate=visible.some(row=>selected.has(row.index))&&!$('ciSelectVisible').checked;
     }
@@ -86,13 +158,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const list=body.querySelector('.ci-editor [data-editor-issues]');if(list)list.replaceChildren(...warnings(row).map(message=>el('li',message)));
     }
     function categorySelect(row) {
-        const input=el('select',undefined,'form-select form-select-sm');input.setAttribute('aria-label',`Category for ${row.title}`);input.append(new Option('Needs Review',''));
+        const input=el('select',undefined,'form-select form-select-sm');input.setAttribute('aria-label',`Category for ${row.title||'event'}`);input.append(new Option('Needs Review',''));
         categories.forEach(cat=>input.append(new Option(cat.category_name,cat.category_id)));input.value=row.category_id||'';
+        if(!row.category_id&&!row.reviewed)input.classList.add('ci-field-flagged');
         input.addEventListener('change',()=>{change(row,'category_id',input.value);render();});return input;
     }
     function fillDepartments(input,value='') {
         input.replaceChildren(new Option('All departments',''));
-        for(const [value,label] of [['basic-education','All Basic Education'],['college','All College']]){const option=new Option(label,'group:'+value);option.disabled=!groupsReady;input.append(option);}
+        for(const [val,lbl] of [['basic-education','All Basic Education'],['college','All College']]){const option=new Option(lbl,'group:'+val);option.disabled=!groupsReady;input.append(option);}
         departments.forEach(dept=>input.append(new Option(dept.dept_name,dept.dept_id)));
         input.value=value||'';input.disabled=!departmentsReady;
         if(!groupsReady)input.title='Department groups need database/migrate-event-audience-groups.php on this server.';
@@ -111,19 +184,119 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         dirty=true;feedback(`${accepted} activities approved.${skipped?` ${skipped} skipped: correct errors, duplicates or warnings first.`:''}`);render();
     }
+    function mergeRowList(targetRows) {
+        const validTargets=targetRows.filter(r=>r&&r.action!=='archive');
+        if(validTargets.length<2){feedback('Select at least 2 activities to merge into a single event.');return;}
+        const primary=validTargets[0];
+        const removeSet=new Set();
+        const venueRegex=/\b(gymnasium|gym|auditorium|covered court|court|quadrangle|hall|avr|audio[\s-]*visual|library|lab|laboratory|chapel|church|campus|grounds|room|rm\.?|bldg|building|office|lobby|canteen|zoom|google meet|ms teams|online|virtual)\b/i;
+        const activityRegex=/\b(day|celebration|orientation|exam|examination|meeting|assembly|seminar|workshop|training|contest|competition|festival|program|ceremony|graduation|recognition|enrollment|registration|intramurals|holiday|break|suspension|mass|retreat|recollection|blessing|parade|pageant|fair)\b/i;
+        const timeRegex=/^(?:time\s*:\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?:\s*(?:-|–|—|\bto\b)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?)?$/i;
+
+        for(let i=1;i<validTargets.length;i++){
+            const other=validTargets[i];
+            removeSet.add(other.index);
+            const otherTitle=(other.title||'').trim();
+            if(otherTitle){
+                // Check if the other row's title was actually a standalone time, location, or description
+                const tm=otherTitle.match(timeRegex);
+                if(tm&&(tm[2]||tm[3])&&!primary.start_time){
+                    const to24=(h,m,ap)=>{let hr=Number(h);const mn=Number(m||0);const a=(ap||'').toLowerCase();if(a)hr=(hr%12)+(a==='pm'?12:0);return `${String(hr).padStart(2,'0')}:${String(mn).padStart(2,'0')}`;};
+                    primary.start_time=to24(tm[1],tm[2],tm[3]);
+                    if(tm[4])primary.end_time=to24(tm[4],tm[5],tm[6]);
+                    primary.timeCorrected=true;
+                } else if(!primary.location&&!other.location&&venueRegex.test(otherTitle)&&!activityRegex.test(otherTitle)){
+                    primary.location=otherTitle.replace(/^(?:location|venue|place|at|@)\s*[:\-–—]?\s*/i,'').trim();
+                } else if(!(primary.title||'').trim()){
+                    primary.title=otherTitle;
+                } else if(otherTitle.toLowerCase()!==primary.title.trim().toLowerCase()){
+                    primary.description=[primary.description,otherTitle].filter(Boolean).join('\n');
+                }
+            }
+            if(!primary.start_date&&other.start_date)primary.start_date=other.start_date;
+            if(!primary.end_date&&other.end_date)primary.end_date=other.end_date;
+            else if(other.start_date&&primary.start_date&&other.start_date>primary.start_date&&!primary.end_date)primary.end_date=other.start_date;
+            if(!primary.start_time&&other.start_time){primary.start_time=other.start_time;primary.timeCorrected=true;}
+            if(!primary.end_time&&other.end_time){primary.end_time=other.end_time;primary.timeCorrected=true;}
+            if(!primary.location&&other.location)primary.location=other.location;
+            else if(other.location&&!primary.location.toLowerCase().includes(other.location.toLowerCase()))primary.location+=`, ${other.location}`;
+            if(other.description&&!(primary.description||'').includes(other.description)){
+                primary.description=[primary.description,other.description].filter(Boolean).join('\n');
+            }
+            if(!primary.category_id&&other.category_id)primary.category_id=other.category_id;
+            if(!primary.dept_id&&other.dept_id){primary.dept_id=other.dept_id;primary.program=other.program||'ALL';}
+            else if((!primary.program||primary.program==='ALL')&&other.program&&other.program!=='ALL'&&(!other.dept_id||String(other.dept_id)===String(primary.dept_id)))primary.program=other.program;
+            if(!primary.event_id&&other.event_id){primary.event_id=other.event_id;primary.action=other.action;}
+            primary.source=[primary.source,other.source].filter(Boolean).join('\n');
+        }
+        primary.include=false;primary.reviewed=false;primary.excluded=false;
+        rows=rows.filter(r=>!removeSet.has(r.index));
+        reindexRows();
+        selected.clear();
+        editing=primary.index;
+        dirty=true;
+        feedback(`Merged ${validTargets.length} entries into "${primary.title||'Untitled event'}". Review the combined details below.`);
+        render();
+    }
+    function separateRow(row) {
+        if(row.action==='archive')return;
+        const pos=rows.findIndex(r=>r.index===row.index);
+        if(pos<0)return;
+        // Check if title or description has multiple lines or semicolon-separated items
+        const titleParts=(row.title||'').split(/\n+|\s*;\s*/).map(s=>s.trim()).filter(Boolean);
+        const descLines=(row.description||'').split(/\n+/).map(s=>s.trim()).filter(Boolean);
+        const newEntries=[];
+        if(titleParts.length>1){
+            row.title=titleParts[0];
+            for(let i=1;i<titleParts.length;i++){
+                newEntries.push({...row,title:titleParts[i],event_id:0,action:'create',include:false,reviewed:false,excluded:false});
+            }
+        } else if(descLines.length>=1){
+            const firstDesc=descLines[0];
+            row.description=descLines.slice(1).join('\n');
+            newEntries.push({...row,title:firstDesc,description:'',event_id:0,action:'create',include:false,reviewed:false,excluded:false});
+        } else {
+            newEntries.push({...row,title:`${row.title||''} (Part 2)`.trim(),event_id:0,action:'create',include:false,reviewed:false,excluded:false});
+        }
+        row.include=false;row.reviewed=false;
+        rows.splice(pos+1,0,...newEntries);
+        reindexRows();
+        editing=rows[pos+1].index;
+        dirty=true;
+        feedback(`Separated into ${1+newEntries.length} entries. Edit the separated entry below.`);
+        render();
+    }
+    function removeRows(targetRows) {
+        if(!targetRows.length)return;
+        const removeSet=new Set(targetRows.map(r=>r.index));
+        rows=rows.filter(r=>!removeSet.has(r.index));
+        reindexRows();
+        selected.clear();
+        if(editing!==null&&removeSet.has(editing))editing=null;
+        dirty=true;
+        feedback(`Removed ${targetRows.length} ${targetRows.length===1?'entry':'entries'} from the import preview.`);
+        render();
+    }
     function button(text,callback,className='btn btn-sm btn-outline-secondary'){const node=el('button',text,className);node.type='button';node.addEventListener('click',callback);return node;}
     function editor(row) {
         const tr=el('tr',undefined,'ci-editor'),td=el('td');td.colSpan=6;const grid=el('div',undefined,'ci-editor-grid');
+        const flags=flaggedFields(row);
         for(const [key,text,type,wide] of [['title','Event title','text',true],['location','Location','text',true],['start_date','Start date','date'],['end_date','End date','date'],['start_time','Start time','time'],['end_time','End time','time'],['description','Description','textarea',true]]){
-            const wrapper=el('label',text,wide?'ci-wide':''),input=el(type==='textarea'?'textarea':'input',undefined,'form-control form-control-sm');if(type!=='textarea')input.type=type;
+            const wrapper=el('label',undefined,wide?'ci-wide':'');
+            const labelSpan=el('span',text);wrapper.append(labelSpan);
+            if(flags.has(key))wrapper.append(el('span','Needs review','ci-flag-inline'));
+            const input=el(type==='textarea'?'textarea':'input',undefined,'form-control form-control-sm');if(type!=='textarea')input.type=type;
+            if(flags.has(key))input.classList.add('ci-field-flagged');
             input.value=row[key]||'';input.dataset.field=key;if(['title','location','description'].includes(key))input.maxLength=key==='description'?10000:500;
-            input.addEventListener('input',()=>change(row,key,input.value));wrapper.append(input);grid.append(wrapper);
+            input.addEventListener('input',()=>{input.classList.remove('ci-field-flagged');change(row,key,input.value);});wrapper.append(input);grid.append(wrapper);
         }
         if(row.action!=='archive'){
-            const departmentLabel=el('label','Department'),department=el('select',undefined,'form-select form-select-sm');department.dataset.field='dept_id';
+            const departmentLabel=el('label'),department=el('select',undefined,'form-select form-select-sm');department.dataset.field='dept_id';
+            departmentLabel.append(el('span','Department'));
+            if(flags.has('dept_id')){departmentLabel.append(el('span','Needs review','ci-flag-inline'));department.classList.add('ci-field-flagged');}
             const programLabel=el('label','Program (optional)'),program=el('select',undefined,'form-select form-select-sm');program.dataset.field='program';
             fillDepartments(department,row.dept_id);fillPrograms(program,row.dept_id,row.program);
-            department.addEventListener('change',()=>{change(row,'dept_id',department.value);fillPrograms(program,department.value,row.program);if(program.value!==row.program)change(row,'program',program.value);render();});
+            department.addEventListener('change',()=>{department.classList.remove('ci-field-flagged');change(row,'dept_id',department.value);fillPrograms(program,department.value,row.program);if(program.value!==row.program)change(row,'program',program.value);render();});
             program.addEventListener('change',()=>{change(row,'program',program.value);render();});
             departmentLabel.append(department);if(!departmentsReady)departmentLabel.append(el('small','Run database/migrate-event-departments.php to enable departments.','text-muted'));
             programLabel.append(program);grid.append(departmentLabel,programLabel);
@@ -133,23 +306,129 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         td.append(grid);const list=el('ul',undefined,'small mt-3 mb-2');list.dataset.editorIssues='';list.setAttribute('aria-live','polite');warnings(row).forEach(message=>list.append(el('li',message)));td.append(list);
         const source=el('details',undefined,'small my-2');source.append(el('summary','Document source and previous values'),el('p',row.source||''));if(row.previous)source.append(el('p',`Previously: ${row.previous.title}; ${row.previous.start_date}; ${row.previous.location||''}; ${row.previous.description||''}`));td.append(source);
-        const actions=el('div',undefined,'d-flex gap-2 flex-wrap');actions.append(button('Mark reviewed',()=>{if(critical(row).length){feedback('Correct the errors before marking this activity reviewed.');return;}row.reviewed=true;dirty=true;render();}),button(row.action==='archive'?'Approve archiving':'Approve activity',()=>approve([row],false,true)),button('Exclude',()=>{row.include=false;row.excluded=true;dirty=true;render();}),button('Done',()=>{editing=null;render();}));td.append(actions);tr.append(td);return tr;
+        const actions=el('div',undefined,'d-flex gap-2 flex-wrap');
+        actions.append(
+            button(row.action==='archive'?'Save & Approve Archive':'Save & Approve',()=>{
+                if(critical(row).length){feedback('Please fix the highlighted required fields before approving.');return;}
+                approve([row],false,true);
+                if(row.include)editing=null;
+                render();
+            },'btn btn-sm btn-success'),
+            button('Mark reviewed',()=>{if(critical(row).length){feedback('Correct the errors before marking this activity reviewed.');return;}row.reviewed=true;dirty=true;render();})
+        );
+        if(row.action!=='archive'){
+            actions.append(button('Separate into 2 events',()=>separateRow(row),'btn btn-sm btn-outline-primary'));
+            const filtered=matches();
+            const curPos=filtered.findIndex(r=>r.index===row.index);
+            if(curPos>=0&&curPos+1<filtered.length&&filtered[curPos+1].action!=='archive'){
+                actions.append(button('Merge with next row',()=>mergeRowList([row,filtered[curPos+1]]),'btn btn-sm btn-outline-primary'));
+            }
+        }
+        actions.append(
+            button(row.excluded?'Restore':'Exclude',()=>{row.include=false;row.excluded=!row.excluded;dirty=true;render();}),
+            button('Remove entry',()=>removeRows([row]),'btn btn-sm btn-outline-danger'),
+            button('Close',()=>{editing=null;render();})
+        );
+        td.append(actions);tr.append(td);return tr;
     }
     function render() {
         const years=new Set(Array.from($('ciYear').options,option=>option.value));
         rows.forEach(row=>{const year=row.start_date?.slice(0,4);if(year&&!years.has(year)){years.add(year);$('ciYear').append(new Option(year,year));}});
         body.replaceChildren();const filtered=matches(),visible=pageRows();
         visible.forEach(row=>{
-            const tr=el('tr');tr.dataset.rowIndex=row.index;const checkCell=el('td'),check=el('input',undefined,'form-check-input');check.type='checkbox';check.checked=selected.has(row.index);check.setAttribute('aria-label',`Select ${row.title}`);
+            const tr=el('tr');tr.dataset.rowIndex=row.index;
+            if(row.include)tr.classList.add('ci-row-approved');
+            else if(warnings(row).length)tr.classList.add('ci-row-flagged');
+            const flags=flaggedFields(row);
+            const checkCell=el('td'),check=el('input',undefined,'form-check-input');check.type='checkbox';check.checked=selected.has(row.index);check.setAttribute('aria-label',`Select ${row.title||'Untitled activity'}`);
             check.addEventListener('change',()=>{if(check.checked)selected.add(row.index);else selected.delete(row.index);updateSummary();});checkCell.append(check);
+
             const title=el('td'),titleText=el('div',undefined,'ci-title'),issues=warnings(row);
             if(issues.length){const warning=el('i',undefined,'bi bi-exclamation-triangle-fill ci-warning');warning.title=issues.join('\n');warning.setAttribute('aria-label','Needs attention');titleText.append(warning);}
-            titleText.append(document.createTextNode(row.title||'Untitled activity'));title.append(titleText);
-            if(audienceName(row))title.append(el('div',audienceName(row),'ci-description'));
-            if(row.action==='archive')title.append(el('div','Possible removal · archive if approved','ci-description'));else if(row.description||row.location)title.append(el('div',[row.location,row.description].filter(Boolean).join(' · '),'ci-description'));
-            const dates=el('td',row.start_date||'Date needed');dates.style.whiteSpace='nowrap';if(row.end_date&&row.end_date!==row.start_date)dates.append(el('div',`– ${row.end_date}`,'small text-muted'));
-            const category=el('td');category.append(categorySelect(row));const status=el('td');status.append(el('span',label(row),`ci-badge ${state(row)}`));
-            const action=el('td'),edit=button(editing===row.index?'Close':'Edit',()=>{editing=editing===row.index?null:row.index;render();});edit.setAttribute('aria-expanded',String(editing===row.index));action.append(edit);
+            if((row.title||'').trim()){
+                titleText.append(document.createTextNode(row.title));
+            } else {
+                titleText.append(el('span','Missing event title — Needs review','ci-flag-chip'));
+            }
+            title.append(titleText);
+
+            if(row.action==='archive'){
+                if(audienceName(row))title.append(el('div',audienceName(row),'ci-description'));
+                title.append(el('div','Possible removal · archive if approved','ci-description'));
+            } else {
+                const metaRow=el('div',undefined,'ci-meta-details');
+                if(audienceName(row)){
+                    metaRow.append(el('span',audienceName(row),'ci-detail-pill ci-dept-pill'));
+                } else if(flags.has('dept_id')){
+                    metaRow.append(el('span','Department: Needs review','ci-flag-chip'));
+                }
+                if(row.location){
+                    const locSpan=el('span',`Venue: ${row.location}`,flags.has('location')?'ci-detail-pill ci-flag-chip':'ci-detail-pill');
+                    metaRow.append(locSpan);
+                } else if(flags.has('location')){
+                    metaRow.append(el('span','Location: Needs review','ci-flag-chip'));
+                }
+                if(metaRow.childNodes.length)title.append(metaRow);
+                if(row.description){
+                    title.append(el('div',row.description,'ci-description'));
+                }
+            }
+
+            // Show inline warning explanations directly so admins don't need to guess why a row is flagged
+            if(issues.length){
+                const warnList=el('div',undefined,'ci-warning-list');
+                issues.forEach(msg=>warnList.append(el('span',`⚠ ${msg}`,'ci-flag-chip')));
+                title.append(warnList);
+            }
+
+            const dates=el('td');dates.style.whiteSpace='nowrap';
+            if(row.start_date&&dateValid(row.start_date)){
+                dates.append(el('div',formatDateHuman(row.start_date),'fw-semibold'));
+                if(row.end_date&&row.end_date!==row.start_date)dates.append(el('div',`to ${formatDateHuman(row.end_date,false)}`,'small text-muted'));
+            } else {
+                dates.append(el('span',row.start_date||'Date missing','ci-flag-chip'));
+            }
+            const timeText=formatTimeRange(row);
+            if(timeText){
+                dates.append(el('div',timeText,flags.has('start_time')?'small ci-flag-chip mt-1':'small text-muted'));
+            } else if(flags.has('start_time')){
+                dates.append(el('div','Time TBA / unclear','small ci-flag-chip mt-1'));
+            } else if(row.action!=='archive'){
+                dates.append(el('div','All day','small text-muted'));
+            }
+
+            const category=el('td');category.append(categorySelect(row));
+            const status=el('td');status.append(el('span',label(row),`ci-badge ${state(row)}`));
+            const action=el('td',undefined,'ci-row-actions');
+            if(!row.excluded){
+                const quickApprove=button(
+                    row.include?'Approved ✓':'Approve',
+                    ()=>{
+                        if(row.include){
+                            row.include=false;dirty=true;render();
+                        } else if(critical(row).length){
+                            editing=row.index;feedback('Please complete the required fields below before approving.');render();
+                        } else {
+                            approve([row],false,true);
+                        }
+                    },
+                    row.include?'btn btn-sm btn-success':'btn btn-sm btn-outline-success'
+                );
+                quickApprove.title=row.include?'Click to unapprove':'Approve this activity for import';
+                action.append(quickApprove);
+            }
+            const edit=button(editing===row.index?'Close':'Edit',()=>{editing=editing===row.index?null:row.index;render();});
+            edit.setAttribute('aria-expanded',String(editing===row.index));
+            action.append(edit);
+            if(row.action!=='archive'){
+                const splitBtn=button('Separate',()=>separateRow(row),'btn btn-sm btn-outline-secondary');
+                splitBtn.title='Separate this entry into multiple events';
+                action.append(splitBtn);
+            }
+            const removeBtn=button('Remove',()=>removeRows([row]),'btn btn-sm btn-outline-danger');
+            removeBtn.title='Remove this entry from the import preview';
+            action.append(removeBtn);
+
             tr.append(checkCell,title,dates,category,status,action);body.append(tr);if(editing===row.index)body.append(editor(row));
         });
         if(!visible.length){const tr=el('tr'),td=el('td','No activities match these filters.','text-center text-muted py-4');td.colSpan=6;tr.append(td);body.append(tr);}
@@ -160,7 +439,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if(busy||(next>1&&!token)||management)return;if(step!==next)show('calendarImportError',false);step=next;
         show('calendarImportUpload',step===1);show('calendarImportManagement',step===1);show('calendarImportPreview',step===2||step===3);show('ciFinal',step===4);show('calendarImportSummary',!!token);show('ciBack',step>1);show('ciContinue',step<4&&!!token);show('calendarImportConfirm',step===4);
         document.querySelectorAll('[data-ci-step]').forEach(node=>{const number=Number(node.dataset.ciStep);node.classList.toggle('active',number===step);node.disabled=number>1&&!token;node.removeAttribute('aria-current');if(number===step)node.setAttribute('aria-current','step');});
-        $('calendarImportReviewHeading').textContent=step===3?'Verify and approve activities':'Review extracted activities';$('calendarImportReviewHelp').textContent=step===3?'Selection and approval are separate. Review warnings, then approve the activities to import.':'Use Edit for details. Category changes can be made directly in the table.';
+        $('calendarImportReviewHeading').textContent=step===3?'Verify and approve activities':'Review extracted activities';
+        $('calendarImportReviewHelp').textContent=step===3?'Click any summary card above to filter by status. Once all desired activities are Approved, continue to confirm import.':'Clean activities have been automatically approved! Click "Needs Review" above to inspect any flagged items, or use Edit, Merge, Separate, and Remove as needed.';
         $('ciContinue').textContent=step===2?'Continue to verification':step===3?'Review final summary':'Continue review';render();
     }
     async function request(action,data=new FormData(),useToken=token) {
@@ -170,25 +450,91 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!result.success)throw new Error(result.message||result.error||'The request could not be completed.');return result;
     }
     async function discardPrompt(){return window.AdminDialogs?window.AdminDialogs.confirm('Discard your calendar review? Edits, selections and approvals in this workspace will be lost.',{title:'Discard calendar review?',confirmText:'Discard review',cancelText:'Keep reviewing',danger:true}):window.confirm('Discard your calendar review and unsaved changes?');}
+    function updateSelectedFileMeta(file) {
+        const meta=$('calendarImportFileMeta');
+        const zone=$('calendarImportDropzone');
+        if(!file){
+            if(meta)meta.textContent='Supports tables, bulleted lists, and paragraphs up to 5 MB';
+            zone?.classList.remove('has-file');
+            return;
+        }
+        const sizeKb=Math.max(1,Math.round(file.size/1024));
+        if(meta)meta.textContent=`Selected: ${file.name} (${sizeKb} KB)`;
+        zone?.classList.add('has-file');
+        const nameInput=$('calendarImportName');
+        if(nameInput&&!nameInput.disabled&&!nameInput.value.trim()){
+            const base=file.name.replace(/\.docx$/i,'').replace(/[_-]+/g,' ').replace(/\s+/g,' ').trim();
+            if(base)nameInput.value=base;
+        }
+        const yearMatch=file.name.match(/\b(20\d{2})\b/);
+        if(yearMatch&&$('calendarImportYear'))$('calendarImportYear').value=yearMatch[1];
+    }
+    $('calendarImportFile')?.addEventListener('change',()=>updateSelectedFileMeta($('calendarImportFile').files[0]));
+    if($('calendarImportDropzone')){
+        const zone=$('calendarImportDropzone');
+        ['dragenter','dragover'].forEach(evt=>zone.addEventListener(evt,e=>{e.preventDefault();zone.classList.add('dragover');}));
+        ['dragleave','drop'].forEach(evt=>zone.addEventListener(evt,e=>{e.preventDefault();zone.classList.remove('dragover');}));
+        zone.addEventListener('drop',e=>{
+            const files=e.dataTransfer?.files;
+            if(files?.length&&$('calendarImportFile')){
+                $('calendarImportFile').files=files;
+                updateSelectedFileMeta(files[0]);
+            }
+        });
+    }
     $('calendarImportUpload').addEventListener('submit',async event=>{
         event.preventDefault();if(busy)return;const file=$('calendarImportFile').files[0];if(!file||file.size>5*1024*1024||!/\.docx$/i.test(file.name)){showError('Choose a .docx file up to 5 MB.');return;}
         if(token&&dirty&&!(await discardPrompt()))return;busy=true;updateSummary();show('calendarImportError',false);$('calendarImportExtract').textContent='Extracting…';$('calendarImportFileStatus').textContent=`${file.name} · Uploading and extracting activities…`;
         try{
             const result=await request('import_preview',new FormData($('calendarImportUpload')));if(token)await request('import_cancel',new FormData(),token).catch(()=>{});
-            token=result.token;categories=result.categories;existing=result.existing;departments=result.departments||[];programs=result.programs||[];departmentsReady=!!result.departments_ready;groupsReady=!!result.audience_groups_ready;rows=result.rows.map((row,index)=>({program:'ALL',...row,dept_id:row.audience_group&&row.audience_group!=='all'?'group:'+row.audience_group:row.dept_id||'',audience_group:'all',index,include:false,reviewed:false,excluded:false}));selected.clear();editing=null;page=1;dirty=true;finished=false;
+            token=result.token;categories=result.categories;existing=result.existing;departments=result.departments||[];programs=result.programs||[];departmentsReady=!!result.departments_ready;groupsReady=!!result.audience_groups_ready;
+            rows=result.rows.map((row,index)=>({program:'ALL',...row,dept_id:row.audience_group&&row.audience_group!=='all'?'group:'+row.audience_group:row.dept_id||'',audience_group:'all',index,source_index:index,include:false,reviewed:false,excluded:false}));
+            selected.clear();editing=null;page=1;dirty=true;finished=false;
             fillDepartments($('ciBulkDepartment'));fillPrograms($('ciBulkProgram'),'');
+            if($('ciDepartment')){
+                fillDepartments($('ciDepartment'));
+                $('ciDepartment').disabled=false;
+                $('ciDepartment').insertBefore(new Option('General / Institutional (No specific dept)','general'),$('ciDepartment').options[1]||null);
+            }
             for(const id of ['ciCategory','ciBulkCategory']){const select=$(id);while(select.options.length>(id==='ciCategory'?2:1))select.remove(select.options.length-1);categories.forEach(cat=>select.append(new Option(cat.category_name,cat.category_id)));}
             $('ciYear').replaceChildren(new Option('All years',''));[...new Set(rows.map(row=>row.start_date?.slice(0,4)).filter(Boolean))].sort().forEach(year=>$('ciYear').append(new Option(year,year)));
-            $('calendarImportFileStatus').textContent=`${file.name} · Extraction complete · ${rows.length} activities`;busy=false;setStep(2);
+            // Auto-approve all clean rows without warnings so the admin only needs to review flagged items
+            let autoApproved=0, flaggedCount=0;
+            for(const row of rows){
+                if(!critical(row).length&&!warnings(row).length&&row.action!=='archive'&&!duplicateIssues([...rows.filter(other=>other.include&&other!==row),row])){
+                    row.reviewed=true;row.include=true;row.excluded=false;autoApproved++;
+                } else {
+                    flaggedCount++;
+                }
+            }
+            const fb=$('ciFeedback');
+            fb.replaceChildren();
+            const banner=el('div',undefined,'ci-feedback-banner');
+            banner.append(el('span',`✓ ${autoApproved} clean ${autoApproved===1?'activity was':'activities were'} automatically approved.${flaggedCount?` ${flaggedCount} ${flaggedCount===1?'activity has':'activities have'} notes or TBA details to review.`:' All extracted activities are ready to import!'}`));
+            if(flaggedCount>0){
+                const reviewBtn=button(`Review ${flaggedCount} flagged ${flaggedCount===1?'item':'items'}`,()=>{
+                    $('ciStatus').value='needs';page=1;render();
+                },'btn btn-sm btn-warning ms-2');
+                banner.append(reviewBtn);
+            }
+            fb.append(banner);
+            $('calendarImportFileStatus').textContent=`${file.name} · Extraction complete · ${rows.length} ${rows.length===1?'activity':'activities'} detected`;busy=false;setStep(2);
         }catch(e){showError(e.message);$('calendarImportFileStatus').textContent=`${file.name} · Extraction failed. Your previous review is still available.`;}finally{busy=false;$('calendarImportExtract').textContent='Extract Activities';updateSummary();}
     });
-    for(const id of ['ciSearch','ciMonth','ciYear','ciCategory','ciStatus','ciSort','ciWarningsOnly','ciPageSize'])$(id).addEventListener(id==='ciSearch'?'input':'change',()=>{page=1;render();});
+    for(const id of ['ciSearch','ciMonth','ciYear','ciDepartment','ciCategory','ciStatus','ciSort','ciWarningsOnly','ciPageSize'])$(id)?.addEventListener(id==='ciSearch'?'input':'change',()=>{page=1;render();});
+    $('ciResetFilters')?.addEventListener('click',()=>{
+        for(const id of ['ciSearch','ciMonth','ciYear','ciDepartment','ciCategory','ciStatus'])if($(id))$(id).value='';
+        if($('ciWarningsOnly'))$('ciWarningsOnly').checked=false;
+        page=1;render();
+    });
     for(const [id,selector] of [['ciToggleFilters','.ci-toolbar'],['ciToggleBulk','.ci-bulk']])$(id).addEventListener('click',()=>{const expanded=$(id).closest(selector).classList.toggle('ci-expanded');$(id).setAttribute('aria-expanded',String(expanded));});
     $('ciPrevious').addEventListener('click',()=>{page--;render();});$('ciNext').addEventListener('click',()=>{page++;render();});
     $('ciSelectVisible').addEventListener('change',event=>{pageRows().forEach(row=>event.target.checked?selected.add(row.index):selected.delete(row.index));render();});
     $('ciSelectMatching').addEventListener('click',()=>{matches().forEach(row=>selected.add(row.index));render();});$('ciClearSelection').addEventListener('click',()=>{selected.clear();render();});
     $('ciApproveSelected').addEventListener('click',()=>approve(rows.filter(row=>selected.has(row.index))));
+    $('ciMergeSelected')?.addEventListener('click',()=>mergeRowList(rows.filter(row=>selected.has(row.index))));
     $('ciExcludeSelected').addEventListener('click',()=>{const targets=rows.filter(row=>selected.has(row.index));targets.forEach(row=>{row.include=false;row.excluded=true;});dirty=true;feedback(`${targets.length} activities excluded.`);render();});
+    $('ciRemoveSelected')?.addEventListener('click',()=>removeRows(rows.filter(row=>selected.has(row.index))));
     $('ciApplyCategory').addEventListener('click',()=>{const category=$('ciBulkCategory').value;if(!category){feedback('Choose a category before assigning it.');return;}const targets=rows.filter(row=>selected.has(row.index));targets.forEach(row=>change(row,'category_id',category));feedback(`Category changed for ${targets.length} activities. Review them before approving.`);render();});
     $('ciBulkDepartment').addEventListener('change',()=>fillPrograms($('ciBulkProgram'),$('ciBulkDepartment').value,$('ciBulkProgram').value));
     $('ciApplyAudience').addEventListener('click',()=>{
@@ -215,8 +561,9 @@ document.addEventListener('DOMContentLoaded', () => {
     confirm.addEventListener('click',async()=>{
         if(busy||confirm.disabled||(!management&&step!==4))return;busy=true;updateSummary();show('calendarImportError',false);confirm.textContent='Saving…';
         try{
-            const data=new FormData();if(management)data.set('reviewed_all',$('calendarManageReviewed').checked?'1':'0');const fields=['event_id','title','description','location','start_date','end_date','start_time','end_time','category_id','dept_id','program','include','reviewed'];
-            data.set('import_rows',JSON.stringify(rows.map(row=>Object.fromEntries(fields.map(key=>[key,row[key]])))));data.set('import_status','draft');
+            const data=new FormData();if(management)data.set('reviewed_all',$('calendarManageReviewed').checked?'1':'0');
+            const fields=['source_index','action','event_id','title','description','location','start_date','end_date','start_time','end_time','category_id','dept_id','program','include','reviewed'];
+            data.set('import_rows',JSON.stringify(rows.map(row=>Object.fromEntries(fields.map(key=>[key,row[key]])))));data.set('import_status',$('ciImportStatus')?.value||'draft');
             const result=await request('import_confirm',data);finished=true;dirty=false;sessionStorage.setItem('calendarImportMessage',result.message);window.location.reload();
         }catch(e){showError(e.message);}finally{busy=false;updateSummary();confirm.textContent=management?(management==='delete'?'Confirm Delete Calendar':'Confirm Archive Calendar'):'Confirm Import';}
     });
@@ -226,7 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     modal.addEventListener('hidden.bs.modal',()=>{
         const oldToken=token;token='';rows=[];selected.clear();categories=[];existing=[];management='';editing=null;dirty=false;finished=false;allowClose=false;page=1;if(oldToken)request('import_cancel',new FormData(),oldToken).catch(()=>{});
-        show('calendarManagePreview',false);show('calendarImportError',false);confirm.classList.remove('btn-danger');confirm.classList.add('btn-gnc-gold');confirm.textContent='Confirm Import';$('ciFeedback').textContent='';$('calendarImportFileStatus').textContent='Step 1 of 4 · Choose your calendar document to get started.';setStep(1);
+        show('calendarManagePreview',false);show('calendarImportError',false);confirm.classList.remove('btn-danger');confirm.classList.add('btn-gnc-gold');confirm.textContent='Confirm Import';$('ciFeedback').textContent='';$('calendarImportFileStatus').textContent='Step 1 of 4 · Choose your calendar document to get started.';updateSelectedFileMeta(null);setStep(1);
     });
     window.addEventListener('beforeunload',event=>{if(dirty&&!finished){event.preventDefault();event.returnValue='';}});setStep(1);
 });

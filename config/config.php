@@ -74,7 +74,11 @@ function env(string $key, $default = null, bool $required = false) {
 // ------------------------------------------------------------
 // Database
 // ------------------------------------------------------------
-define('DB_HOST', $_ENV['DB_HOST']);
+$configuredDbHost = $_ENV['DB_HOST'] ?? '127.0.0.1';
+if ($configuredDbHost === 'db' && PHP_SAPI === 'cli' && gethostbyname('db') === 'db') {
+    $configuredDbHost = '127.0.0.1';
+}
+define('DB_HOST', $configuredDbHost);
 define('DB_NAME', $_ENV['DB_NAME']);
 define('DB_USER', $_ENV['DB_USER']);
 define('DB_PASS', $_ENV['DB_PASS']);
@@ -84,7 +88,13 @@ define('DB_CHARSET', $_ENV['DB_CHARSET'] ?? 'utf8mb4');
 // Application Settings
 // ------------------------------------------------------------
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'GNC Admin System');
-define('APP_URL', $_ENV['APP_URL'] ?? 'http://localhost:8080/admin');
+$rawAppUrl = trim((string)($_ENV['APP_URL'] ?? 'http://localhost:8080/admin'));
+if ($rawAppUrl !== '' && !preg_match('#^https?://#i', $rawAppUrl)) {
+    $rawHost = strtolower((string)preg_replace('#[:/].*$#', '', $rawAppUrl));
+    $rawScheme = in_array($rawHost, ['localhost', '127.0.0.1', '::1', '[::1]'], true) ? 'http://' : 'https://';
+    $rawAppUrl = $rawScheme . ltrim($rawAppUrl, '/');
+}
+define('APP_URL', $rawAppUrl ?: 'http://localhost:8080/admin');
 define('SESSION_TIMEOUT', max(60,(int)env('SESSION_TIMEOUT',1800))); // 30 minutes
 // Validate before casting: casting a missing value first turns the fallback into 0.
 define('OTP_EXPIRY', filter_var($_ENV['OTP_EXPIRY'] ?? 300, FILTER_VALIDATE_INT,
@@ -95,12 +105,12 @@ define('LOCKOUT_DURATION', 900); // 15 minutes
 // ------------------------------------------------------------
 // Email Configuration (PHPMailer)
 // ------------------------------------------------------------
-define('MAIL_HOST', $_ENV['MAIL_HOST'] ?? 'smtp.gmail.com');
+define('MAIL_HOST', trim((string)($_ENV['MAIL_HOST'] ?? 'smtp.gmail.com')));
 define('MAIL_PORT', (int) env('MAIL_PORT',587));
-define('MAIL_USERNAME', $_ENV['MAIL_USERNAME'] ?? '');
-define('MAIL_PASSWORD', $_ENV['MAIL_PASSWORD'] ?? '');
-define('MAIL_FROM_NAME', $_ENV['MAIL_FROM_NAME'] ?? 'GNC Admin System');
-define('MAIL_ENCRYPTION', $_ENV['MAIL_ENCRYPTION'] ?? 'tls');
+define('MAIL_USERNAME', trim((string)($_ENV['MAIL_USERNAME'] ?? '')));
+define('MAIL_PASSWORD', trim((string)($_ENV['MAIL_PASSWORD'] ?? '')));
+define('MAIL_FROM_NAME', trim((string)($_ENV['MAIL_FROM_NAME'] ?? 'GNC Admin System')));
+define('MAIL_ENCRYPTION', strtolower(trim((string)($_ENV['MAIL_ENCRYPTION'] ?? 'tls'))));
 
 // ------------------------------------------------------------
 // Facebook Page Feed

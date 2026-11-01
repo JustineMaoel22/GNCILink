@@ -118,7 +118,7 @@ $escape = fn($value) => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
         <form method="post">
             <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>"><input type="hidden" name="action" value="reconcile"><input type="hidden" name="announcement_id" value="<?= (int)$delivery['announcement_id'] ?>">
             <label class="form-label" for="reconcile-<?= (int)$delivery['announcement_id'] ?>">Existing Facebook post ID (PageID_PostID)</label>
-            <input class="form-control mb-2" id="reconcile-<?= (int)$delivery['announcement_id'] ?>" name="post_id" placeholder="PageID_PostID">
+            <input class="form-control mb-2" id="reconcile-<?= (int)$delivery['announcement_id'] ?>" name="post_id" placeholder="e.g. 123456789_987654321">
             <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="confirmed_absent" value="1"> If no ID: I checked the original Page and confirmed that no matching post exists. Allow a manual retry.</label>
             <button class="btn btn-outline-secondary">Reconcile delivery</button>
         </form>

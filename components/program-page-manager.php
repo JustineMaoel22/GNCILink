@@ -295,7 +295,7 @@ foreach ($pgPrograms as $p):
                     <div class="row g-3">
                         <div class="col-12">
                             <label class="pgm-label">Program name <span class="pgm-req">*</span></label>
-                            <input type="text" class="form-control" maxlength="255" data-field="program_name" value="<?= $e($p['program_name']) ?>">
+                            <input type="text" class="form-control" maxlength="255" data-field="program_name" placeholder="e.g. Bachelor of Science in Nursing" value="<?= $e($p['program_name']) ?>">
                             <div class="pgm-help">Write the full name. The big title is made from it (for example “Nursing” from “Bachelor of Science in Nursing”).</div>
                         </div>
                         <div class="col-lg-6">
@@ -310,7 +310,7 @@ foreach ($pgPrograms as $p):
                         </div>
                         <div class="col-12">
                             <label class="pgm-label">Short description <span class="pgm-opt">(optional)</span></label>
-                            <textarea class="form-control" rows="2" maxlength="5000" data-field="description"><?= $e($p['description'] ?? '') ?></textarea>
+                            <textarea class="form-control" rows="2" maxlength="5000" data-field="description" placeholder="e.g. Prepares students for clinical nursing practice and compassionate patient care."><?= $e($p['description'] ?? '') ?></textarea>
                             <div class="pgm-help">Shown on this program's card in the department page. The banner introduction is edited separately below.</div>
                         </div>
                     </div>
@@ -368,60 +368,60 @@ foreach ($pgPrograms as $p):
                 <details class="pgm-sec" open>
                     <summary><span class="pgm-sec-num"></span> Top of the page <small>The big banner</small></summary>
                     <div class="pgm-sec-body"><div class="row g-3">
-                        <div class="col-12"><?php $pgField('subtitle', 'Line under the title', $c['subtitle'], 'text', 'The short italic line, for example a motto. Leave empty to hide it.'); ?></div>
-                        <div class="col-12"><?php $pgField('hero_desc', 'Banner paragraph', $c['hero_desc'], 'long', 'Optional. Leave empty to hide the introduction in the banner.'); ?></div>
+                        <div class="col-12"><?php $pgField('subtitle', 'Line under the title', $c['subtitle'], 'text', 'The short italic line, for example a motto. Leave empty to hide it.', 'e.g. Caring Hands, Competent Minds'); ?></div>
+                        <div class="col-12"><?php $pgField('hero_desc', 'Banner paragraph', $c['hero_desc'], 'long', 'Optional. Leave empty to hide the introduction in the banner.', 'e.g. Build a rewarding healthcare career through hands-on clinical training and compassionate service.'); ?></div>
                     </div></div>
                 </details>
 
                 <details class="pgm-sec">
                     <summary><span class="pgm-sec-num"></span> About, Vision &amp; Mission <small>What the program is about</small></summary>
                     <div class="pgm-sec-body"><div class="row g-3">
-                        <div class="col-lg-6"><?php $pgField('about_title', 'About heading', $c['about_title'], 'text', '', 'About the Program'); ?></div>
-                        <div class="col-12"><?php $pgField('about_text', 'About the program', $c['about_text'], 'long', 'Leave About, Vision and Mission all empty to hide this whole part of the page.'); ?></div>
-                        <div class="col-lg-6"><?php $pgField('vision_title', 'Vision heading', $c['vision_title'], 'text', '', 'Vision'); ?></div>
+                        <div class="col-lg-6"><?php $pgField('about_title', 'About heading', $c['about_title'], 'text', '', 'e.g. About the Program'); ?></div>
+                        <div class="col-12"><?php $pgField('about_text', 'About the program', $c['about_text'], 'long', 'Leave About, Vision and Mission all empty to hide this whole part of the page.', 'e.g. The program equips students with the knowledge, skills, and professional values needed in their field.'); ?></div>
+                        <div class="col-lg-6"><?php $pgField('vision_title', 'Vision heading', $c['vision_title'], 'text', '', 'e.g. Vision'); ?></div>
                         <div class="col-lg-6"><?php $pgField('vision_icon', 'Vision icon', $c['vision_icon'], 'icon'); ?></div>
-                        <div class="col-12"><?php $pgField('vision_text', 'Vision text', $c['vision_text'], 'long'); ?></div>
-                        <div class="col-lg-6"><?php $pgField('mission_title', 'Mission heading', $c['mission_title'], 'text', '', 'Mission'); ?></div>
+                        <div class="col-12"><?php $pgField('vision_text', 'Vision text', $c['vision_text'], 'long', '', 'e.g. A premier program recognized for producing globally competitive and ethical graduates.'); ?></div>
+                        <div class="col-lg-6"><?php $pgField('mission_title', 'Mission heading', $c['mission_title'], 'text', '', 'e.g. Mission'); ?></div>
                         <div class="col-lg-6"><?php $pgField('mission_icon', 'Mission icon', $c['mission_icon'], 'icon'); ?></div>
-                        <div class="col-12"><?php $pgField('mission_text', 'Mission text', $c['mission_text'], 'long'); ?></div>
+                        <div class="col-12"><?php $pgField('mission_text', 'Mission text', $c['mission_text'], 'long', '', 'e.g. To deliver quality instruction, research, and community extension that empower learners.'); ?></div>
                     </div></div>
                 </details>
 
                 <details class="pgm-sec pgm-core-sec"<?= $p['core_enabled'] ? '' : ' hidden' ?>>
                     <summary><span class="pgm-sec-num"></span> Core Values <small>Heading only. Write the values in the “Core values” tab</small></summary>
                     <div class="pgm-sec-body"><div class="row g-3">
-                        <div class="col-lg-6"><?php $pgField('core_title', 'Heading', $c['core_title'], 'text', '', 'Core Values'); ?></div>
-                        <div class="col-12"><?php $pgField('core_intro', 'Line under the heading', $c['core_intro'], 'text'); ?></div>
+                        <div class="col-lg-6"><?php $pgField('core_title', 'Heading', $c['core_title'], 'text', '', 'e.g. Core Values'); ?></div>
+                        <div class="col-12"><?php $pgField('core_intro', 'Line under the heading', $c['core_intro'], 'text', '', 'e.g. The principles that guide every student and graduate of this program.'); ?></div>
                     </div></div>
                 </details>
 
                 <details class="pgm-sec">
                     <summary><span class="pgm-sec-num"></span> Why Choose <small>Heading and introduction</small></summary>
                     <div class="pgm-sec-body"><div class="row g-3">
-                        <div class="col-12"><?php $pgField('why_title', 'Heading', $c['why_title'], 'text', '', 'Why Choose This Program at GNCI?'); ?></div>
-                        <div class="col-12"><?php $pgField('why_intro', 'Introduction', $c['why_intro'], 'long'); ?></div>
+                        <div class="col-12"><?php $pgField('why_title', 'Heading', $c['why_title'], 'text', '', 'e.g. Why Choose This Program at GNCI?'); ?></div>
+                        <div class="col-12"><?php $pgField('why_intro', 'Introduction', $c['why_intro'], 'long', '', 'e.g. Discover the hands-on training, mentorship, and facilities that set our students apart.'); ?></div>
                     </div></div>
                 </details>
 
                 <details class="pgm-sec">
                     <summary><span class="pgm-sec-num"></span> Curriculum, Facilities, Uniform &amp; Careers <small>Their headings</small></summary>
                     <div class="pgm-sec-body"><div class="row g-3">
-                        <div class="col-lg-6"><?php $pgField('curriculum_title', 'Curriculum heading', $c['curriculum_title'], 'text', '', 'Program Curriculum'); ?></div>
-                        <div class="col-lg-6"><?php $pgField('curriculum_intro', 'Text shown when there is no PDF yet', $c['curriculum_intro'], 'text', '', 'Curriculum details coming soon.'); ?></div>
-                        <div class="col-lg-6"><?php $pgField('uniform_title', 'Uniform heading', $c['uniform_title'], 'text', '', 'Uniform'); ?></div>
-                        <div class="col-12"><?php $pgField('uniform_text', 'Uniform text', $c['uniform_text'], 'long'); ?></div>
-                        <div class="col-lg-6"><?php $pgField('career_title', 'Careers heading', $c['career_title'], 'text', '', 'Career Opportunities'); ?></div>
-                        <div class="col-lg-6"><?php $pgField('facility_title', 'Facilities heading', $c['facility_title'], 'text', '', 'Facilities'); ?></div>
+                        <div class="col-lg-6"><?php $pgField('curriculum_title', 'Curriculum heading', $c['curriculum_title'], 'text', '', 'e.g. Program Curriculum'); ?></div>
+                        <div class="col-lg-6"><?php $pgField('curriculum_intro', 'Text shown when there is no PDF yet', $c['curriculum_intro'], 'text', '', 'e.g. Curriculum details coming soon.'); ?></div>
+                        <div class="col-lg-6"><?php $pgField('uniform_title', 'Uniform heading', $c['uniform_title'], 'text', '', 'e.g. Uniform'); ?></div>
+                        <div class="col-12"><?php $pgField('uniform_text', 'Uniform text', $c['uniform_text'], 'long', '', 'e.g. Students wear the prescribed uniform during classes, laboratory sessions, and practicum.'); ?></div>
+                        <div class="col-lg-6"><?php $pgField('career_title', 'Careers heading', $c['career_title'], 'text', '', 'e.g. Career Opportunities'); ?></div>
+                        <div class="col-lg-6"><?php $pgField('facility_title', 'Facilities heading', $c['facility_title'], 'text', '', 'e.g. Facilities'); ?></div>
                     </div></div>
                 </details>
 
                 <details class="pgm-sec">
                     <summary><span class="pgm-sec-num"></span> Bottom banner <small>The “Apply now” call to action</small></summary>
                     <div class="pgm-sec-body"><div class="row g-3">
-                        <div class="col-lg-9"><?php $pgField('cta_title', 'Title', $c['cta_title'], 'text', '', 'Make a difference. Begin Your Journey with GNCI.'); ?></div>
+                        <div class="col-lg-9"><?php $pgField('cta_title', 'Title', $c['cta_title'], 'text', '', 'e.g. Make a difference. Begin Your Journey with GNCI.'); ?></div>
                         <div class="col-lg-3"><?php $pgField('cta_icon', 'Icon', $c['cta_icon'], 'icon'); ?></div>
-                        <div class="col-12"><?php $pgField('cta_text', 'Text', $c['cta_text'], 'text'); ?></div>
-                        <div class="col-lg-4"><?php $pgField('cta_button', 'Button label', $c['cta_button'], 'text', '', 'Apply Now'); ?></div>
+                        <div class="col-12"><?php $pgField('cta_text', 'Text', $c['cta_text'], 'text', '', 'e.g. Applications are now open for incoming students.'); ?></div>
+                        <div class="col-lg-4"><?php $pgField('cta_button', 'Button label', $c['cta_button'], 'text', '', 'e.g. Apply Now'); ?></div>
                         <div class="col-lg-8"><p class="form-text">Apply buttons open Enrollment Procedures for every program.</p></div>
                     </div></div>
                 </details>
@@ -445,7 +445,7 @@ foreach ($pgPrograms as $p):
             'why'        => ['Why choose us', 'Cards that tell students why to pick this program. Each has a title and a few sentences.'],
             'career'     => ['Careers', 'Jobs graduates can go into. Each has a small picture, a title and a description.'],
             'uniform'    => ['Uniform photos', 'Photos of the uniform. Visitors can click a photo to enlarge it.'],
-            'facility'   => ['Facilities', 'Photos of the labs, rooms and equipment students of THIS program use. Each needs a name and a picture (JPG, PNG or WEBP, up to 5 MB); the description is optional. Press “Upload several pictures” to add many at once.'],
+            'facility'   => ['Facilities', 'Photos of the labs, rooms and equipment students of THIS program use. Each needs a picture (JPG, PNG or WEBP, up to 5 MB); the name and description are optional. Press “Upload several pictures” to add many at once.'],
         ];
         foreach ($listHelp as $type => [$label, $help]): ?>
         <div class="pgm-panel" data-panel="<?= $e($type) ?>" hidden>
@@ -1085,20 +1085,20 @@ foreach ($pgPrograms as $p):
                             '<input type="text" class="form-control form-control-sm pgm-icon-name" list="pgm-icon-suggest" maxlength="50" placeholder="icon name, e.g. school" value="' + esc(parts[1] || '') + '"></span></div></div>';
                     }
                     if (type === 'core_value') {
-                        html += inputHtml('Big letter', 'f-sm', 'data-k="letter" maxlength="2"', r.letter);
-                        html += inputHtml('Title *', 'f-md', 'data-k="title" maxlength="255"', r.title);
-                        html += inputHtml('Description', 'f-lg', 'data-k="body" maxlength="2000"', r.body, true);
+                        html += inputHtml('Big letter', 'f-sm', 'data-k="letter" maxlength="2" placeholder="e.g. E"', r.letter);
+                        html += inputHtml('Title *', 'f-md', 'data-k="title" maxlength="255" placeholder="e.g. Excellence"', r.title);
+                        html += inputHtml('Description', 'f-lg', 'data-k="body" maxlength="2000" placeholder="e.g. Striving for the highest standards in academics and service."', r.body, true);
                     } else if (type === 'badge') {
-                        html += inputHtml('Bold text *', 'f-sm', 'data-k="title" maxlength="255" placeholder="4 Years"', r.title);
-                        html += inputHtml('Small text', 'f-sm', 'data-k="subtitle" maxlength="255" placeholder="Program"', r.subtitle);
+                        html += inputHtml('Bold text *', 'f-sm', 'data-k="title" maxlength="255" placeholder="e.g. 4 Years"', r.title);
+                        html += inputHtml('Small text', 'f-sm', 'data-k="subtitle" maxlength="255" placeholder="e.g. Program"', r.subtitle);
                     } else if (type === 'why' || type === 'career') {
-                        html += inputHtml('Title *', 'f-lg', 'data-k="title" maxlength="255"', r.title);
-                        html += inputHtml('Description', 'f-lg', 'data-k="body" maxlength="2000"', r.body, true);
+                        html += inputHtml('Title *', 'f-lg', 'data-k="title" maxlength="255" placeholder="' + (type === 'career' ? 'e.g. Registered Nurse' : 'e.g. Hands-On Clinical Training') + '"', r.title);
+                        html += inputHtml('Description', 'f-lg', 'data-k="body" maxlength="2000" placeholder="e.g. Striving for the highest standards in academics and service."', r.body, true);
                     } else if (type === 'uniform') {
-                        html += inputHtml('Name (shown when the picture is enlarged)', 'f-lg', 'data-k="title" maxlength="255" placeholder="Female Uniform"', r.title);
+                        html += inputHtml('Name (shown when the picture is enlarged)', 'f-lg', 'data-k="title" maxlength="255" placeholder="e.g. Female Uniform"', r.title);
                     } else if (type === 'facility') {
-                        html += inputHtml('Facility name *', 'f-lg', 'data-k="title" maxlength="255" placeholder="Computer Laboratory"', r.title);
-                        html += inputHtml('Description (optional)', 'f-lg', 'data-k="body" maxlength="500"', r.body, true);
+                        html += inputHtml('Facility name (optional)', 'f-lg', 'data-k="title" maxlength="255" placeholder="e.g. Computer Laboratory"', r.title);
+                        html += inputHtml('Description (optional)', 'f-lg', 'data-k="body" maxlength="500" placeholder="e.g. Equipped with updated workstations for hands-on exercises."', r.body, true);
                     }
                     if (hasImg) {
                         html += '<div class="f-lg pgm-item-img"><div class="thumb">No picture</div>' +

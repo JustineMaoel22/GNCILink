@@ -20,6 +20,10 @@ $calendarMonthUrl = static fn($month, $year) => '?' . http_build_query(array_mer
         <?php endif; ?>
     </div>
 
+    <div class="gnc-cal-hint">
+        <i class="bi bi-cursor-fill" aria-hidden="true"></i> Dates are clickable &mdash; select any date to view scheduled events
+    </div>
+
     <div class="gnc-cal-grid" data-calendar-scope="<?= htmlspecialchars(http_build_query(array_filter(['department'=>$calendarFilters['department']??null,'program'=>$calendarFilters['program']??null,'category'=>$calendarCategory??null],static fn($value)=>$value!==null)),ENT_QUOTES,'UTF-8') ?>">
         <?php foreach (['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as $dow): ?>
             <div class="gnc-cal-dow"><?= $dow ?></div>

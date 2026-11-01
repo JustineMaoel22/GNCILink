@@ -4,7 +4,8 @@ const GNC_PRIVACY_COOKIE = 'gnc_privacy_v1';
 const GNC_PRIVACY_DAYS = 180;
 function gncPrivacyChoices(): array {
     $none=['analytics'=>false,'personalization'=>false,'external'=>false];
-    if (($_SERVER['HTTP_SEC_GPC']??'')==='1' || ($_SERVER['HTTP_DNT']??'')==='1') return $none;
+    // A browser GPC/DNT signal keeps everything off by default (no banner opt-in is
+    // assumed); only a cookie written by the visitor's own explicit choice can enable features.
     $raw=$_COOKIE[GNC_PRIVACY_COOKIE]??'';
     if (!is_string($raw) || strlen($raw)>600) return $none;
     $value=json_decode($raw,true);

@@ -49,7 +49,7 @@ $publicDepartments = departmentApplyOrder($publicDepartments, departmentStoredOr
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&amp;display=block">
-    <link href="/assets/css/col-dept-style.css" rel="stylesheet">
+    <link href="/assets/css/col-dept-style.css?v=<?= (int)filemtime(__DIR__ . '/../../../assets/css/col-dept-style.css') ?>" rel="stylesheet">
     <link href="/assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
     <style>

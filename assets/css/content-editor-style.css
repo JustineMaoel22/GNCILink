@@ -955,10 +955,14 @@ body.ve-mode { overflow: hidden; }
 @keyframes vePublishOpen { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 420px) { .ve-publish-content { padding: 22px; } .ve-publish-actions { flex-direction: column-reverse; } .ve-publish-actions button { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .ve-publish-dialog[open] { animation: none; } }
-.ve-tb { position: fixed; z-index: 1060; display: flex; align-items: center; flex-wrap: nowrap; gap: 2px; padding: 5px; background: #fff; border: 1px solid #cfd9d3; border-radius: 12px; box-shadow: 0 10px 34px rgba(11,61,34,.28); max-width: calc(100vw - 16px); overflow-x: auto; }
+.ve-tb { position: fixed; z-index: 1060; display: flex; align-items: center; flex-wrap: nowrap; gap: 3px; padding: 6px; background: #fff; border: 1px solid #cfd9d3; border-radius: 12px; box-shadow: 0 10px 34px rgba(11,61,34,.28); max-width: calc(100vw - 16px); overflow-x: auto; scrollbar-width: thin; scrollbar-color: rgba(9,64,36,.25) transparent; }
+.ve-tb::-webkit-scrollbar { height: 4px; }
+.ve-tb::-webkit-scrollbar-track { background: transparent; }
+.ve-tb::-webkit-scrollbar-thumb { background: rgba(9,64,36,.25); border-radius: 4px; }
+.ve-tb::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 .ve-tb::after { content: ""; }
-.ve-b { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 6px; min-width: 34px; height: 34px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ve-ink); font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap; }
-.ve-b:hover { background: #eef3ef; }
+.ve-b { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 6px; min-width: 34px; height: 34px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ve-ink); font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap; transition: background var(--transition), color var(--transition), transform .1s ease; }
+.ve-b:hover { background: #eef3ef; } .ve-b:active { transform: scale(0.96); }
 .ve-b.is-on { background: #dff1e5; color: var(--ve-green); }
 .ve-b.is-primary { background: var(--ve-green-2); color: #fff; }
 .ve-b.is-primary:hover { background: var(--ve-green); }
@@ -967,7 +971,7 @@ body.ve-mode { overflow: hidden; }
 .ve-b[disabled] { opacity: .35; cursor: not-allowed; }
 .ve-b i { font-size: 15px; }
 .ve-sep { width: 1px; height: 22px; background: var(--ve-line); margin: 0 4px; flex: 0 0 auto; }
-.ve-sel { height: 34px; border: 1px solid var(--ve-line); border-radius: 8px; background: #fff; padding: 0 6px; font-weight: 600; color: var(--ve-ink); }
+.ve-sel { height: 34px; border: 1px solid var(--ve-line); border-radius: 8px; background: #fff; padding: 0 8px; font-weight: 600; font-size: 13px; color: var(--ve-ink); cursor: pointer; outline: none; transition: border-color var(--transition), box-shadow var(--transition); } .ve-sel:focus { border-color: var(--ve-green); box-shadow: 0 0 0 2px rgba(9,64,36,.15); }
 .ve-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; margin: 0 2px; border-radius: 99px; background: #eef3ef; color: var(--ve-mute); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .ve-chip-ok { background: #e6f2ea; color: #14532d; }
 .ve-chip-warn { background: #fdf0d5; color: #92400e; }

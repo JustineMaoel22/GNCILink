@@ -156,6 +156,19 @@ function rbacRejectSubmission(int $id,int $revision,string $reason): void {
     if($q->rowCount()!==1)throw new RuntimeException('The submission changed or has already been reviewed. Reload before reviewing.');
     logActivity((int)$_SESSION['user_id'],'REJECT','rbac_submissions',$id,$reason);
 }
+function rbacDeleteSubmission(int $id,int $revision): void {
+    $row=rbacGetSubmission($id);
+    if(!$row||((int)$row['user_id']!==(int)($_SESSION['user_id']??0)&&!rbacIsSuper()))throw new RuntimeException('You cannot delete this submission.');
+    if($row['status']==='processing')throw new RuntimeException('This submission is currently being processed.');
+    $db=getDB();$db->beginTransaction();
+    try{
+        $q=$db->prepare("DELETE FROM rbac_submissions WHERE submission_id=? AND revision=? AND status!='processing'");$q->execute([$id,$revision]);
+        if($q->rowCount()!==1)throw new RuntimeException('This submission changed or was already deleted. Reload and try again.');
+        $db->prepare('DELETE FROM rbac_submission_chunks WHERE submission_id=?')->execute([$id]);
+        logActivity((int)$_SESSION['user_id'],'DELETE','rbac_submissions',$id,'Deleted submission: '.$row['title']);
+        $db->commit();
+    }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
+}
 function rbacFlattenFields(array $data,string $prefix=''): array {
     $flat=[];foreach($data as $key=>$value){$name=$prefix===''?(string)$key:$prefix.'['.$key.']';if(is_array($value))$flat+=rbacFlattenFields($value,$name);elseif(is_scalar($value)||$value===null)$flat[$name]=(string)$value;}return $flat;
 }

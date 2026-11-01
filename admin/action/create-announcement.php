@@ -246,12 +246,8 @@ if ($postAction === 'create' || $postAction === 'update') {
                 getDB()->prepare('INSERT INTO facebook_publishing_requests (request_key,user_id,announcement_id,created_at) VALUES (?,?,0,NOW())')->execute([$requestKey, $_SESSION['user_id']]);
             }
             $program = normalizeAnnouncementProgramCategory($_POST['program'] ?? null, $isUpdate ? ($existing['program'] ?? null) : null);
-            $mediaId = null;
-            if (!empty($_FILES['image']['name'] ?? '')) {
-                $mediaId = uploadAnnouncementImage($_FILES['image']);
-            }
 
-            // Gallery: validate the count up front so a bad batch never partially uploads.
+            // Gallery: validate the count (including existing kept images) up front so a bad batch never partially uploads.
             $galleryFiles = $_FILES['gallery_images'] ?? null;
             $galleryCount = 0;
             if (!empty($galleryFiles['name']) && is_array($galleryFiles['error'])) {
@@ -259,8 +255,23 @@ if ($postAction === 'create' || $postAction === 'update') {
                     if ($err !== UPLOAD_ERR_NO_FILE) $galleryCount++;
                 }
             }
-            if ($galleryCount > 10) {
-                throw new Exception('You can add up to 10 extra photos at a time. Please choose fewer photos.');
+            $existingGalleryImages = ($isUpdate && $id) ? getAnnouncementImages($id) : [];
+            $removedGalleryIds = (!empty($_POST['remove_gallery_ids']) && is_array($_POST['remove_gallery_ids']))
+                ? array_map('intval', $_POST['remove_gallery_ids'])
+                : [];
+            $remainingExistingGalleryCount = 0;
+            foreach ($existingGalleryImages as $existingImg) {
+                if (!in_array((int)($existingImg['image_id'] ?? 0), $removedGalleryIds, true)) {
+                    $remainingExistingGalleryCount++;
+                }
+            }
+            if ($galleryCount > 0 && ($galleryCount > 10 || ($remainingExistingGalleryCount + $galleryCount) > 10)) {
+                throw new Exception('You can only upload a maximum of 10 images. Please reduce your selection and try again.');
+            }
+
+            $mediaId = null;
+            if (!empty($_FILES['image']['name'] ?? '')) {
+                $mediaId = uploadAnnouncementImage($_FILES['image']);
             }
 
             $data = [
@@ -345,6 +356,7 @@ if ($postAction === 'create' || $postAction === 'update') {
             $_SESSION['flash_success'] = $websiteMessage;
             $_SESSION['flash_errors'] = ['The announcement is saved. ' . $e->getMessage() . ' Use Edit on the saved announcement to retry.'];
         } catch (Throwable $e) {
+            error_log('Facebook announcement publish failed (#' . $savedId . '): ' . get_class($e) . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
             $_SESSION['flash_success'] = $websiteMessage;
             $_SESSION['flash_errors'] = ['The announcement is saved, but Facebook delivery could not be confirmed. Check Facebook Integration before retrying.'];
         }

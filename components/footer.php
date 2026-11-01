@@ -114,6 +114,7 @@ if (!function_exists('gncResolvePopularUrl')) {
                         <a href="https://www.facebook.com/gnc.edu.ph" aria-label="Facebook" target="_blank" rel="noopener noreferrer"><i class="bi bi-facebook"></i></a>
                         <a href="https://www.instagram.com/gnci1918/" aria-label="Instagram" target="_blank" rel="noopener noreferrer"><i class="bi bi-instagram"></i></a>
                         <a href="https://www.linkedin.com/school/guagua-national-colleges/" aria-label="LinkedIn" target="_blank" rel="noopener noreferrer"><i class="bi bi-linkedin"></i></a>
+                        <a href="https://www.tiktok.com/@gnci1918" aria-label="TikTok" target="_blank" rel="noopener noreferrer"><i class="bi bi-tiktok"></i></a>
                     </div>
                 </div>
 
@@ -183,7 +184,6 @@ if (!function_exists('gncResolvePopularUrl')) {
                     <?php endif; ?>
                     <button type="button" class="gnc-privacy-settings" data-privacy-action="manage">Privacy &amp; cookie settings</button>
                 </nav>
-                <a href="#" class="gnc-footer-totop" id="gncBackToTop" aria-label="Back to top"><i class="bi bi-arrow-up" aria-hidden="true"></i></a>
             </div>
         </div>
     </div>
@@ -193,17 +193,6 @@ if (!function_exists('gncResolvePopularUrl')) {
 <?php include_once __DIR__ . '/../chatbot/widget.php'; ?>
 
 <script>
-(function () {
-    var btn = document.getElementById('gncBackToTop');
-    if (!btn) return;
-    btn.addEventListener('click', function (ev) {
-        ev.preventDefault();
-        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
-    });
-})();
-</script>
-
 <script>
 (function () {
     if (window.top !== window.self || new URLSearchParams(location.search).has('ce_preview')) return;

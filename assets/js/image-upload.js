@@ -118,11 +118,37 @@
         if (window.AdminDialogs) window.AdminDialogs.alert(message, { title: 'Photo upload' });
         else window.alert(message);
     }
+    function validateSelection(input, files, event) {
+        if (!input || input._gncInternalChange || event?._gncValidatedSelection) return true;
+        if (typeof input._gncBeforeProcessFiles === 'function') {
+            if (!input._gncBeforeProcessFiles(files, event)) return false;
+            if (event) event._gncValidatedSelection = true;
+            return true;
+        }
+        const maxFiles = parseInt(input.dataset?.maxFiles || '', 10);
+        if (Number.isFinite(maxFiles) && maxFiles > 0) {
+            const existingSelector = input.dataset?.existingCountSelector || '';
+            const existingCount = existingSelector ? document.querySelectorAll(existingSelector).length : 0;
+            if (files.length > maxFiles || (existingCount + files.length) > maxFiles) {
+                input.value = '';
+                const msg = input.dataset?.maxFilesMessage || ('You can only upload a maximum of ' + maxFiles + ' images. Please reduce your selection and try again.');
+                if (window.AdminDialogs) window.AdminDialogs.alert(msg, { title: 'Maximum Image Limit Exceeded', danger: true });
+                else window.alert(msg);
+                return false;
+            }
+        }
+        if (event) event._gncValidatedSelection = true;
+        return true;
+    }
     // Run before framing, photo checks and each form's existing size validation.
     document.addEventListener('change', async event => {
         const input = event.target;
         if (input.tagName !== 'INPUT' || input.type !== 'file') return;
         const files = Array.from(input.files || []);
+        if (!validateSelection(input, files, event)) {
+            event.stopImmediatePropagation();
+            return;
+        }
         if (!files.some(isLargeImage)) return;
         event.stopImmediatePropagation();
         input.disabled = true;
@@ -131,12 +157,23 @@
             for (const file of await optimizeFiles(files)) transfer.items.add(file);
             input.files = transfer.files;
             input.disabled = false;
-            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input._gncInternalChange = true;
+            try {
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            } finally {
+                input._gncInternalChange = false;
+            }
         } catch (error) { input.value = ''; report(error); }
         finally { input.disabled = false; }
     }, true);
     document.addEventListener('drop', async event => {
         const files = Array.from(event.dataTransfer?.files || []);
+        const input = event.target?.tagName === 'INPUT' && event.target.type === 'file' ? event.target : null;
+        if (input && !validateSelection(input, files, event)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            return;
+        }
         if (!files.some(isLargeImage)) return;
         event.preventDefault(); event.stopImmediatePropagation();
         try {

@@ -5,21 +5,51 @@ function authIp(): string {
     return filter_var($ip,FILTER_VALIDATE_IP)?$ip:'unknown';
 }
 function authIsHttps(): bool {
-    if((!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off')||(int)($_SERVER['SERVER_PORT']??0)===443)return true;
+    if((!empty($_SERVER['HTTPS'])&&strtolower((string)$_SERVER['HTTPS'])!=='off')||(int)($_SERVER['SERVER_PORT']??0)===443||strtolower((string)($_SERVER['REQUEST_SCHEME']??''))==='https')return true;
+    if(strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO']??''))==='https'||strtolower((string)($_SERVER['HTTP_X_FORWARDED_SSL']??''))==='on')return true;
+    if(!empty($_SERVER['HTTP_CF_VISITOR'])&&str_contains((string)$_SERVER['HTTP_CF_VISITOR'],'"scheme":"https"'))return true;
     $trusted=array_filter(array_map('trim',explode(',',(string)env('AUTH_TRUSTED_PROXIES',''))));
     return in_array(authIp(),$trusted,true)&&($_SERVER['HTTP_X_FORWARDED_PROTO']??'')==='https';
 }
+function authNormalizeUrl(string $url): string {
+    $url=trim($url);
+    if($url==='')return '';
+    if(!preg_match('#^https?://#i',$url)){
+        $host=strtolower((string)preg_replace('#[:/].*$#','',$url));
+        $scheme=in_array($host,['localhost','127.0.0.1','::1','[::1]'],true)?'http://':'https://';
+        $url=$scheme.ltrim($url,'/');
+    }
+    return $url;
+}
 function authLocalDevelopment(): bool {
     $local=['localhost','127.0.0.1','::1','[::1]'];
-    $configured=in_array(strtolower((string)parse_url(APP_URL,PHP_URL_HOST)),$local,true);
-    $requested=strtolower((string)parse_url('http://'.($_SERVER['HTTP_HOST']??''),PHP_URL_HOST));
-    return $configured&&(PHP_SAPI==='cli'||in_array($requested,$local,true));
+    $configuredHost=strtolower((string)parse_url(authNormalizeUrl((string)APP_URL),PHP_URL_HOST));
+    $configured=in_array($configuredHost,$local,true);
+    $reqHost=strtolower((string)parse_url('http://'.($_SERVER['HTTP_HOST']??$_SERVER['SERVER_NAME']??''),PHP_URL_HOST));
+    if(in_array($reqHost,$local,true))return true;
+    return $configured&&PHP_SAPI==='cli';
 }
 function authPublicOrigin(): string {
-    $url=(string)env('AUTH_PUBLIC_URL',APP_URL);$parts=parse_url($url);
+    $local=['localhost','127.0.0.1','::1','[::1]'];
+    $explicit=trim((string)env('AUTH_PUBLIC_URL',''));
+    $candidate=$explicit!==''?$explicit:(string)APP_URL;
+    $parts=parse_url(authNormalizeUrl($candidate));
+    // If AUTH_PUBLIC_URL was not set and APP_URL still points to localhost while running on a live domain, use the live host over HTTPS.
+    $reqHostRaw=trim((string)($_SERVER['HTTP_HOST']??$_SERVER['SERVER_NAME']??''));
+    $reqParts=$reqHostRaw!==''?parse_url('http://'.$reqHostRaw):false;
+    $reqHost=strtolower((string)($reqParts['host']??''));
+    if($explicit===''&&$reqHost!==''&&!in_array($reqHost,$local,true)&&preg_match('/^[a-z0-9.-]+$/i',$reqHost)&&in_array(strtolower((string)($parts['host']??'')),$local,true)){
+        $scheme=authIsHttps()||!in_array($reqHost,$local,true)?'https':'http';
+        $port=isset($reqParts['port'])&&(int)$reqParts['port']!==80&&(int)$reqParts['port']!==443?':'.(int)$reqParts['port']:'';
+        return $scheme.'://'.$reqHost.$port;
+    }
     if(!$parts||empty($parts['host'])||isset($parts['user'])||isset($parts['pass'])||!in_array($parts['scheme']??'',['https','http'],true))throw new RuntimeException('Authentication URL is not configured.');
-    if(($parts['scheme']??'')!=='https'&&!in_array(strtolower($parts['host']),['localhost','127.0.0.1','::1'],true))throw new RuntimeException('Authentication URL must use HTTPS.');
-    return $parts['scheme'].'://'.$parts['host'].(isset($parts['port'])?':'.$parts['port']:'');
+    $host=strtolower((string)$parts['host']);
+    $scheme=strtolower((string)$parts['scheme']);
+    if($scheme!=='https'&&!in_array($host,$local,true)){
+        $scheme='https';
+    }
+    return $scheme.'://'.$parts['host'].(isset($parts['port'])?':'.$parts['port']:'');
 }
 function authEnforceTransport(): void {
     if(PHP_SAPI==='cli'||rbacRequestRoute()==='')return;
@@ -37,11 +67,52 @@ function authEnforceTransport(): void {
     header('Location: '.$origin.$uri,true,302);exit;
 }
 function authAudit(?int $userId,string $action,string $description): void {
-    try{getDB()->prepare('INSERT INTO auth_security_logs(user_id,action,ip_address,description) VALUES(?,?,?,?)')->execute([$userId,$action,authIp(),$description]);}
-    catch(Throwable $e){error_log('Authentication audit unavailable; action='.$action);}
+    try{getDB()->prepare('INSERT INTO auth_security_logs(user_id,action,ip_address,description) VALUES(?,?,?,?)')->execute([$userId,$action,authIp(),substr($description,0,255)]);}
+    catch(Throwable $e){error_log('Authentication audit unavailable; action='.$action.': '.$e->getMessage());}
+}
+function authEnsureSchema(): void {
+    $db=getDB();
+    $db->exec('CREATE TABLE IF NOT EXISTS auth_password_resets (
+        user_id INT NOT NULL PRIMARY KEY,
+        token_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL UNIQUE,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+    $db->exec('CREATE TABLE IF NOT EXISTS auth_rate_limits (
+        bucket_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY,
+        attempts INT UNSIGNED NOT NULL DEFAULT 1,
+        expires_at DATETIME NOT NULL,
+        INDEX auth_rate_expiry(expires_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+    $db->exec('CREATE TABLE IF NOT EXISTS auth_security_logs (
+        log_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NULL,
+        action VARCHAR(50) NOT NULL,
+        ip_address VARCHAR(45) NOT NULL,
+        description VARCHAR(255) NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX auth_log_time(created_at),
+        INDEX auth_log_user(user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 }
 function authSecurityReady(): bool {
-    try{getDB()->query('SELECT token_hash FROM auth_password_resets LIMIT 0');getDB()->query('SELECT bucket_hash FROM auth_rate_limits LIMIT 0');getDB()->query('SELECT log_id FROM auth_security_logs LIMIT 0');return firstLoginPasswordReady();}catch(Throwable $e){return false;}
+    try{
+        getDB()->query('SELECT token_hash FROM auth_password_resets LIMIT 0');
+        getDB()->query('SELECT bucket_hash FROM auth_rate_limits LIMIT 0');
+        getDB()->query('SELECT log_id FROM auth_security_logs LIMIT 0');
+        return firstLoginPasswordReady();
+    }catch(Throwable $e){
+        try{
+            authEnsureSchema();
+            getDB()->query('SELECT token_hash FROM auth_password_resets LIMIT 0');
+            getDB()->query('SELECT bucket_hash FROM auth_rate_limits LIMIT 0');
+            getDB()->query('SELECT log_id FROM auth_security_logs LIMIT 0');
+            return firstLoginPasswordReady();
+        }catch(Throwable $migrateErr){
+            error_log('Authentication security schema initialization failed: '.$migrateErr->getMessage());
+            return false;
+        }
+    }
 }
 function authRateAllowed(string $scope,string $key,int $limit,int $seconds): bool {
     $hash=hash('sha256',$scope.':'.$key);$db=getDB();
@@ -63,7 +134,7 @@ function authCheckCredentials(string $email,string $password): ?array {
     if(!authRateAllowed('login-ip',authIp(),30,900)){authAudit(null,'LOGIN_RATE_LIMIT','Login rate limit reached.');return null;}
     $db=getDB();$db->beginTransaction();
     try{
-        $q=$db->prepare('SELECT * FROM users WHERE email=? FOR UPDATE');$q->execute([$email]);$user=$q->fetch();
+        $q=$db->prepare('SELECT * FROM users WHERE LOWER(TRIM(email))=LOWER(TRIM(?)) FOR UPDATE');$q->execute([$email]);$user=$q->fetch();
         if(!$user){password_verify($password,'$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.');$db->commit();authAudit(null,'LOGIN_FAILED','Invalid login credentials.');return null;}
         $id=(int)$user['user_id'];$locked=!empty($user['locked_until'])&&strtotime($user['locked_until'])>time();
         if($locked||$user['status']!=='active'){$db->commit();authAudit($id,'LOGIN_FAILED','Login refused.');return null;}
@@ -87,27 +158,170 @@ function authConsumeOtp(string $otp): ?array {
         $db->prepare('UPDATE users SET otp_code=NULL,otp_expires_at=NULL,otp_verified=1 WHERE user_id=?')->execute([$id]);$db->commit();return $u;
     }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
 }
-/** Email is successful only when PHPMailer reports SMTP acceptance. */
-function authSendMail(string $email,string $name,string $subject,string $body,?int $id=null): bool {
-    try{
-        if(!MAIL_HOST||!MAIL_USERNAME||!MAIL_PASSWORD||!is_file(__DIR__.'/../vendor/autoload.php'))throw new RuntimeException('Mail configuration missing.');
-        require_once __DIR__.'/../vendor/autoload.php';$mail=new \PHPMailer\PHPMailer\PHPMailer(true);
-        $mail->isSMTP();$mail->Host=MAIL_HOST;$mail->Port=MAIL_PORT;$mail->SMTPAuth=true;$mail->Username=MAIL_USERNAME;$mail->Password=MAIL_PASSWORD;$mail->SMTPSecure=MAIL_ENCRYPTION;$mail->Timeout=15;$mail->SMTPDebug=0;
-        $mail->setFrom((string)env('MAIL_FROM_ADDRESS',MAIL_USERNAME),MAIL_FROM_NAME);$mail->addAddress($email,$name);$mail->CharSet='UTF-8';$mail->Subject=$subject;$mail->Body=$body;$mail->isHTML(false);
-        if(!$mail->send())throw new RuntimeException('SMTP did not accept the message.');return true;
-    }catch(Throwable $e){authAudit($id,'AUTH_MAIL_FAILED','Authentication email could not be sent. Check SMTP configuration and provider logs.');error_log('Authentication email delivery failed; check SMTP configuration/provider logs.');return false;}
+function authSanitizeMailError(string $msg): string {
+    $secrets=array_filter([MAIL_PASSWORD,preg_replace('/\s+/','',MAIL_PASSWORD)]);
+    foreach($secrets as $secret){
+        if($secret!=='')$msg=str_replace($secret,'[REDACTED]',$msg);
+    }
+    $msg=preg_replace('/https?:\/\/\S*token=[a-f0-9]+/i','[RESET_URL]',$msg);
+    $msg=preg_replace('/\s+/',' ',trim($msg));
+    return $msg!==''?$msg:'Unknown mail transport error';
 }
-function authRequestReset(string $email): void {
-    $allowed=authRateAllowed('reset-ip',authIp(),10,900);
-    $allowed=authRateAllowed('reset-email',strtolower($email),3,900)&&$allowed;
-    if(!$allowed){authAudit(null,'RESET_RATE_LIMIT','Password recovery rate limit reached.');return;}
-    $q=getDB()->prepare("SELECT user_id,first_name,email FROM users WHERE email=? AND status='active'");$q->execute([$email]);$u=$q->fetch();
-    authAudit($u?(int)$u['user_id']:null,'FORGOT_PASSWORD','Password recovery requested.');if(!$u)return;
-    $token=bin2hex(random_bytes(32));$hash=hash('sha256',$token);
-    try{$url=authPublicOrigin().'/admin/reset-password.php?token='.$token;}
-    catch(Throwable $e){authAudit((int)$u['user_id'],'AUTH_CONFIGURATION_ERROR','Set a valid HTTPS AUTH_PUBLIC_URL for password recovery.');return;}
+function authLoadMailer(): bool {
+    if(class_exists(\PHPMailer\PHPMailer\PHPMailer::class))return true;
+    $autoload=__DIR__.'/../vendor/autoload.php';
+    if(is_file($autoload)){require_once $autoload;if(class_exists(\PHPMailer\PHPMailer\PHPMailer::class))return true;}
+    $src=__DIR__.'/../vendor/phpmailer/phpmailer/src';
+    if(is_file($src.'/PHPMailer.php')&&is_file($src.'/SMTP.php')&&is_file($src.'/Exception.php')){
+        require_once $src.'/Exception.php';require_once $src.'/PHPMailer.php';require_once $src.'/SMTP.php';
+        return class_exists(\PHPMailer\PHPMailer\PHPMailer::class);
+    }
+    return false;
+}
+/** Email is successful when PHPMailer SMTP or verified host MTA accepts the message. */
+function authSendMail(string $email,string $name,string $subject,string $body,?int $id=null,?string $htmlBody=null): bool {
+    $host=trim((string)MAIL_HOST);
+    $user=trim((string)MAIL_USERNAME);
+    $rawPass=trim((string)MAIL_PASSWORD);
+    $fromAddr=trim((string)env('MAIL_FROM_ADDRESS',$user));
+    if(!filter_var($fromAddr,FILTER_VALIDATE_EMAIL))$fromAddr=filter_var($user,FILTER_VALIDATE_EMAIL)?$user:'no-reply@gnc.edu.ph';
+    $fromName=trim((string)MAIL_FROM_NAME)?:'GNC Admin System';
+    $errors=[];
+
+    if($host!==''&&$user!==''&&$rawPass!==''&&authLoadMailer()){
+        $compactPass=preg_replace('/\s+/','',$rawPass);
+        // Gmail App Passwords are 16 chars often copied as 19 chars with spaces ("xxxx xxxx xxxx xxxx").
+        $passwords=($compactPass!==''&&$compactPass!==$rawPass)?[$compactPass,$rawPass]:[$rawPass];
+        $cfgPort=(int)MAIL_PORT?:587;
+        $cfgEnc=strtolower(trim((string)MAIL_ENCRYPTION));
+        $primaryEnc=($cfgPort===465||$cfgEnc==='ssl'||$cfgEnc==='smtps')
+            ?\PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS
+            :\PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        $transports=[[$cfgPort,$primaryEnc]];
+        // Only add automatic port fallback for real external SMTP servers (not custom local test ports)
+        if(!in_array(strtolower($host),['localhost','127.0.0.1','::1'],true)&&in_array($cfgPort,[465,587],true)){
+            $altPort=$cfgPort===465?587:465;
+            $altEnc=$altPort===465?\PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS:\PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+            $transports[]=[$altPort,$altEnc];
+        }
+
+        foreach($transports as [$port,$enc]){
+            foreach($passwords as $passAttempt){
+                try{
+                    $mail=new \PHPMailer\PHPMailer\PHPMailer(true);
+                    $mail->isSMTP();
+                    $mail->Host=$host;
+                    $mail->Port=$port;
+                    $mail->SMTPAuth=true;
+                    $mail->Username=$user;
+                    $mail->Password=$passAttempt;
+                    $mail->SMTPSecure=$enc;
+                    $mail->Timeout=12;
+                    $mail->SMTPDebug=0;
+                    if(authLocalDevelopment()){
+                        $mail->SMTPOptions=['ssl'=>['verify_peer'=>false,'verify_peer_name'=>false,'allow_self_signed'=>true]];
+                    }
+                    $mail->setFrom($fromAddr,$fromName);
+                    $mail->addAddress($email,$name);
+                    $mail->CharSet='UTF-8';
+                    $mail->Subject=$subject;
+                    if($htmlBody!==null&&$htmlBody!==''){
+                        $mail->isHTML(true);
+                        $mail->Body=$htmlBody;
+                        $mail->AltBody=$body;
+                    }else{
+                        $mail->isHTML(false);
+                        $mail->Body=$body;
+                    }
+                    if(!$mail->send())throw new RuntimeException('SMTP did not accept the message.');
+                    return true;
+                }catch(Throwable $e){
+                    $err=authSanitizeMailError($e->getMessage());
+                    $errors[]="SMTP($host:$port): $err";
+                    // If the error is a network/socket timeout rather than authentication failure, skip testing second password format on same dead port
+                    if(!preg_match('/authenticate|username|password|535|534/i',$err))break;
+                }
+            }
+        }
+    }else{
+        $missing=[];
+        if($host==='')$missing[]='MAIL_HOST';
+        if($user==='')$missing[]='MAIL_USERNAME';
+        if($rawPass==='')$missing[]='MAIL_PASSWORD';
+        if(!authLoadMailer())$missing[]='PHPMailer(vendor)';
+        $errors[]='Missing configuration: '.implode(', ',$missing);
+    }
+
+    // Hosted cPanel fallback: if external SMTP is blocked by the host's outbound SMTP firewall, attempt local MTA delivery when not running against a local mock SMTP port.
+    if(!authLocalDevelopment()&&function_exists('mail')){
+        $safeFrom=str_replace(["\r","\n"],'',$fromAddr);
+        $headers="From: $fromName <$safeFrom>\r\nReply-To: $safeFrom\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8";
+        if(@mail($email,$subject,$body,$headers)){
+            error_log('Authentication email sent via local MTA fallback after SMTP error: '.implode(' | ',$errors));
+            return true;
+        }
+        $errors[]='Local mail() fallback also failed';
+    }
+
+    $summary=authSanitizeMailError(implode(' | ',$errors));
+    authAudit($id,'AUTH_MAIL_FAILED','Email delivery failed: '.$summary);
+    error_log('Authentication email delivery failed for user '.($id??'unknown').': '.$summary);
+    return false;
+}
+function authBuildResetEmailHtml(string $firstName,string $url): string {
+    $safeName=htmlspecialchars($firstName!==''?$firstName:'Administrator',ENT_QUOTES,'UTF-8');
+    $safeUrl=htmlspecialchars($url,ENT_QUOTES,'UTF-8');
+    return '<!doctype html><html lang="en"><body style="margin:0;padding:24px;background:#f4f6f5;font-family:Arial,Helvetica,sans-serif;color:#1e2923;">'
+        .'<div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #dce4df;border-radius:10px;overflow:hidden;">'
+        .'<div style="background:#094024;color:#ffffff;padding:20px 24px;">'
+        .'<h2 style="margin:0;font-size:18px;font-weight:700;">GNC Admin Panel — Password Reset</h2>'
+        .'<p style="margin:4px 0 0;font-size:13px;opacity:0.9;">Guagua National Colleges, Inc.</p>'
+        .'</div>'
+        .'<div style="padding:24px;font-size:14px;line-height:1.6;">'
+        .'<p style="margin-top:0;">Hello <strong>'.$safeName.'</strong>,</p>'
+        .'<p>We received a request to reset the password for your GNC Admin Panel account. Click the button below within <strong>15 minutes</strong> to set a new password:</p>'
+        .'<p style="margin:24px 0;text-align:center;">'
+        .'<a href="'.$safeUrl.'" style="display:inline-block;background:#094024;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:6px;">Reset My Password</a>'
+        .'</p>'
+        .'<p style="font-size:12px;color:#526057;">If the button above does not open, copy and paste this single-use link into your browser:<br>'
+        .'<a href="'.$safeUrl.'" style="color:#094024;word-break:break-all;">'.$safeUrl.'</a></p>'
+        .'<hr style="border:0;border-top:1px solid #e5ebe7;margin:20px 0;">'
+        .'<p style="margin-bottom:0;font-size:12px;color:#66736b;">This link expires in 15 minutes and can only be used once. If you did not request a password reset, you can safely ignore this email—your password has not been changed.</p>'
+        .'</div></div></body></html>';
+}
+function authRequestReset(string $email): bool {
+    $normalizedEmail=strtolower(trim($email));
+    try{getDB()->exec('DELETE FROM auth_password_resets WHERE expires_at<=NOW()');}catch(Throwable $e){}
+    $allowedIp=authRateAllowed('reset-ip',authIp(),10,900);
+    $allowedEmail=authRateAllowed('reset-email',$normalizedEmail,3,900);
+    $allowedCooldown=authRateAllowed('reset-cooldown',$normalizedEmail,1,60);
+    if(!$allowedIp||!$allowedEmail||!$allowedCooldown){
+        authAudit(null,'RESET_RATE_LIMIT','Password recovery rate limit reached.');
+        return false;
+    }
+    $q=getDB()->prepare("SELECT user_id,first_name,email FROM users WHERE LOWER(TRIM(email))=LOWER(TRIM(?)) AND status='active' LIMIT 1");
+    $q->execute([$normalizedEmail]);
+    $u=$q->fetch();
+    authAudit($u?(int)$u['user_id']:null,'FORGOT_PASSWORD','Password recovery requested.');
+    if(!$u)return true;
+    $token=bin2hex(random_bytes(32));
+    $hash=hash('sha256',$token);
+    try{
+        $url=authPublicOrigin().'/admin/reset-password.php?token='.$token;
+    }catch(Throwable $e){
+        authAudit((int)$u['user_id'],'AUTH_CONFIGURATION_ERROR','Invalid public URL for password recovery: '.$e->getMessage());
+        error_log('Password recovery URL configuration error: '.$e->getMessage());
+        return false;
+    }
     getDB()->prepare('INSERT INTO auth_password_resets(user_id,token_hash,expires_at) VALUES(?,?,DATE_ADD(NOW(),INTERVAL 15 MINUTE)) ON DUPLICATE KEY UPDATE token_hash=VALUES(token_hash),expires_at=VALUES(expires_at),created_at=NOW()')->execute([$u['user_id'],$hash]);
-    if(!authSendMail($u['email'],$u['first_name'],'GNCILink - Reset your password',"A password reset was requested for your GNCILink account.\n\nOpen this link within 15 minutes:\n$url\n\nThis link can be used once. If you did not request it, ignore this email. Your password has not changed.",(int)$u['user_id']))getDB()->prepare('DELETE FROM auth_password_resets WHERE user_id=? AND token_hash=?')->execute([$u['user_id'],$hash]);
+    $plainBody="Hello {$u['first_name']},\n\nA password reset was requested for your GNCILink Admin Panel account.\n\nOpen this link within 15 minutes:\n$url\n\nThis link can be used once. If you did not request it, ignore this email. Your password has not changed.";
+    $htmlBody=authBuildResetEmailHtml((string)$u['first_name'],$url);
+    if(!authSendMail($u['email'],(string)$u['first_name'],'GNCILink - Reset your password',$plainBody,(int)$u['user_id'],$htmlBody)){
+        getDB()->prepare('DELETE FROM auth_password_resets WHERE user_id=? AND token_hash=?')->execute([$u['user_id'],$hash]);
+        return false;
+    }
+    authAudit((int)$u['user_id'],'RESET_EMAIL_SENT','Password reset link emailed to registered account.');
+    return true;
 }
 function authResetTokenValid(string $token): bool {
     if(!preg_match('/^[a-f0-9]{64}$/D',$token))return false;

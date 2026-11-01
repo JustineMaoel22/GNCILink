@@ -8,7 +8,7 @@
     const dueAt=Date.now()+Math.max(0,60000-performance.now());
     let hasOpened=false,openTimer=null,closeTimer=null,previousFocus=null,pageScroll=null;
     let state={consent:null,history:{},shown:{}}, items=[], current=null, selected=[], observed=false, lastTick=Date.now(), counted=false;
-    const restricted=!!navigator.globalPrivacyControl || navigator.doNotTrack==='1';
+    const restricted=false; // Privacy signals only default choices to off; explicit consent is checked via GNCPrivacy.
     function load() {
         if (!window.GNCPrivacy?.allows('personalization')) { state={consent:false,history:{},shown:{}};return; }
         try {

@@ -551,9 +551,9 @@ if ($program !== null) {
                     <?php foreach ($facilities as $i => $fac):
                         $facName = trim((string)$fac['title']);
                     ?>
-                    <button type="button" class="fcar-slide" data-index="<?= (int)$i ?>" aria-label="<?= $e($facName) ?>">
-                        <img src="<?= $e(facilityCarouselThumb((string)$fac['image_url'])) ?>" alt="<?= $e($facName) ?>" loading="<?= $i < 3 ? 'eager' : 'lazy' ?>" decoding="async" draggable="false">
-                        <span class="fcar-caption"><?= $e($facName) ?></span>
+                    <button type="button" class="fcar-slide" data-index="<?= (int)$i ?>" aria-label="<?= $e($facName !== '' ? $facName : 'Facility photo ' . ($i + 1)) ?>">
+                        <img src="<?= $e(facilityCarouselThumb((string)$fac['image_url'])) ?>" alt="<?= $e($facName !== '' ? $facName : 'Facility photo ' . ($i + 1)) ?>" loading="<?= $i < 3 ? 'eager' : 'lazy' ?>" decoding="async" draggable="false">
+                        <?php if ($facName !== ''): ?><span class="fcar-caption"><?= $e($facName) ?></span><?php endif; ?>
                     </button>
                     <?php endforeach; ?>
                 </div>
@@ -563,7 +563,7 @@ if ($program !== null) {
                 <button type="button" class="fcar-arrow fcar-next" id="fcarNext" aria-label="Next facility"><i class="bi bi-chevron-right"></i></button>
                 <div class="fcar-dots" id="fcarDots" role="tablist" aria-label="Choose facility">
                     <?php foreach ($facilities as $i => $fac): ?>
-                    <button type="button" class="fcar-dot" role="tab" data-index="<?= (int)$i ?>" aria-label="Show <?= $e(trim((string)$fac['title'])) ?>"></button>
+                    <button type="button" class="fcar-dot" role="tab" data-index="<?= (int)$i ?>" aria-label="Show <?= $e(trim((string)$fac['title']) !== '' ? trim((string)$fac['title']) : 'facility photo ' . ($i + 1)) ?>"></button>
                     <?php endforeach; ?>
                 </div>
                 <?php endif; ?>
@@ -915,7 +915,7 @@ if ($program !== null) {
             function show(i) {
                 cur = (i + data.length) % data.length;
                 img.src = data[cur].src; img.alt = data[cur].name;
-                nm.textContent = data[cur].name;
+                nm.textContent = data[cur].name; nm.hidden = !data[cur].name;
                 ds.textContent = data[cur].desc; ds.hidden = !data[cur].desc;
                 var single = data.length < 2; prev.hidden = single; next.hidden = single;
             }

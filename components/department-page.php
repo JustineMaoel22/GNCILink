@@ -20,7 +20,7 @@ if (!$dept) {
 $dean       = $dept ? publicDepartmentDean($dept) : ['photo_url' => null, 'name' => '', 'title' => '', 'bio' => '', 'phone' => '', 'email' => '', 'office' => '', 'hours' => ''];
 $programs   = $dept ? publicDepartmentPrograms((int)$dept['dept_id']) : [];
 $fbEmbedUrl = $dept ? publicDepartmentFacebookEmbedUrl((string)($dept['facebook_url'] ?? '')) : null;
-$useFacebookLinkCard = ($dept['slug'] ?? '') === 'cased';
+$useFacebookLinkCard = ($dept['slug'] ?? '') === 'cased' || ($dept['department_type'] ?? '') === 'basic-education';
 $logoUrl    = $dept['logo_url'] ?? null;
 $pageTitle  = $dept ? (string)$dept['dept_name'] : 'Department Not Found';
 $isGraduateSchool = ($dept['slug'] ?? '') === 'graduate-school';
@@ -214,6 +214,10 @@ $cdText = function (?string $v) use ($cePreview): string {
         .dept-fb-copy { min-width:0; overflow-wrap:anywhere; }
         .dept-fb-copy strong { display:block; font:700 17px/1.4 'Noto Serif',Georgia,serif; }
         .dept-fb-copy span { display:block; margin-top:8px; font:600 14px/1.5 Inter,Arial,sans-serif; text-decoration:underline; }
+        @media (max-width: 768px) {
+            .dept-fb-link { flex-direction: column; justify-content: center; text-align: center; padding: 20px 18px; gap: 12px; }
+            .dept-fb-copy { text-align: center; }
+        }
     </style>
     <script>document.documentElement.classList.add('js-anim');</script>
 </head>
@@ -482,7 +486,7 @@ $cdText = function (?string $v) use ($cePreview): string {
                     <?php if ($useFacebookLinkCard): ?>
                     <a class="dept-fb-link" href="<?= cd_h($dept['facebook_url']) ?>" target="_blank" rel="noopener noreferrer">
                         <i class="bi bi-facebook dept-fb-icon" aria-hidden="true"></i>
-                        <div class="dept-fb-copy"><strong><?= cd_h(trim($pageContent['facebook_page_name']['value']) ?: 'Facebook page') ?></strong><span>Visit on Facebook <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></span></div>
+                        <div class="dept-fb-copy"><strong><?= cd_h(trim($pageContent['facebook_page_name']['value']) ?: ($pageTitle ?: 'Facebook page')) ?></strong><span>Visit on Facebook <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></span></div>
                     </a>
                     <?php else: ?>
                     <iframe <?= gncPrivacyFrameSource($fbEmbedUrl) ?> width="500" height="130" scrolling="no" frameborder="0"

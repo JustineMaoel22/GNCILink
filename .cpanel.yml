@@ -1,4 +1,4 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/gncipamp/public_html/
-    - /bin/tar --exclude='./.git' --exclude='./.github' --exclude='./.cpanel.yml' --exclude='./.gitignore' --exclude='./.env' --exclude='./config.php' --exclude='./secrets.php' --exclude='./uploads' --exclude='./vendor' --exclude='./cba.gncipampanga.com' --exclude='./clinic.gncipampanga.com' --exclude='./library.gncipampanga.com' --exclude='./osa.gncipampanga.com' -cf - . | /bin/tar -xf - -C "$DEPLOYPATH"
+    - /bin/tar --exclude='./.git' --exclude='./.github' --exclude='./.cpanel.yml' --exclude='./.gitignore' --exclude='./.env' --exclude='./config.php' --exclude='./secrets.php' --exclude='./uploads' --exclude='./cba.gncipampanga.com' --exclude='./clinic.gncipampanga.com' --exclude='./library.gncipampanga.com' --exclude='./osa.gncipampanga.com' -cf - . | /bin/tar -xf - -C "$DEPLOYPATH"

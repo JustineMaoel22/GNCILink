@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
 
     try {
         if (in_array($action, ['import_preview', 'import_manage_preview', 'import_confirm', 'import_cancel'], true)) {
-            echo json_encode(calendarImportHandle($db, $action, (int)$userId));
+            echo json_encode(calendarImportHandle($db, $action, (int)$userId), JSON_INVALID_UTF8_SUBSTITUTE);
             exit;
         }
         $existingEvent = null;
@@ -234,7 +234,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
         echo json_encode(['success' => false, 'message' => 'Unknown action.']);
         exit;
 
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         error_log('Events AJAX error: ' . $e->getMessage());
         echo json_encode(['success' => false, 'message' => $e instanceof InvalidArgumentException ? $e->getMessage() : 'A server error occurred. Please try again.']);
         exit;
@@ -484,9 +484,25 @@ include __DIR__ . '/../components/header-admin.php';
         <div class="data-card">
             <div class="data-card-header flex-wrap gap-2">
                 <span class="data-card-title"><i class="bi bi-list-ul me-1"></i> All Events</span>
-                <div class="evt-search ms-auto">
-                    <i class="bi bi-search"></i>
-                    <input type="search" id="evtSearch" class="form-control form-control-sm" placeholder="Search by event name…" autocomplete="off">
+                <div class="d-flex flex-wrap gap-2 align-items-center ms-auto">
+                    <select id="evtDeptFilter" class="form-select form-select-sm" style="width:auto;min-width:170px;" aria-label="Filter by department">
+                        <option value="">All departments</option>
+                        <option value="group:basic-education">All Basic Education</option>
+                        <option value="group:college">All College</option>
+                        <?php foreach ($eventDepartments as $dept): ?>
+                            <option value="<?= (int)$dept['dept_id'] ?>"><?= htmlspecialchars($dept['dept_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <select id="evtCatFilter" class="form-select form-select-sm" style="width:auto;min-width:150px;" aria-label="Filter by category">
+                        <option value="">All categories</option>
+                        <?php foreach ($categories as $cat): ?>
+                            <option value="<?= (int)$cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="evt-search">
+                        <i class="bi bi-search"></i>
+                        <input type="search" id="evtSearch" class="form-control form-control-sm" placeholder="Search by event name…" autocomplete="off">
+                    </div>
                 </div>
             </div>
             <div class="evt-filters">
@@ -530,6 +546,8 @@ include __DIR__ . '/../components/header-admin.php';
                         <tr data-event-id="<?= $ev['event_id'] ?>"
                             data-status="<?= htmlspecialchars($ev['status']) ?>"
                             data-title="<?= htmlspecialchars($ev['title']) ?>"
+                            data-category="<?= (int)($ev['category_id'] ?? 0) ?>"
+                            data-dept="<?= htmlspecialchars(($ev['audience_group'] ?? 'all') !== 'all' ? 'group:' . $ev['audience_group'] : (string)($ev['dept_id'] ?? '')) ?>"
                             class="evt-row<?= $isPast ? ' evt-past' : '' ?>">
                             <td class="evt-title-cell" data-label="Event">
                                 <div class="evt-row-title"><?= htmlspecialchars($ev['title']) ?></div>
@@ -615,7 +633,7 @@ include __DIR__ . '/../components/header-admin.php';
                     <?php if ($calendarImportReady): ?>
                     <div class="mb-3">
                         <label class="form-label" for="eventDescription">Description (optional)</label>
-                        <textarea class="form-control" id="eventDescription" name="description" maxlength="10000" rows="3"></textarea>
+                        <textarea class="form-control" id="eventDescription" name="description" maxlength="10000" rows="3" placeholder="e.g. Annual school-wide celebration with booths, games, and performances."></textarea>
                     </div>
                     <?php endif; ?>
                     <div class="evt-section-label">When</div>
@@ -1259,24 +1277,32 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // ---- Search + status filter for the events list ----
-    const searchEl = document.getElementById('evtSearch');
-    const chips    = document.querySelectorAll('.evt-chip');
-    const noMatch  = document.getElementById('evtNoMatch');
+    // ---- Search + status + department + category filter for the events list ----
+    const searchEl   = document.getElementById('evtSearch');
+    const deptEl     = document.getElementById('evtDeptFilter');
+    const catEl      = document.getElementById('evtCatFilter');
+    const chips      = document.querySelectorAll('.evt-chip');
+    const noMatch    = document.getElementById('evtNoMatch');
     let activeFilter = 'all';
     function applyFilters() {
-        const q = (searchEl.value || '').trim().toLowerCase();
+        const q    = (searchEl.value || '').trim().toLowerCase();
+        const dept = deptEl ? deptEl.value : '';
+        const cat  = catEl ? catEl.value : '';
         let visible = 0;
         document.querySelectorAll('tr.evt-row').forEach(function (row) {
             const okStatus = activeFilter === 'all' || row.dataset.status === activeFilter;
             const okText   = !q || (row.dataset.title || '').toLowerCase().indexOf(q) !== -1;
-            const show = okStatus && okText;
+            const okDept   = !dept || row.dataset.dept === dept;
+            const okCat    = !cat || row.dataset.category === cat;
+            const show = okStatus && okText && okDept && okCat;
             row.style.display = show ? '' : 'none';
             if (show) visible++;
         });
         if (noMatch) noMatch.style.display = visible ? 'none' : '';
     }
     searchEl.addEventListener('input', applyFilters);
+    if (deptEl) deptEl.addEventListener('change', applyFilters);
+    if (catEl) catEl.addEventListener('change', applyFilters);
     chips.forEach(function (chip) {
         chip.addEventListener('click', function () {
             chips.forEach(function (c) { c.classList.remove('active'); });

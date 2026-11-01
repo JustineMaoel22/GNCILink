@@ -1,7 +1,30 @@
 <?php
 function firstLoginPasswordReady(): bool {
-    try { getDB()->query('SELECT must_change_password,password_changed_at,credential_version FROM users LIMIT 0');return true; }
-    catch(PDOException $e){return false;}
+    try {
+        getDB()->query('SELECT must_change_password,password_changed_at,credential_version FROM users LIMIT 0');
+        return true;
+    } catch (PDOException $e) {
+        try {
+            $db = getDB();
+            $cols = [
+                'must_change_password' => 'ALTER TABLE users ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0',
+                'password_changed_at'  => 'ALTER TABLE users ADD COLUMN password_changed_at DATETIME NULL',
+                'credential_version'   => 'ALTER TABLE users ADD COLUMN credential_version INT UNSIGNED NOT NULL DEFAULT 1',
+            ];
+            foreach ($cols as $col => $sql) {
+                try {
+                    $db->query("SELECT `$col` FROM users LIMIT 0");
+                } catch (PDOException $colErr) {
+                    $db->exec($sql);
+                }
+            }
+            $db->query('SELECT must_change_password,password_changed_at,credential_version FROM users LIMIT 0');
+            return true;
+        } catch (Throwable $migrateErr) {
+            error_log('First-login password schema check failed: ' . $migrateErr->getMessage());
+            return false;
+        }
+    }
 }
 function generateTemporaryPassword(): string {
     // Cryptographically random characters; omit easily confused letters and digits.

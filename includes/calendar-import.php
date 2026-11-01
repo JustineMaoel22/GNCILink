@@ -12,25 +12,341 @@ function calendarImportAudience(array $row, array $previous = []): array {
     return normalizeEventAudience($selection,$program);
 }
 
-/** Match stored department names, compact slugs and derived acronyms; never guess between matches. */
-function calendarImportDetectDepartments(array $rows, array $departments): array {
-    $normalize=static fn(string $value)=>trim(preg_replace('/[^\p{L}\p{N}]+/u',' ',mb_strtolower($value,'UTF-8')));
+/** Match stored department names, compact slugs, derived acronyms, audience groups, and program categories; never guess between conflicting matches. */
+function calendarImportDetectDepartments(array $rows, array $departments, array $programs = [], bool $audienceGroupsReady = false): array {
+    $lower=static fn(string $s)=>function_exists('mb_strtolower')?mb_strtolower($s,'UTF-8'):strtolower($s);
+    $len=static fn(string $s)=>function_exists('mb_strlen')?mb_strlen($s,'UTF-8'):strlen($s);
+    $sub=static fn(string $s,int $start,int $length)=>function_exists('mb_substr')?mb_substr($s,$start,$length,'UTF-8'):substr($s,$start,$length);
+    $normalize=static fn(string $value)=>trim((string)(preg_replace('/[^\p{L}\p{N}]+/u',' ',$lower($value))??$lower($value)));
+
+    $deptById=[];
     $aliases=[];
     foreach($departments as $department) {
-        $name=$normalize($department['dept_name']);$words=explode(' ',$name);$acronym='';
-        foreach($words as $word)if($word!==''&&!in_array($word,['of','and','the','in','for'],true))$acronym.=mb_substr($word,0,1,'UTF-8');
+        $id=(int)$department['dept_id'];
+        $deptById[$id]=$department;
+        $name=$normalize($department['dept_name']??'');
+        $words=explode(' ',$name);
+        $acronym='';
+        $acronymWithAnd='';
+        foreach($words as $word) {
+            if($word==='')continue;
+            if(!in_array($word,['of','and','the','in','for'],true))$acronym.=$sub($word,0,1);
+            if(!in_array($word,['of','the','in','for'],true))$acronymWithAnd.=$sub($word,0,1);
+        }
         $names=[$name];
-        if(mb_strlen($acronym)>=2&&mb_strlen($acronym)<=10)$names[]=$acronym;
+        if($len($acronym)>=2&&$len($acronym)<=10)$names[]=$acronym;
+        if($acronymWithAnd!==$acronym&&$len($acronymWithAnd)>=2&&$len($acronymWithAnd)<=10)$names[]=$acronymWithAnd;
         $slug=$normalize($department['slug']??'');
-        if($slug!==''&&!str_contains($slug,' ')&&mb_strlen($slug)>=2&&mb_strlen($slug)<=10)$names[]=$slug;
-        $aliases[(int)$department['dept_id']]=array_unique($names);
+        if($slug!==''&&$len($slug)>=2)$names[]=$slug;
+
+        // Add "<field> department" and "<field> college" for "College of <field>"
+        if(str_starts_with($name,'college of ')) {
+            $field=trim(substr($name,11));
+            if($field!=='') {
+                $names[]=$field.' department';
+                $names[]=$field.' college';
+            }
+        }
+
+        // Known GNC department keyword synonyms & abbreviations
+        if($slug==='cased'||str_contains($name,'arts and sciences')) {
+            array_push($names,'cased','college of arts and sciences','college of education','arts and sciences','teacher education','education department','education days','education day','education students');
+        } elseif($slug==='cba'||str_contains($name,'business administration')) {
+            array_push($names,'cba','college of business','business administration department','business department','bsba department','cba day','cba days');
+        } elseif($slug==='coe'||str_contains($name,'engineering')) {
+            array_push($names,'coe','engineering department','engineering days','engineering day');
+        } elseif($slug==='camp'||str_contains($name,'medical laboratory science')) {
+            array_push($names,'camp','cmls','cmlsp','college of allied medical professions','allied medical professions','medical laboratory science and pharmacy','medtech and pharmacy','stamp days','stamp day');
+        } elseif($slug==='coa'||str_contains($name,'accountancy')) {
+            array_push($names,'coa','accountancy department','accounting department','accountancy days','accountancy day');
+        } elseif($slug==='conursing'||str_contains($name,'nursing')) {
+            array_push($names,'con','conursing','nursing department','school of nursing','nursing students','nurses day','nursing days','nursing day');
+        } elseif($slug==='graduate-school'||$name==='graduate school') {
+            array_push($names,'graduate school','grad school','graduate studies','postgraduate','post graduate');
+        } elseif($slug==='casa-gradeschool'||str_contains($name,'casa')) {
+            array_push($names,'casa','advance casa','junior advance casa','grade school montessori','elementary montessori','montessori grade school','casa and grade school','grade 1 montessori','grade 2 montessori','grade 3 montessori','grade 4 montessori','grade 5 montessori','grade 6 montessori','grade 1 and 2 montessori','grades 1 and 2 montessori','grade 2 and 3 montessori','grades 2 and 3 montessori','grade 1 3 montessori','grades 1 3 montessori','grade 4 6 montessori','grades 4 6 montessori');
+        } elseif($slug==='hs-monte'||str_contains($name,'high school montessori')) {
+            array_push($names,'high school montessori','montessori high school','hs montessori','hs monte','montessori promenade');
+        } elseif($slug==='jhs-regular'||str_contains($name,'junior high')) {
+            array_push($names,'jhs','junior high school','junior high','jhs regular','jhs department','high school regular','grade 7','grade 8','grade 9','grade 10','grades 9 and 10');
+        } elseif($slug==='shs-regular'||str_contains($name,'senior high')) {
+            array_push($names,'shs','senior high school','senior high','shs regular','shs reg','shs department','grades 11 and 12','grade 11 and 12');
+        } elseif($slug==='college-of-computing'||str_contains($name,'computing')) {
+            array_push($names,'ccs','coc','college of computer studies','computer studies','computing department','it department','ict department');
+        } elseif($slug==='college-of-criminology'||str_contains($name,'criminology')) {
+            array_push($names,'cocrim','ccje','criminology department','criminal justice','college of criminal justice education');
+        }
+
+        $aliases[$id]=array_values(array_unique(array_filter($names,static fn($n)=>$n!=='')));
     }
+
+    // Resolve canonical department ID for each program from $programs or fallback department matching
+    $findDeptByHint=static function(array $slugHints) use ($departments,$normalize): ?int {
+        foreach($slugHints as $hint) {
+            $nHint=$normalize($hint);
+            foreach($departments as $dept) {
+                $dSlug=$normalize($dept['slug']??'');
+                $dName=$normalize($dept['dept_name']??'');
+                if($dSlug===$nHint||$dName===$nHint||($nHint!==''&&str_contains($dName,$nHint)))return (int)$dept['dept_id'];
+            }
+        }
+        return null;
+    };
+
+    $programCatalog=[
+        'BEEd'=>['hints'=>['cased','arts and sciences'],'aliases'=>['beed','bachelor of elementary education','elementary education'],'short'=>['elementary education']],
+        'BSEd'=>['hints'=>['cased','arts and sciences'],'aliases'=>['bsed','bse','bachelor of secondary education','secondary education'],'short'=>['secondary education']],
+        'BAEL'=>['hints'=>['cased','arts and sciences'],'aliases'=>['bael','abel','ab english','ba english','bachelor of arts in english language','bachelor of arts in english','english language studies','english language program'],'short'=>['english language','english']],
+        'BSCE'=>['hints'=>['coe','engineering'],'aliases'=>['bsce','bs civil engineering','bachelor of science in civil engineering','civil engineering'],'short'=>['civil engineering']],
+        'BSAIS'=>['hints'=>['coa','accountancy'],'aliases'=>['bsais','bsact','bs accounting information systems','bs accounting information system','bachelor of science in accounting information systems','bachelor of science in accounting information system','accounting information systems','accounting information system','accounting technology'],'short'=>['accounting information systems','accounting information system']],
+        'BSA'=>['hints'=>['coa','accountancy'],'aliases'=>['bsa','bs accountancy','bachelor of science in accountancy'],'short'=>['accountancy']],
+        'BSBA-FM'=>['hints'=>['cba','business administration'],'aliases'=>['bsba fm','bsba','bsba financial management','bs business administration','bachelor of science in business administration','bachelor of science in business administration major in financial management','financial management'],'short'=>['business administration','financial management']],
+        'BSCS'=>['hints'=>['college-of-computing','computing','cba'],'aliases'=>['bscs','bs computer science','bachelor of science in computer science','computer science'],'short'=>['computer science']],
+        'BSIT'=>['hints'=>['college-of-computing','computing','cba'],'aliases'=>['bsit','bs information technology','bachelor of science in information technology','information technology'],'short'=>['information technology']],
+        'BSHM'=>['hints'=>['cba','business administration'],'aliases'=>['bshm','bshrm','bshm tm','bstm hm','bs hospitality management','bachelor of science in hospitality management','hospitality management','hotel and restaurant management'],'short'=>['hospitality management','hospitality']],
+        'BSTM'=>['hints'=>['cba','business administration'],'aliases'=>['bstm','bshm tm','bstm hm','bs tourism management','bs tourism','bachelor of science in tourism management','tourism management','tourism day'],'short'=>['tourism management','tourism']],
+        'BSMLS'=>['hints'=>['camp','medical laboratory science'],'aliases'=>['bsmls','bsmt','bs medical laboratory science','bs medtech','bs medical technology','bachelor of science in medical laboratory science','bachelor of science in medical technology','medical laboratory science','medical technology','medtech'],'short'=>['medical laboratory science','medical technology','medtech']],
+        'BSPh'=>['hints'=>['camp','medical laboratory science'],'aliases'=>['bsph','bspha','bs pharmacy','bachelor of science in pharmacy','pharmacy program','pharmacy students','pharmacy week','pharmacy day','pharmacy orientation'],'short'=>['pharmacy']],
+        'BSN'=>['hints'=>['conursing','nursing'],'aliases'=>['bsn','bs nursing','bachelor of science in nursing'],'short'=>['nursing']],
+        'BSCRIM'=>['hints'=>['college-of-criminology','criminology'],'aliases'=>['bscrim','bs criminology','bachelor of science in criminology'],'short'=>['criminology']],
+        'GS-PHD'=>['hints'=>['graduate-school','graduate school'],'aliases'=>['gs phd','phd','ph d','edd','ed d','doctor of philosophy','doctor of education','doctoral program'],'short'=>['doctor of philosophy','doctoral']],
+        'GS-MAED'=>['hints'=>['graduate-school','graduate school'],'aliases'=>['gs maed','maed','ma ed','master of arts in education','masters in education','educational management'],'short'=>['master of arts in education','educational management']],
+        'GS-MBA'=>['hints'=>['graduate-school','graduate school'],'aliases'=>['gs mba','mba','master in business administration','masters in business administration','master of business administration'],'short'=>['master in business administration']],
+        'GS-MPA'=>['hints'=>['graduate-school','graduate school'],'aliases'=>['gs mpa','mpa','master in public administration','masters in public administration','master of public administration','public administration'],'short'=>['master in public administration','public administration']],
+    ];
+
+    $progDeptMap=[];
+    $hasExplicitPrograms=!empty($programs);
+    foreach($programs as $prog) {
+        $code=(string)($prog['code']??$prog['program_code']??'');
+        if($code===''||$code==='ALL')continue;
+        $dId=isset($prog['dept_id'])&&$prog['dept_id']!==''&&$prog['dept_id']!==null?(int)$prog['dept_id']:null;
+        $progDeptMap[$code]=($dId!==null&&isset($deptById[$dId]))?$dId:null;
+        $pName=$normalize((string)($prog['name']??$prog['program_name']??''));
+        $nCode=$normalize($code);
+        if(!isset($programCatalog[$code])) {
+            $programCatalog[$code]=['hints'=>[],'aliases'=>array_values(array_filter([$nCode,$pName])),'short'=>[]];
+        } else {
+            if($nCode!==''&&!in_array($nCode,$programCatalog[$code]['aliases'],true))$programCatalog[$code]['aliases'][]=$nCode;
+            if($pName!==''&&!in_array($pName,$programCatalog[$code]['aliases'],true))$programCatalog[$code]['aliases'][]=$pName;
+        }
+    }
+    if(!$hasExplicitPrograms) {
+        foreach($programCatalog as $code=>$info) {
+            $progDeptMap[$code]=$findDeptByHint($info['hints']);
+        }
+    }
+
+    $matchProgramsInText=static function(string $haystack, bool $includeShort) use ($programCatalog,$normalize): array {
+        $norm=' '.$normalize($haystack).' ';
+        if(trim($norm)==='')return ['codes'=>[],'masked'=>$norm];
+        // Pre-mask full multi-program department names (e.g. "College of Medical Laboratory Science and Pharmacy") so they match the department rather than a single program
+        $progSearch=$norm;
+        if(!$includeShort) {
+            foreach(['college of medical laboratory science and pharmacy','medical laboratory science and pharmacy','medtech and pharmacy','college of business administration'] as $deptPhrase) {
+                $progSearch=str_replace(' '.$deptPhrase.' ',' ',$progSearch);
+            }
+        }
+        $matched=[];
+        $masked=$norm;
+        foreach($programCatalog as $code=>$info) {
+            $candidates=$includeShort?array_merge($info['aliases'],$info['short']):$info['aliases'];
+            // Sort longer phrases first so full degree names are masked before shorter tokens
+            usort($candidates,static fn(string $a,string $b)=>strlen($b)<=>strlen($a));
+            foreach($candidates as $alias) {
+                if($alias!==''&&str_contains($progSearch,' '.$alias.' ')) {
+                    $matched[$code]=true;
+                    if(str_contains($alias,' '))$masked=str_replace(' '.$alias.' ',' ',$masked);
+                    break;
+                }
+            }
+        }
+        return ['codes'=>array_keys($matched),'masked'=>$masked];
+    };
+
+    $matchDepartmentsInText=static function(string $paddedNorm) use ($aliases): array {
+        if(trim($paddedNorm)==='')return [];
+        $matches=[];
+        foreach($aliases as $id=>$names) {
+            foreach($names as $name) {
+                if($name!==''&&str_contains($paddedNorm,' '.$name.' ')) {
+                    $matches[]=$id;
+                    break;
+                }
+            }
+        }
+        return array_values(array_unique($matches));
+    };
+
+    $deptGroupOf=static function(int $dId) use ($deptById,$normalize): string {
+        $dept=$deptById[$dId]??[];
+        $dSlug=$normalize($dept['slug']??'');
+        $dName=$normalize($dept['dept_name']??'');
+        $dType=strtolower(trim((string)($dept['department_type']??'')));
+        if($dSlug==='graduate school'||$dName==='graduate school')return 'graduate';
+        if($dType==='basic-education'||in_array($dSlug,['casa gradeschool','hs monte','jhs regular','shs regular'],true)||preg_match('/\b(casa|montessori|junior high|senior high|grade school|elementary)\b/',$dName)) {
+            return 'basic-education';
+        }
+        return 'college';
+    };
+
+    $collegeGroupPhrases=['all college','all colleges','different colleges','college wide','college department','college departments','college level','college students','college freshmen','college faculty','college orientation','college foundation day','college week','college days','college day','college intramurals','college assembly','collegiate','tertiary level','tertiary department','higher education'];
+    $basicEdGroupPhrases=['all basic education','basic education','basic education group','basic ed','bed department','k to 12','k 12','preschool to senior high','elementary and high school','grade school and high school','jhs and shs montessori regular','senior high school regular and montessori','junior and senior high school regular and montessori','junior high school montessori and regular','senior high school montessori and regular'];
+
     foreach($rows as &$row) {
-        $text=' '.$normalize(($row['title']??'').' '.($row['description']??'')).' ';$matches=[];
-        foreach($aliases as $id=>$names)foreach($names as $name)if($name!==''&&str_contains($text,' '.$name.' ')){$matches[]=$id;break;}
-        $row['dept_id']=count($matches)===1?$matches[0]:null;
+        $deptHint=trim((string)($row['department_hint']??''));
+        $progHint=trim((string)($row['program_hint']??''));
+        $fullText=trim(($row['title']??'').' '.($row['description']??''));
+        $combinedNorm=' '.$normalize($deptHint.' '.$progHint.' '.$fullText).' ';
+
+        // Multi-department Basic Education shorthand phrases (e.g. "JHS and SHS Montessori/Regular", "Senior High School Regular and Montessori")
+        if($audienceGroupsReady) {
+            if(str_contains($combinedNorm,' basic education group ') && (str_contains($combinedNorm,' different colleges ') || str_contains($combinedNorm,' all colleges '))) {
+                $row['dept_id']=null;
+                $row['program']='ALL';
+                $row['audience_group']='all';
+                continue;
+            }
+        }
+
+        // 1. Detect program categories (check explicit program_hint first, then department_hint, then title/description)
+        $progResult=['codes'=>[],'masked'=>' '.$normalize($fullText).' '];
+        if($progHint!=='') {
+            $progResult=$matchProgramsInText($progHint,true);
+        }
+        if(!$progResult['codes']&&$deptHint!=='') {
+            $progResult=$matchProgramsInText($deptHint,false);
+        }
+        $bodyProgResult=$matchProgramsInText($fullText,false);
+        if(!$progResult['codes']) {
+            $progResult=$bodyProgResult;
+        }
+        $matchedPrograms=$progResult['codes'];
+
+        // 2. Detect departments (check explicit department_hint first, then title/description with multi-word degree phrases masked)
+        $matchedDepts=[];
+        if($deptHint!=='') {
+            $hintMask=$matchProgramsInText($deptHint,false)['masked'];
+            $matchedDepts=$matchDepartmentsInText($hintMask);
+        }
+        if(!$matchedDepts) {
+            $matchedDepts=$matchDepartmentsInText($bodyProgResult['masked']);
+        }
+        // If both a specific Basic Ed department (e.g. "High School Montessori" or "Junior High School Regular") and a generic grade ("Grade 7", "Grade 10") matched, keep the explicit Montessori/SHS department when the text specifically says "High School Montessori"
+        if(count($matchedDepts)>1 && str_contains($combinedNorm,' high school montessori ') && !str_contains($combinedNorm,' regular ')) {
+            $hsMonteIds=array_values(array_filter($matchedDepts,static fn(int $id)=>str_contains($normalize($deptById[$id]['dept_name']??''),'high school montessori')));
+            if(count($hsMonteIds)===1)$matchedDepts=$hsMonteIds;
+        }
+
+        $row['dept_id']=null;
         $row['program']='ALL';
-        if(count($matches)>1)$row['warnings'][]='Several departments match this activity. Choose its department before approving.';
+
+        if(count($matchedPrograms)===1) {
+            $progCode=$matchedPrograms[0];
+            $progDept=$progDeptMap[$progCode]??null;
+            if(count($matchedDepts)>1) {
+                $row['warnings'][]='Several departments match this activity. Choose its department before approving.';
+            } elseif(count($matchedDepts)===1) {
+                $explicitDept=$matchedDepts[0];
+                if($progDept!==null&&$progDept===$explicitDept) {
+                    $row['dept_id']=$progDept;
+                    $row['program']=$progCode;
+                } elseif(!$hasExplicitPrograms) {
+                    $row['dept_id']=$explicitDept;
+                    $row['program']=$progCode;
+                } elseif($progDept!==null) {
+                    if(in_array($progCode,['BSIT','BSCS'],true)&&str_contains($normalize($deptById[$explicitDept]['dept_name']??''),'business administration')) {
+                        $row['dept_id']=$progDept;
+                        $row['program']=$progCode;
+                    } else {
+                        // Explicit department and program belong to different departments
+                        $row['warnings'][]='Several departments match this activity. Choose its department before approving.';
+                    }
+                } else {
+                    $row['dept_id']=$explicitDept;
+                    $row['program']='ALL';
+                }
+            } else {
+                // Only the program was mentioned; auto-assign its parent department when available
+                if($progDept!==null) {
+                    $row['dept_id']=$progDept;
+                    $row['program']=$progCode;
+                } elseif(!$hasExplicitPrograms) {
+                    // If no departments in $departments matched this program's hints, only set program when $departments is empty
+                    if(!$departments)$row['program']=$progCode;
+                } else {
+                    $row['dept_id']=null;
+                    $row['program']=$progCode;
+                }
+            }
+        } elseif(count($matchedPrograms)>1) {
+            // Check if all matched programs belong to the exact same department
+            $progDepts=[];
+            foreach($matchedPrograms as $pCode) {
+                if(isset($progDeptMap[$pCode])&&$progDeptMap[$pCode]!==null)$progDepts[]=$progDeptMap[$pCode];
+            }
+            $progDepts=array_values(array_unique($progDepts));
+            if(count($progDepts)===1&&(count($matchedDepts)===0||(count($matchedDepts)===1&&$matchedDepts[0]===$progDepts[0]))) {
+                $row['dept_id']=$progDepts[0];
+                $row['program']='ALL';
+            } elseif($audienceGroupsReady) {
+                $allCollege=true;
+                foreach($progDepts as $pd) { if($deptGroupOf($pd)!=='college')$allCollege=false; }
+                foreach($matchedDepts as $md) { if($deptGroupOf($md)!=='college')$allCollege=false; }
+                if($allCollege && (!empty($progDepts)||!empty($matchedDepts))) {
+                    $row['audience_group']='college';
+                } else {
+                    $row['warnings'][]='Several departments match this activity. Choose its department before approving.';
+                }
+            } else {
+                $row['warnings'][]='Several departments match this activity. Choose its department before approving.';
+            }
+        } else {
+            // No specific program matched; use department match
+            if(count($matchedDepts)===1) {
+                $row['dept_id']=$matchedDepts[0];
+                // Still check if a multi-department Basic Ed phrase like "JHS and SHS Montessori/Regular" or "Senior High School Regular and Montessori" is present
+                if($audienceGroupsReady) {
+                    foreach(['jhs and shs montessori regular','senior high school regular and montessori','junior and senior high school regular and montessori','junior high school montessori and regular','senior high school montessori and regular'] as $multiBePhrase) {
+                        if(str_contains($combinedNorm,' '.$multiBePhrase.' ')) {
+                            $row['dept_id']=null;
+                            $row['audience_group']='basic-education';
+                            break;
+                        }
+                    }
+                }
+            } elseif(count($matchedDepts)>1) {
+                if($audienceGroupsReady) {
+                    $groups=array_values(array_unique(array_map($deptGroupOf,$matchedDepts)));
+                    if(count($groups)===1 && in_array($groups[0],['basic-education','college'],true)) {
+                        $row['audience_group']=$groups[0];
+                    } else {
+                        $row['warnings'][]='Several departments match this activity. Choose its department before approving.';
+                    }
+                } else {
+                    $row['warnings'][]='Several departments match this activity. Choose its department before approving.';
+                }
+            }
+        }
+
+        // 3. Detect broad audience groups ("All College" / "All Basic Education") when no specific department or program matched
+        if($audienceGroupsReady && $row['dept_id']===null && empty($row['audience_group']) && $row['program']==='ALL' && count($matchedDepts)===0 && count($matchedPrograms)===0) {
+            // Avoid matching "college of <specific name>" as an All-College group when that college isn't in $departments
+            $withoutCollegeOf=preg_replace('/\bcollege of [a-z]+/u',' ',$combinedNorm);
+            $isCollegeGroup=false;
+            $isBasicEdGroup=false;
+            foreach($collegeGroupPhrases as $phrase) {
+                if(str_contains($withoutCollegeOf,' '.$phrase.' ')) { $isCollegeGroup=true; break; }
+            }
+            foreach($basicEdGroupPhrases as $phrase) {
+                if(str_contains($combinedNorm,' '.$phrase.' ')) { $isBasicEdGroup=true; break; }
+            }
+            if($isCollegeGroup && !$isBasicEdGroup) {
+                $row['audience_group']='college';
+            } elseif($isBasicEdGroup && !$isCollegeGroup) {
+                $row['audience_group']='basic-education';
+            }
+        }
     }
     unset($row);
     return $rows;
@@ -52,7 +368,7 @@ function calendarImportExisting(PDO $db, int $series): array {
     $q=$db->prepare('SELECT e.* FROM events e JOIN calendar_import_sources s ON s.event_id=e.event_id WHERE s.series_id=? ORDER BY e.start_date');
     $q->execute([$series]); return $q->fetchAll(PDO::FETCH_ASSOC);
 }
-function calendarTitleKey(string $title): string { return strtolower(trim(preg_replace('/\s+/u',' ',$title))); }
+function calendarTitleKey(string $title): string { return strtolower(trim((string)(preg_replace('/\s+/u',' ',$title)??$title))); }
 
 function calendarImportCompare(array $rows, array $existing, array $all): array {
     $used=[]; $seen=[];
@@ -66,6 +382,9 @@ function calendarImportCompare(array $rows, array $existing, array $all): array 
             $row['audience_group']=$event['audience_group']??'all';
             if(empty($row['location_provided'])&&empty($row['location']))$row['location']=$event['location']??'';
             $row['warnings']=array_values(array_filter($row['warnings'],static fn($w)=>$w!=='Category needs review.'));
+            if (!empty($row['missing_fields'])) {
+                $row['missing_fields']=array_values(array_filter($row['missing_fields'],static fn($f)=>$f!=='category_id'));
+            }
             $row['warnings'][]='Revised activity: check the changes. The current category has been kept.';
             $row['previous']=$event;
         } elseif ($matches) $row['warnings'][]='Several existing activities may match. Choose the correct existing event or exclude this row.';
@@ -74,14 +393,14 @@ function calendarImportCompare(array $rows, array $existing, array $all): array 
         $seen[$key]=true;
         foreach ($all as $event) {
             if((int)$event['event_id']===$row['event_id'])continue;
-            if(calendarTitleKey($event['title'])===calendarTitleKey($row['title']) || ($row['start_date']!==''&&substr($event['start_date']??'',0,10)===$row['start_date']&&similar_text(calendarTitleKey($event['title']),calendarTitleKey($row['title']))>min(strlen($event['title']),strlen($row['title']))*0.75)) {
+            if($row['title']!=='' && (calendarTitleKey($event['title'])===calendarTitleKey($row['title']) || ($row['start_date']!==''&&substr($event['start_date']??'',0,10)===$row['start_date']&&similar_text(calendarTitleKey($event['title']),calendarTitleKey($row['title']))>min(strlen($event['title']),strlen($row['title']))*0.75))) {
                 $row['warnings'][]='Possible duplicate of existing event #'.$event['event_id'].': '.$event['title'];
             }
         }
     }
     unset($row);
     foreach($existing as $event) if(!isset($used[$event['event_id']])) {
-        $rows[]=['title'=>$event['title'],'start_date'=>substr($event['start_date']??'',0,10),'end_date'=>substr($event['end_date']??'',0,10),'start_time'=>'','end_time'=>'','description'=>$event['description']??'','category_id'=>$event['category_id'],'event_id'=>(int)$event['event_id'],'action'=>'archive','warnings'=>['Possibly removed from this revision. Excluded by default; select only to hide it after approval.'],'source'=>'Not matched in the revised document.','previous'=>$event];
+        $rows[]=['title'=>$event['title'],'start_date'=>substr($event['start_date']??'',0,10),'end_date'=>substr($event['end_date']??'',0,10),'start_time'=>'','end_time'=>'','description'=>$event['description']??'','category_id'=>$event['category_id'],'event_id'=>(int)$event['event_id'],'action'=>'archive','warnings'=>['Possibly removed from this revision. Excluded by default; select only to hide it after approval.'],'missing_fields'=>[],'source'=>'Not matched in the revised document.','previous'=>$event];
     }
     return $rows;
 }
@@ -89,23 +408,27 @@ function calendarImportCompare(array $rows, array $existing, array $all): array 
 function calendarImportValidate(array $edits, array $preview, array $existing, array $categories): array {
     if(count($edits)>1500)throw new InvalidArgumentException('Too many activities.');
     $existingById=array_column($existing,null,'event_id');$catIds=array_map('intval',array_column($categories,'category_id'));$out=[];$targets=[];$keys=[];
+    $len=static fn(string $s)=>function_exists('mb_strlen')?mb_strlen($s,'UTF-8'):strlen($s);
     foreach($edits as $index=>$edit) {
         if(!is_array($edit)||empty($edit['include']))continue;
-        if(!isset($preview[$index]))throw new InvalidArgumentException('The preview changed. Upload the document again.');
-        $original=$preview[$index];
+        $hasSourceIndex = isset($edit['source_index']) && is_scalar($edit['source_index']) && ctype_digit((string)$edit['source_index']);
+        $srcIdx = $hasSourceIndex ? (int)$edit['source_index'] : (is_int($index) ? $index : -1);
+        if (!isset($preview[$srcIdx])) throw new InvalidArgumentException('The preview changed. Upload the document again.');
+        $original = $preview[$srcIdx];
         if(!is_scalar($edit['event_id']??0)||!ctype_digit((string)($edit['event_id']??0)))throw new InvalidArgumentException('Choose a valid imported event target.');
         $id=(int)($edit['event_id']??0);
         if($id && (!isset($existingById[$id])||isset($targets[$id])))throw new InvalidArgumentException('Choose each existing imported event only once. Manually created events cannot be overwritten.');
         if($id)$targets[$id]=true;
         if(empty($edit['reviewed']))throw new InvalidArgumentException('Review and approve each selected activity.');
-        $operation=$original['action']==='archive'?'archive':($id?'update':'create');
-        if($operation==='archive' && $id!==(int)$original['event_id'])throw new InvalidArgumentException('Invalid removal target.');
+        $editAction = is_string($edit['action'] ?? null) ? $edit['action'] : ($original['action'] ?? 'create');
+        $operation=$editAction==='archive'?'archive':($id?'update':'create');
+        if($operation==='archive' && (!$original || ($original['action']??'')!=='archive' || $id!==(int)$original['event_id']))throw new InvalidArgumentException('Invalid removal target.');
         $row=['event_id'=>$id,'action'=>$operation,'signature'=>$id?calendarEventSignature($existingById[$id]):null];
         if($operation==='archive') { $row['title']=$existingById[$id]['title'];$row['start_date']=$existingById[$id]['start_date'];$row['end_date']=$existingById[$id]['end_date'];$row['category_id']=$existingById[$id]['category_id'];$row['location']=$existingById[$id]['location']??'';$out[]=$row;continue; }
         foreach(['title'=>500,'description'=>10000,'location'=>500,'start_date'=>10,'end_date'=>10,'start_time'=>5,'end_time'=>5] as $field=>$limit) {
             if(!is_scalar($edit[$field]??''))throw new InvalidArgumentException('Invalid event field.');
             $row[$field]=trim((string)($edit[$field]??($field==='location'&&$id?($existingById[$id]['location']??''):'')));
-            if(mb_strlen($row[$field])>$limit)throw new InvalidArgumentException('An event field is too long: '.$field);
+            if($len($row[$field])>$limit)throw new InvalidArgumentException('An event field is too long: '.$field);
         }
         if($row['title']===''||!calendarValidDate($row['start_date'])||($row['end_date']!==''&&!calendarValidDate($row['end_date'])))throw new InvalidArgumentException('Every selected activity needs a title and valid dates (1900–2050).');
         foreach(['start_time','end_time'] as $field) if($row[$field]!==''&&!preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/',$row[$field]))throw new InvalidArgumentException('Use valid 24-hour times.');
@@ -221,10 +544,31 @@ function calendarImportHandle(PDO $db, string $action, int $userId): array {
             $year=(int)$series['start_year'];
         }
         $rows=calendarExtractXml(calendarDocxXml($file['tmp_name']),$year,$categories);
-        if(eventDepartmentsReady())$rows=calendarImportDetectDepartments($rows,$db->query('SELECT dept_id,dept_name,slug FROM departments')->fetchAll(PDO::FETCH_ASSOC));
+        try {
+            $programDepartments=array_column($db->query('SELECT program_code,dept_id FROM programs')->fetchAll(PDO::FETCH_ASSOC),'dept_id','program_code');
+        } catch(Throwable $e) {
+            $programDepartments=[];
+        }
+        $programs=[];
+        foreach(getAnnouncementProgramCategories() as $code=>$name)if($code!=='ALL')$programs[]=['code'=>$code,'name'=>$name,'dept_id'=>$programDepartments[$code]??null];
+        if(eventDepartmentsReady()) {
+            try {
+                $deptList=$db->query('SELECT dept_id,dept_name,slug,department_type FROM departments')->fetchAll(PDO::FETCH_ASSOC);
+            } catch(Throwable $e) {
+                try {
+                    $deptList=$db->query('SELECT dept_id,dept_name,slug FROM departments')->fetchAll(PDO::FETCH_ASSOC);
+                } catch(Throwable $e2) {
+                    $deptList=[];
+                }
+            }
+            $rows=calendarImportDetectDepartments($rows,$deptList,$programs,eventAudienceGroupsReady());
+        } else {
+            $rows=calendarImportDetectDepartments($rows,[],$programs,eventAudienceGroupsReady());
+        }
         if(!$series) {
             $name=trim((string)($_POST['calendar_name']??''));
-            if($name===''||mb_strlen($name)>200)throw new InvalidArgumentException('Enter a calendar name up to 200 characters.');
+            $nameLen=function_exists('mb_strlen')?mb_strlen($name,'UTF-8'):strlen($name);
+            if($name===''||$nameLen>200)throw new InvalidArgumentException('Enter a calendar name up to 200 characters.');
             $db->prepare('INSERT INTO calendar_import_series(name,start_year,user_id) VALUES(?,?,?)')->execute([$name,$year,$userId]);
             $seriesId=(int)$db->lastInsertId();$series=['revision'=>0];
         }
@@ -232,11 +576,9 @@ function calendarImportHandle(PDO $db, string $action, int $userId): array {
         $all=$db->query('SELECT event_id,title,start_date FROM events')->fetchAll(PDO::FETCH_ASSOC);
         $rows=calendarImportCompare($rows,$existing,$all);
         $token=bin2hex(random_bytes(32));
-        $db->prepare('INSERT INTO calendar_import_batches(token,series_id,user_id,base_revision,filename,preview_json) VALUES(?,?,?,?,?,?)')->execute([$token,$seriesId,$userId,$series['revision'],mb_substr(basename($file['name']),0,255),json_encode(['rows'=>$rows,'existing'=>$existing],JSON_THROW_ON_ERROR)]);
+        $safeFilename=function_exists('mb_substr')?mb_substr(basename($file['name']),0,255,'UTF-8'):substr(basename($file['name']),0,255);
+        $db->prepare('INSERT INTO calendar_import_batches(token,series_id,user_id,base_revision,filename,preview_json) VALUES(?,?,?,?,?,?)')->execute([$token,$seriesId,$userId,$series['revision'],$safeFilename,json_encode(['rows'=>$rows,'existing'=>$existing],JSON_THROW_ON_ERROR|JSON_INVALID_UTF8_SUBSTITUTE)]);
         logActivity($userId,'IMPORT_PREVIEW','events',null,'Prepared calendar import preview ('.count($rows).' rows).');
-        $programDepartments=array_column($db->query('SELECT program_code,dept_id FROM programs')->fetchAll(PDO::FETCH_ASSOC),'dept_id','program_code');
-        $programs=[];
-        foreach(getAnnouncementProgramCategories() as $code=>$name)if($code!=='ALL')$programs[]=['code'=>$code,'name'=>$name,'dept_id'=>$programDepartments[$code]??null];
         return ['success'=>true,'token'=>$token,'rows'=>$rows,'existing'=>$existing,'categories'=>$categories,
             'departments'=>$db->query('SELECT dept_id,dept_name FROM departments ORDER BY dept_name')->fetchAll(PDO::FETCH_ASSOC),
             'programs'=>$programs,'departments_ready'=>eventDepartmentsReady(),'audience_groups_ready'=>eventAudienceGroupsReady()];

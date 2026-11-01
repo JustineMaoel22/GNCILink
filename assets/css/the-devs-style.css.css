@@ -98,12 +98,12 @@ body { overflow-x: clip; }
 
 /* Yellow Solid Circle */
 .circle-solid {
-    width: 200px;
-    height: 200px;
+    width: 300px;
+    height: 300px;
     background-color: var(--gnc-gold);
     border-radius: 50%;
-    top: -50px;
-    left: -50px;
+    top: -75px;
+    left: -75px;
 }
 
 /* Yellow Outline Circles (Holes) */
@@ -114,17 +114,17 @@ body { overflow-x: clip; }
 }
 
 .hole-top {
-    width: 250px;
-    height: 250px;
-    top: -125px;
-    left: 45%;
+    width: 350px;
+    height: 350px;
+    top: -175px;
+    left: 42%;
 }
 
 .hole-bottom {
-    width: 200px;
-    height: 200px;
-    bottom: -125px;
-    right: -50px;
+    width: 300px;
+    height: 300px;
+    bottom: -175px;
+    right: -75px;
 }
 
 /* --- IMAGE ASSET PLACEHOLDERS FOR 3D GREEN SPHERES --- */
@@ -136,19 +136,19 @@ body { overflow-x: clip; }
 .sphere-top-left {
     top: 8%;
     left: 5%;
-    width: 120px;
+    width: 180px;
 }
 
 .sphere-bottom-left {
     bottom: -5%;
     left: 5%;
-    width: 250px;
+    width: 350px;
 }
 
 .sphere-bottom-right {
     bottom: 15%;
     right: 5%;
-    width: 100px;
+    width: 150px;
     z-index: 11;
 }
 
@@ -328,4 +328,10 @@ body { overflow-x: clip; }
     .gallery-image-wrapper {
         min-height: 250px;
     }
+}
+
+/* --- SPACE BEFORE FOOTER --- */
+.footer-spacer {
+    background-color: #F9F6F1; /* Matches the page's off-white background */
+    height: 6rem;
 }

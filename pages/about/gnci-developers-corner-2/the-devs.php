@@ -181,6 +181,9 @@
         </div>
     </section>
 
+    <!-- Breathing room between the last section and the footer -->
+    <div class="footer-spacer" aria-hidden="true"></div>
+
     <!-- ========================================== -->
     <!-- GALLERY SECTION -->
     <!-- ========================================== -->

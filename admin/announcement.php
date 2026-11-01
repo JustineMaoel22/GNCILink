@@ -73,8 +73,12 @@ try {
 // Which modal (if any) should auto-open on load
 $modalMode    = $facebookPostsPage ? '' : ($_GET['modal'] ?? '');   // '', 'create', or 'edit'
 $modalEditing = null;
+$modalGallery = [];
 if ($modalMode === 'edit') {
     $modalEditing = getAnnouncementById((int)($_GET['id'] ?? 0));
+    if ($modalEditing && !empty($modalEditing['announcement_id'])) {
+        $modalGallery = getAnnouncementImages((int)$modalEditing['announcement_id']);
+    }
 }
 if (!empty($flashOld)) {
     $modalEditing = array_merge($modalEditing ?? [], $flashOld);
@@ -446,8 +450,8 @@ include __DIR__ . '/../components/header-admin.php';
 
           <div class="ann-section-label">More pictures (gallery)</div>
           <div class="mb-3">
-            <input type="file" name="gallery_images[]" id="modal-gallery-input" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" multiple>
-            <div class="form-text">Optional. You can pick several photos at once — up to 10 at a time, 5 MB each.</div>
+            <input type="file" name="gallery_images[]" id="modal-gallery-input" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" multiple data-max-files="10" data-existing-count-selector="#modal-gallery-existing .gallery-thumb-wrap:not(.marked-remove)" data-max-files-message="You can only upload a maximum of 10 images. Please reduce your selection and try again.">
+            <div class="form-text">Optional. You can pick several photos at once — up to 10 total, 5 MB each.</div>
 
             <div id="modal-gallery-existing-wrap" class="mt-3" style="display:none">
               <div class="fw-semibold" style="font-size:.85rem">Pictures already in the gallery</div>
@@ -506,7 +510,7 @@ include __DIR__ . '/../components/header-admin.php';
           </div>
           <div class="mb-3">
             <label for="facebook-link" class="form-label">Facebook attachment link (optional)</label>
-            <input type="url" class="form-control" id="facebook-link" name="facebook_link" maxlength="2000" placeholder="https://example.com/announcement">
+            <input type="url" class="form-control" id="facebook-link" name="facebook_link" maxlength="2000" placeholder="e.g. https://example.com/announcement">
             <div class="form-text">With photos, the link is added to the message. Otherwise Facebook receives a link attachment. Main picture and gallery photos are included, up to 10 total.</div>
           </div>
           <input type="hidden" name="facebook_request_key" id="facebook-request-key" value="<?= bin2hex(random_bytes(32)) ?>">
@@ -888,6 +892,60 @@ const modalGalleryNew        = document.getElementById('modal-gallery-new');
 const modalGalleryExistWrap  = document.getElementById('modal-gallery-existing-wrap');
 const modalGalleryExist      = document.getElementById('modal-gallery-existing');
 const MAX_GALLERY_IMAGES = 10;
+const GALLERY_LIMIT_MESSAGE = 'You can only upload a maximum of 10 images. Please reduce your selection and try again.';
+let stagedGalleryFiles = [];
+
+function getExistingGalleryCount() {
+    if (!modalGalleryExist) return 0;
+    return modalGalleryExist.querySelectorAll('.gallery-thumb-wrap:not(.marked-remove)').length;
+}
+
+function syncGalleryInputFiles(fileList) {
+    if (!modalGalleryInput) return;
+    if (!fileList || !fileList.length) {
+        modalGalleryInput.value = '';
+        return;
+    }
+    try {
+        const dt = new DataTransfer();
+        fileList.forEach(f => dt.items.add(f));
+        modalGalleryInput.files = dt.files;
+    } catch (e) {
+        // Fallback if DataTransfer is unavailable
+    }
+}
+
+function showGalleryLimitWarning() {
+    if (window.AdminDialogs && typeof window.AdminDialogs.alert === 'function') {
+        window.AdminDialogs.alert(GALLERY_LIMIT_MESSAGE, {
+            title: 'Maximum Image Limit Exceeded',
+            danger: true
+        });
+    } else {
+        window.alert(GALLERY_LIMIT_MESSAGE);
+    }
+}
+
+if (modalGalleryInput) {
+    modalGalleryInput._gncBeforeProcessFiles = function (selectedFiles) {
+        const files = Array.isArray(selectedFiles) ? selectedFiles : Array.from(modalGalleryInput.files || []);
+        if (!files.length) {
+            if (stagedGalleryFiles.length > 0) {
+                syncGalleryInputFiles(stagedGalleryFiles);
+            }
+            renderNewGalleryPreview();
+            return false;
+        }
+        const existingCount = getExistingGalleryCount() + stagedGalleryFiles.length;
+        if (files.length > MAX_GALLERY_IMAGES || (existingCount + files.length) > MAX_GALLERY_IMAGES) {
+            syncGalleryInputFiles(stagedGalleryFiles);
+            renderNewGalleryPreview();
+            showGalleryLimitWarning();
+            return false;
+        }
+        return true;
+    };
+}
 
 // Plain-language hint under the Visibility dropdown
 const statusHelpText = <?= json_encode($statusHelp) ?>;
@@ -901,6 +959,7 @@ function updateStatusHelp() {
 modalStatus?.addEventListener('change', updateStatusHelp);
 
 function resetGalleryUI() {
+    stagedGalleryFiles = [];
     modalGalleryInput.value = '';
     modalGalleryNew.innerHTML = '';
     modalGalleryNewWrap.style.display = 'none';
@@ -934,25 +993,42 @@ function resetModalForm() {
     updateStatusHelp();
 }
 
+function removeStagedGalleryFile(index) {
+    if (index < 0 || index >= stagedGalleryFiles.length) return;
+    stagedGalleryFiles.splice(index, 1);
+    syncGalleryInputFiles(stagedGalleryFiles);
+    renderNewGalleryPreview();
+}
+
 // Preview of the new pictures picked in this session
 function renderNewGalleryPreview() {
     modalGalleryNew.innerHTML = '';
-    const files = Array.from(modalGalleryInput.files || []);
+    const files = stagedGalleryFiles.length ? stagedGalleryFiles : Array.from(modalGalleryInput.files || []);
     if (!files.length) {
         modalGalleryNewWrap.style.display = 'none';
         return;
     }
     modalGalleryNewWrap.style.display = 'block';
-    files.forEach(file => {
+    files.forEach((file, index) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'gallery-thumb-wrap';
+        const img = document.createElement('img');
+        img.alt = '';
+        wrap.appendChild(img);
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'gallery-thumb-remove';
+        btn.title = 'Remove this picture';
+        btn.textContent = '×';
+        btn.addEventListener('click', () => removeStagedGalleryFile(index));
+        wrap.appendChild(btn);
+
+        modalGalleryNew.appendChild(wrap);
+
         const reader = new FileReader();
         reader.onload = e => {
-            const wrap = document.createElement('div');
-            wrap.className = 'gallery-thumb-wrap';
-            const img = document.createElement('img');
             img.src = e.target.result;
-            img.alt = '';
-            wrap.appendChild(img);
-            modalGalleryNew.appendChild(wrap);
         };
         reader.readAsDataURL(file);
     });
@@ -991,6 +1067,10 @@ function renderExistingGallery(images) {
 function toggleGalleryRemoval(wrap, imageId) {
     const existingInput = document.querySelector('input[name="remove_gallery_ids[]"][value="' + imageId + '"]');
     if (existingInput) {
+        if ((getExistingGalleryCount() + stagedGalleryFiles.length) >= MAX_GALLERY_IMAGES) {
+            showGalleryLimitWarning();
+            return;
+        }
         existingInput.remove();
         wrap.classList.remove('marked-remove');
     } else {
@@ -1104,19 +1184,37 @@ modalImageInput?.addEventListener('change', () => {
 });
 
 modalGalleryInput?.addEventListener('change', () => {
-    const files = Array.from(modalGalleryInput.files || []);
-    if (files.length > MAX_GALLERY_IMAGES) {
-        annToast('You can upload up to ' + MAX_GALLERY_IMAGES + ' pictures at a time.', 'error');
-        modalGalleryInput.value = '';
+    if (modalGalleryInput._gncFramingCancelled) {
+        modalGalleryInput._gncFramingCancelled = false;
+        syncGalleryInputFiles(stagedGalleryFiles);
         renderNewGalleryPreview();
         return;
     }
-    if (files.some(f => f.size > 5 * 1024 * 1024)) {
+    const incomingFiles = Array.from(modalGalleryInput.files || []);
+    if (!incomingFiles.length) {
+        syncGalleryInputFiles(stagedGalleryFiles);
+        renderNewGalleryPreview();
+        return;
+    }
+    const isAlreadySynced = incomingFiles.length === stagedGalleryFiles.length
+        && incomingFiles.every((f, idx) => f === stagedGalleryFiles[idx]);
+    const combinedFiles = isAlreadySynced ? stagedGalleryFiles : stagedGalleryFiles.concat(incomingFiles);
+    const existingSavedCount = getExistingGalleryCount();
+
+    if (combinedFiles.length > MAX_GALLERY_IMAGES || (existingSavedCount + combinedFiles.length) > MAX_GALLERY_IMAGES) {
+        syncGalleryInputFiles(stagedGalleryFiles);
+        renderNewGalleryPreview();
+        showGalleryLimitWarning();
+        return;
+    }
+    if (incomingFiles.some(f => f.size > 5 * 1024 * 1024)) {
         annToast('One of the pictures is larger than 5 MB. Please choose smaller ones.', 'error');
-        modalGalleryInput.value = '';
+        syncGalleryInputFiles(stagedGalleryFiles);
         renderNewGalleryPreview();
         return;
     }
+    stagedGalleryFiles = combinedFiles;
+    syncGalleryInputFiles(stagedGalleryFiles);
     renderNewGalleryPreview();
 });
 
@@ -1212,6 +1310,9 @@ updateStatusHelp();
 modalImagePreview.src = <?= json_encode($modalEditing['image_path']) ?>;
 modalImagePreviewWrap.style.display = 'block';
 modalRemoveWrap.style.display = 'block';
+<?php endif; ?>
+<?php if (!empty($modalGallery)): ?>
+renderExistingGallery(<?= json_encode($modalGallery) ?>);
 <?php endif; ?>
 announcementModal.show();
 <?php endif; ?>

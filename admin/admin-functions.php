@@ -617,6 +617,15 @@ function uploadAnnouncementImages(?array $files): array {
 
     $mediaIds = [];
     $count = count($files['name']);
+    $nonEmptyCount = 0;
+    for ($i = 0; $i < $count; $i++) {
+        if (($files['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $nonEmptyCount++;
+        }
+    }
+    if ($nonEmptyCount > 10) {
+        throw new Exception('You can only upload a maximum of 10 images. Please reduce your selection and try again.');
+    }
 
     for ($i = 0; $i < $count; $i++) {
         if ($files['error'][$i] === UPLOAD_ERR_NO_FILE) {
@@ -5349,7 +5358,7 @@ function saveProgramPageItems(int $programId, string $type, array $rows): array 
             if (mb_strlen($title) > 255 || mb_strlen($sub) > 255 || mb_strlen($body) > 2000) {
                 throw new Exception('Item ' . ($i + 1) . ' has text that is too long.');
             }
-            if ($type !== 'uniform' && $type !== 'hero_slide' && $title === '' && !contentPublishAllowsIncomplete()) {
+            if ($type !== 'uniform' && $type !== 'hero_slide' && $type !== 'facility' && $title === '' && !contentPublishAllowsIncomplete()) {
                 throw new Exception(($type === 'facility' ? 'Facility ' : 'Item ') . ($i + 1) . ' needs a name.');
             }
             if ($type === 'facility' && mb_strlen($body) > 500) {

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 function gncbot_tuition_path(string $url): ?string {
-    if (!preg_match('~^/uploads/tuition-fees/(college|graduate-school|senior-high-school|basic-education|other-fees)/[^/\\\\\x00-\x1f]+\.pdf$~iD', $url)
+    if (!preg_match('~^/uploads/tuition-fees/(college|graduate-school|senior-high-school|basic-education)/[^/\\\\\x00-\x1f]+\.pdf$~iD', $url)
         || str_contains($url, '..') || str_contains($url, '%')) return null;
     $root=realpath(__DIR__.'/../../uploads/tuition-fees');
     $file=realpath(__DIR__.'/../..'.$url);
@@ -14,7 +14,7 @@ function gncbot_tuition_path(string $url): ?string {
 }
 
 function gncbot_tuition_documents(PDO $db, string $question, ?string $program, string $programName, ?string $category): array {
-    $categories=['college','graduate-school','senior-high-school','basic-education','other-fees'];
+    $categories=['college','graduate-school','senior-high-school','basic-education'];
     try{$rows=$db->query('SELECT document_id,category_key,title,file_path FROM tuition_fee_documents ORDER BY document_id DESC')->fetchAll(PDO::FETCH_ASSOC);}
     catch(PDOException $e){
         if(!in_array($e->getCode(),['42S02','HY000'],true))throw $e;
@@ -30,7 +30,7 @@ function gncbot_tuition_documents(PDO $db, string $question, ?string $program, s
     $names=array_filter($names,static fn($word)=>mb_strlen($word)>3&&!in_array($word,['bachelor','science','arts','master','doctor','education'],true));
     $out=[];
     foreach($rows as $row){
-        if(!in_array($row['category_key'],$categories,true)||($category!==null&&$row['category_key']!==$category&&$row['category_key']!=='other-fees'))continue;
+        if(!in_array($row['category_key'],$categories,true)||($category!==null&&$row['category_key']!==$category))continue;
         $path=gncbot_tuition_path((string)$row['file_path']);if(!$path)continue;
         $title=mb_strtolower((string)$row['title']);$score=0;
         if($category!==null&&$row['category_key']===$category)$score+=5;

@@ -869,7 +869,7 @@ include __DIR__ . '/../components/header-admin.php';
                     </div>
                     <div class="ce-review-actions">
                         <label class="visually-hidden" for="note-<?= (int)$q['section_id'] ?>">Note to the editor</label>
-                        <input type="text" id="note-<?= (int)$q['section_id'] ?>" class="form-control ce-review-note" maxlength="500" placeholder="Note to the editor (needed when you request changes)">
+                        <input type="text" id="note-<?= (int)$q['section_id'] ?>" class="form-control ce-review-note" maxlength="500" placeholder="e.g. Please shorten the second paragraph.">
                         <button type="button" class="btn btn-outline-secondary" data-review="reject"><i class="bi bi-arrow-counterclockwise"></i> Request changes</button>
                         <button type="button" class="btn-gnc-gold" data-review="approve"><i class="bi bi-check2-circle"></i> Approve &amp; publish</button>
                     </div>

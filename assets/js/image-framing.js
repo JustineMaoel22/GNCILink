@@ -375,6 +375,21 @@
         FileReader.prototype.readAsDataURL=function(file){this.addEventListener('load',()=>{if(file instanceof File&&typeof this.result==='string'){sources.set(this.result,file);schedule(document);}},{once:true});return read.call(this,file);};
         document.addEventListener('change',e=>{
             const input=e.target;if(input.tagName!=='INPUT'||input.type!=='file'||!input.files.length)return;
+            if(!e._gncValidatedSelection&&!input._gncInternalChange){
+                if(typeof input._gncBeforeProcessFiles==='function'&&!input._gncBeforeProcessFiles(Array.from(input.files),e)){e.stopImmediatePropagation();return;}
+                const maxFiles=parseInt(input.dataset?.maxFiles||'',10);
+                if(Number.isFinite(maxFiles)&&maxFiles>0){
+                    const existingSelector=input.dataset?.existingCountSelector||'';
+                    const existingCount=existingSelector?document.querySelectorAll(existingSelector).length:0;
+                    if(input.files.length>maxFiles||(existingCount+input.files.length)>maxFiles){
+                        e.stopImmediatePropagation();input.value='';
+                        const msg=input.dataset?.maxFilesMessage||('You can only upload a maximum of '+maxFiles+' images. Please reduce your selection and try again.');
+                        if(window.AdminDialogs)window.AdminDialogs.alert(msg,{title:'Maximum Image Limit Exceeded',danger:true});else window.alert(msg);
+                        return;
+                    }
+                }
+                e._gncValidatedSelection=true;
+            }
             if(input.hasAttribute('data-no-image-framing'))return;
             const selected=Array.from(input.files),pictures=selected.filter(f=>/^image\/(jpeg|png|webp|gif)$/.test(f.type));
             if(!pictures.length||pictures.every(f=>files.has(f)))return;
@@ -385,9 +400,11 @@
                 // determine the upload preview instead of the landscape fallback.
                 const assignedTarget=uploadTargets.get(input);
                 const target=findTarget(assignedTarget)||assignedTarget||findTarget(input.closest('form,.modal,.card')||input.parentElement);
-                for(const file of pictures){if(files.has(file))continue;const src=nativeObjectURL(file);sources.set(src,file);const value=await dialog({src,target:null,file,ratio:baseRatio(target,input),fit:fitOf(target)});URL.revokeObjectURL(src);sources.delete(src);if(!value){input.value='';break;}}
-                input.dispatchEvent(new Event('change',{bubbles:true}));
-            }).catch(err=>{console.error('Image framing:',err);input.value='';input.dispatchEvent(new Event('change',{bubbles:true}));});
+                input._gncFramingCancelled=false;
+                for(const file of pictures){if(files.has(file))continue;const src=nativeObjectURL(file);sources.set(src,file);const value=await dialog({src,target:null,file,ratio:baseRatio(target,input),fit:fitOf(target)});URL.revokeObjectURL(src);sources.delete(src);if(!value){input._gncFramingCancelled=true;input.value='';break;}}
+                input._gncInternalChange=true;
+                try{input.dispatchEvent(new Event('change',{bubbles:true}));}finally{input._gncInternalChange=false;}
+            }).catch(err=>{console.error('Image framing:',err);input._gncFramingCancelled=true;input.value='';input._gncInternalChange=true;try{input.dispatchEvent(new Event('change',{bubbles:true}));}finally{input._gncInternalChange=false;}});
         },true);
         async function payload(fd){
             const values={};

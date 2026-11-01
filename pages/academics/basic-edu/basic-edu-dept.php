@@ -112,7 +112,7 @@ cePreviewActive();
                         <p class="basic-edu-desc"><?= htmlspecialchars($cardDescription, ENT_QUOTES, 'UTF-8') ?></p>
                         <?php endif; ?>
                     </div>
-                    <a class="basic-edu-btn" href="<?= htmlspecialchars('/pages/academics/basic-edu/basic-edu-department/' . $c['key'] . '.php') ?>">View Programs <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+                    <a class="basic-edu-btn" href="<?= htmlspecialchars('/pages/academics/basic-edu/basic-edu-department/' . $c['key'] . '.php') ?>">View Department <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
                 </article>
                 <?php endforeach; ?>
             </div>

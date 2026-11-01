@@ -18,7 +18,7 @@ function gncRecCatalog(PDO $db): array {
     };
     $programs = $db->query("SELECT p.*, m.file_path AS image FROM programs p LEFT JOIN departments d ON d.dept_id=p.dept_id
         LEFT JOIN media_library m ON m.media_id=COALESCE(p.hero_media_id,p.image_media_id)
-        WHERE p.is_published=1 AND (d.dept_id IS NULL OR d.archived_at IS NULL) ORDER BY p.program_id DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC);
+        WHERE p.is_published=1 AND (d.dept_id IS NULL OR (d.archived_at IS NULL AND d.department_type<>'basic-education')) ORDER BY p.program_id DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC);
     $programDepartments = [];
     foreach ($programs as $p) {
         if (!$p['slug']) continue;
@@ -35,7 +35,7 @@ function gncRecCatalog(PDO $db): array {
             ['academics','program:'.$code, $p['dept_id'] ? 'dept:'.$p['dept_id'] : ''], null, $aliases);
     }
     foreach ($db->query("SELECT d.*,m.file_path AS image FROM departments d LEFT JOIN media_library m ON m.media_id=d.media_id WHERE d.archived_at IS NULL ORDER BY d.dept_id DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC) as $d) {
-        if (!$d['slug']) continue;
+        if (!$d['slug'] || $d['department_type'] === 'basic-education') continue;
         $legacy = '/pages/academics/basic-edu/basic-edu-department/'.$d['slug'].'.php';
         $url = $d['department_type'] === 'basic-education' && is_file(__DIR__.'/..'.$legacy)
             ? $legacy : '/pages/academics/college/college-department/'.rawurlencode($d['slug']);
@@ -71,7 +71,7 @@ function gncRecCatalog(PDO $db): array {
         'programs'=>'/pages/academics/college/college-dept.php', 'basic-education-departments'=>'/pages/academics/basic-edu/basic-edu-dept.php', 'contact-us'=>'/pages/contact-us.php'];
     foreach ($db->query("SELECT * FROM pages WHERE status='active' ORDER BY display_order LIMIT 200")->fetchAll(PDO::FETCH_ASSOC) as $p) {
         $url = $routes[$p['slug']] ?? '/pages/about/'.$p['slug'].'.php';
-        if ($url === '/' || !is_file(__DIR__.'/..'.$url)) continue;
+        if ($url === '/' || str_contains($url, '/basic-edu/') || !is_file(__DIR__.'/..'.$url)) continue;
         $academic = str_contains($url, '/academics/');
         $add('page:'.$p['page_id'], $url, $p['title'], $academic ? 'Academics' : 'Campus', $p['description'], null, $academic ? ['academics'] : [], $p['updated_at']);
     }

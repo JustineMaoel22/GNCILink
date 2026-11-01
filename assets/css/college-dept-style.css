@@ -1489,6 +1489,241 @@
   .dept-programs-grid > * { flex-basis: 100%; }
 }
 
+/* ---------- Mobile view (768px and below): center-align all department text ---------- */
+@media (max-width: 768px) {
+  .dept-hero-inner {
+    text-align: center;
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .dept-breadcrumb,
+  .dept-intro-program .dept-breadcrumb {
+    justify-content: center;
+    text-align: center;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-intro-program .dept-hero-content {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 100%;
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+    gap: 14px;
+  }
+
+  .dept-intro-program .dept-hero-copy {
+    width: 100%;
+    text-align: center;
+  }
+
+  .dept-hero h1,
+  .dept-intro-program .dept-hero-title,
+  .dept-hero p,
+  .dept-intro-program .dept-hero-blurb,
+  .dept-intro-program .dept-header-extra {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-about-inner {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .dept-about-content,
+  .dept-about-content .dept-eyebrow,
+  .dept-about-content h2,
+  .dept-about-content h3,
+  .dept-about-content h4,
+  .dept-about-content p,
+  .dept-about-content .dept-about-raw,
+  .dept-about-content .dept-about-raw p,
+  .dept-offers-label {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-offers-list,
+  .dept-about-content ul,
+  .dept-about-content ol {
+    text-align: center;
+    list-style-position: inside;
+    padding-left: 0;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-about-content blockquote {
+    text-align: center;
+    border-left: none;
+    border-top: 3px solid var(--gnc-gold);
+    padding-left: 0;
+    padding-top: 12px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-statements-inner,
+  .dept-programs-inner,
+  .dept-dean-inner {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .dept-statements {
+    gap: 56px;
+    padding: 28px 8px 0;
+  }
+
+  .dept-statement-card {
+    flex-basis: 100%;
+    min-height: 0;
+    padding: 48px 24px 26px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .dept-statement-head {
+    margin: -78px -10px 14px -22px;
+  }
+
+  .dept-statement-icon {
+    flex-basis: 64px;
+    width: 64px;
+    height: 64px;
+    font-size: 27px;
+  }
+
+  .dept-statement-title,
+  .dept-programs-inner .dept-statement-title {
+    font-size: 16px;
+    padding: 12px 36px 12px 32px;
+    text-align: center;
+    margin-left: -20px;
+    margin-right: 0;
+  }
+
+  .dept-statement-text,
+  .dept-statement-text p,
+  .dept-statement-text.cms-rich,
+  .dept-statement-text.cms-rich p,
+  .dept-statement-text.cms-rich div,
+  .dept-statement-text.cms-rich span,
+  .dept-statement-text.cms-rich ul,
+  .dept-statement-text.cms-rich ol {
+    text-align: center !important;
+    hyphens: none;
+    -webkit-hyphens: none;
+    list-style-position: inside;
+    padding-left: 0;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-programs-inner,
+  .dept-programs-inner .dept-eyebrow,
+  .dept-programs-inner h2 {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-program-body {
+    align-items: center;
+    text-align: center;
+    padding: 20px 18px 22px;
+  }
+
+  .dept-program-body h3,
+  .dept-program-body p,
+  .dept-program-body > .cms-rich,
+  .dept-program-body > .cms-rich p {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-program-link {
+    justify-content: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-dean-intro,
+  .dept-dean-intro .dept-eyebrow,
+  .dept-dean-intro h2,
+  .dept-dean-intro p,
+  .dept-dean-intro > .cms-rich,
+  .dept-dean-intro > .cms-rich p {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-dean-badge,
+  .dept-dean-badge-title,
+  .dept-dean-badge-sub {
+    text-align: center;
+    align-items: center;
+  }
+
+  .dept-dean-content,
+  .dept-dean-content .dept-eyebrow,
+  .dept-dean-content h3,
+  .dept-dean-content p,
+  .dept-dean-content > .cms-rich,
+  .dept-dean-content > .cms-rich p {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-dean-rule {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-dean-contacts-grid {
+    grid-template-columns: 1fr;
+    max-width: 360px;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+    justify-items: center;
+  }
+
+  .dept-dean-contacts-grid .dept-dean-contact {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+    width: 100%;
+  }
+
+  .dept-contact-label,
+  .dept-contact-value {
+    text-align: center;
+  }
+
+  .dept-facebook,
+  .dept-fb-lead,
+  .dept-fb-lead p {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
 /* Extend the existing details link across the public card without covering editor fields. */
 .dept-program-card-clickable {
   position: relative;

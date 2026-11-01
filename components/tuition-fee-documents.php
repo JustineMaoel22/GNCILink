@@ -27,7 +27,6 @@ function tuitionFeeFolderCategories(): array
         'graduate-school' => ['label' => 'Graduate School', 'icon' => 'bank'],
         'senior-high-school' => ['label' => 'Senior High School', 'icon' => 'book'],
         'basic-education' => ['label' => 'Basic Education', 'icon' => 'people'],
-        'other-fees' => ['label' => 'Other Fees', 'icon' => 'file-earmark-text'],
     ];
     $root = dirname(__DIR__) . '/uploads/tuition-fees';
     foreach ($categories as $key => &$category) {

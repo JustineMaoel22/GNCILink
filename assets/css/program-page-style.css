@@ -2788,6 +2788,45 @@ html, body {
 }
 
 /* Scale the complete seal on phones; keep the text ring outside the logo. */
+@media (max-width: 768px) {
+    .template-vm-stack {
+        gap: 3rem 1.5rem;
+        padding-top: 1.75rem;
+    }
+    .template-vm-card {
+        flex-basis: 100%;
+        min-height: 0;
+        padding: 2.75rem 1.5rem 1.6rem;
+        text-align: center;
+    }
+    .template-vm-head {
+        left: 0.5rem;
+        right: 0.5rem;
+    }
+    .template-vm-icon {
+        width: 60px;
+        height: 60px;
+    }
+    .template-vm-icon .template-vm-icon-glyph {
+        width: 1.65rem;
+        height: 1.65rem;
+        font-size: 1.65rem;
+    }
+    .template-vm-card-title {
+        min-width: 0;
+        font-size: 0.95rem;
+        padding: 0.65rem 2.4rem 0.65rem 2rem;
+    }
+    .template-vm-card-text,
+    .template-vm-card-text p,
+    .template-vm-card-text div,
+    .template-vm-card-text span {
+        text-align: center !important;
+        hyphens: none;
+        -webkit-hyphens: none;
+    }
+}
+
 @media (max-width: 575px) {
     .about-feature-seal { max-width: 280px; padding: 30px; }
     .about-feature { gap: .75rem; }

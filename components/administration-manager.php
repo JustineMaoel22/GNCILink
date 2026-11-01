@@ -98,26 +98,26 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
           </div>
           <div class="col-md-6">
             <label class="form-label" for="adm-office-phone">Phone number <span class="adm-opt">optional</span></label>
-            <input type="text" class="form-control" id="adm-office-phone" maxlength="100" placeholder="(045) 900-4473 Loc. 106">
+            <input type="text" class="form-control" id="adm-office-phone" maxlength="100" placeholder="e.g. (045) 900-4473 Loc. 106">
           </div>
           <div class="col-md-6">
             <label class="form-label" for="adm-office-email">Email address <span class="adm-opt">optional</span></label>
-            <input type="email" class="form-control" id="adm-office-email" maxlength="255" placeholder="registrar@gnc.edu.ph">
+            <input type="email" class="form-control" id="adm-office-email" maxlength="255" placeholder="e.g. registrar@gnc.edu.ph">
           </div>
           <div class="col-md-6">
             <label class="form-label" for="adm-office-location">Where the office is <span class="adm-opt">optional</span></label>
-            <input type="text" class="form-control" id="adm-office-location" maxlength="255" placeholder="BETA Hall | Floor 2 | Room 200">
+            <input type="text" class="form-control" id="adm-office-location" maxlength="255" placeholder="e.g. BETA Hall | Floor 2 | Room 200">
           </div>
           <div class="col-md-6">
             <label class="form-label" for="adm-office-hours">Office hours <span class="adm-opt">optional</span></label>
             <textarea class="form-control" id="adm-office-hours" rows="2"
-                      placeholder="Monday - Friday | 8:00AM - 5:00PM&#10;Saturday | 8:00AM - 3:00PM"></textarea>
+                      placeholder="e.g. Monday - Friday | 8:00AM - 5:00PM&#10;Saturday | 8:00AM - 3:00PM"></textarea>
             <div class="form-text">Press Enter to start a new line for each day or time.</div>
           </div>
           <div class="col-12">
             <label class="form-label" for="adm-office-services">Services offered <span class="adm-opt">optional</span></label>
             <textarea class="form-control" id="adm-office-services" rows="6"
-                      placeholder="Enrollment Services&#10;Student Records Services"></textarea>
+                      placeholder="e.g. Enrollment Services&#10;Student Records Services"></textarea>
             <div class="form-text">Type one service per line (press Enter between them). Leave empty if there is nothing to list.</div>
           </div>
           <div class="col-12">

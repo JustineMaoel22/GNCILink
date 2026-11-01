@@ -21,8 +21,12 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         $revision=(int)($_POST['revision']??0);$action=$_POST['action']??'';
         if($action==='approve')$success=rbacApproveRequest($id,$revision);
         elseif($action==='reject'){rbacRejectSubmission($id,$revision,(string)($_POST['reason']??''));$success='Submission rejected. The author can see your reason and revise it.';}
+        elseif($action==='delete'&&((int)$row['user_id']===$userId||$super)){
+            rbacDeleteSubmission($id,$revision);
+            $_SESSION['flash_success']='Submission deleted.';header('Location: /admin/submissions.php');exit;
+        }
         elseif($action==='submit'&&(int)$row['user_id']===$userId){
-            $q=getDB()->prepare("UPDATE rbac_submissions SET status='pending',reason=NULL,reviewed_by=NULL,reviewed_at=NULL,updated_at=NOW() WHERE submission_id=? AND revision=? AND status IN ('draft','rejected','failed')");$q->execute([$id,$revision]);if($q->rowCount()!==1)throw new RuntimeException('This submission changed. Reload before submitting.');
+            $q=getDB()->prepare("UPDATE rbac_submissions SET status='pending',reason=NULL,reviewed_by=NULL,reviewed_at=NULL,updated_at=NOW() WHERE submission_id=? AND revision=? AND status IN ('draft','rejected','failed','uncertain')");$q->execute([$id,$revision]);if($q->rowCount()!==1)throw new RuntimeException('This submission changed. Reload before submitting.');
             logActivity($userId,'RESUBMIT','rbac_submissions',$id,'Sent saved proposal for approval.');$success='Submitted for Super Admin approval.';
         }else throw new RuntimeException('This action is not available to your role.');
         $_SESSION['flash_success']=$success;header('Location: /admin/submissions.php?id='.$id);exit;
@@ -85,16 +89,19 @@ $counts=array_count_values(array_column($rows,'status'));
  <?php endforeach;?></details>
  <?php endif;?>
  <div class="approval-actions">
- <?php if($super&&$row['status']==='pending'&&$row['kind']==='request'):?>
- <form method="post" data-review-confirm="Approve and apply these changes to the website?"><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="submission_id" value="<?= $id ?>"><input type="hidden" name="revision" value="<?= (int)$row['revision'] ?>"><input type="hidden" name="action" value="approve"><button class="btn btn-gnc-gold">Approve and apply</button></form>
+ <?php if($super&&in_array($row['status'],['pending','uncertain'],true)&&$row['kind']==='request'):?>
+ <form method="post" data-review-confirm="<?= $row['status']==='uncertain'?'Verify first that this item is not already published on the website, then retry approval?':'Approve and apply these changes to the website?' ?>"><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="submission_id" value="<?= $id ?>"><input type="hidden" name="revision" value="<?= (int)$row['revision'] ?>"><input type="hidden" name="action" value="approve"><button class="btn btn-gnc-gold"><?= $row['status']==='uncertain'?'Retry approval':'Approve and apply' ?></button></form>
  <?php endif;?>
- <?php if((int)$row['user_id']===$userId&&in_array($row['status'],['draft','rejected','failed'],true)):?>
+ <?php if((int)$row['user_id']===$userId&&in_array($row['status'],['draft','rejected','failed','uncertain'],true)):?>
  <?php if($row['kind']==='request'&&in_array($row['route'],['/admin/action/create-news.php','/admin/action/create-announcement.php'],true)):$kind=str_contains($row['route'],'create-news')?'news':'announcement';$post=$payload['post'];$url='/admin/'.$kind.'.php?'.http_build_query(['modal'=>($post['action']??'')==='update'?'edit':'create','id'=>$row['target_id'],'revise'=>$id]);?><a class="btn btn-outline-secondary" href="<?= $e($url) ?>">Revise submission</a><?php endif;?>
  <form method="post" data-review-confirm="Submit this saved proposal for Super Admin approval?"><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="submission_id" value="<?= $id ?>"><input type="hidden" name="revision" value="<?= (int)$row['revision'] ?>"><input type="hidden" name="action" value="submit"><button class="btn btn-outline-secondary">Submit for approval</button></form>
  <?php endif;?>
+ <?php if(((int)$row['user_id']===$userId||$super)&&$row['status']!=='processing'):?>
+ <form method="post" data-review-confirm="Delete this submission from your queue? Published website content will not be affected."><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="submission_id" value="<?= $id ?>"><input type="hidden" name="revision" value="<?= (int)$row['revision'] ?>"><input type="hidden" name="action" value="delete"><button class="btn btn-outline-danger"><i class="bi bi-trash" aria-hidden="true"></i> Delete submission</button></form>
+ <?php endif;?>
  </div>
  <?php if($super&&$row['status']==='pending'):?>
- <details class="approval-reject"><summary>Reject with reason</summary><form method="post" data-review-confirm="Reject this submission and send your reason to the author?"><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="submission_id" value="<?= $id ?>"><input type="hidden" name="revision" value="<?= (int)$row['revision'] ?>"><input type="hidden" name="action" value="reject"><label class="form-label" for="reason-<?= $id ?>">What should the author change?</label><textarea class="form-control mb-2" id="reason-<?= $id ?>" name="reason" maxlength="2000" placeholder="Explain what needs to be revised…" required></textarea><p class="small text-muted">This reason will be visible to the author so they can revise and resubmit.</p><button class="btn btn-outline-danger">Confirm rejection</button></form></details>
+ <details class="approval-reject"><summary>Reject with reason</summary><form method="post" data-review-confirm="Reject this submission and send your reason to the author?"><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="submission_id" value="<?= $id ?>"><input type="hidden" name="revision" value="<?= (int)$row['revision'] ?>"><input type="hidden" name="action" value="reject"><label class="form-label" for="reason-<?= $id ?>">What should the author change?</label><textarea class="form-control mb-2" id="reason-<?= $id ?>" name="reason" maxlength="2000" placeholder="e.g. Please update the event date and attach the official poster." required></textarea><p class="small text-muted">This reason will be visible to the author so they can revise and resubmit.</p><button class="btn btn-outline-danger">Confirm rejection</button></form></details>
  <?php endif;?>
  <?php if(in_array($row['status'],['processing','uncertain'],true)):?><p class="text-warning mt-3">Execution needs verification. Check the actual content before submitting another request; this request cannot be executed twice.</p><?php endif;?>
 </section>

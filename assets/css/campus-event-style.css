@@ -589,13 +589,13 @@ body {
 .campus-calendar-scope { animation: cev-fade-in .5s .7s ease backwards; }
 
 /* ---------- Calendar and upcoming panels ---------- */
-.gnc-cal-sec .gnc-cal-card     { animation: cev-fade-up .7s .55s cubic-bezier(.22,.61,.36,1) backwards; }
+.gnc-cal-sec .gnc-cal-card     { animation: cev-fade-up .7s .35s cubic-bezier(.22,.61,.36,1) backwards; }
 .gnc-cal-sec .gnc-upcoming-card,
-.gnc-cal-sec .gnc-evs          { animation: cev-fade-up .7s .7s cubic-bezier(.22,.61,.36,1) backwards; }
-.gnc-cal-sec .gnc-cal-grid     { animation: cev-fade-in .6s .8s ease backwards; }
-.gnc-cal-sec .gnc-cal-legend   { animation: cev-fade-in .5s 1s ease backwards; }
-.gnc-cal-sec .gnc-cal-title    { animation: cev-fade-in .5s .7s ease backwards; }
-.campus-calendar-empty         { animation: cev-fade-in .5s .9s ease backwards; }
+.gnc-cal-sec .gnc-evs          { animation: cev-fade-up .7s .45s cubic-bezier(.22,.61,.36,1) backwards; }
+.campus-calendar-empty         { animation: cev-fade-in .5s .5s ease backwards; }
+
+
+
 
 /* upcoming-event date cards stagger in */
 .gnc-evs-item { animation: cev-fade-up .5s cubic-bezier(.22,.61,.36,1) backwards; }

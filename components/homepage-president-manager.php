@@ -81,7 +81,7 @@ $president = homepagePresidentAdminPayload(getHomepagePresident());
                                     <label class="form-label d-flex justify-content-between" for="president-message">
                                         <span>Message</span><span class="pm-help president-count">0 words</span>
                                     </label>
-                                    <textarea id="president-message" name="president_message" class="form-control president-message-input" rows="6" placeholder="Type the President's welcome message here..."></textarea>
+                                    <textarea id="president-message" name="president_message" class="form-control president-message-input" rows="6" placeholder="e.g. At Guagua National Colleges, we are committed to nurturing future leaders through quality education and service..."></textarea>
                                     <div class="pm-help">Tip: press Enter twice to start a new paragraph.</div>
                                 </div>
                             </div>

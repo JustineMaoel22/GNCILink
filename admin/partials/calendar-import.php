@@ -22,7 +22,7 @@ $calendarImportSeries = $calendarImportReady ? $db->query("SELECT series_id,name
                 <div id="calendarImportFileStatus" class="ci-file-status" role="status">Step 1 of 4 · Choose your calendar document to get started.</div>
                 <div id="calendarImportSummary" class="ci-summary d-none" aria-live="polite"></div>
                 <form id="calendarImportUpload" enctype="multipart/form-data">
-                    <p>Upload a Word document with Date and Activity columns. Description, Time and Location (or Venue / Place) columns are optional. Each activity on a separate line becomes its own event. Use month names or YYYY-MM-DD dates; unclear dates will need correction.</p>
+                    <p>Upload a Word document (<code>.docx</code>) containing your calendar in tables, bulleted or numbered lists, or paragraphs. Related event details (Event Title, Date, Time, Location/Venue, and Description) are automatically grouped into complete events. Any missing or unclear details will be flagged for manual review before importing.</p>
                     <div class="mb-3">
                         <label for="calendarImportSeries" class="form-label">Calendar to import</label>
                         <select class="form-select" name="series_id" id="calendarImportSeries">
@@ -35,11 +35,21 @@ $calendarImportSeries = $calendarImportReady ? $db->query("SELECT series_id,name
                         <div class="form-text">For a revised document, select its original calendar. Existing event categories will be kept. Possible removals require your approval.</div>
                     </div>
                     <div class="row">
-                        <div class="col-sm-8 mb-3"><label for="calendarImportName" class="form-label">Calendar name</label><input class="form-control" id="calendarImportName" name="calendar_name" maxlength="200" required placeholder="School Calendar of Activities 2026–2027"></div>
+                        <div class="col-sm-8 mb-3"><label for="calendarImportName" class="form-label">Calendar name</label><input class="form-control" id="calendarImportName" name="calendar_name" maxlength="200" required placeholder="e.g. School Calendar of Activities 2026–2027"></div>
                         <div class="col-sm-4 mb-3"><label for="calendarImportYear" class="form-label">Starting year</label><input class="form-control" id="calendarImportYear" type="number" name="start_year" min="1900" max="2050" value="<?= (int)date('Y') ?>" required><div class="form-text">Used for dates without a year.</div></div>
                     </div>
-                    <div class="mb-3"><label class="form-label" for="calendarImportFile">Word document (.docx, up to 5 MB)</label><input class="form-control" id="calendarImportFile" name="calendar_file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required></div>
-                    <button class="btn btn-gnc-gold" type="submit" id="calendarImportExtract">Extract Activities</button>
+                    <div class="mb-3">
+                        <label class="form-label" for="calendarImportFile">Word document (.docx, up to 5 MB)</label>
+                        <div class="ci-dropzone" id="calendarImportDropzone">
+                            <i class="bi bi-cloud-arrow-up ci-dropzone-icon" aria-hidden="true"></i>
+                            <div class="ci-dropzone-text">
+                                <strong>Drag &amp; drop your Word calendar (.docx) here</strong> or <span class="ci-dropzone-browse">click to browse</span>
+                            </div>
+                            <div class="ci-dropzone-sub small text-muted" id="calendarImportFileMeta">Supports tables, bulleted lists, and paragraphs up to 5 MB</div>
+                            <input class="form-control ci-dropzone-input" id="calendarImportFile" name="calendar_file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+                        </div>
+                    </div>
+                    <button class="btn btn-gnc-gold px-4" type="submit" id="calendarImportExtract"><i class="bi bi-magic me-1"></i> Extract Activities</button>
                 </form>
                 <div id="calendarImportManagement" class="border-top pt-3 mt-4">
                     <h6>Manage imported calendars</h6>
@@ -64,15 +74,17 @@ $calendarImportSeries = $calendarImportReady ? $db->query("SELECT series_id,name
                     <?php if (!hasPermission('publish_event')): ?><p class="small text-muted mt-2">This request will be sent to Super Admin for approval. Events stay unchanged until approved.</p><?php endif; ?>
                 </div>
                 <div id="calendarImportPreview" class="d-none">
-                    <div class="ci-section-heading"><div><h6 id="calendarImportReviewHeading">Review extracted activities</h6><p id="calendarImportReviewHelp">Use Edit for details. Category changes can be made directly in the table.</p></div><span id="calendarImportCount" class="small text-muted"></span></div>
+                    <div class="ci-section-heading"><div><h6 id="calendarImportReviewHeading">Review extracted activities</h6><p id="calendarImportReviewHelp">Review detected titles, dates, times, locations, and descriptions. Use Edit to correct details, Merge to combine rows, Separate to split an entry, or Remove to discard false entries.</p></div><span id="calendarImportCount" class="small text-muted"></span></div>
                     <div class="ci-toolbar">
-                        <label class="ci-search"><span class="visually-hidden">Search event title</span><input id="ciSearch" class="form-control form-control-sm" type="search" placeholder="Search activities…"></label>
+                        <label class="ci-search"><span class="visually-hidden">Search event title</span><input id="ciSearch" class="form-control form-control-sm" type="search" placeholder="Search title, venue, department…"></label>
                         <label><span class="visually-hidden">Month</span><select id="ciMonth" class="form-select form-select-sm"><option value="">All months</option><?php for($m=1;$m<=12;$m++): ?><option value="<?= sprintf('%02d',$m) ?>"><?= date('F',mktime(0,0,0,$m,1,2026)) ?></option><?php endfor; ?></select></label>
                         <label><span class="visually-hidden">Year</span><select id="ciYear" class="form-select form-select-sm"><option value="">All years</option></select></label>
+                        <label><span class="visually-hidden">Department</span><select id="ciDepartment" class="form-select form-select-sm"><option value="">All departments</option></select></label>
                         <label><span class="visually-hidden">Category</span><select id="ciCategory" class="form-select form-select-sm"><option value="">All categories</option><option value="uncategorized">Uncategorized</option></select></label>
                         <label><span class="visually-hidden">Review status</span><select id="ciStatus" class="form-select form-select-sm"><option value="">All statuses</option><option value="needs">Needs Review</option><option value="ready">Ready</option><option value="approved">Approved</option><option value="excluded">Excluded</option></select></label>
                         <label><span class="visually-hidden">Sort activities</span><select id="ciSort" class="form-select form-select-sm"><option value="date">Sort: Date</option><option value="title">Sort: Title</option><option value="category">Sort: Category</option></select></label>
                         <label class="form-check mb-0"><input id="ciWarningsOnly" class="form-check-input" type="checkbox"><span class="form-check-label small">Warnings only</span></label>
+                        <button type="button" id="ciResetFilters" class="btn btn-sm btn-link text-decoration-none d-none">Reset filters</button>
                         <button type="button" id="ciToggleFilters" class="btn btn-sm btn-outline-secondary d-md-none" aria-expanded="false">Filters</button>
                     </div>
                     <div class="ci-bulk">
@@ -81,7 +93,9 @@ $calendarImportSeries = $calendarImportReady ? $db->query("SELECT series_id,name
                         <button type="button" class="btn btn-sm btn-outline-secondary" id="ciSelectMatching">Select all matching</button>
                         <button type="button" class="btn btn-sm btn-outline-secondary" id="ciClearSelection">Clear selection</button>
                         <button type="button" class="btn btn-sm btn-outline-success" id="ciApproveSelected">Approve selected</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="ciMergeSelected">Merge selected</button>
                         <button type="button" class="btn btn-sm btn-outline-secondary" id="ciExcludeSelected">Exclude selected</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="ciRemoveSelected">Remove selected</button>
                         <label><span class="visually-hidden">Bulk category</span><select class="form-select form-select-sm" id="ciBulkCategory"><option value="">Choose category…</option></select></label>
                         <button type="button" class="btn btn-sm btn-outline-secondary" id="ciApplyCategory">Assign to selected</button>
                         <label><span class="visually-hidden">Department for selected activities</span><select class="form-select form-select-sm" id="ciBulkDepartment"><option value="">All departments</option></select></label>
@@ -92,7 +106,7 @@ $calendarImportSeries = $calendarImportReady ? $db->query("SELECT series_id,name
                     <div id="ciFeedback" class="small py-2" role="status"></div>
                     <div class="table-responsive ci-table-wrap">
                         <table class="table align-middle ci-table">
-                            <thead><tr><th><input type="checkbox" id="ciSelectVisible" class="form-check-input" aria-label="Select all activities on this page"></th><th>Activity</th><th>Date</th><th>Category</th><th>Status</th><th>Action</th></tr></thead>
+                            <thead><tr><th><input type="checkbox" id="ciSelectVisible" class="form-check-input" aria-label="Select all activities on this page"></th><th>Event &amp; Details</th><th>Date &amp; Time</th><th>Category</th><th>Status</th><th>Action</th></tr></thead>
                             <tbody id="calendarImportRows"></tbody>
                         </table>
                     </div>
@@ -100,7 +114,17 @@ $calendarImportSeries = $calendarImportReady ? $db->query("SELECT series_id,name
                 </div>
                 <div id="ciFinal" class="d-none ci-final">
                     <i class="bi bi-calendar-check" aria-hidden="true"></i><h5>Ready to import?</h5><p id="ciFinalSummary"></p>
-                    <div class="alert alert-info"><?php if (hasPermission('publish_event')): ?>Approved activities will be saved as drafts. Publish them separately through Events when ready.<?php else: ?>Approved activities will be submitted to Super Admin for publishing approval. Existing published content stays unchanged until approved.<?php endif; ?> Nothing is automatically published by this import.</div>
+                    <?php if (hasPermission('publish_event')): ?>
+                    <div class="ci-publish-choice mb-3 p-3 rounded border bg-light">
+                        <label class="form-label fw-semibold mb-2" for="ciImportStatus">How should approved events be saved?</label>
+                        <select id="ciImportStatus" class="form-select">
+                            <option value="published" selected>Publish live on website (visible immediately on the public calendar)</option>
+                            <option value="draft">Save as drafts (review or publish later from Events)</option>
+                        </select>
+                    </div>
+                    <?php else: ?>
+                    <div class="alert alert-info">Approved activities will be submitted to Super Admin for publishing approval. Existing published content stays unchanged until approved.</div>
+                    <?php endif; ?>
                     <p class="small text-muted">Only approved rows are included. Pending and excluded activities will not be saved. Approved removals will archive their existing events.</p>
                 </div>
                 <?php endif; ?>

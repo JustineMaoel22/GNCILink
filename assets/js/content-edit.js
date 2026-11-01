@@ -760,32 +760,103 @@
     function renderToolbar() {
         tb.innerHTML = '';
         var items = S.sel && S.adapter.toolbar ? S.adapter.toolbar(S.sel) : [];
-        if(textLayout){
-            var textTarget=S.sel && S.sel.el;
-            var layoutMedia=textTarget && textTarget.hasAttribute('data-gnc-layout-media');
-            textLayout.select(textTarget);
-            if(textLayout.eligible(textTarget))items=[{icon:'arrows-move',label:layoutMedia?'Move and resize logo':'Move and resize text',on:textLayout.active(),run:function(){textLayout.toggle();renderToolbar();}},{icon:'grid-3x3',label:'Snap to grid',title:'Snap to grid',on:textLayout.snapping(),run:function(){textLayout.toggleSnap();renderToolbar();}},{icon:'align-center',label:'Snap to center',title:'Center horizontally within this section',run:function(){textLayout.snapToCenter();renderToolbar();}},{icon:'arrow-counterclockwise',label:layoutMedia?'Reset logo placement':'Reset text placement',run:function(){textLayout.reset();}}].concat(items||[]);
-            if(textLayout.eligible(textTarget)&&!layoutMedia)items=[
-                {type:'select',title:'Google Font ('+S.win.GNCTextLayout.device()+')',value:textLayout.fontFamily(),options:[['','Default font']].concat(textLayout.fonts()),onChange:function(value){textLayout.changeFontFamily(value);renderToolbar();}},
-            ].concat(items);
+        var textTarget = S.sel && S.sel.el;
+        var layoutMedia = textTarget && textTarget.hasAttribute('data-gnc-layout-media');
+        var isRich = S.sel && S.sel.el && S.sel.el.__ve && S.sel.el.__ve.rich;
+        var hasInline = S.sel && S.sel.el && S.sel.el.isContentEditable && S.sel.el.__ve?.onChange && S.win.GNCInlineTextStyle;
+        var layoutEligible = textLayout && textLayout.eligible(textTarget);
+
+        if (textLayout) textLayout.select(textTarget);
+
+        if (isRich && !items.some(function (item) { return item.type === 'select' && item.title === 'Text style'; })) {
+            var rt = richTextTools();
+            var typo = [];
+            if (layoutEligible && !layoutMedia) {
+                typo.push({
+                    type: 'select',
+                    title: 'Font (' + S.win.GNCTextLayout.device() + ')',
+                    value: textLayout.fontFamily(),
+                    options: [['', 'Default font']].concat(textLayout.fonts()),
+                    onChange: function (value) { textLayout.changeFontFamily(value); renderToolbar(); }
+                });
+            }
+            if (hasInline) {
+                typo.push(
+                    { icon: 'type', title: 'Font size', run: function () { inlineStyleOptions('size'); } },
+                    { icon: 'palette', title: 'Font color', run: function () { inlineStyleOptions('color'); } }
+                );
+            }
+            if (typo.length) {
+                rt.splice(1, 0, { type: 'sep' });
+                for (var ti = typo.length - 1; ti >= 0; ti--) {
+                    rt.splice(2, 0, typo[ti]);
+                }
+            }
+            items = rt.concat(items || []);
+        } else {
+            if (layoutEligible && !layoutMedia) {
+                items = [{
+                    type: 'select',
+                    title: 'Font (' + S.win.GNCTextLayout.device() + ')',
+                    value: textLayout.fontFamily(),
+                    options: [['', 'Default font']].concat(textLayout.fonts()),
+                    onChange: function (value) { textLayout.changeFontFamily(value); renderToolbar(); }
+                }, { type: 'sep' }].concat(items || []);
+            }
+            if (hasInline) {
+                items = [
+                    { icon: 'type', title: 'Font size', run: function () { inlineStyleOptions('size'); } },
+                    { icon: 'palette', title: 'Font color', run: function () { inlineStyleOptions('color'); } },
+                    { type: 'sep' }
+                ].concat(items || []);
+            }
         }
+
+        if (layoutEligible) {
+            var active = textLayout.active();
+            var layoutControls = [{ type: 'sep' }];
+            layoutControls.push({
+                icon: 'arrows-move',
+                label: active ? 'Done' : (layoutMedia ? 'Position logo' : 'Position text'),
+                title: layoutMedia ? 'Move and resize logo' : 'Move and resize text',
+                on: active,
+                primary: active,
+                run: function () { textLayout.toggle(); renderToolbar(); }
+            });
+            if (active) {
+                layoutControls.push(
+                    { icon: 'grid-3x3', title: 'Snap to grid', on: textLayout.snapping(), run: function () { textLayout.toggleSnap(); renderToolbar(); } },
+                    { icon: 'align-center', title: 'Snap to center (horizontal)', run: function () { textLayout.snapToCenter(); renderToolbar(); } },
+                    { icon: 'arrow-counterclockwise', title: layoutMedia ? 'Reset logo placement' : 'Reset text placement', run: function () { textLayout.reset(); } }
+                );
+            }
+            items = items.concat(layoutControls);
+        }
+
         if (S.sel && window.GNCImageFraming) {
             var photoTarget = (S.sel.kind === 'office' || S.sel.kind === 'person')
                 ? S.sel.el.querySelector('[data-ve-img="office-photo"],[data-ve-img="person-photo"]') : null;
             var frameTarget = window.GNCImageFraming.findTarget(photoTarget || S.sel.el);
-            if (frameTarget&&!backgroundTarget(frameTarget)) items = [{icon:'arrows-move',label:'Reposition image',run:function () { window.GNCImageFraming.edit(frameTarget); }}].concat(items || []);
+            if (frameTarget && !backgroundTarget(frameTarget)) items = [{ icon: 'arrows-move', label: 'Reposition image', run: function () { window.GNCImageFraming.edit(frameTarget); } }].concat(items || []);
         }
-        var deviceBackground=S.sel&&backgroundTarget(S.sel.area||S.sel.el);
-        if(deviceBackground&&S.sel.kind!=='field'&&S.sel.kind!=='rich'){
-            items=(items||[]).filter(function(item){return !/image|picture|background|photo|banner/i.test(item.label||item.title||'');});
-            items.unshift({icon:'image',label:'Background ('+S.device+')',run:function(){responsiveBackgroundOptions(deviceBackground);}});
+        var deviceBackground = S.sel && backgroundTarget(S.sel.area || S.sel.el);
+        if (deviceBackground && S.sel.kind !== 'field' && S.sel.kind !== 'rich') {
+            items = (items || []).filter(function (item) { return !/image|picture|background|photo|banner/i.test(item.label || item.title || ''); });
+            items.unshift({ icon: 'image', label: 'Background (' + S.device + ')', run: function () { responsiveBackgroundOptions(deviceBackground); } });
         }
-        if(S.sel&&S.sel.el&&S.sel.el.__ve&&S.sel.el.__ve.rich&&!items.some(function(item){return item.type==='select'&&item.title==='Text style';}))items=richTextTools().concat(items||[]);
-        if(S.sel&&S.sel.el&&S.sel.el.isContentEditable&&S.sel.el.__ve?.onChange&&S.win.GNCInlineTextStyle){
-            items=[{icon:'type',label:'Font size',run:function(){inlineStyleOptions('size');}},{icon:'palette',label:'Font color',run:function(){inlineStyleOptions('color');}}].concat(items||[]);
-        }
+
         if (!items || !items.length) { tb.hidden = true; return; }
-        items.forEach(function (it) { if (it) tb.appendChild(buildItem(it)); });
+        var cleaned = [];
+        items.forEach(function (it) {
+            if (!it) return;
+            if (it.type === 'sep') {
+                if (!cleaned.length || cleaned[cleaned.length - 1].type === 'sep') return;
+            }
+            cleaned.push(it);
+        });
+        if (cleaned.length && cleaned[cleaned.length - 1].type === 'sep') cleaned.pop();
+        if (!cleaned.length) { tb.hidden = true; return; }
+        cleaned.forEach(function (it) { tb.appendChild(buildItem(it)); });
         tb.hidden = false; tb.style.visibility = 'hidden'; placeTb(true);
     }
     var lastPos = '';
@@ -906,7 +977,7 @@
         it.push({ icon: 'text-left', title: 'Align left', on: state('justifyLeft'), run: function () { exec('justifyLeft'); } });
         it.push({ icon: 'text-center', title: 'Align centre', on: state('justifyCenter'), run: function () { exec('justifyCenter'); } });
         it.push({ icon: 'text-right', title: 'Align right', on: state('justifyRight'), run: function () { exec('justifyRight'); } });
-        it.push({ icon: 'justify', label: 'Justify', title: 'Align text to both margins', on: state('justifyFull'), run: function () { exec('justifyFull'); } });
+        it.push({ icon: 'justify', title: 'Justify', on: state('justifyFull'), run: function () { exec('justifyFull'); } });
         it.push({ type: 'sep' });
         it.push({ icon: 'link-45deg', title: 'Add or change a link', on: state('createLink'), run: linkAction });
         it.push({ icon: 'eraser', title: 'Clear formatting', run: function () { exec('removeFormat'); } });
@@ -3090,7 +3161,7 @@
             var confirmName = async function (publish) {
                 if(S.busy)return;
                 var v = input.value.trim();
-                if (!v && needName) { input.focus(); return; }
+                // A facility name is optional; a blank name is allowed.
                 if (!needName) {
                     if (v === s.title) { closePop(); return; }
                     if (!publish) { closePop(); return; }

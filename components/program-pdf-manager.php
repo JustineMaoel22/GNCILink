@@ -102,7 +102,7 @@ $programCategoryOptions = getProgramCategories();
             <div class="col-12">
                 <label class="small text-muted mb-1">Card description <span class="text-muted fw-normal">(shown on the department page)</span></label>
                 <textarea class="form-control form-control-sm" id="create-program-description" rows="2"
-                          maxlength="5000" placeholder="A short summary shown on the program card..."></textarea>
+                          maxlength="5000" placeholder="e.g. Prepares students for clinical nursing practice and healthcare leadership."></textarea>
             </div>
         </div>
         <div class="alert d-none mt-3 mb-0" id="program-create-alert"></div>
@@ -173,7 +173,7 @@ $programCategoryOptions = getProgramCategories();
                         <div class="col-12">
                             <label class="small text-muted mb-1">Card description <span class="text-muted fw-normal">(shown on the department page)</span></label>
                             <textarea class="form-control form-control-sm program-description-input" rows="3"
-                                      maxlength="5000" placeholder="A short summary shown on the program card..."></textarea>
+                                      maxlength="5000" placeholder="e.g. Prepares students for clinical nursing practice and healthcare leadership."></textarea>
                         </div>
                     </div>
                 </div>
