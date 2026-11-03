@@ -1381,8 +1381,8 @@
           var s = { z: view.z, cx: view.cx, cy: view.cy },
             t0 = performance.now(),
             D = 550;
-          (function step(t) {
-            var k = Math.min(1, (t - t0) / D),
+          (function step() {
+            var k = Math.min(1, Math.max(0, (performance.now() - t0) / D)),
               e = 1 - Math.pow(1 - k, 3);
             view = {
               z: Math.exp(Math.log(s.z) + (Math.log(z) - Math.log(s.z)) * e),
@@ -1391,7 +1391,7 @@
             };
             apply(view);
             if (k < 1) raf = requestAnimationFrame(step);
-          })(t0);
+          })();
         }
         function toMap(px, py) {
           var b = box(),
@@ -1432,8 +1432,8 @@
           var length = path.getTotalLength();
           var initial = { z: view.z, cx: view.cx, cy: view.cy };
           var started = performance.now(), duration = 2600, introDuration = 600;
-          (function step(now) {
-            var elapsed = Math.max(0, now - started);
+          (function step() {
+            var elapsed = Math.max(0, performance.now() - started);
             if (elapsed < duration) {
               var p = Math.max(0, Math.min(1, elapsed / duration));
               var progress = Math.sin(p * Math.PI * 0.5);
@@ -1456,7 +1456,7 @@
               view = { z: targetZoom, cx: point.x, cy: settleY };
               apply(view);
             }
-          })(started);
+          })();
         };
         window.focusRoute = function (id) {
           try {
@@ -2519,10 +2519,12 @@
       if (ta !== lastTA) { host.style.touchAction = ta; lastTA = ta; }
     }
     var lastT = 0;
-    function tick(now) {
+    function tick() {
       raf = 0;
       if (!glOn) return;
-      now = now || performance.now();
+      // Lazy iframe animation timestamps can lag performance.now() on first load.
+      // Use the same clock as tween/route start times for every animation frame.
+      var now = performance.now();
       var busy = false;
 
       if (tw) {
