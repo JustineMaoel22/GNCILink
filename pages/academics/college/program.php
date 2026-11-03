@@ -34,7 +34,7 @@ if (($_GET['ce_preview'] ?? '') === '1') {
 
 $programRequestPath = (string)parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
 $slug = isset($_GET['slug']) && is_string($_GET['slug']) ? $_GET['slug'] : '';
-if (preg_match('~^/pages/academics/college/program/([a-z0-9-]+)/?$~D', $programRequestPath, $programPathMatch)) {
+if (preg_match('~^/(?:pages/academics/college/program|programs)/([a-z0-9-]+)/?$~D', $programRequestPath, $programPathMatch)) {
     $slug = $programPathMatch[1];
 } elseif (in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true)
     && preg_match('~^/pages/academics/college/program(?:\.php)?$~D', $programRequestPath)

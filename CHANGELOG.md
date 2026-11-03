@@ -24,6 +24,7 @@
 - You can now set distinct font sizes per device view.
 
 ### Bug Fixes
+- Fixed short department URLs showing “Department not found” because the department slug was read before URL normalization; both old and short department/program paths now identify their records directly.
 - Fixed an issue where Banner Slides did not reflect background image changes made directly through the Visual Editor instead of the Banner Slides section.
 
 ### Removes
