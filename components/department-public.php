@@ -193,12 +193,13 @@ function publicDepartmentAnnouncements(int $deptId, int $limit = 6): array {
                    m.file_path AS image_path
             FROM announcements a
             LEFT JOIN media_library m ON m.media_id = a.featured_image
-            WHERE a.dept_id = ? AND a.status = 'published'
+            WHERE (a.dept_id = ? OR EXISTS (SELECT 1 FROM announcement_departments ad WHERE ad.announcement_id = a.announcement_id AND ad.dept_id = ?)) AND a.status = 'published'
             ORDER BY a.created_at DESC
             LIMIT ?
         ");
         $stmt->bindValue(1, $deptId, PDO::PARAM_INT);
-        $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+        $stmt->bindValue(2, $deptId, PDO::PARAM_INT);
+        $stmt->bindValue(3, $limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {

@@ -16,7 +16,8 @@ function publicCalendarFilters(array $query): array
     if ($department!==null) {
         $departmentId=(int)$departments[$department]['dept_id'];
         if (eventDepartmentsReady()) {
-            $condition=" AND (e.dept_id = ? OR (e.dept_id IS NULL AND e.program IN (SELECT program_code FROM programs WHERE dept_id = ?)))";
+            $condition=" AND (e.dept_id = ? OR EXISTS (SELECT 1 FROM event_departments ed WHERE ed.event_id = e.event_id AND ed.dept_id = ?) OR (e.dept_id IS NULL AND e.program IN (SELECT program_code FROM programs WHERE dept_id = ?)))";
+            $params=[$departmentId,$departmentId,$departmentId];
             $params=[$departmentId,$departmentId];
         } else {
             $condition=' AND e.program IN (SELECT program_code FROM programs WHERE dept_id = ?)';

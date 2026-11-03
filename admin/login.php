@@ -60,7 +60,7 @@ if (isLoggedIn()) { // Changed back to your original function!
                             class="form-control" 
                             id="email" 
                             name="email" 
-                            placeholder="e.g. admin@gnc.edu.ph" 
+                            placeholder="e.g. admin@gmail.com" 
                             required
                         >
                     </div>

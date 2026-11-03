@@ -245,7 +245,12 @@ if ($postAction === 'create' || $postAction === 'update') {
                 // Unique request key is reserved in the same transaction as the saved announcement.
                 getDB()->prepare('INSERT INTO facebook_publishing_requests (request_key,user_id,announcement_id,created_at) VALUES (?,?,0,NOW())')->execute([$requestKey, $_SESSION['user_id']]);
             }
-            $program = normalizeAnnouncementProgramCategory($_POST['program'] ?? null, $isUpdate ? ($existing['program'] ?? null) : null);
+            $audience = normalizeMultiAudienceInput(
+                $_POST['dept_ids'] ?? ($_POST['dept_id'] ?? null),
+                $_POST['programs'] ?? ($_POST['program'] ?? null)
+            );
+            $program = $audience['primary_program'];
+            $deptId  = $audience['primary_dept_id'];
 
             // Gallery: validate the count (including existing kept images) up front so a bad batch never partially uploads.
             $galleryFiles = $_FILES['gallery_images'] ?? null;
@@ -280,7 +285,7 @@ if ($postAction === 'create' || $postAction === 'update') {
                 'allow_incomplete' => ($_POST['allow_incomplete'] ?? '') === '1',
                 'category_id' => !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
                 'program'     => $program,
-                'dept_id'     => $_POST['dept_id'] ?? null, // validated in create/updateAnnouncement
+                'dept_id'     => $deptId, // validated in create/updateAnnouncement
             ];
 
             if ($isUpdate) {
@@ -323,6 +328,9 @@ if ($postAction === 'create' || $postAction === 'update') {
                 }
             }
             $savedId = $isUpdate ? $id : (int)($result ?? 0);
+            if ($savedId > 0 && empty($errors)) {
+                saveAnnouncementAudience(getDB(), $savedId, $audience['dept_ids'], $audience['programs']);
+            }
             if ($sendFacebook && empty($errors) && $savedId) {
                 if ($destination === 'facebook') {
                     // Keep a local editable record, but do not expose it on the public website.

@@ -186,6 +186,7 @@
         document.querySelectorAll('form[data-content-publish]').forEach(form => { form.noValidate = true; });
         if (!workflow()) return;
         document.querySelectorAll('button[data-content-publish],form[data-content-publish] button[type="submit"]').forEach(button => {
+            if (button.closest('form[data-custom-publish-label]')) return;
             const status = button.closest('form')?.querySelector('[name="status"]');
             const busy = button.disabled && /(?:saving|publishing|uploading|submitting)/i.test(button.textContent);
             const label = status?.value === 'pending' ? (busy ? 'Submitting…' : 'Submit for approval')

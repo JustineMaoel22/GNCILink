@@ -1,13 +1,30 @@
-## [0.18.1] - 2026-11-1
+## [0.19.0] - 11-4-2026
+
+### Major Features/Improvements
+- Added Department and Academic Program multi-selection to Create/Edit Announcements and Add/Edit Events in the Admin Panel.
+  - Allows selecting one, multiple, or all departments and academic programs.
+  - Checkboxes beside each item, Select All / Deselect All convenience buttons, and real-time search filtering.
+  - Selected options appear as removable tags in the input box.
+  - Multi-department and multi-program display badges in management tables and synchronized audience filtering across both admin and public calendars/bulletins.
+
+### Major Features/Improvements
+- Added Department and Academic Program multi-selection to Create/Edit Announcements and Add/Edit Events in the Admin Panel.
+  - Allows selecting one, multiple, or all departments and academic programs.
+  - Checkboxes beside each item, Select All / Deselect All convenience buttons, and real-time search filtering.
+  - Selected options appear as removable tags in the input box.
+  - Multi-department and multi-program display badges in management tables and synchronized audience filtering across both admin and public calendars/bulletins.
 
 ### Minor Additions/Improvements
-- You can now delete submissions in The Mirror account.
-- Added example text (e.g) inside form placeholders to guide users.
-- The calendar importer now better recongnizes keywords and detects events from uploaded word documents.
-- Improve the design and layout of the calendar import screen.
-- Added a link to the offical Tiktok account of GNC.
-- Improve the responsiveness of the mission and vision.
+- Added short public and admin browser URLs with redirects from existing links, preserving query parameters, CMS page identities, and server-side permissions.
+- Redesigned Create User with inline validation, role guidance, compact account-setup instructions, and a masked temporary-password confirmation with show/copy controls and close protection.
+- Applied the same grouped modal layout, persistent save bar, inline validation, and unsaved-change protection to Create/Edit News, preserving author/category fields, galleries, and approval rules.
+- Applied the event modal's grouped layout, persistent save bar, accessible audience controls, inline validation, and unsaved-change protection to Create/Edit Announcement, preserving rich text, galleries, and Facebook publishing.
+- Redesigned the Events & Calendar event form with grouped fields, single-day/multi-day scheduling, searchable audience selection, inline validation, visibility-specific save actions, and unsaved-change protection.
+- Fixed event audience persistence when creating and editing events, and added server-side date/time range validation.
+- You can now set distinct font sizes per device view.
 
 ### Bug Fixes
-- Fixed and error ("The existing handler did not confirm this change") that appeared when a Super Admin approved a post from The Mirror account.
-- Fixed the photo upload limit for announcement so the "maximum 10 images" warning appears immediately when selecting files, rather than waiting until after the resizing step.
+- Fixed an issue where Banner Slides did not reflect background image changes made directly through the Visual Editor instead of the Banner Slides section.
+
+### Removes
+- Removed floating animations in icons

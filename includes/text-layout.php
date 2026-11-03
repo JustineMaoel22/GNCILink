@@ -14,6 +14,7 @@ function textLayoutFonts(): array {
     ];
 }
 function textLayoutRoute(string $route): string {
+    $route = gncBrowserLegacyUrl($route);
     if (strlen($route)>1000) throw new InvalidArgumentException('Invalid public page.');
     $parts = parse_url($route);
     $path = rawurldecode($parts['path'] ?? '');
@@ -56,9 +57,24 @@ function textLayoutNormalize(array $entries): array {
         foreach ($devices as $device => $box) {
             if (!in_array($device, ['desktop','tablet','mobile'], true)) throw new InvalidArgumentException('Invalid device.');
             if ($box === null) { $out[$key][$device] = null; continue; }
-            if (!is_array($box) || !$box || array_diff(array_keys($box), ['x','y','w','h','fontSize','fontFamily','centerX','runs'])) throw new InvalidArgumentException('Invalid text box.');
+            if (!is_array($box) || !$box || array_diff(array_keys($box), ['x','y','w','h','fontSize','fontFamily','centerX','runs','color','lineHeight','letterSpacing','textAlign'])) throw new InvalidArgumentException('Invalid text box.');
             $positioned = (bool)array_intersect(array_keys($box), ['x','y','w','h']);
-            if (!$positioned && !array_key_exists('fontFamily', $box) && !array_key_exists('runs',$box)) throw new InvalidArgumentException('Invalid text box.');
+            $styled = (bool)array_intersect(array_keys($box), ['fontFamily','runs','fontSize','color','lineHeight','letterSpacing','textAlign']);
+            if (!$positioned && !$styled) throw new InvalidArgumentException('Invalid text box.');
+            if (array_key_exists('color', $box)) {
+                if (!is_string($box['color']) || !preg_match('/\A#[a-fA-F0-9]{6}\z/D', $box['color'])) throw new InvalidArgumentException('Use a HEX text color such as #176B42.');
+                $out[$key][$device]['color'] = strtoupper($box['color']);
+            }
+            foreach (['lineHeight'=>[0.8,4,'Line height must be between 0.8 and 4.'],'letterSpacing'=>[-5,20,'Letter spacing must be between -5 and 20 pixels.']] as $prop => [$min,$max,$msg]) {
+                if (!array_key_exists($prop, $box)) continue;
+                $n = $box[$prop];
+                if ((!is_int($n) && !is_float($n)) || !is_finite((float)$n) || $n < $min || $n > $max) throw new InvalidArgumentException($msg);
+                $out[$key][$device][$prop] = round((float)$n, 2);
+            }
+            if (array_key_exists('textAlign', $box)) {
+                if (!is_string($box['textAlign']) || !in_array($box['textAlign'], ['left','center','right','justify'], true)) throw new InvalidArgumentException('Invalid text alignment.');
+                $out[$key][$device]['textAlign'] = $box['textAlign'];
+            }
             if (array_key_exists('runs',$box)) $out[$key][$device]['runs']=textLayoutRuns($box['runs']);
             foreach ($positioned ? ['x'=>[-100,100], 'y'=>[-100,100], 'w'=>[1,100], 'h'=>[0,3000]] : [] as $prop => [$min,$max]) {
                 $n = $box[$prop] ?? null;

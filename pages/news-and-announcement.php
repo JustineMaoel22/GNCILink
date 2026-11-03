@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/facebook-post-url.php';
+require_once __DIR__ . '/../includes/multi-audience.php';
 require_once __DIR__ . '/../admin/admin-functions.php';
 require_once __DIR__ . '/../components/calendar-filters.php';
 // Resume an authorized Visual Editor session before the document sends output.
@@ -151,13 +152,15 @@ if ($db) {
     try {
         $stmt = $db->query("
             SELECT a.announcement_id, a.title, a.slug, a.content, a.published_at, a.created_at,
-                a.category_id, a.program, c.category_name, m.file_path as image_path
+                a.category_id, a.program, a.dept_id, c.category_name, m.file_path as image_path
             FROM announcements a
             LEFT JOIN categories c ON a.category_id = c.category_id
             LEFT JOIN media_library m ON a.featured_image = m.media_id
             WHERE a.status = 'published'
         ");
-        foreach ($stmt->fetchAll() as $ann) {
+        $allAnnRows = $stmt->fetchAll();
+        $pubAnnAudiences = getAnnouncementAudiencesBatch($db, $allAnnRows);
+        foreach ($allAnnRows as $ann) {
             $excerpt = strip_tags($ann['content']);
             $excerpt = mb_strlen($excerpt) > 140 ? mb_substr($excerpt, 0, 140) . '…' : $excerpt;
             $feedItems[] = [
@@ -173,6 +176,9 @@ if ($db) {
                 'category_id'   => $ann['category_id'],
                 'category_name' => $ann['category_name'],
                 'program'       => $ann['program'],
+                'dept_id'       => $ann['dept_id'] ?? null,
+                'dept_ids'      => $pubAnnAudiences[$ann['announcement_id']]['dept_ids'] ?? (!empty($ann['dept_id']) ? [(int)$ann['dept_id']] : []),
+                'programs'      => $pubAnnAudiences[$ann['announcement_id']]['programs'] ?? (!empty($ann['program']) && $ann['program'] !== 'ALL' ? [$ann['program']] : []),
                 'author'        => null,
             ];
         }
@@ -451,7 +457,7 @@ function na_url(array $overrides = []): string {
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-    <link href="/assets/css/news-announcement-style.css?v=2" rel="stylesheet">
+    <link href="/assets/css/news-announcement-style.css?v=<?= filemtime(__DIR__ . '/../assets/css/news-announcement-style.css') ?>" rel="stylesheet">
     <link href="/assets/css/skeleton-style.css?v=2" rel="stylesheet">
     <link href="/assets/css/calendar-program-widget.css?v=<?= filemtime(__DIR__ . '/../assets/css/calendar-program-widget.css') ?>" rel="stylesheet">
     <style>
@@ -942,6 +948,78 @@ function na_url(array $overrides = []): string {
         }
         wire('.na-card', 'a.na-read-more');
         wire('.gnc-pinned-card', 'a.gnc-pinned-btn');
+
+        // Equalize pinned news/announcement cards so all slides have the same height in mobile view.
+        function syncPinnedHeights() {
+            var carousel = document.getElementById('gncPinnedCarousel');
+            if (!carousel) return;
+            var cards = carousel.querySelectorAll('.gnc-pinned-card');
+            if (cards.length <= 1) return;
+
+            // Reset inline heights so natural height can be computed
+            for (var i = 0; i < cards.length; i++) {
+                cards[i].style.height = '';
+            }
+
+            // Only equalize on mobile view (<= 768px) where cards stack vertically
+            if (window.innerWidth <= 768) {
+                var items = carousel.querySelectorAll('.carousel-item');
+                var maxHeight = 0;
+
+                for (var j = 0; j < items.length; j++) {
+                    var item = items[j];
+                    var wasActive = item.classList.contains('active');
+                    if (!wasActive) {
+                        item.style.position = 'absolute';
+                        item.style.visibility = 'hidden';
+                        item.style.display = 'block';
+                        item.style.width = '100%';
+                        item.style.top = '0';
+                        item.style.left = '0';
+                    }
+                    var card = item.querySelector('.gnc-pinned-card');
+                    if (card) {
+                        var h = card.offsetHeight;
+                        if (h > maxHeight) maxHeight = h;
+                    }
+                    if (!wasActive) {
+                        item.style.position = '';
+                        item.style.visibility = '';
+                        item.style.display = '';
+                        item.style.width = '';
+                        item.style.top = '';
+                        item.style.left = '';
+                    }
+                }
+
+                if (maxHeight > 0) {
+                    var hStr = Math.ceil(maxHeight) + 'px';
+                    for (var k = 0; k < cards.length; k++) {
+                        cards[k].style.height = hStr;
+                    }
+                }
+            }
+        }
+
+        syncPinnedHeights();
+        window.addEventListener('load', syncPinnedHeights);
+        var resizeTimer;
+        window.addEventListener('resize', function () {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(syncPinnedHeights, 100);
+        });
+        window.addEventListener('orientationchange', function () {
+            setTimeout(syncPinnedHeights, 150);
+        });
+        var carouselEl = document.getElementById('gncPinnedCarousel');
+        if (carouselEl) {
+            carouselEl.addEventListener('slid.bs.carousel', syncPinnedHeights);
+            carouselEl.querySelectorAll('.gnc-pinned-media img').forEach(function (img) {
+                if (!img.complete) {
+                    img.addEventListener('load', syncPinnedHeights);
+                }
+            });
+        }
     })();
     </script>
 </body>

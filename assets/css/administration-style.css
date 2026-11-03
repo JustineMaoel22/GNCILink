@@ -911,7 +911,10 @@
 
 /* ---------- Large phones ---------- */
 @media (max-width: 768px) {
-    .admin-hero-inner { padding: 32px 20px 36px; }
+    .admin-hero-inner { padding: 32px 20px 36px; text-align: center; }
+    .admin-hero h1,
+    .admin-hero p { text-align: center; margin-left: auto; margin-right: auto; }
+    .admin-hero h1::after { margin-left: auto; margin-right: auto; }
     .admin-tabs-wrap { padding: 0 20px 20px; margin-top: 20px; }
     .admin-section { padding: 40px 20px 50px; }
     .admin-section-intro { margin-bottom: 28px; }

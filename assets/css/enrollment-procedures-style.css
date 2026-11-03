@@ -114,8 +114,9 @@ html, body {
 
 /* ---------- Tabs ---------- */
 .enrollment-tabs {
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 28px;
+    flex-wrap: wrap;
 }
 .enrollment-level-tabs { padding-bottom: 24px; border-bottom: 1px solid var(--gnc-border); }
 .enrollment-level-title { color: var(--gnc-green-light); font: 700 28px/1.4 'Noto Serif', serif; margin: 0 0 24px; }
@@ -124,16 +125,34 @@ html, body {
     font-family: 'Inter', sans-serif;
     font-weight: 600;
     font-size: 13px;
-    color: var(--gnc-green);
+    color: #396744;
     background-color: transparent;
-    border: 1px solid var(--gnc-green);
-    border-radius: 4px;
-    padding: 8px 18px;
+    border: 1px solid var(--gnc-gold);
+    border-radius: 24px;
+    padding: 6px 24px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.enrollment-tabs .nav-link:hover {
+    background-color: var(--gnc-green-light);
+    border-color: var(--gnc-green-light);
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(31, 94, 44, 0.2);
 }
 
 .enrollment-tabs .nav-link.active {
-    background-color: var(--gnc-green);
-    color: white;
+    background-color: var(--gnc-green-light);
+    border-color: var(--gnc-green-light);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(31, 94, 44, 0.25);
+}
+
+.enrollment-tabs .nav-link:focus-visible {
+    outline: 3px solid var(--gnc-gold);
+    outline-offset: 3px;
 }
 
 /* ---------- Pane header ---------- */
@@ -164,6 +183,8 @@ html, body {
 }
 
 @media (max-width: 576px) {
+    .enrollment-tabs { gap: 8px; }
+    .enrollment-tabs .nav-link { padding: 5px 14px; text-align: center; }
     .enrollment-steps-grid { grid-template-columns: 1fr; }
 }
 
@@ -272,18 +293,9 @@ html, body {
 }
 
 /* ---------- Tabs ---------- */
-.enrollment-tabs .nav-link {
-    transition: background-color 0.25s ease, color 0.25s ease,
-                transform 0.25s ease, box-shadow 0.25s ease;
-}
-
-.enrollment-tabs .nav-link:hover:not(.active) {
-    background-color: rgba(11, 66, 40, 0.08);
-    transform: translateY(-2px);
-}
-
-.enrollment-tabs .nav-link.active {
-    box-shadow: 0 4px 12px rgba(11, 66, 40, 0.25);
+.enrollment-tabs .nav-link:active {
+    transform: translateY(0) scale(0.97);
+    box-shadow: none;
 }
 
 /* Pane header slides in when a tab opens */

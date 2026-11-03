@@ -352,20 +352,11 @@
     animation-name: cp-scale-in;
 }
 
-/* Continuous idle animations for feature icons */
-.basic-edu-feature-icon img {
-    animation: cp-icon-float 4s ease-in-out infinite;
-}
-
-/* Stagger the ambient floating so they don't move uniformly together */
-.basic-edu-feature:nth-child(2) .basic-edu-feature-icon img { animation-delay: 1s; }
-.basic-edu-feature:nth-child(3) .basic-edu-feature-icon img { animation-delay: 2s; }
-.basic-edu-feature:nth-child(4) .basic-edu-feature-icon img { animation-delay: 3s; }
+/* Floating animation removed */
 
 /* Accessibility compliance */
 @media (prefers-reduced-motion: reduce) {
-    .js-anim [data-reveal].is-visible,
-    .basic-edu-feature-icon img {
+    .js-anim [data-reveal].is-visible {
         animation: none !important;
     }
     .js-anim [data-reveal]:not(.is-visible) {

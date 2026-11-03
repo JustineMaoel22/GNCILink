@@ -58,6 +58,7 @@ function gncbot_page_urls(): array
         'college_departments' => ['label' => 'College Departments',          'url' => gncbot_url('/pages/academics/college/college-dept.php')],
         'basic_education'     => ['label' => 'Basic Education',              'url' => gncbot_url('/pages/academics/basic-edu/basic-edu-dept.php')],
         'graduate_school'     => ['label' => 'Graduate School',              'url' => gncbot_url('/pages/academics/graduate-school/graduate-school.php')],
+        'athletics_sports'    => ['label' => 'Athletics and Sports',         'url' => gncbot_url('/pages/student%20life/athletics-sports.php')],
         'campus_navigator'    => ['label' => 'Campus Navigator',             'url' => gncbot_url('/campus_navigator.html')],
         'facebook'            => ['label' => 'GNC Official Facebook Page',   'url' => 'https://www.facebook.com/gnc.edu.ph'],
         // --- fill these in when the routes are confirmed (null = not recommended) ---

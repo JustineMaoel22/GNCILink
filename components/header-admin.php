@@ -256,7 +256,7 @@ const CSRF_TOKEN = '<?= $csrfToken ?>';
 
 // Confirm logout before ending the session.
 let logoutConfirmationPending = false;
-document.querySelectorAll('a[href="/admin/auth/logout.php"]').forEach(link => {
+document.querySelectorAll('a[href="/admin/auth/logout.php"],a[href="/logout"]').forEach(link => {
     link.addEventListener('click', async event => {
         event.preventDefault();
         if (logoutConfirmationPending) return;

@@ -1,0 +1,335 @@
+/**
+ * GNC Multi-Audience Select Component Styles
+ *
+ * Provides a clean, responsive multi-selection dropdown with:
+ * - Clickable trigger container with removable tags
+ * - Search bar with real-time filtering
+ * - "Select All" and "Deselect All" bulk controls
+ * - Checkbox list with department & program badges
+ */
+
+.gnc-ms-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.gnc-ms-trigger {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-height: 42px;
+    padding: 6px 36px 6px 10px;
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    user-select: none;
+}
+
+.gnc-ms-trigger:hover {
+    border-color: #EABA3B;
+}
+
+.gnc-ms-trigger:focus,
+.gnc-ms-wrap.is-open .gnc-ms-trigger {
+    border-color: #EABA3B;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(234, 186, 59, 0.25);
+}
+
+.gnc-ms-tags-area {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.gnc-ms-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    font-weight: 500;
+    background: rgba(234, 186, 59, 0.16);
+    color: #17231e;
+    border: 1px solid rgba(234, 186, 59, 0.45);
+    max-width: 100%;
+    word-break: break-word;
+}
+
+.gnc-ms-tag-all {
+    background: rgba(31, 138, 59, 0.12);
+    color: #1F5E2C;
+    border-color: rgba(31, 138, 59, 0.35);
+    font-weight: 600;
+}
+
+.gnc-ms-tag-code {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: #EABA3B;
+    color: #094024;
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+}
+
+.gnc-ms-tag-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: #6c757d;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color .15s, color .15s;
+}
+
+.gnc-ms-tag-remove:hover {
+    background: rgba(220, 53, 69, 0.2);
+    color: #dc3545;
+}
+
+.gnc-ms-arrow {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6c757d;
+    pointer-events: none;
+    transition: transform .2s ease;
+    font-size: 0.85rem;
+}
+
+.gnc-ms-wrap.is-open .gnc-ms-arrow {
+    transform: translateY(-50%) rotate(180deg);
+}
+
+/* Dropdown Menu */
+.gnc-ms-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    z-index: 1060;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    animation: gncMsFadeIn .15s ease-out;
+}
+
+@keyframes gncMsFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.gnc-ms-wrap.is-open .gnc-ms-dropdown {
+    display: flex;
+}
+
+/* Header & Search Bar */
+.gnc-ms-header {
+    padding: 8px 10px;
+    background: #fdfdfd;
+    border-bottom: 1px solid #eef0f2;
+}
+
+.gnc-ms-search-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.gnc-ms-search-wrap .bi-search {
+    position: absolute;
+    left: 10px;
+    color: #8c9297;
+    font-size: 0.82rem;
+    pointer-events: none;
+}
+
+.gnc-ms-search-input {
+    padding-left: 30px !important;
+    padding-right: 28px !important;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.gnc-ms-search-clear {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 1rem;
+    color: #8c9297;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.gnc-ms-search-clear:hover {
+    color: #dc3545;
+}
+
+/* Quick Action Toolbar */
+.gnc-ms-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 2px 2px;
+    font-size: 0.78rem;
+}
+
+.gnc-ms-btn-action {
+    background: none;
+    border: none;
+    padding: 2px 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #1F5E2C;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 4px;
+    transition: background-color .15s, color .15s;
+}
+
+.gnc-ms-btn-action:hover {
+    background-color: rgba(31, 138, 59, 0.1);
+    color: #094024;
+}
+
+.gnc-ms-btn-deselect {
+    color: #dc3545;
+}
+
+.gnc-ms-btn-deselect:hover {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #bd2130;
+}
+
+/* Scrollable Options List */
+.gnc-ms-list {
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 4px 0;
+    scrollbar-width: thin;
+}
+
+.gnc-ms-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    margin: 0;
+    font-size: 0.85rem;
+    color: #212529;
+    cursor: pointer;
+    transition: background-color .12s;
+    user-select: none;
+}
+
+.gnc-ms-option:hover {
+    background-color: #f6f8f6;
+}
+
+.gnc-ms-option.is-checked {
+    background-color: rgba(234, 186, 59, 0.1);
+}
+
+.gnc-ms-option input[type="checkbox"] {
+    flex-shrink: 0;
+    margin: 0;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    accent-color: #1F5E2C;
+}
+
+.gnc-ms-option-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: rgba(201,162,39,.18);
+    color: #C9A227;
+    border: 1px solid rgba(201,162,39,.4);
+    flex-shrink: 0;
+}
+
+.gnc-ms-option-text {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: normal;
+    line-height: 1.35;
+}
+
+.gnc-ms-divider {
+    height: 1px;
+    background: #eef0f2;
+    margin: 4px 0;
+}
+
+.gnc-ms-no-results {
+    padding: 18px 12px;
+    text-align: center;
+    font-size: 0.82rem;
+    color: #8c9297;
+}
+
+/* Badges for table list */
+.audience-tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+.audience-tag {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: rgba(128,128,128,.14);
+    color: #495057;
+    white-space: nowrap;
+}
+
+.audience-tag-dept {
+    background: rgba(31,138,59,.12);
+    color: #1F5E2C;
+    border: 1px solid rgba(31,138,59,.25);
+}
+
+.audience-tag-prog {
+    background: rgba(234,186,59,.16);
+    color: #C9A227;
+    border: 1px solid rgba(234,186,59,.4);
+}
+

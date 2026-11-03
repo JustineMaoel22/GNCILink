@@ -379,3 +379,19 @@ body {
     .logo-info-wrapper h2::after { width: 65px !important; transition: none !important; }
     .meaning-text { transition: none !important; }
 }
+
+@media (max-width: 768px) {
+    .logo-meaning-hero {
+        background-position: center;
+    }
+    .logo-meaning-hero-inner {
+        padding: 32px 18px 36px;
+        text-align: center;
+    }
+    .logo-meaning-hero h1,
+    .logo-meaning-hero p {
+        text-align: center;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}

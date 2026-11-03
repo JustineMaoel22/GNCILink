@@ -8,6 +8,9 @@ $sportsContent=athleticsSportsContent();
 $sportsPreview=cePreviewCanManage();
 $sportsPrograms=$sportsContent['sports'];
 $sportsFacebookEmbed=athleticsSportsFacebookEmbedUrl($sportsContent['facebook_url']);
+$sportsFacebookUrl=trim((string)($sportsContent['facebook_url']??''));
+$hasSportsFacebook=$sportsFacebookUrl!==''&&preg_match('~^https?://(?:www\.)?facebook\.com/[^\s]*$~iD',$sportsFacebookUrl);
+$sportsFacebookName=trim((string)($sportsContent['texts']['facebook_page_name']??''))?:'GNC Sports Club';
 $sportsText=static fn($key)=>htmlspecialchars($sportsContent['texts'][$key],ENT_QUOTES,'UTF-8');
 $sportsField=static fn($key,$label)=>ceField('sports-text',['key'=>$key,'label'=>$label,'max'=>str_ends_with($key,'title')?255:3000]);
 $sportsH = static fn($value) => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
@@ -166,19 +169,27 @@ $highlightsUrl=static fn($page)=>'?'.http_build_query(array_merge(['highlights_p
             <?php endif; ?>
             <?php endif; ?>
         </section>
+        <?php if ($hasSportsFacebook || $sportsPreview): ?>
         <section class="athletics-facebook" aria-labelledby="sportsFacebookTitle">
             <span class="athletics-facebook-kicker"<?= $sportsField('facebook_kicker','Facebook section label') ?>><?= $sportsText('facebook_kicker') ?></span>
             <h2 id="sportsFacebookTitle"<?= $sportsField('facebook_title','Facebook section heading') ?>><?= $sportsText('facebook_title') ?></h2>
             <p<?= $sportsField('facebook_description','Facebook section introduction') ?>><?= $sportsText('facebook_description') ?></p>
-            <div class="athletics-facebook-box"<?= $sportsPreview?' data-ve-sports-facebook data-ve-pick="sports-facebook" data-ve-link="'.$sportsH($sportsContent['facebook_url']).'"':'' ?>>
-                <?php if($sportsFacebookEmbed!==null): ?>
-                <iframe <?= gncPrivacyFrameSource($sportsFacebookEmbed) ?> width="500" height="130" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen loading="lazy" title="GNC Sports Club Facebook page"></iframe>
+            <div class="athletics-facebook-box"<?= $sportsPreview?' data-ve-sports-facebook data-ve-pick="sports-facebook" data-ve-link="'.$sportsH($sportsFacebookUrl).'"':'' ?>>
+                <?php if($hasSportsFacebook): ?>
+                <a class="dept-fb-link athletics-fb-link" href="<?= $sportsH($sportsFacebookUrl) ?>" target="_blank" rel="noopener noreferrer">
+                    <i class="bi bi-facebook dept-fb-icon" aria-hidden="true"></i>
+                    <div class="dept-fb-copy">
+                        <strong><?= $sportsH($sportsFacebookName) ?></strong>
+                        <span>Visit on Facebook <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></span>
+                    </div>
+                </a>
                 <?php endif; ?>
                 <?php if($sportsPreview): ?>
-                <button type="button" class="athletics-facebook-edit" data-ve-sports-facebook-edit><i class="bi bi-facebook" aria-hidden="true"></i> <?= $sportsFacebookEmbed!==null?'Change Facebook page link':'Add the Facebook page link' ?></button>
+                <button type="button" class="athletics-facebook-edit" data-ve-sports-facebook-edit><i class="bi bi-facebook" aria-hidden="true"></i> <?= $hasSportsFacebook?'Change Facebook page link':'Add the Facebook page link' ?></button>
                 <?php endif; ?>
             </div>
         </section>
+        <?php endif; ?>
     </main>
 
     <?= ceData('veSportsData',['content'=>$sportsContent,'revision'=>athleticsSportsRevision($sportsContent)]) ?>

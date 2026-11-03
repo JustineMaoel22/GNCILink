@@ -1,0 +1,50 @@
+.user-create-card { overflow: visible; }
+.user-create-heading { padding: 22px 24px 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid #e2e8e3; }
+.user-create-heading h2 { margin: 0; color: var(--gnc-green, #094024); font-size: 1.05rem; font-weight: 700; }
+.user-create-heading p { margin: 5px 0 0; color: #59665e; font-size: .85rem; }
+.user-required-note { color: #59665e; font-size: .78rem; }
+.user-create-body { padding: 22px 24px; }
+#create-user-form :is(.form-control, .form-select) { min-height: 44px; border-color: #c9d4cd; }
+#create-user-form :is(.form-text, .user-role-help) { color: #59665e; font-size: .8rem; line-height: 1.55; }
+#create-user-form .user-role-help { margin: 6px 0 0; }
+#create-user-form .is-invalid { border-color: #b02a37; }
+.user-setup-note { display: flex; gap: 12px; padding: 14px 16px; margin-top: 20px; background: #eff6f1; border: 1px solid #d9e6dc; border-radius: var(--admin-control-radius, 8px); color: #234d30; font-size: .83rem; }
+.user-setup-note > i { font-size: 20px; flex: none; }
+.user-setup-note p { margin: 3px 0 0; line-height: 1.6; }
+.user-create-footer { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px 24px; background: #fff; border-top: 1px solid #e2e8e3; border-radius: 0 0 var(--admin-card-radius, 12px) var(--admin-card-radius, 12px); }
+.user-create-footer > span { color: #59665e; font-size: .8rem; }
+.user-create-footer .btn { min-height: 44px; padding: 10px 20px; white-space: nowrap; }
+.user-account-help { overflow: hidden; }
+.user-account-help summary { min-height: 56px; padding: 16px 24px; color: var(--gnc-green, #094024); font-size: .88rem; font-weight: 600; cursor: pointer; }
+.user-account-help summary span { margin-left: 12px; color: #59665e; font-size: .8rem; font-weight: 400; }
+.user-account-help-body { padding: 0 24px 20px; max-width: 900px; font-size: .85rem; line-height: 1.7; color: #45564a; }
+.user-account-help-body li { padding-left: 4px; margin-bottom: 7px; }
+.user-account-help-body p:last-child { margin-bottom: 0; }
+.user-password-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); }
+.user-password-heading { display: flex; align-items: flex-start; gap: 14px; padding: 24px 24px 20px; border-bottom: 1px solid #e2e8e3; }
+.user-password-dialog h2 { font-size: 1.1rem; margin-bottom: 6px; }
+.user-created-icon { display: grid; place-items: center; flex: none; width: 42px; height: 42px; color: var(--gnc-green, #094024); background: #edf5ef; border-radius: 8px; font-size: 24px; }
+.user-password-body { padding: 20px 24px; }
+.user-created-details { margin: 0 0 20px; }
+.user-created-details > div { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 12px; padding: 5px 0; font-size: .85rem; }
+.user-created-details dt { color: #59665e; font-weight: 500; }
+.user-created-details dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.user-password-control { display: flex; gap: 8px; }
+.user-password-control .form-control { min-width: 0; min-height: 46px; font: 16px/1.5 ui-monospace, monospace; }
+.user-password-control .btn { min-width: 70px; min-height: 46px; }
+#password-copy-status { min-height: 22px; margin: 6px 0; color: #245834; font-size: .8rem; }
+.user-password-reminder { padding: 13px 15px; border: 1px solid #e3d5ac; border-radius: 8px; background: #fff9e9; color: #655020; font-size: .82rem; line-height: 1.65; }
+.user-password-footer { position: sticky; bottom: 0; display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; padding: 16px 24px; border-top: 1px solid #e2e8e3; background: #fff; }
+.user-password-footer .btn { min-height: 44px; padding: 10px 18px; }
+:is(#create-user-form, .user-account-help, .user-password-dialog) :is(input, select, button, summary):focus-visible { outline: 3px solid var(--gnc-gold, #eaba3b); outline-offset: 2px; }
+.user-account-help summary:focus-visible { outline: 3px solid var(--gnc-gold, #eaba3b); outline-offset: -3px; }
+@media (max-width: 575.98px) {
+    :is(.user-create-heading, .user-create-body, .user-create-footer, .user-password-heading, .user-password-body, .user-password-footer) { padding: 16px; }
+    .user-create-footer { flex-wrap: wrap; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+    .user-create-footer .btn { width: 100%; }
+    #create-user-form :is(.form-control, .form-select) { font-size: 16px; }
+    .user-account-help summary { padding: 16px; }
+    .user-account-help summary span { display: block; margin: 4px 0 0; }
+    .user-account-help-body { padding: 0 16px 16px; }
+    .user-password-footer .btn { flex: 1 1 0; }
+}

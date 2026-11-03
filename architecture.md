@@ -41,6 +41,7 @@ Do not mix SQL, permission logic, and markup unnecessarily. Refactor in small ba
 - Document any required environment variables and schema migrations.
 
 ## Frontend architecture
+- Browser URLs are mapped explicitly in `includes/browser-routes.php` and the matching Apache rules in `.htaccess`. `includes/browser-urls.php` redirects legacy GET/HEAD URLs, renders short navigation links, and restores the original request route internally for CMS identities. Apache continues to execute the original PHP entry point, so file-based RBAC checks retain their existing boundary. POST/action endpoints and visual-editor preview URLs keep their existing submission behavior.
 - Favor shared navbar, footer, buttons, cards, modal, form, and responsive layout components.
 - Keep layout/design tokens centralized; consult `designsystem.md`.
 - Ensure the public website and admin editor do not unintentionally leak styles or scripts into each other.

@@ -1,0 +1,24 @@
+:is(#announcementModal, #newsModal) .ann-optional { margin-left: 8px; color: #59665e; font-size: .75rem; font-weight: 400; }
+:is(#announcementModal, #newsModal) .ann-status-help { color: #59665e; font-size: .8rem; line-height: 1.6; }
+:is(#announcementModal, #newsModal) .ann-image-box > .flex-grow-1 { min-width: 0; }
+:is(#announcementModal, #newsModal) .ql-toolbar { border-color: #c9d4cd; border-radius: 8px 8px 0 0; background: #fafcfb; }
+:is(#announcementModal, #newsModal) .ql-container { border-color: #c9d4cd; border-radius: 0 0 8px 8px; font-family: inherit; font-size: .95rem; }
+:is(#announcementModal, #newsModal) .ql-editor { min-height: 190px; line-height: 1.65; }
+:is(#announcementModal, #newsModal) .ql-editor:focus-visible { outline: 3px solid var(--gnc-gold, #eaba3b); outline-offset: -3px; }
+:is(#announcementModal, #newsModal) .ql-editor.ql-blank::before { color: #657169; font-style: normal; }
+:is(#announcementModal, #newsModal) .ql-toolbar button { min-width: 36px; min-height: 36px; }
+:is(#announcementModal, #newsModal) .ann-message-invalid { border-color: #b02a37; }
+:is(#announcementModal, #newsModal) .ann-message-invalid ~ .invalid-feedback { display: block; }
+:is(#announcementModal, #newsModal) .gallery-thumb-wrap { width: 98px; height: 98px; }
+:is(#announcementModal, #newsModal) .gallery-thumb-remove { width: 44px; height: 44px; line-height: 44px; }
+:is(#announcementModal, #newsModal) input[type="file"] { overflow: hidden; }
+:is(#announcementModal, #newsModal) .evt-save-intent { max-width: 290px; }
+:is(#announcementModal, #newsModal) .modal-footer { flex-wrap: wrap; }
+:is(#announcementModal, #newsModal) .btn:focus-visible { outline: 3px solid var(--gnc-gold, #eaba3b); outline-offset: 2px; }
+@media (max-width: 575.98px) {
+    :is(#announcementModal, #newsModal) .evt-save-intent { flex-basis: 100%; max-width: none; }
+    :is(#announcementModal, #newsModal) .modal-footer .btn { flex: 1 1 0; }
+    :is(#announcementModal, #newsModal) .ql-toolbar button { min-width: 44px; min-height: 44px; }
+    :is(#announcementModal, #newsModal) .ql-toolbar .ql-formats { margin-right: 6px; }
+    :is(#announcementModal, #newsModal) .ql-editor { font-size: 16px; min-height: 180px; }
+}

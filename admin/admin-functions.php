@@ -21,6 +21,7 @@ require_once __DIR__ . '/../includes/student-achievements.php';
 require_once __DIR__ . '/../includes/admin-rbac.php';
 require_once __DIR__ . '/../includes/first-login-password.php';
 require_once __DIR__ . '/../includes/auth-security.php';
+require_once __DIR__ . '/../includes/multi-audience.php';
 
 /**
  * Initialize secure session
@@ -570,23 +571,27 @@ function getAnnouncements(array $filters = [], int $limit = 20, int $offset = 0)
             $params[] = $filters['status'];
         }
 
-        if (isset($filters['program'])) {
-            $query .= " AND a.program = ?";
+        if (isset($filters['program']) && $filters['program'] !== '') {
+            $query .= " AND (a.program = ? OR EXISTS (SELECT 1 FROM announcement_programs ap WHERE ap.announcement_id = a.announcement_id AND ap.program_code = ?))";
             $params[] = $filters['program'];
+            $params[] = $filters['program'];
+        }
+
+        if (isset($filters['dept_id']) && $filters['dept_id'] !== '') {
+            $query .= " AND (a.dept_id = ? OR EXISTS (SELECT 1 FROM announcement_departments ad WHERE ad.announcement_id = a.announcement_id AND ad.dept_id = ?))";
+            $params[] = (int)$filters['dept_id'];
+            $params[] = (int)$filters['dept_id'];
         }
         
         if (isset($filters['search'])) {
             // Escape LIKE wildcard characters (% _ \) in the user-supplied
             // search term so they can't widen the match pattern beyond what
-            // was intended. This is always bound as a parameter (never raw
-            // SQL), so it's not an injection risk either way — but leaving
-            // % / _ unescaped lets a "search" turn into an unintended
-            // wildcard scan.
+            // was intended.
             $escapedSearch = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filters['search']);
             // Search everything visible in the table: title, content, category,
-            // department, program and author name.
-            $query .= " AND (a.title LIKE ? ESCAPE '\\\\' OR a.content LIKE ? ESCAPE '\\\\' OR c.category_name LIKE ? ESCAPE '\\\\' OR d.dept_name LIKE ? ESCAPE '\\\\' OR a.program LIKE ? ESCAPE '\\\\' OR CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,'')) LIKE ? ESCAPE '\\\\')";
-            for ($i = 0; $i < 6; $i++) {
+            // department, program and author name, plus multiple programs and departments.
+            $query .= " AND (a.title LIKE ? ESCAPE '\\\\' OR a.content LIKE ? ESCAPE '\\\\' OR c.category_name LIKE ? ESCAPE '\\\\' OR d.dept_name LIKE ? ESCAPE '\\\\' OR a.program LIKE ? ESCAPE '\\\\' OR CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,'')) LIKE ? ESCAPE '\\\\' OR EXISTS (SELECT 1 FROM announcement_programs ap WHERE ap.announcement_id = a.announcement_id AND ap.program_code LIKE ? ESCAPE '\\\\') OR EXISTS (SELECT 1 FROM announcement_departments ad JOIN departments d2 ON d2.dept_id = ad.dept_id WHERE ad.announcement_id = a.announcement_id AND d2.dept_name LIKE ? ESCAPE '\\\\'))";
+            for ($i = 0; $i < 8; $i++) {
                 $params[] = '%' . $escapedSearch . '%';
             }
         }

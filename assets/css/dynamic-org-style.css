@@ -175,11 +175,73 @@ body{background:#f9f6f1;color:#26372c}.org-overview,.org-values,.org-gallery-sec
 /* Match the compact, centered College Departments Facebook section. */
 .org-facebook > p { max-width: 100ch; margin: 0 auto 24px; font-size: 15px; line-height: 1.7; color: #6b6b66; }
 .org-facebook-slot { width: 100%; }
-.org-fb-box { position: relative; width: 100%; max-width: 500px; margin-inline: auto; border-radius: 8px; overflow: hidden; transition: transform .3s ease, box-shadow .3s ease; }
-.org-fb-box:hover { transform: translateY(-5px); box-shadow: 0 8px 24px #20382718; }
+.org-fb-box { position: relative; width: 100%; max-width: 500px; margin-inline: auto; border-radius: 8px; transition: transform .3s cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow .3s ease; }
+.org-fb-box:hover { transform: translateY(-5px); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12); }
 .org-fb-box iframe { display: block; width: 100%; height: 130px; border: 0; background: transparent; border-radius: inherit; }
+.dept-fb-link,
+.org-fb-link {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 22px;
+    text-align: left;
+    background: #fff;
+    border: 1px solid var(--gnc-green, #094024);
+    border-radius: 8px;
+    color: var(--gnc-green, #094024);
+    text-decoration: none;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+.dept-fb-link:hover,
+.org-fb-link:hover {
+    color: var(--gnc-green, #094024);
+    background: #f4f7f4;
+}
+.dept-fb-link:focus-visible,
+.org-fb-link:focus-visible {
+    outline: 3px solid #eaba3b;
+    outline-offset: 4px;
+}
+.dept-fb-icon {
+    flex: 0 0 44px;
+    font-size: 36px;
+    line-height: 1;
+}
+.dept-fb-copy {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.dept-fb-copy strong {
+    display: block;
+    font: 700 17px / 1.4 'Noto Serif', Georgia, serif;
+    color: inherit;
+}
+.dept-fb-copy span {
+    display: block;
+    margin-top: 8px;
+    font: 600 14px / 1.5 Inter, Arial, sans-serif;
+    text-decoration: underline;
+}
+.dept-fb-copy span i {
+    font-size: 13px;
+    margin-left: 2px;
+}
+@media (max-width: 768px) {
+    .dept-fb-link,
+    .org-fb-link {
+        flex-direction: column;
+        justify-content: center;
+        text-align: center;
+        padding: 20px 18px;
+        gap: 12px;
+    }
+    .dept-fb-copy {
+        text-align: center;
+    }
+}
 .org-fb-edit { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; border: 0; background: transparent; cursor: pointer; border-radius: 8px; }
 .org-fb-edit:focus-visible { outline: 2px solid #d3a63a; outline-offset: -3px; }
+html.ve-previewing .org-fb-edit { display: none; }
 .org-fb-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6rem; width: 100%; max-width: 500px; min-height: 130px; margin-inline: auto; border: 2px dashed #a0b6a4; border-radius: 8px; background: #f0f4ef; color: #356641; font: inherit; cursor: pointer; }
 .org-fb-add > span:first-child { font-size: 28px; line-height: 1; }
 .org-fb-add:hover, .org-fb-add:focus-visible { border-color: #1f5e2c; background: #e7efe8; }

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/browser-urls.php';
 /** Pending proposals are isolated from all public content tables. */
 const RBAC_PAYLOAD_LIMIT = 100663296;
 function rbacSubmissionLabel(array $submission,array $payload): string {
@@ -62,6 +63,7 @@ function rbacWritePayload(int $id,array $payload): void {
     for($i=0,$offset=0;$offset<strlen($raw);$i++,$offset+=262144)$insert->execute([$id,$i,substr($raw,$offset,262144)]);
 }
 function rbacSafePreviewRoute(string $route): bool {
+    $route = gncBrowserLegacyUrl($route);
     $path=rawurldecode((string)parse_url($route,PHP_URL_PATH));
     return str_starts_with($route,'/')&&!str_starts_with($route,'//')&&!preg_match('/[\x00-\x20\\\\]/',$route)
         && !in_array('..',explode('/',$path),true)

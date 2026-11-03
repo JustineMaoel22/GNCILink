@@ -193,7 +193,6 @@ if (!function_exists('gncResolvePopularUrl')) {
 <?php include_once __DIR__ . '/../chatbot/widget.php'; ?>
 
 <script>
-<script>
 (function () {
     if (window.top !== window.self || new URLSearchParams(location.search).has('ce_preview')) return;
     var inFlight=false;

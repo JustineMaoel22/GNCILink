@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../includes/browser-urls.php';
+gncBrowserRoutingStart();
 function loadEnv(string $path): void {
     if (!file_exists($path)) {
         return; // fine in prod if real env vars are set another way

@@ -7,8 +7,21 @@
     const loadedFonts = new Set();
     const fontStyle=document.createElement('style');
     // Rich-text headings and links can have their own font rules. Preserve icon fonts.
-    fontStyle.textContent='[data-gnc-text][style*="--gnc-text-font:"] :is(p,h1,h2,h3,h4,h5,h6,ul,ol,li,blockquote,a,strong,em,b,u,span:not([class])){font-family:var(--gnc-text-font)!important}';
+    fontStyle.textContent='[data-gnc-text][style*="--gnc-text-font:"] :is(p,h1,h2,h3,h4,h5,h6,ul,ol,li,blockquote,a,strong,em,b,u,span:not([class])){font-family:var(--gnc-text-font)!important}'
+        +'[data-gnc-text][style*="--gnc-text-size:"]{font-size:var(--gnc-text-size)!important}'
+        +'[data-gnc-text][style*="--gnc-text-size:"] :is(p,h1,h2,h3,h4,h5,h6,ul,ol,li,blockquote,span:not([class])){font-size:var(--gnc-text-size)!important}'
+        +'[data-gnc-text][style*="--gnc-text-color:"]{color:var(--gnc-text-color)!important}'
+        +'[data-gnc-text][style*="--gnc-text-color:"] :is(p,h1,h2,h3,h4,h5,h6,ul,ol,li,blockquote,a,strong,em,b,u,span:not([class])){color:var(--gnc-text-color)!important}'
+        +'[data-gnc-text][style*="--gnc-text-lh:"]{line-height:var(--gnc-text-lh)!important}'
+        +'[data-gnc-text][style*="--gnc-text-lh:"] :is(p,h1,h2,h3,h4,h5,h6,ul,ol,li,blockquote,a,strong,em,b,u,span:not([class])){line-height:var(--gnc-text-lh)!important}'
+        +'[data-gnc-text][style*="--gnc-text-ls:"]{letter-spacing:var(--gnc-text-ls)!important}'
+        +'[data-gnc-text][style*="--gnc-text-ls:"] :is(p,h1,h2,h3,h4,h5,h6,ul,ol,li,blockquote,a,strong,em,b,u,span:not([class])){letter-spacing:var(--gnc-text-ls)!important}'
+        +'[data-gnc-text][style*="--gnc-text-align:"]{text-align:var(--gnc-text-align)!important}'
+        +'[data-gnc-text][style*="--gnc-text-align:"] :is(p,h1,h2,h3,h4,h5,h6,ul,ol,li,blockquote){text-align:var(--gnc-text-align)!important}';
     document.head.appendChild(fontStyle);
+    const ALIGNS=['left','center','right','justify'];
+    let forcedDevice=null;
+    const mode = () => forcedDevice || (innerWidth < 768 ? 'mobile' : innerWidth <= 1024 ? 'tablet' : 'desktop');
     function loadFont(key) {
         if (!Object.prototype.hasOwnProperty.call(fonts,key) || loadedFonts.has(key)) return;
         loadedFonts.add(key);
@@ -21,15 +34,22 @@
     }
     function applyFont(el,box) {
         if(isMedia(el))return;
-        if(Number.isFinite(box.fontSize))el.style.fontSize=clamp(box.fontSize,8,200)+'px';
+        if(Number.isFinite(box.fontSize)){
+            const size=clamp(box.fontSize,8,200)+'px';
+            el.style.setProperty('--gnc-text-size',size);
+            el.style.setProperty('font-size',size,'important');
+        }
         if(Object.prototype.hasOwnProperty.call(fonts,box.fontFamily)) {
             loadFont(box.fontFamily);
             const family='"'+fonts[box.fontFamily].label+'", '+fonts[box.fontFamily].fallback;
             el.style.setProperty('--gnc-text-font',family);
             el.style.setProperty('font-family',family,'important');
         }
+        if(/^#[0-9a-f]{6}$/i.test(box.color||'')){el.style.setProperty('--gnc-text-color',box.color);el.style.setProperty('color',box.color,'important');}
+        if(Number.isFinite(box.lineHeight)){const v=String(clamp(box.lineHeight,.8,4));el.style.setProperty('--gnc-text-lh',v);el.style.setProperty('line-height',v,'important');}
+        if(Number.isFinite(box.letterSpacing)){const v=clamp(box.letterSpacing,-5,20)+'px';el.style.setProperty('--gnc-text-ls',v);el.style.setProperty('letter-spacing',v,'important');}
+        if(ALIGNS.includes(box.textAlign)){el.style.setProperty('--gnc-text-align',box.textAlign);el.style.setProperty('text-align',box.textAlign,'important');}
     }
-    const mode = () => innerWidth < 768 ? 'mobile' : innerWidth <= 1024 ? 'tablet' : 'desktop';
     const clamp = (n,min,max) => Math.max(min,Math.min(max,n));
     let controller=null, scheduled=0;
     function scopeKey(id,scope){let out='';for(const seed of [2166136261,3339675911,2862933557]){let n=seed;for(const c of id+':'+scope)n=Math.imul(n^c.charCodeAt(0),16777619);out+=(n>>>0).toString(16).padStart(8,'0');}return out;}
@@ -126,8 +146,7 @@
             const current=settings[id]?.[mode()];
             if(value&&preserveFont){
                 const typography={};
-                if(Number.isFinite(current?.fontSize))typography.fontSize=current.fontSize;
-                if(current?.fontFamily)typography.fontFamily=current.fontFamily;
+                ['fontSize','fontFamily','color','lineHeight','letterSpacing','textAlign'].forEach(key=>{if(current&&current[key]!==undefined)typography[key]=current[key];});
                 if(current?.runs)typography.runs=current.runs;
                 value=Object.assign(typography,value);
             }
@@ -140,6 +159,22 @@
             const box=Object.assign({},settings[id]?.[mode()]||{});
             if(key)box.fontFamily=key;else delete box.fontFamily;
             commit(Object.keys(box).length?box:null,false);
+        }
+        /** Change typography for the CURRENT device only; null removes that property (back to the default responsive style). */
+        function changeStyle(patch){
+            if(!selected||isMedia(selected)||options.state().busy||options.state().preview)return;
+            const id=identify(selected);if(!id)return;
+            const box=Object.assign({},settings[id]?.[mode()]||{});
+            Object.entries(patch||{}).forEach(([key,value])=>{if(value===null||value===undefined||value==='')delete box[key];else box[key]=value;});
+            commit(Object.keys(box).length?box:null,false);
+        }
+        function styleValues(){
+            if(!selected||isMedia(selected))return null;
+            const custom=settings[identify(selected)]?.[mode()]||{},cs=getComputedStyle(selected);
+            const rgb=(cs.color.match(/\d+/g)||[0,0,0]).slice(0,3).map(n=>Number(n).toString(16).padStart(2,'0')).join('');
+            const lh=parseFloat(cs.lineHeight),fs=parseFloat(cs.fontSize);
+            return {custom,fontSize:parseFloat(cs.fontSize),color:'#'+rgb.toUpperCase(),lineHeight:Number.isFinite(lh)&&fs?Math.round(lh/fs*100)/100:1.4,
+                letterSpacing:parseFloat(cs.letterSpacing)||0,textAlign:['start','left'].includes(cs.textAlign)?'left':cs.textAlign==='end'?'right':cs.textAlign};
         }
         function snapToCenter(){
             if(!selected||!controller.eligible(selected)||options.state().busy||options.state().preview)return;
@@ -214,7 +249,7 @@
         });
         addEventListener('scroll',refresh,{passive:true});addEventListener('resize',refresh);
         controller={refresh,eligible:el=>!!el&&!!identify(el)&&!el.closest('[data-gnc-layout-ignore]')&&!el.querySelector('[data-gnc-text]'),
-            changeFontSize,fontSize:()=>selected&&!isMedia(selected)?parseFloat(getComputedStyle(selected).fontSize):null,
+            changeFontSize,changeStyle,styleValues,fontSize:()=>selected&&!isMedia(selected)?parseFloat(getComputedStyle(selected).fontSize):null,
             changeFontFamily,fontFamily:()=>settings[identify(selected)]?.[mode()]?.fontFamily||'',
             snapToCenter,
             fonts:()=>Object.entries(fonts).map(([key,font])=>[key,font.label]),
@@ -226,7 +261,8 @@
         return controller;
     }
     function acceptChanges(changes){Object.entries(changes||{}).forEach(([id,devices])=>Object.entries(devices).forEach(([device,entry])=>{published[id]=published[id]||{};if(entry.value===null)delete published[id][device];else published[id][device]=entry.value;}));setChanges({});}
-    window.GNCTextLayout={create,apply,setChanges,acceptChanges,targets,device:mode,snapshot:()=>JSON.parse(JSON.stringify(settings)),baseline:()=>JSON.parse(JSON.stringify(published))};
+    function setDevice(d){forcedDevice=d||null;apply();if(controller)controller.refresh();}
+    window.GNCTextLayout={create,apply,setDevice,setChanges,acceptChanges,targets,device:mode,snapshot:()=>JSON.parse(JSON.stringify(settings)),baseline:()=>JSON.parse(JSON.stringify(published))};
     addEventListener('resize',schedule);addEventListener('load',schedule);
     if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply);else apply();
     if(document.fonts)document.fonts.ready.then(schedule);

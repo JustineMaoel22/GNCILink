@@ -10,6 +10,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/facebook-post-url.php';
 require_once __DIR__ . '/admin-functions.php';
+require_once __DIR__ . '/../includes/multi-audience.php';
 require_once __DIR__ . '/../includes/facebook-publishing.php';
 
 initSession();
@@ -47,6 +48,7 @@ if ($search !== '') $filters['search'] = $search;
 
 // Source filter: "facebook" hides website announcements entirely.
 $announcements = ($sourceFilter === 'facebook') ? [] : getAnnouncements($filters, 50, 0);
+$announcementAudiences = getAnnouncementAudiencesBatch(getDB(), $announcements);
 $pinnedCount   = countPinnedItems();
 
 // Facebook posts have their own sidebar page; both lists retain search.
@@ -69,19 +71,28 @@ try {
 } catch (Exception $e) {
     $departments = [];
 }
+$departmentNames = array_column($departments, 'dept_name', 'dept_id');
 
 // Which modal (if any) should auto-open on load
 $modalMode    = $facebookPostsPage ? '' : ($_GET['modal'] ?? '');   // '', 'create', or 'edit'
 $modalEditing = null;
 $modalGallery = [];
+$modalAudience = ['dept_ids' => [], 'programs' => []];
 if ($modalMode === 'edit') {
     $modalEditing = getAnnouncementById((int)($_GET['id'] ?? 0));
     if ($modalEditing && !empty($modalEditing['announcement_id'])) {
         $modalGallery = getAnnouncementImages((int)$modalEditing['announcement_id']);
+        $modalAudience = getAnnouncementAudience(getDB(), (int)$modalEditing['announcement_id'], $modalEditing['dept_id'] ?? null, $modalEditing['program'] ?? null);
     }
 }
 if (!empty($flashOld)) {
     $modalEditing = array_merge($modalEditing ?? [], $flashOld);
+    if (isset($flashOld['dept_ids']) || isset($flashOld['programs'])) {
+        $modalAudience = [
+            'dept_ids' => isset($flashOld['dept_ids']) ? (array)$flashOld['dept_ids'] : ($modalAudience['dept_ids'] ?? []),
+            'programs' => isset($flashOld['programs']) ? (array)$flashOld['programs'] : ($modalAudience['programs'] ?? []),
+        ];
+    }
 }
 
 
@@ -252,8 +263,26 @@ include __DIR__ . '/../components/header-admin.php';
                     <td data-label="Category"><?= htmlspecialchars($a['category_name'] ?? '') ?: '<span class="text-muted">—</span>' ?></td>
                     <td data-label="For">
                         <div class="ann-for">
-                            <span><?= htmlspecialchars($a['dept_name'] ?? 'All departments') ?></span>
-                            <span class="program-badge<?= $progCode === 'ALL' ? ' program-badge-all' : '' ?>"><?= $progCode === 'ALL' ? 'All programs' : htmlspecialchars($progCode) ?></span>
+                            <div class="audience-tag-list mb-1">
+                                <?php
+                                $aAud = $announcementAudiences[$a['announcement_id']] ?? ['dept_ids' => [], 'programs' => []];
+                                $aDeptNames = [];
+                                foreach ($aAud['dept_ids'] as $did) {
+                                    if (isset($departmentNames[$did])) $aDeptNames[] = $departmentNames[$did];
+                                }
+                                if (empty($aDeptNames)): ?>
+                                    <span class="audience-tag">All departments</span>
+                                <?php else: foreach ($aDeptNames as $dName): ?>
+                                    <span class="audience-tag audience-tag-dept" title="<?= htmlspecialchars($dName) ?>"><?= htmlspecialchars(mb_strlen($dName) > 26 ? mb_substr($dName, 0, 24) . '…' : $dName) ?></span>
+                                <?php endforeach; endif; ?>
+                            </div>
+                            <div class="audience-tag-list">
+                                <?php if (empty($aAud['programs'])): ?>
+                                    <span class="program-badge program-badge-all">All programs</span>
+                                <?php else: foreach ($aAud['programs'] as $pCode): ?>
+                                    <span class="program-badge" title="<?= htmlspecialchars($programCategories[$pCode] ?? $pCode) ?>"><?= htmlspecialchars($pCode) ?></span>
+                                <?php endforeach; endif; ?>
+                            </div>
                         </div>
                     </td>
                     <td data-label="Status"><span class="status-badge <?= htmlspecialchars($a['status']) ?>"><?= htmlspecialchars($statusLabels[$a['status']] ?? ucfirst($a['status'])) ?></span>
@@ -304,6 +333,8 @@ include __DIR__ . '/../components/header-admin.php';
                                 data-category="<?= (int)($a['category_id'] ?? 0) ?>"
                                 data-program="<?= htmlspecialchars($a['program'] ?? 'ALL') ?>"
                                 data-dept="<?= (int)($a['dept_id'] ?? 0) ?>"
+                                data-depts='<?= json_encode($aAud['dept_ids']) ?>'
+                                data-programs='<?= json_encode($aAud['programs']) ?>'
                                 data-status="<?= htmlspecialchars($a['status']) ?>"
                                 data-image="<?= htmlspecialchars($a['image_path'] ?? '') ?>"
                                 data-gallery="<?= htmlspecialchars(json_encode($rowGallery), ENT_QUOTES) ?>"
@@ -395,18 +426,22 @@ include __DIR__ . '/../components/header-admin.php';
 <!-- ============================================================
      CREATE / EDIT MODAL — posts to /admin/action/create-announcement.php
 ============================================================ -->
-<div class="modal fade" id="announcementModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
+<div class="modal fade gnc-content-modal" id="announcementModal" tabindex="-1" aria-hidden="true" aria-labelledby="announcementModalLabel" aria-describedby="announcementModalIntro">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-fullscreen-sm-down">
     <div class="modal-content">
-      <form data-content-publish method="POST" action="/admin/action/create-announcement.php" enctype="multipart/form-data" id="announcement-form">
+      <form data-content-publish data-custom-publish-label method="POST" action="/admin/action/create-announcement.php" enctype="multipart/form-data" id="announcement-form" class="gnc-content-form" novalidate>
         <div class="modal-header">
-          <h5 class="modal-title" id="announcementModalLabel">New Announcement</h5>
+          <div class="evt-modal-heading">
+            <span class="evt-modal-icon" aria-hidden="true"><i class="bi bi-megaphone"></i></span>
+            <div><h5 class="modal-title" id="announcementModalLabel">New Announcement</h5>
+            <p id="announcementModalIntro" class="evt-modal-intro">Write an update and choose who it is for.</p></div>
+          </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
 
           <?php if (!empty($flashErrors)): ?>
-          <div class="alert alert-danger d-flex gap-2 align-items-start">
+          <div class="alert alert-danger d-flex gap-2 align-items-start" role="alert" tabindex="-1">
             <i class="bi bi-exclamation-triangle-fill mt-1"></i>
             <div>
               <?php foreach ($flashErrors as $err): ?>
@@ -420,6 +455,10 @@ include __DIR__ . '/../components/header-admin.php';
           <input type="hidden" name="action" id="modal-action" value="create">
           <input type="hidden" name="announcement_id" id="modal-announcement-id" value="">
           <input type="hidden" name="_review_id" value="<?= (int)($_GET['revise'] ?? 0) ?>">
+          <div id="announcement-form-alert" class="alert alert-danger d-none" role="alert" tabindex="-1"></div>
+          <p class="evt-required-note">Fields marked <span class="text-danger">*</span> are required. Pictures and audience restrictions are optional.</p>
+          <section class="evt-form-section" aria-labelledby="ann-message-heading">
+          <h6 id="ann-message-heading">Announcement details</h6>
 
           <div class="mb-3">
             <label class="form-label" for="modal-title">Headline <span class="text-danger">*</span></label>
@@ -427,13 +466,16 @@ include __DIR__ . '/../components/header-admin.php';
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Message <span class="text-danger">*</span></label>
+            <label class="form-label" id="ann-message-label">Message <span class="text-danger">*</span></label>
             <div id="modal-content-editor"></div>
             <input type="hidden" name="content" id="modal-content-input">
-            <div class="form-text">Write what you want everyone to know. You can use the toolbar to make text bold or add lists and links.</div>
+            <div class="form-text" id="ann-message-help">Include the key details and any action readers should take. Use the toolbar for formatting, lists, and links.</div>
+            <div class="invalid-feedback" id="ann-message-error" aria-live="polite"></div>
           </div>
-
-          <div class="ann-section-label">Picture</div>
+          </section>
+          <section class="evt-form-section" aria-labelledby="ann-pictures-heading" data-warning-optional="true">
+          <h6 id="ann-pictures-heading">Pictures <span class="ann-optional">Optional</span></h6>
+          <label class="form-label" for="modal-image-input">Main picture</label>
           <div class="ann-image-box mb-3">
             <div id="modal-image-preview-wrap" style="display:none">
               <img id="modal-image-preview" src="" alt="Selected picture preview">
@@ -448,7 +490,7 @@ include __DIR__ . '/../components/header-admin.php';
             </div>
           </div>
 
-          <div class="ann-section-label">More pictures (gallery)</div>
+          <label class="form-label" for="modal-gallery-input">More pictures (gallery)</label>
           <div class="mb-3">
             <input type="file" name="gallery_images[]" id="modal-gallery-input" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" multiple data-max-files="10" data-existing-count-selector="#modal-gallery-existing .gallery-thumb-wrap:not(.marked-remove)" data-max-files-message="You can only upload a maximum of 10 images. Please reduce your selection and try again.">
             <div class="form-text">Optional. You can pick several photos at once — up to 10 total, 5 MB each.</div>
@@ -465,9 +507,11 @@ include __DIR__ . '/../components/header-admin.php';
             </div>
           </div>
 
-          <div class="ann-section-label">Who is this for?</div>
+          </section>
+          <section class="evt-form-section" aria-labelledby="ann-audience-heading">
+          <h6 id="ann-audience-heading">Category &amp; audience</h6>
           <div class="row g-3 mb-3">
-            <div class="col-12 col-sm-4">
+            <div class="col-12">
               <label class="form-label" for="modal-category">Type</label>
               <select name="category_id" id="modal-category" class="form-select">
                 <option value="">Not set</option>
@@ -476,28 +520,35 @@ include __DIR__ . '/../components/header-admin.php';
                 <?php endforeach; ?>
               </select>
             </div>
-            <div class="col-12 col-sm-4">
-              <label class="form-label" for="modal-dept">Department</label>
-              <select name="dept_id" id="modal-dept" class="form-select">
-                <option value="">Everyone (all departments)</option>
-                <?php foreach ($departments as $d): ?>
-                <option value="<?= (int)$d['dept_id'] ?>"><?= htmlspecialchars($d['dept_name']) ?></option>
-                <?php endforeach; ?>
-              </select>
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold" id="ann-dept-label">Departments</label>
+              <div id="modal-dept-multiselect"></div>
+              <div class="form-text">Leave unrestricted for all departments.</div>
             </div>
-            <div class="col-12 col-sm-4">
-              <label class="form-label" for="modal-program">Program <span class="text-muted fw-normal">(optional)</span></label>
-              <select name="program" id="modal-program" class="form-select" aria-describedby="modal-audience-help">
-                <?php foreach ($announcementProgramChoices as $code => $label): ?>
-                <option value="<?= htmlspecialchars($code) ?>"><?= $code === 'ALL' ? 'Everyone (all programs)' : htmlspecialchars($code . ' — ' . $label) ?></option>
-                <?php endforeach; ?>
-              </select>
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold" id="ann-program-label">Academic programs</label>
+              <div id="modal-program-multiselect"></div>
+              <div class="form-text">Leave unrestricted for all programs.</div>
             </div>
-            <div class="col-12"><div class="form-text mt-0" id="modal-audience-help">Program is optional. Select a department to include all its programs, or leave both on "Everyone" for a school-wide announcement.</div></div>
+            <div class="col-12"><div class="evt-audience-summary" id="modal-audience-help" role="status"></div></div>
           </div>
 
-          <div class="ann-section-label">Visibility</div>
+          </section>
+          <section class="evt-form-section" aria-labelledby="ann-visibility-heading">
+          <h6 id="ann-visibility-heading">Visibility &amp; publishing</h6>
           <?php if ($canPublish): ?>
+          <div class="mb-3">
+            <label class="form-label" for="modal-status">What should happen when you save?</label>
+            <select name="status" id="modal-status" class="form-select">
+              <option value="draft">Save as draft — still working on it</option>
+              <?php if (!$isSuperAdmin): ?>
+              <option value="pending">Send for approval</option>
+              <?php endif; ?>
+              <option value="published">Publish now — use selected destination</option>
+              <option value="archived">Archive — hide from website</option>
+            </select>
+            <div class="ann-status-help" id="modal-status-help" aria-live="polite"></div>
+          </div>
           <div class="mb-3">
             <label class="form-label" for="publish-destination">Publish destination</label>
             <select name="publish_destination" id="publish-destination" class="form-select">
@@ -516,23 +567,17 @@ include __DIR__ . '/../components/header-admin.php';
           <input type="hidden" name="facebook_request_key" id="facebook-request-key" value="<?= bin2hex(random_bytes(32)) ?>">
           <input type="hidden" name="facebook_confirmed" id="facebook-confirmed" value="0">
           <input type="hidden" name="facebook_page_id" value="<?= htmlspecialchars($facebookConnection['page_id'] ?? '') ?>">
-          <select name="status" id="modal-status" class="form-select">
-            <option value="draft">Save as draft — still working on it</option>
-            <?php if (!$isSuperAdmin): ?>
-            <option value="pending">Send for approval</option>
-            <?php endif; ?>
-            <option value="published">Publish now — use selected destination</option>
-            <option value="archived">Archive — hide from website</option>
-          </select>
-          <div class="ann-status-help" id="modal-status-help"></div>
           <?php else: ?>
+          <input type="hidden" name="status" value="pending">
           <div class="alert alert-secondary mb-0 d-flex gap-2" style="font-size:.88rem">
             <i class="bi bi-info-circle mt-1"></i>
             <span>This will be sent for approval first. It appears on the public website once it is approved.</span>
           </div>
           <?php endif; ?>
+          </section>
         </div>
         <div class="modal-footer">
+          <span id="ann-save-intent" class="evt-save-intent" aria-live="polite"></span>
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-gnc-gold" id="modal-save-btn">
             <i class="bi bi-check-lg"></i> <span id="modal-save-label">Create Announcement</span>
@@ -812,6 +857,12 @@ include __DIR__ . '/../components/header-admin.php';
     .ann-toast { right: max(20px, env(safe-area-inset-right)); }
 }
 </style>
+<link rel="stylesheet" href="/assets/css/multi-audience-select.css?v=<?= filemtime(__DIR__ . '/../assets/css/multi-audience-select.css') ?>">
+<script src="/assets/js/multi-audience-select.js?v=<?= filemtime(__DIR__ . '/../assets/js/multi-audience-select.js') ?>"></script>
+<link rel="stylesheet" href="/assets/css/event-form.css?v=<?= filemtime(__DIR__ . '/../assets/css/event-form.css') ?>">
+<link rel="stylesheet" href="/assets/css/announcement-form.css?v=<?= filemtime(__DIR__ . '/../assets/css/announcement-form.css') ?>">
+<script src="/assets/js/admin-form-audience.js?v=<?= filemtime(__DIR__ . '/../assets/js/admin-form-audience.js') ?>"></script>
+<script src="/assets/js/announcement-form.js?v=<?= filemtime(__DIR__ . '/../assets/js/announcement-form.js') ?>"></script>
 
 <?php ob_start(); ?>
 <script>
@@ -842,38 +893,47 @@ const announcementModal   = new bootstrap.Modal(announcementModalEl);
 
 const modalTitleInput   = document.getElementById('modal-title');
 const modalCategory     = document.getElementById('modal-category');
-const modalProgram      = document.getElementById('modal-program');
-const modalDept         = document.getElementById('modal-dept');
-// Only an existing announcement may retain its previously saved Basic Education tag.
-const savedProgramLabels = <?= json_encode($programCategories, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-function selectAnnouncementProgram(code = 'ALL', preserveExisting = false) {
-    if (!modalProgram) return;
-    modalProgram.querySelectorAll('[data-legacy-program]').forEach(option => option.remove());
-    if (preserveExisting && savedProgramLabels[code] && !Array.from(modalProgram.options).some(option => option.value === code)) {
-        const option = new Option(code + ' \u2014 ' + savedProgramLabels[code] + ' (existing selection)', code);
-        option.dataset.legacyProgram = '1';
-        modalProgram.add(option);
-    }
-    modalProgram.value = code;
-    if (!modalProgram.value) modalProgram.value = 'ALL';
-}
+
+const deptSelectItems = <?= json_encode(array_values(array_map(function($d) {
+    return ['value' => (string)$d['dept_id'], 'label' => $d['dept_name']];
+}, $departments)), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+const progSelectItems = <?= json_encode(array_values(array_map(function($code, $label) {
+    return ['value' => (string)$code, 'label' => $label, 'badge' => $code];
+}, array_keys(array_diff_key($announcementProgramChoices, ['ALL' => ''])), array_diff_key($announcementProgramChoices, ['ALL' => '']))), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+const annDeptSelect = new GncMultiSelect(document.getElementById('modal-dept-multiselect'), {
+    name: 'dept_ids[]',
+    allLabel: 'Everyone (All departments)',
+    allValue: 'ALL',
+    placeholder: 'Select departments...',
+    items: deptSelectItems
+});
+
+const annProgSelect = new GncMultiSelect(document.getElementById('modal-program-multiselect'), {
+    name: 'programs[]',
+    allLabel: 'Everyone (All academic programs)',
+    allValue: 'ALL',
+    placeholder: 'Select programs...',
+    items: progSelectItems
+});
 
 function updateAudienceHelp() {
-    const hasDepartment = Boolean(modalDept?.value);
-    const allPrograms = modalProgram?.querySelector('option[value="ALL"]');
-    if (allPrograms) allPrograms.textContent = hasDepartment ? 'All programs in this department' : 'Everyone (all programs)';
+    const depts = annDeptSelect ? annDeptSelect.getSelected() : [];
+    const progs = annProgSelect ? annProgSelect.getSelected() : [];
     const help = document.getElementById('modal-audience-help');
-    if (help) help.textContent = hasDepartment
-        ? (modalProgram?.value && modalProgram.value !== 'ALL'
-            ? 'This announcement is limited to the selected department and program. Choose "All programs in this department" to include the whole department.'
-            : 'This announcement applies to all programs in the selected department. Choosing a specific program is optional.')
-        : 'Program is optional. Select a department to include all its programs, or leave both on "Everyone" for a school-wide announcement.';
+    if (!help) return;
+    if (depts.length === 0 && progs.length === 0) {
+        help.innerHTML = '<i class="bi bi-info-circle me-1"></i>School-wide announcement (applies to all departments and all programs).';
+    } else {
+        help.innerHTML = '<i class="bi bi-info-circle me-1"></i>Targeted announcement: ' +
+            (depts.length ? depts.length + ' department(s) ' : 'all departments ') +
+            '&middot; ' +
+            (progs.length ? progs.length + ' program(s)' : 'all programs');
+    }
 }
-modalDept?.addEventListener('change', () => {
-    selectAnnouncementProgram();
-    updateAudienceHelp();
-});
-modalProgram?.addEventListener('change', updateAudienceHelp);
+annDeptSelect.config.onChange = updateAudienceHelp;
+annProgSelect.config.onChange = updateAudienceHelp;
 const modalStatus       = document.getElementById('modal-status');
 const modalActionInput  = document.getElementById('modal-action');
 const modalIdInput      = document.getElementById('modal-announcement-id');
@@ -952,8 +1012,8 @@ const statusHelpText = <?= json_encode($statusHelp) ?>;
 const modalStatusHelp = document.getElementById('modal-status-help');
 function updateStatusHelp() {
     // If the saved status has no matching option (e.g. an old "pending" item
-    // opened by a super admin), fall back to Publish now.
-    if (modalStatus && modalStatus.value === '') modalStatus.value = 'published';
+    // opened by a super admin), fall back to a draft.
+    if (modalStatus && modalStatus.value === '') modalStatus.value = 'draft';
     if (modalStatus && modalStatusHelp) modalStatusHelp.textContent = statusHelpText[modalStatus.value] || '';
 }
 modalStatus?.addEventListener('change', updateStatusHelp);
@@ -971,6 +1031,7 @@ function resetGalleryUI() {
 
 function resetModalForm() {
     document.getElementById('announcement-form').reset();
+    document.querySelector('#announcement-form [name="allow_incomplete"]')?.remove();
     const facebookConfirmed = document.getElementById('facebook-confirmed');
     if (facebookConfirmed) facebookConfirmed.value = '0';
     const facebookRequestKey = document.getElementById('facebook-request-key');
@@ -980,8 +1041,8 @@ function resetModalForm() {
     modalQuill.setContents([]);
     modalActionInput.value = 'create';
     modalIdInput.value = '';
-    selectAnnouncementProgram();
-    if (modalDept) modalDept.value = '';
+    if (annDeptSelect) annDeptSelect.deselectAll();
+    if (annProgSelect) annProgSelect.deselectAll();
     updateAudienceHelp();
     modalLabel.textContent = 'New Announcement';
     modalSaveLabel.textContent = 'Create Announcement';
@@ -1097,8 +1158,12 @@ function openEditModal(btn) {
 
     modalTitleInput.value = btn.dataset.title || '';
     if (modalCategory) modalCategory.value = btn.dataset.category || '';
-    selectAnnouncementProgram(btn.dataset.program || 'ALL', true);
-    if (modalDept) modalDept.value = (btn.dataset.dept && btn.dataset.dept !== '0') ? btn.dataset.dept : '';
+    let depts = [];
+    try { depts = JSON.parse(btn.dataset.depts || '[]'); } catch (e) {}
+    let progs = [];
+    try { progs = JSON.parse(btn.dataset.programs || '[]'); } catch (e) {}
+    if (annDeptSelect) annDeptSelect.setSelected(depts);
+    if (annProgSelect) annProgSelect.setSelected(progs);
     updateAudienceHelp();
     if (modalStatus) modalStatus.value = btn.dataset.status || 'draft';
     updateStatusHelp();
@@ -1243,14 +1308,16 @@ document.getElementById('announcement-form').addEventListener('submit', async (e
         if (confirmed) confirmed.value = sendingFacebook ? '1' : '0';
         modalSaveBtn.disabled = true;
         modalSaveLabel.textContent = 'Publishing…';
+        e.target.dispatchEvent(new Event('announcement-form:submitting'));
         // The shared completeness/approval checks already ran before this listener.
         HTMLFormElement.prototype.submit.call(e.target);
         return;
     }
     // Show progress so people don't click twice while the picture uploads
+    e.target.dispatchEvent(new Event('announcement-form:submitting'));
     setTimeout(() => {
         modalSaveBtn.disabled = true;
-        modalSaveLabel.textContent = 'Saving…';
+        modalSaveLabel.textContent = modalStatus?.value === 'pending' || !modalStatus ? 'Submitting…' : 'Saving…';
     }, 0);
 });
 
@@ -1281,6 +1348,8 @@ document.getElementById('announcement-form').addEventListener('submit', async (e
     }
 })();
 
+window.GncAnnouncementForm.init({quill: modalQuill});
+
 // Auto-reopen the modal on load: validation error, or ?modal=create / ?modal=edit&id=N
 <?php if ($modalMode === 'create'): ?>
 openCreateModal();
@@ -1288,8 +1357,8 @@ openCreateModal();
 modalTitleInput.value = <?= json_encode($flashOld['title'] ?? '') ?>;
 modalQuill.root.innerHTML = <?= json_encode($flashOld['content'] ?? '') ?>;
 if (modalCategory) modalCategory.value = <?= json_encode($flashOld['category_id'] ?? '') ?>;
-selectAnnouncementProgram(<?= json_encode($flashOld['program'] ?? 'ALL') ?>);
-if (modalDept) modalDept.value = <?= json_encode($flashOld['dept_id'] ?? '') ?>;
+if (annDeptSelect) annDeptSelect.setSelected(<?= json_encode($modalAudience['dept_ids'] ?? []) ?>);
+if (annProgSelect) annProgSelect.setSelected(<?= json_encode($modalAudience['programs'] ?? []) ?>);
 if (modalStatus) modalStatus.value = <?= json_encode($flashOld['status'] ?? 'draft') ?>;
 updateStatusHelp();
 <?php endif; ?>
@@ -1302,8 +1371,8 @@ modalSaveLabel.textContent = 'Save Changes';
 modalTitleInput.value = <?= json_encode($modalEditing['title'] ?? '') ?>;
 modalQuill.root.innerHTML = <?= json_encode($modalEditing['content'] ?? '') ?>;
 if (modalCategory) modalCategory.value = <?= json_encode($modalEditing['category_id'] ?? '') ?>;
-selectAnnouncementProgram(<?= json_encode($modalEditing['program'] ?? 'ALL') ?>, true);
-if (modalDept) modalDept.value = <?= json_encode($modalEditing['dept_id'] ?? '') ?>;
+if (annDeptSelect) annDeptSelect.setSelected(<?= json_encode($modalAudience['dept_ids'] ?? []) ?>);
+if (annProgSelect) annProgSelect.setSelected(<?= json_encode($modalAudience['programs'] ?? []) ?>);
 if (modalStatus) modalStatus.value = <?= json_encode($modalEditing['status'] ?? 'draft') ?>;
 updateStatusHelp();
 <?php if (!empty($modalEditing['image_path'])): ?>

@@ -119,12 +119,13 @@ function gnc_get_global_announcements(string $program, int $limit): array
     $sql = "SELECT announcement_id, title, content, slug, COALESCE(published_at, created_at) AS item_date
             FROM announcements
             WHERE status = 'published'
-            AND (program = :program OR program = 'ALL')
+            AND (program = :program OR program = 'ALL' OR EXISTS (SELECT 1 FROM announcement_programs ap WHERE ap.announcement_id = announcements.announcement_id AND ap.program_code = :prog_check))
             ORDER BY COALESCE(published_at, created_at) DESC
             LIMIT :limit";
 
     $stmt = $pdo->prepare($sql);
     $stmt->bindValue(':program', $program, PDO::PARAM_STR);
+    $stmt->bindValue(':prog_check', $program, PDO::PARAM_STR);
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
     $stmt->execute();
 
@@ -158,12 +159,13 @@ function gnc_get_global_events(string $program, int $limit): array
             FROM events
             WHERE status = 'published'
               AND start_date >= NOW()
-              AND (program = :program OR (program = 'ALL' {$departmentScope})) {$groupScope}
+              AND (program = :program OR (program = 'ALL' {$departmentScope}) OR EXISTS (SELECT 1 FROM event_programs ep WHERE ep.event_id = events.event_id AND ep.program_code = :prog_evt_check)) {$groupScope}
             ORDER BY start_date ASC
             LIMIT :limit";
 
     $stmt = $pdo->prepare($sql);
     $stmt->bindValue(':program', $program, PDO::PARAM_STR);
+    $stmt->bindValue(':prog_evt_check', $program, PDO::PARAM_STR);
     if ($departmentScope !== '') $stmt->bindValue(':department_program', $program, PDO::PARAM_STR);
     if ($groupScope !== '') $stmt->bindValue(':group_program', $program, PDO::PARAM_STR);
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);

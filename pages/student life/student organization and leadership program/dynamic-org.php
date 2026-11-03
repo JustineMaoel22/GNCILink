@@ -47,7 +47,7 @@ $settingMark=static fn($key)=>ceField('org-setting',['key'=>$key,'max'=>$setting
 <?php if ($facebook||$orgPreview): ?><section class="org-facebook" data-warning-optional="true"><span class="org-eyebrow"<?= $settingMark('facebook_eyebrow') ?>><?= $orgH($settings['facebook_eyebrow']['value']) ?></span><h2<?= $settingMark('facebook_title') ?>><?= $orgH($settings['facebook_title']['value']) ?></h2>
 <p<?= $settingMark('facebook_description') ?>><?= $orgH($settings['facebook_description']['value']) ?></p>
 <div class="org-facebook-slot">
-<?php if ($facebook): ?><div class="org-fb-box"><iframe title="<?= $orgH($org['name']) ?> Facebook page" <?= gncPrivacyFrameSource($facebook) ?> width="500" height="130" scrolling="no" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+<?php if ($facebook): ?><div class="org-fb-box"><a class="dept-fb-link org-fb-link" href="<?= $orgH($org['facebook_url']) ?>" target="_blank" rel="noopener noreferrer"><i class="bi bi-facebook dept-fb-icon" aria-hidden="true"></i><div class="dept-fb-copy"><strong><?= $orgH($org['name']) ?></strong><span>Visit on Facebook <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></span></div></a>
 <?php if ($orgPreview): ?><button type="button" class="org-fb-edit" data-ve-org-facebook aria-label="Edit Facebook page URL" title="Click to change the Facebook page"></button><?php endif; ?></div>
 <?php elseif ($orgPreview): ?><button type="button" class="org-fb-add" data-ve-org-facebook><span aria-hidden="true">+</span><span>Add the Facebook page link</span></button><?php endif; ?>
 </div></section><?php endif; ?>

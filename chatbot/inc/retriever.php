@@ -44,7 +44,7 @@ final class GncbotRetriever
     public bool $offTopic = false;
 
     /** Words that make a question plausibly about the school even when no retriever matched. */
-    private const SCHOOL_TERMS = '/\b(gnc|gncian\w*|guagua|school|college|campus|student\w*|teacher\w*|faculty|class\w*|semester|term|uniform|dress ?code|library|canteen|grades?|id|policy|policies|rules?|handbook|clearance|graduat\w+|diploma|transcript|enroll\w*|tuition|admission\w*|scholar\w*|program\w*|course\w*|dean|office|registrar|announce\w*|events?|news|vision|mission|alumni|principal|president|nstp|pampanga|home games|intramurals?)\b/u';
+    private const SCHOOL_TERMS = '/\b(gnc|gncian\w*|guagua|school|college|campus|student\w*|teacher\w*|faculty|class\w*|semester|term|uniform|dress ?code|library|canteen|grades?|id|policy|policies|rules?|handbook|clearance|graduat\w+|diploma|transcript|enroll\w*|tuition|admission\w*|scholar\w*|program\w*|course\w*|dean|office|registrar|announce\w*|events?|news|vision|mission|alumni|principal|president|nstp|pampanga|home games|intramurals?|sports?|athletic\w*|varsity|badminton|basketball|volleyball|table tennis|sepak takraw|arnis|weightlifting|taekwondo|dance sports?|chess|athletes?|tryouts?)\b/u';
     public ?string $scopeProgram = null;
     private array $ctx;
 
@@ -151,6 +151,7 @@ final class GncbotRetriever
         if (isset($i['vision_mission']))    { $this->pageSections(['vision-mission'], 'Vision and Mission'); }
         if (isset($i['about']))             { $this->pageSections(['about-us', 'history'], 'About GNC / History'); }
         if (isset($i['people']))            { $this->people($q); }
+        if (isset($i['sports']))            { $this->sports(); }
         if (isset($i['offices']) || isset($i['contact']) || isset($i['gaps'])) { $this->offices($q, isset($i['contact']) && !isset($i['offices'])); }
         if (isset($i['location']))          { $this->location(); }
         if (isset($i['basic_ed']))          { $this->link('basic_education'); }
@@ -314,7 +315,8 @@ final class GncbotRetriever
             'about'          => '/\b(about gnc|about the school|history|founded|established|who is gnc|what is gnc|about us)\b/u',
             'contact'        => '/\b(contact|phone|telephone|number|e-?mail|call|reach)\b/u',
             'location'       => '/\b(where|located|location|address|directions?|map|navigat\w+|how to get|saan)\b/u',
-            'offices'        => '/\b(offices?|registrar|librar\w+|clinic|guidance|business office|cashier|student affairs|osa|security|mis|nstp|printing|purchasing|sports|technician|stockroom|student services?|hours|open|office hours)\b/u',
+            'offices'        => '/\b(offices?|registrar|librar\w+|clinic|guidance|business office|cashier|student affairs|osa|security|mis|nstp|printing|purchasing|technician|stockroom|student services?|hours|open|office hours)\b/u',
+            'sports'         => '/\b(sports?|athletics?|varsity|teams?|tryouts?|badminton|basketball|volleyball|table tennis|sepak takraw|arnis|weightlifting|taekwondo|dance sports?|chess|athletes?)\b/u',
             'people'         => '/\b(president|chairman|chairwoman|trustees?|principal|administrators?|administration|board|officers?|who is|head of|directress|director|librarian|treasurer)\b/u',
             'basic_ed'       => '/\b(basic education|elementary|junior high|senior high|grade school|high school|kindergarten|shs|jhs|montessori|grade \d+)\b/u',
             'grad'           => '/\b(graduate school|master\w*|doctor\w*|phd|thesis)\b/u',
@@ -341,6 +343,21 @@ final class GncbotRetriever
         if (!$out && preg_match('/\b(latest|recent|newest)\b/u', $q)) { $out['announcements'] = true; }
         // "programs" with a program scope is covered by programDetail
         if ($hasProgram) { unset($out['programs']); }
+        // "sports program" is an athletic inquiry; do not pull academic college degree catalog
+        if (isset($out['sports']) && !preg_match('/\b(academic|college|degree|bachelor|undergrad\w*|curriculum)\b/u', $q)) {
+            unset($out['programs']);
+        }
+        // "sports" queries already get full sports office/coordinator info; do not pull unrelated office directories
+        if (isset($out['sports']) && !preg_match('/\b(registrar|clinic|cashier|guidance|accounting|library|librar\w+|admission|finance|osa|student affairs)\b/u', $q)) {
+            unset($out['offices']);
+        }
+        // When viewing the Athletics & Sports page, generic "programs" questions refer to sports programs
+        if (preg_match('/athletics[-_ ]sports/i', (string)($this->ctx['url'] ?? '')) || stripos((string)($this->ctx['title'] ?? ''), 'athletics') !== false) {
+            if (isset($out['programs']) && !$hasProgram) {
+                $out['sports'] = true;
+                unset($out['programs']);
+            }
+        }
         return $out;
     }
 
@@ -609,6 +626,58 @@ final class GncbotRetriever
             if ($out) { $this->addBlock('School leadership (Administration page)', implode("\n", $out)); }
         } catch (Throwable $e) { $this->dbFail($e); }
         $this->link('administration');
+    }
+
+    private function sports(): void
+    {
+        require_once __DIR__ . '/../../components/athletics-sports-manager.php';
+        $content = athleticsSportsContent($this->db);
+        $lines = [];
+
+        if (!empty($content['texts']['programs_title']) || !empty($content['texts']['programs_description'])) {
+            $lines[] = ($content['texts']['programs_title'] ?? 'Our Sports Programs') . ': ' . ($content['texts']['programs_description'] ?? '');
+        }
+
+        if (!empty($content['sports'])) {
+            $sportList = [];
+            foreach ($content['sports'] as $s) {
+                $name = trim((string)($s['name'] ?? ''));
+                $type = trim((string)($s['type'] ?? ''));
+                if ($name === '') continue;
+                $sportList[] = $type !== '' ? "$name ($type)" : $name;
+            }
+            if ($sportList) {
+                $lines[] = 'Sports programs offered at GNC: ' . implode(', ', $sportList) . '.';
+            }
+        }
+
+        if (!empty($content['teams'])) {
+            $teamList = [];
+            foreach ($content['teams'] as $t) {
+                $tname = trim((string)($t['name'] ?? ''));
+                if ($tname !== '') $teamList[] = $tname;
+            }
+            if ($teamList) {
+                $lines[] = ($content['texts']['teams_title'] ?? 'GNCI Varsity Teams') . ': ' . implode(', ', $teamList) . '.';
+            }
+        }
+
+        if (!empty($content['facilities'])) {
+            $facList = [];
+            foreach ($content['facilities'] as $f) {
+                $fname = trim((string)($f['name'] ?? ''));
+                if ($fname !== '') $facList[] = $fname;
+            }
+            if ($facList) {
+                $lines[] = 'Athletic Facilities: ' . implode(', ', $facList) . '.';
+            }
+        }
+
+        $lines[] = 'Sports Office & Tryouts: Sports Office, Tanjangco Hall, 1st Floor, Room 100 (Coordinator: Eduardo V. Gozun Jr., Phone: (045) 900-4473, Email: info@gnc.edu.ph).';
+        $lines[] = 'Athletics & Sports page: ' . ($this->pages['athletics_sports']['url'] ?? gncbot_url('/pages/student%20life/athletics-sports.php'));
+
+        $this->addBlock('Athletics and Sports Programs at Guagua National Colleges (GNC)', implode("\n", $lines));
+        $this->link('athletics_sports');
     }
 
     private function offices(string $q, bool $contactOnly): void

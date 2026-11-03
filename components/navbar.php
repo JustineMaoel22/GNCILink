@@ -346,6 +346,7 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
 };
 ?>
 
+<link rel="stylesheet" href="/assets/css/choice-controls.css?v=<?= filemtime(__DIR__.'/../assets/css/choice-controls.css') ?>">
 <link rel="stylesheet" href="/assets/css/privacy.css?v=<?= filemtime(__DIR__.'/../assets/css/privacy.css') ?>">
 <script src="/assets/js/privacy-consent.js?v=<?= filemtime(__DIR__.'/../assets/js/privacy-consent.js') ?>" defer></script>
 <?php include_once __DIR__ . '/site-disclaimer.php'; ?>

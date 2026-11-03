@@ -12,6 +12,7 @@
  */
 
 require_once __DIR__ . '/visitor-counter.php';
+require_once __DIR__ . '/../includes/browser-urls.php';
 
 if (!function_exists('gncPageNow')) {
 
@@ -49,6 +50,7 @@ if (!function_exists('gncPageNow')) {
      * Query strings are ignored except for entity identifiers. Home is excluded.
      */
     function gncPageNormalizePath(string $raw): ?string {
+        $raw = gncBrowserLegacyUrl($raw);
         $path = parse_url($raw, PHP_URL_PATH);
         if (!is_string($path) || $path === '') return null;
 

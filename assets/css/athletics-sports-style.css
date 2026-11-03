@@ -244,10 +244,74 @@ html:not(.ve-previewing) [data-ve-team-image] { cursor: pointer; }
 .athletics-facebook-kicker { display: inline-block; color: #b38b19; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 .athletics-facebook h2 { margin: 10px 0 14px; color: #28733a; font: 700 clamp(24px, 1.9vw, 30px)/1.3 "Noto Serif", Georgia, serif; }
 .athletics-facebook p { max-width: 760px; margin: 0 auto; font-size: 15px; line-height: 1.6; }
-.athletics-facebook-box { position: relative; width: min(500px, 100%); margin: 28px auto 0; }
+.athletics-facebook-box { position: relative; width: 100%; max-width: 500px; margin: 28px auto 0; border-radius: 8px; transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 0.3s ease; }
+.athletics-facebook-box:hover { transform: translateY(-5px); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12); }
 .athletics-facebook-box iframe { display: block; max-width: 100%; border: 0; margin: auto; }
-.athletics-facebook-edit { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 130px; padding: 20px; border: 2px dashed #28733a; border-radius: 12px; background: #f2f7f2; color: #094024; font-weight: 600; cursor: pointer; }
-.athletics-facebook-box iframe + .athletics-facebook-edit { position: absolute; inset: 0; min-height: 0; background: rgba(249,246,241,.85); }
+.dept-fb-link,
+.athletics-fb-link {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 22px;
+    text-align: left;
+    background: #fff;
+    border: 1px solid var(--gnc-green, #094024);
+    border-radius: 8px;
+    color: var(--gnc-green, #094024);
+    text-decoration: none;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+.dept-fb-link:hover,
+.athletics-fb-link:hover {
+    color: var(--gnc-green, #094024);
+    background: #f4f7f4;
+}
+.dept-fb-link:focus-visible,
+.athletics-fb-link:focus-visible {
+    outline: 3px solid #eaba3b;
+    outline-offset: 4px;
+}
+.dept-fb-icon {
+    flex: 0 0 44px;
+    font-size: 36px;
+    line-height: 1;
+}
+.dept-fb-copy {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.dept-fb-copy strong {
+    display: block;
+    font: 700 17px / 1.4 'Noto Serif', Georgia, serif;
+    color: inherit;
+}
+.dept-fb-copy span {
+    display: block;
+    margin-top: 8px;
+    font: 600 14px / 1.5 Inter, Arial, sans-serif;
+    text-decoration: underline;
+}
+.dept-fb-copy span i {
+    font-size: 13px;
+    margin-left: 2px;
+}
+@media (max-width: 768px) {
+    .dept-fb-link,
+    .athletics-fb-link {
+        flex-direction: column;
+        justify-content: center;
+        text-align: center;
+        padding: 20px 18px;
+        gap: 12px;
+    }
+    .dept-fb-copy {
+        text-align: center;
+    }
+}
+.athletics-facebook-edit { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 90px; padding: 20px; border: 2px dashed #28733a; border-radius: 8px; background: #f2f7f2; color: #094024; font-weight: 600; cursor: pointer; }
+.athletics-facebook-box :is(iframe, .dept-fb-link, .athletics-fb-link) + .athletics-facebook-edit { position: absolute; inset: 0; min-height: 0; border-radius: inherit; background: rgba(249,246,241,.92); opacity: 0; transition: opacity 0.2s ease; z-index: 2; }
+.athletics-facebook-box:hover .athletics-facebook-edit,
+.athletics-facebook-edit:focus-visible { opacity: 1; }
 html.ve-previewing .athletics-facebook-edit { display: none; }
 .athletics-highlights-pagination { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 32px; }
 .athletics-highlights-pagination a { display: grid; place-items: center; min-width: 30px; height: 30px; padding: 4px; border: 1px solid #d3e0d5; border-radius: 4px; background: #fff; color: #28733a; text-decoration: none; font-size: 13px; font-weight: 600; }
@@ -512,7 +576,7 @@ html:not(.ve-previewing) [data-ve-sport],html:not(.ve-previewing) [data-ve-sport
     .athletics-highlights-pagination a { transition: background .2s ease, color .2s ease, border-color .2s ease, transform .2s ease; }
 
     /* ---------- Facebook box ---------- */
-    .athletics-facebook-box { transition: transform .35s ease, box-shadow .35s ease; border-radius: 12px; }
+    .athletics-facebook-box { transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 0.3s ease; border-radius: 8px; }
 
     /* ---------- Hover effects only where a real pointer exists ---------- */
     @media (hover: hover) {
@@ -528,7 +592,7 @@ html:not(.ve-previewing) [data-ve-sport],html:not(.ve-previewing) [data-ve-sport
         .athletics-highlight:hover .athletics-highlight-date { transform: scale(1.06); background: #1f5e2c; }
 
         .athletics-highlights-pagination a:hover:not([aria-current="page"]) { transform: translateY(-2px); }
-        .athletics-facebook-box:hover { transform: translateY(-3px); }
+        .athletics-facebook-box:hover { transform: translateY(-5px); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12); }
     }
 
     /* ---------- Scroll reveal (classes added by JS) ---------- */

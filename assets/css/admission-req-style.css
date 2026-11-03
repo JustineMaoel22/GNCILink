@@ -110,28 +110,41 @@ html, body {
     display: flex;
     gap: 12px;
     margin-bottom: 36px;
+    flex-wrap: wrap;
 }
 
 .req-tab {
     font-family: 'Inter', sans-serif;
     font-size: 13px;
     font-weight: 600;
-    padding: 8px 18px;
-    border-radius: 4px;
-    border: 1px solid var(--gnc-green);
+    padding: 6px 24px;
+    border-radius: 24px;
+    border: 1px solid var(--gnc-gold);
     background-color: transparent;
-    color: var(--gnc-green);
+    color: #396744;
     cursor: pointer;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    text-decoration: none;
+    transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .req-tab:hover {
-    background-color: rgba(11, 66, 40, 0.06);
+    background-color: var(--gnc-green-light);
+    border-color: var(--gnc-green-light);
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(31, 94, 44, 0.2);
 }
 
 .req-tab.is-active {
-    background-color: var(--gnc-green);
+    background-color: var(--gnc-green-light);
+    border-color: var(--gnc-green-light);
     color: #ffffff;
+    box-shadow: 0 4px 12px rgba(31, 94, 44, 0.25);
+}
+
+.req-tab:focus-visible {
+    outline: 3px solid var(--gnc-gold);
+    outline-offset: 3px;
 }
 
 .requirements-panels {
@@ -240,6 +253,14 @@ html, body {
 }
 
 @media (max-width: 575px) {
+    .requirements-tabs {
+        gap: 8px;
+    }
+
+    .req-tab {
+        padding: 5px 14px;
+    }
+
     .req-list li {
         gap: 12px;
         padding: 12px 14px;
@@ -331,24 +352,14 @@ html, body {
 /* ---------- Tabs ---------- */
 .req-tab {
     animation: admFadeDown 0.5s ease-out both;
-    transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .req-tab:nth-child(1) { animation-delay: 0.2s; }
 .req-tab:nth-child(2) { animation-delay: 0.3s; }
 
-.req-tab:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 14px rgba(11, 66, 40, 0.15);
-}
-
 .req-tab:active {
     transform: translateY(0) scale(0.97);
     box-shadow: none;
-}
-
-.req-tab.is-active {
-    box-shadow: 0 6px 14px rgba(11, 66, 40, 0.25);
 }
 
 /* ---------- Panels (replay each time a tab is selected) ---------- */

@@ -572,10 +572,42 @@
 .gnc-pinned-nav button:hover { background: #f1f5f2; border-color: #094024; }
 
 @media (max-width: 768px) {
-    .gnc-pinned-card { flex-direction: column; gap: 16px; height: auto; }
-    .gnc-pinned-media { flex: none; max-width: 100%; height: auto; aspect-ratio: 4 / 3; }
-    .gnc-pinned-body { padding: 0 8px 8px; }
-    .gnc-pinned-title { font-size: 1.35rem; }
+    .gnc-pinned-card {
+        flex-direction: column;
+        gap: 16px;
+        height: auto;
+        box-sizing: border-box;
+    }
+    .gnc-pinned-media {
+        flex: none;
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        aspect-ratio: 4 / 3;
+    }
+    .gnc-pinned-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        padding: 0 8px 8px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .gnc-pinned-content {
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+    .gnc-pinned-footer {
+        flex-shrink: 0;
+        margin-top: auto;
+    }
+    .gnc-pinned-title {
+        font-size: 1.35rem;
+        overflow-wrap: anywhere;
+    }
+    .gnc-pinned-intro {
+        overflow-wrap: anywhere;
+    }
 }
 
 /* =============================================================

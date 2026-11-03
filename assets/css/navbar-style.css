@@ -26,6 +26,109 @@ nav:is(.template-breadcrumb, .nursing-breadcrumb, .pharmacy-breadcrumb, .finan-b
     text-transform: uppercase;
 }
 
+/* =============================================================
+   MOBILE VIEW BREADCRUMB NAVIGATION (<= 767.98px)
+   - Single line, no text wrapping across all pages
+   - Horizontally scrollable when too long (reuses Programs implementation)
+   - Center-aligned horizontally when content fits within the screen
+   - Adapts to different mobile screen sizes without page-level overflow
+   ============================================================= */
+@media (max-width: 767.98px) {
+    nav:is([aria-label="breadcrumb" i], [aria-label="Breadcrumb" i], [class*="-breadcrumb"]) {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        white-space: nowrap !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        width: max-content;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        padding-bottom: 6px;
+        scrollbar-width: thin;
+        -webkit-overflow-scrolling: touch;
+        justify-content: flex-start;
+        justify-content: safe center !important;
+    }
+    nav:is([aria-label="breadcrumb" i], [aria-label="Breadcrumb" i], [class*="-breadcrumb"]) > * {
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+    }
+}
+
+/* =============================================================
+   MOBILE VIEW HERO HEADER CENTERING (<= 767.98px)
+   Center-align page headers (title, subtitles, intro copy)
+   across all pages in mobile view.
+   ============================================================= */
+@media (max-width: 767.98px) {
+    :is(
+        [class*="-hero"],
+        [class*="-hero-inner"],
+        [class*="-hero-content"],
+        [class*="-hero-copy"],
+        [class*="-hero-description"],
+        .hero-section,
+        .history-hero,
+        .athletics-hero-copy,
+        .gnc-contact-hero,
+        .faq-heading,
+        .legal-header
+    ) {
+        text-align: center !important;
+        background-position: center !important;
+    }
+
+    :is(
+        [class*="-hero"],
+        [class*="-hero-inner"],
+        [class*="-hero-content"],
+        [class*="-hero-copy"],
+        [class*="-hero-description"],
+        .hero-section,
+        .history-hero,
+        .athletics-hero-copy,
+        .gnc-contact-hero,
+        .faq-heading,
+        .legal-header
+    ) :is(
+        h1, h2, h3, p,
+        .template-title, .template-subtitle, .template-desc,
+        [class*="-subtitle"], [class*="-desc"], [class*="-description"],
+        [class*="-lead"], [class*="-title"], [class*="-kicker"],
+        div.cms-rich, div.cms-rich p
+    ) {
+        text-align: center !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+
+    :is(
+        [class*="-hero"],
+        [class*="-hero-inner"],
+        [class*="-hero-content"],
+        [class*="-hero-copy"],
+        [class*="-hero-description"]
+    ) :is(h1::after, h2::after) {
+        margin-left: auto !important;
+        margin-right: auto !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+    }
+
+    :is(
+        [class*="-hero"],
+        [class*="-hero-inner"],
+        [class*="-hero-content"]
+    ) :is(.template-badges, .template-ctas, .hero-ctas, [class*="-badges"], [class*="-ctas"]) {
+        margin-left: auto !important;
+        margin-right: auto !important;
+        justify-content: center !important;
+    }
+}
+
 :root {
     --gnc-nav-bg:     #094024;
     --gnc-green:      #094024;

@@ -1,0 +1,87 @@
+/* Shared public choice controls, matching the admissions reference. */
+:root {
+    --gnc-choice-green: #0b4228;
+    --gnc-choice-radius: 3px;
+}
+
+body :is(.req-tab, .enrollment-tabs .nav-link, .scholarship-tabs .nav-link,
+    .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a, .chip) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    max-width: 100%;
+    padding: 9px 18px;
+    border: 1px solid var(--gnc-choice-green);
+    border-radius: var(--gnc-choice-radius);
+    background: transparent;
+    color: var(--gnc-choice-green);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    text-decoration: none;
+    box-shadow: none;
+    cursor: pointer;
+    transition: background-color .18s ease, color .18s ease, box-shadow .18s ease;
+}
+
+body :is(.req-tab, .enrollment-tabs .nav-link, .scholarship-tabs .nav-link,
+    .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a, .chip):hover {
+    background: #eaf0ec;
+    border-color: var(--gnc-choice-green);
+    color: var(--gnc-choice-green);
+    transform: none;
+    box-shadow: none;
+}
+
+body :is(.req-tab, .enrollment-tabs .nav-link, .scholarship-tabs .nav-link,
+    .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a, .chip):is(.active, .is-active, .on) {
+    background: var(--gnc-choice-green);
+    border-color: var(--gnc-choice-green);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(11, 66, 40, .22);
+    transform: none;
+}
+
+body :is(.req-tab, .enrollment-tabs .nav-link, .scholarship-tabs .nav-link,
+    .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a, .chip):focus-visible {
+    outline: 3px solid #d3a63a;
+    outline-offset: 3px;
+}
+
+/* Keep separate choices spaced like the reference. */
+body .na-tabs {
+    gap: 12px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+/* Preserve the attached category editing tools. */
+body .ve-admission-category {
+    border-radius: var(--gnc-choice-radius);
+}
+body .ve-admission-category .req-tab {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+body .ve-admission-category-tools {
+    border-color: var(--gnc-choice-green);
+    border-radius: 0 var(--gnc-choice-radius) var(--gnc-choice-radius) 0;
+}
+body .ve-previewing .ve-admission-category .req-tab {
+    border-radius: var(--gnc-choice-radius);
+}
+
+/* Navigator chips retain their building colors and responsive side list. */
+#chips .chip { justify-content: flex-start; }
+#chips .chip b { color: inherit; }
+
+@media (prefers-reduced-motion: reduce) {
+    body :is(.req-tab, .enrollment-tabs .nav-link, .scholarship-tabs .nav-link,
+        .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a, .chip) {
+        transition: none;
+    }
+}

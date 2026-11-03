@@ -368,3 +368,19 @@ body {
     .cv-open { display: none; }
     .core-values-hero .reveal-up { transition-delay: 0s !important; }
 }
+
+@media (max-width: 768px) {
+    .core-values-hero {
+        background-position: center;
+    }
+    .core-values-hero-inner {
+        padding: 32px 18px 36px;
+        text-align: center;
+    }
+    .core-values-hero h1,
+    .core-values-hero p {
+        text-align: center;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}

@@ -6,7 +6,8 @@ $onboardingHome = parse_url(rbacHome(), PHP_URL_PATH);
 $onboardingAuto = $onboardingStatus === 'pending' && rbacRequestRoute() === $onboardingHome;
 $onboardingSteps = [['title' => 'Welcome to GNC Admin Panel', 'text' => 'Your account is ready. This short guide introduces your ' . rbacRole() . ' workspace. It only explains controls; it will not edit or publish content.', 'selector' => '.topbar-breadcrumb']];
 foreach (adminOnboardingGuides() as $guide) {
-    $onboardingSteps[] = ['title' => $guide['title'], 'text' => $guide['text'], 'selector' => $guide['route'] === '/admin/settings.php' ? '.topbar-right a[href="/admin/settings.php"]' : '.sidebar-link[href="' . $guide['route'] . '"]'];
+    $guideLinkSelector = $guide['route'] === '/admin/settings.php' ? '.topbar-right a' : '.sidebar-link';
+    $onboardingSteps[] = ['title' => $guide['title'], 'text' => $guide['text'], 'selector' => $guideLinkSelector . '[href="' . $guide['route'] . '"],' . $guideLinkSelector . '[href="' . gncBrowserUrl($guide['route']) . '"]'];
 }
 $onboardingSteps[] = ['title' => 'Check the public website', 'text' => 'This shortcut opens the website in another tab. Review your published changes there. Drafts and pending submissions are not public yet.', 'selector' => '.topbar-right a[title="View Public Site"]'];
 $onboardingSteps[] = ['title' => 'Create and save content', 'text' => 'Use this button to open a new content form. Complete its fields, check the content and use its save or submit control. Look for the success message before leaving. This tutorial will not open or submit a form for you.', 'selector' => '#btn-new-announcement, #btn-new-news', 'optional' => true];

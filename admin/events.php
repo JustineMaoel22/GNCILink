@@ -6,6 +6,7 @@
  */
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../admin/admin-functions.php';
+require_once __DIR__ . '/../includes/multi-audience.php';
 require_once __DIR__ . '/../includes/event-audience.php';
 require_once __DIR__ . '/../includes/calendar-import.php';
 
@@ -46,6 +47,7 @@ $eventDepartmentsReady = eventDepartmentsReady();
 $eventAudienceGroupsReady = eventAudienceGroupsReady();
 $eventDepartments = $db->query('SELECT dept_id, dept_name FROM departments ORDER BY dept_name')->fetchAll(PDO::FETCH_ASSOC);
 $eventDepartmentNames = array_column($eventDepartments, 'dept_name', 'dept_id');
+$programCategories = getProgramCategories();
 
 // ---------------------------------------------------------------
 // Category colors
@@ -108,9 +110,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             $startDate   = $startD;
             $endDate     = null;
             $categoryId  = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
-            $program     = normalizeProgramCategory($_POST['program'] ?? null);
-            $audience=normalizeEventAudience($_POST['dept_id']??eventDepartmentSelection($existingEvent??[]),$program);
-            $department=$audience['dept_id'];
+            $multiAudience = normalizeMultiAudienceInput(
+                $_POST['dept_ids'] ?? ($_POST['dept_id'] ?? null),
+                $_POST['programs'] ?? ($_POST['program'] ?? null)
+            );
+            $program    = $multiAudience['primary_program'];
+            $department = $multiAudience['primary_dept_id'];
+            $audience   = ['dept_id' => $department, 'program' => $program, 'audience_group' => (!empty($_POST['audience_group']) ? $_POST['audience_group'] : 'all')];
             $status      = in_array($_POST['status'] ?? '', ['draft','pending','published','archived'])
                             ? $_POST['status'] : $evtDefaultStatus;
             // Super Admins can't send content to themselves for approval
@@ -128,12 +134,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             }
 
             // basic date/time sanity check
-            $validDate = function ($d) { return (bool)preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) && strtotime($d) !== false; };
-            $validTime = function ($t) { return $t === '' || strtotime('1970-01-01 ' . $t) !== false; };
+            $validDate = function ($d) {
+                $date = DateTimeImmutable::createFromFormat('!Y-m-d', $d);
+                return $date && $date->format('Y-m-d') === $d;
+            };
+            $validTime = function ($t) { return $t === '' || (bool)preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/', $t); };
             if (!$validDate($startD) || !$validTime($startT)
                 || ($endD !== '' && !$validDate($endD)) || !$validTime($endT)) {
                 echo json_encode(['success' => false, 'message' => 'Invalid date or time format.']);
                 exit;
+            }
+
+            if (mb_strlen($title) > 500 || mb_strlen($location) > 500) {
+                throw new InvalidArgumentException('Event name and location must be at most 500 characters.');
+            }
+            if ($endT !== '' && $startT === '') {
+                throw new InvalidArgumentException('Enter a start time before setting an end time.');
+            }
+            if ($endD === '' && $endT !== '') $endD = $startD;
+            if (($endD !== '' && $endD < $startD)
+                || (($endD === '' || $endD === $startD) && $endT !== '' && $endT < $startT)) {
+                throw new InvalidArgumentException('The event must end on or after its start date and time.');
             }
 
             $startDate = $startD . ' ' . ($startT !== '' ? date('H:i:s', strtotime('1970-01-01 ' . $startT)) : '00:00:00');
@@ -152,6 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 if ($eventAudienceGroupsReady) $values[] = $audience['audience_group'];
                 $stmt->execute($values);
                 $newId = $db->lastInsertId();
+                saveEventAudience($db, (int)$newId, $multiAudience['dept_ids'], $multiAudience['programs']);
                 rbacCreatedRecord('event',(int)$newId);
                 if (rbacContentOwnerId() !== (int)$userId) $db->prepare('UPDATE events SET user_id=? WHERE event_id=?')->execute([rbacContentOwnerId(),$newId]);
 
@@ -178,6 +200,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 if ($eventAudienceGroupsReady) $values[] = $audience['audience_group'];
                 $values[] = $eventId;
                 $stmt->execute($values);
+                saveEventAudience($db, $eventId, $multiAudience['dept_ids'], $multiAudience['programs']);
 
                 if (function_exists('logActivity')) {
                     logActivity($userId, 'UPDATE', 'events', $eventId, "Updated event: {$title}");
@@ -207,6 +230,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 echo json_encode(['success' => false, 'message' => 'Event not found.']);
                 exit;
             }
+            $evAudience = getEventAudience($db, (int)$ev['event_id'], $ev['dept_id'] ?? null, $ev['program'] ?? null);
+            $ev['dept_ids'] = $evAudience['dept_ids'];
+            $ev['programs'] = $evAudience['programs'];
             echo json_encode(['success' => true, 'event' => $ev]);
             exit;
         }
@@ -308,9 +334,11 @@ try {
         LEFT JOIN users u ON e.user_id = u.user_id
         ORDER BY e.start_date DESC
     ")->fetchAll();
+    $eventAudiences = getEventAudiencesBatch($db, $allEvents);
 } catch (Exception $e) {
     error_log('Get all events error: ' . $e->getMessage());
     $allEvents = [];
+    $eventAudiences = [];
 }
 
 // Only categories that make sense for an Event go in this dropdown.
@@ -543,11 +571,20 @@ include __DIR__ . '/../components/header-admin.php';
                             $multi = date('Y-m-d', $evEnd) !== date('Y-m-d', $evStart);
                             $authorName = trim($ev['author']);
                         ?>
+                        <?php
+                        $evAud = $eventAudiences[$ev['event_id']] ?? ['dept_ids' => [], 'programs' => []];
+                        $evDeptNames = [];
+                        foreach ($evAud['dept_ids'] as $did) {
+                            if (isset($eventDepartmentNames[$did])) $evDeptNames[] = $eventDepartmentNames[$did];
+                        }
+                        ?>
                         <tr data-event-id="<?= $ev['event_id'] ?>"
                             data-status="<?= htmlspecialchars($ev['status']) ?>"
                             data-title="<?= htmlspecialchars($ev['title']) ?>"
                             data-category="<?= (int)($ev['category_id'] ?? 0) ?>"
                             data-dept="<?= htmlspecialchars(($ev['audience_group'] ?? 'all') !== 'all' ? 'group:' . $ev['audience_group'] : (string)($ev['dept_id'] ?? '')) ?>"
+                            data-depts='<?= json_encode($evAud['dept_ids']) ?>'
+                            data-programs='<?= json_encode($evAud['programs']) ?>'
                             class="evt-row<?= $isPast ? ' evt-past' : '' ?>">
                             <td class="evt-title-cell" data-label="Event">
                                 <div class="evt-row-title"><?= htmlspecialchars($ev['title']) ?></div>
@@ -577,9 +614,20 @@ include __DIR__ . '/../components/header-admin.php';
                                 <?php endif; ?>
                             </td>
                             <td data-label="For" style="font-size:.82rem">
-                                <?= htmlspecialchars(['basic-education'=>'All Basic Education','college'=>'All College'][$ev['audience_group']??'all']??($eventDepartmentNames[$ev['dept_id'] ?? ''] ?? '')) ?>
-                                <?= !empty($ev['dept_id']) || ($ev['audience_group']??'all')!=='all' ? ' · ' : '' ?>
-                                <?= ($ev['program'] ?? 'ALL') !== 'ALL' ? htmlspecialchars($ev['program']) : (!empty($ev['dept_id']) ? 'All programs in department' : 'All programs') ?>
+                                <div class="audience-tag-list mb-1">
+                                    <?php if (empty($evDeptNames)): ?>
+                                        <span class="audience-tag">All departments</span>
+                                    <?php else: foreach ($evDeptNames as $dName): ?>
+                                        <span class="audience-tag audience-tag-dept" title="<?= htmlspecialchars($dName) ?>"><?= htmlspecialchars(mb_strlen($dName) > 26 ? mb_substr($dName, 0, 24) . '…' : $dName) ?></span>
+                                    <?php endforeach; endif; ?>
+                                </div>
+                                <div class="audience-tag-list">
+                                    <?php if (empty($evAud['programs'])): ?>
+                                        <span class="program-badge program-badge-all">All programs</span>
+                                    <?php else: foreach ($evAud['programs'] as $pCode): ?>
+                                        <span class="program-badge" title="<?= htmlspecialchars($programCategories[$pCode] ?? $pCode) ?>"><?= htmlspecialchars($pCode) ?></span>
+                                    <?php endforeach; endif; ?>
+                                </div>
                             </td>
                             <td data-label="Status"><span class="status-badge <?= htmlspecialchars($ev['status']) ?>"><?= htmlspecialchars($evtStatusLabels[$ev['status']] ?? ucfirst($ev['status'])) ?></span></td>
                             <td class="evt-actions-cell">
@@ -605,23 +653,30 @@ include __DIR__ . '/../components/header-admin.php';
 </div>
 
 <!-- Add / Edit Event Modal -->
-<div class="modal fade" id="eventModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-fullscreen-sm-down">
+<div class="modal fade" id="eventModal" tabindex="-1" aria-hidden="true" aria-labelledby="eventModalLabel" aria-describedby="eventModalIntro">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-fullscreen-sm-down">
         <div class="modal-content">
-            <form data-content-publish id="eventForm">
+            <form data-content-publish data-custom-publish-label id="eventForm" novalidate>
                 <input type="hidden" name="ajax_action" id="eventFormAction" value="create">
                 <input type="hidden" name="event_id" id="eventId" value="">
                 <input type="hidden" name="csrf_token" id="csrfToken" value="<?= htmlspecialchars($evtCsrfToken) ?>">
 
                 <div class="modal-header">
-                    <h5 class="modal-title" id="eventModalLabel">Add Event</h5>
+                    <div class="evt-modal-heading">
+                        <span class="evt-modal-icon" aria-hidden="true"><i class="bi bi-calendar-plus"></i></span>
+                        <div><h5 class="modal-title" id="eventModalLabel">Add Event</h5>
+                        <p id="eventModalIntro" class="evt-modal-intro">Plan an activity and choose who it is for.</p></div>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div id="eventFormAlert" class="alert alert-danger d-none" role="alert"></div>
+                    <div id="eventFormAlert" class="alert alert-danger d-none" role="alert" tabindex="-1"></div>
+                    <p class="evt-required-note">Fields marked <span class="text-danger">*</span> are required. Everything else is optional.</p>
+                    <section class="evt-form-section" aria-labelledby="eventDetailsHeading">
+                    <h6 id="eventDetailsHeading">Event details</h6>
 
                     <div class="mb-3">
-                        <label class="form-label" for="eventTitle">What is the event called? <span class="text-danger">*</span></label>
+                        <label class="form-label" for="eventTitle">Event name <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="title" id="eventTitle" required maxlength="500" placeholder="e.g. Foundation Day Celebration">
                     </div>
 
@@ -636,26 +691,26 @@ include __DIR__ . '/../components/header-admin.php';
                         <textarea class="form-control" id="eventDescription" name="description" maxlength="10000" rows="3" placeholder="e.g. Annual school-wide celebration with booths, games, and performances."></textarea>
                     </div>
                     <?php endif; ?>
-                    <div class="evt-section-label">When</div>
+                    </section>
+                    <section class="evt-form-section" aria-labelledby="eventScheduleHeading">
+                    <h6 id="eventScheduleHeading">Schedule</h6>
+                    <div class="evt-schedule-options">
+                        <label class="evt-toggle-label" for="eventMultiDay"><input class="form-check-input" type="checkbox" id="eventMultiDay"> <span>Multi-day event<small>Switch on if the event runs across several dates.</small></span></label>
+                        <label class="evt-toggle-label" for="eventAllDay"><input class="form-check-input" type="checkbox" id="eventAllDay" checked> <span>All day<small>No specific start or end time.</small></span></label>
+                    </div>
                     <div class="row">
                         <div class="col-12 col-sm-6 mb-2">
                             <label class="form-label" for="eventStartDate">Starts on <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="start_date" id="eventStartDate" required>
                         </div>
-                        <div class="col-12 col-sm-6 mb-2">
-                            <label class="form-label" for="eventEndDate">Ends on <span class="text-muted fw-normal">(optional)</span></label>
+                        <div class="col-12 col-sm-6 mb-2 d-none" id="eventEndDateField">
+                            <label class="form-label" for="eventEndDate">Ends on <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" name="end_date" id="eventEndDate">
                         </div>
                     </div>
-                    <div class="form-text mb-2">Leave "Ends on" empty if the event is only one day.</div>
-
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="eventAllDay" checked>
-                        <label class="form-check-label" for="eventAllDay">No specific time (all day)</label>
-                    </div>
                     <div class="row d-none" id="eventTimeRow">
                         <div class="col-12 col-sm-6 mb-3">
-                            <label class="form-label" for="eventStartTime">Start time</label>
+                            <label class="form-label" for="eventStartTime">Start time <span class="text-danger">*</span></label>
                             <input type="time" class="form-control" name="start_time" id="eventStartTime">
                         </div>
                         <div class="col-12 col-sm-6 mb-3">
@@ -664,9 +719,12 @@ include __DIR__ . '/../components/header-admin.php';
                         </div>
                     </div>
 
-                    <div class="evt-section-label">Details</div>
+                    <p id="eventScheduleSummary" class="evt-schedule-summary" aria-live="polite">Choose a start date. Single-day, all-day event.</p>
+                    </section>
+                    <section class="evt-form-section" aria-labelledby="eventAudienceHeading">
+                    <h6 id="eventAudienceHeading">Category &amp; audience</h6>
                     <div class="row">
-                        <div class="col-12 col-sm-6 mb-3">
+                        <div class="col-12 mb-3">
                             <label class="form-label" for="eventCategory">Type of event</label>
                             <div class="d-flex align-items-center gap-2">
                                 <span id="categoryColorDot" class="evt-cat-dot" style="width:14px;height:14px;background:#6c757d;flex:0 0 auto;"></span>
@@ -679,42 +737,39 @@ include __DIR__ . '/../components/header-admin.php';
                             </div>
                         </div>
                         <div class="col-12 col-sm-6 mb-3">
-                            <label class="form-label" for="eventDepartment">Department (optional)</label>
-                            <select class="form-select" name="dept_id" id="eventDepartment"<?= !$eventDepartmentsReady ? ' disabled' : '' ?>>
-                                <option value="">All departments</option>
-                                <option value="group:basic-education"<?= !$eventAudienceGroupsReady?' disabled':'' ?>>All Basic Education</option>
-                                <option value="group:college"<?= !$eventAudienceGroupsReady?' disabled':'' ?>>All College</option>
-                                <?php foreach ($eventDepartments as $department): ?>
-                                <option value="<?= (int)$department['dept_id'] ?>"><?= htmlspecialchars($department['dept_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <?php if (!$eventDepartmentsReady): ?><div class="form-text">Run the Events department migration to enable this option.</div><?php endif; ?>
+                            <label class="form-label fw-semibold" id="eventDeptLabel">Departments</label>
+                            <div id="event-dept-multiselect"></div>
+                            <div class="form-text">Leave unrestricted for all departments.</div>
+                        </div>
+                        <div class="col-12 col-sm-6 mb-3">
+                            <label class="form-label fw-semibold" id="eventProgramLabel">Academic programs</label>
+                            <div id="event-program-multiselect"></div>
+                            <div class="form-text">Leave unrestricted for all programs.</div>
                         </div>
                         <div class="col-12 mb-3">
-                            <label class="form-label" for="eventProgram">Program (optional)</label>
-                            <select class="form-select" name="program" id="eventProgram">
-                                <?php foreach (getAnnouncementProgramCategories() as $code => $label):
-                                    $optionText = $code === 'ALL' ? 'Everyone (all programs)' : "{$code} - {$label}";
-                                ?>
-                                    <option value="<?= htmlspecialchars($code) ?>"<?= $code === 'ALL' ? ' selected' : '' ?>><?= htmlspecialchars($optionText) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <div class="form-text" id="eventAudienceHelp">Leave Program on all programs to include the whole department.</div>
+                            <div class="evt-audience-summary" id="eventAudienceHelp" role="status"></div>
                         </div>
                     </div>
 
-                    <div class="evt-section-label">Visibility</div>
+                    </section>
+                    <section class="evt-form-section evt-visibility-section" aria-labelledby="eventVisibilityHeading">
+                    <h6 id="eventVisibilityHeading">Visibility</h6>
+                    <label class="form-label" for="eventStatus">What should happen when you save?</label>
                     <select class="form-select" name="status" id="eventStatus">
                         <option value="draft"<?= $isSuperAdmin ? ' selected' : '' ?>>Draft — still working on it</option>
                         <?php if (!$isSuperAdmin): ?>
                         <option value="pending" selected>Waiting for approval</option>
                         <?php endif; ?>
-                        <option value="published">Live on website</option>
+                        <?php if (hasPermission('publish_event')): ?>
+                        <option value="published">Published — live on website</option>
+                        <?php endif; ?>
                         <option value="archived">Hidden from website</option>
                     </select>
-                    <div class="evt-status-help" id="eventStatusHelp"></div>
+                    <div class="evt-status-help" id="eventStatusHelp" aria-live="polite"></div>
+                    </section>
                 </div>
                 <div class="modal-footer">
+                    <span id="eventSaveIntent" class="evt-save-intent" aria-live="polite"></span>
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-gnc-gold" id="eventSubmitBtn"><i class="bi bi-check-lg"></i> Save Event</button>
                 </div>
@@ -747,6 +802,11 @@ include __DIR__ . '/../components/header-admin.php';
     </div>
 </div>
 
+<link rel="stylesheet" href="/assets/css/multi-audience-select.css?v=<?= filemtime(__DIR__ . '/../assets/css/multi-audience-select.css') ?>">
+<script src="/assets/js/multi-audience-select.js?v=<?= filemtime(__DIR__ . '/../assets/js/multi-audience-select.js') ?>"></script>
+<link rel="stylesheet" href="/assets/css/event-form.css?v=<?= filemtime(__DIR__ . '/../assets/css/event-form.css') ?>">
+<script src="/assets/js/admin-form-audience.js?v=<?= filemtime(__DIR__ . '/../assets/js/admin-form-audience.js') ?>"></script>
+<script src="/assets/js/event-form.js?v=<?= filemtime(__DIR__ . '/../assets/js/event-form.js') ?>"></script>
 <style>
 .evt-del-icon {
     width: 60px; height: 60px; margin: 0 auto 14px;
@@ -1028,10 +1088,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function syncAllDay() {
         const allDay = allDayCb.checked;
         timeRow.classList.toggle('d-none', allDay);
-        if (allDay) {
-            document.getElementById('eventStartTime').value = '';
-            document.getElementById('eventEndTime').value = '';
-        }
+        document.getElementById('eventStartTime').disabled = allDay;
+        document.getElementById('eventEndTime').disabled = allDay;
     }
     allDayCb.addEventListener('change', syncAllDay);
 
@@ -1048,7 +1106,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const endDateEl   = document.getElementById('eventEndDate');
     startDateEl.addEventListener('change', function () {
         endDateEl.min = startDateEl.value || '';
-        if (endDateEl.value && endDateEl.value < startDateEl.value) endDateEl.value = '';
     });
 
     // ---- Friendly success message that survives the page reload ----
@@ -1071,38 +1128,57 @@ document.addEventListener('DOMContentLoaded', function () {
         if (pending) { sessionStorage.removeItem('evtToast'); showToast(pending); }
     } catch (e) {}
 
-    // Older events may already target a Basic Education track. Keep that
-    // saved selection when editing, without offering it for new events.
-    const eventProgramLabels = <?= json_encode(getProgramCategories(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    const eventProgramDepartments = <?= json_encode(array_column($db->query('SELECT program_code, dept_id FROM programs')->fetchAll(PDO::FETCH_ASSOC), 'dept_id', 'program_code'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    // ---- Multi-Audience Select for Departments & Programs ----
+    const deptSelectItems = <?= json_encode(array_values(array_map(function($d) {
+        return ['value' => (string)$d['dept_id'], 'label' => $d['dept_name']];
+    }, $eventDepartments)), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+    const progSelectItems = <?= json_encode(array_values(array_map(function($code, $label) {
+        return ['value' => (string)$code, 'label' => $label, 'badge' => (string)$code];
+    }, array_keys(array_diff_key($programCategories, ['ALL' => ''])), array_diff_key($programCategories, ['ALL' => '']))), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+    const evtDeptSelectEl = document.getElementById('event-dept-multiselect');
+    const evtProgSelectEl = document.getElementById('event-program-multiselect');
+
+    let evtDeptSelect = null;
+    let evtProgSelect = null;
+
     function updateEventAudience() {
-        const department = document.getElementById('eventDepartment').value;
-        const select = document.getElementById('eventProgram');
-        for (const option of select.options) {
-            const mismatch = option.value !== 'ALL' && department && String(eventProgramDepartments[option.value] || '') !== department;
-            option.hidden = Boolean(mismatch);
-            option.disabled = Boolean(mismatch);
+        const depts = evtDeptSelect ? evtDeptSelect.getSelected() : [];
+        const progs = evtProgSelect ? evtProgSelect.getSelected() : [];
+        const help = document.getElementById('eventAudienceHelp');
+        if (!help) return;
+        if (depts.length === 0 && progs.length === 0) {
+            help.innerHTML = '<i class="bi bi-info-circle me-1"></i>School-wide event (applies to all departments and all academic programs).';
+        } else {
+            help.innerHTML = '<i class="bi bi-info-circle me-1"></i>Targeted event: ' +
+                (depts.length ? depts.length + ' department(s) ' : 'all departments ') +
+                '&middot; ' +
+                (progs.length ? progs.length + ' program(s)' : 'all programs');
         }
-        select.querySelector('option[value="ALL"]').textContent = department.startsWith('group:') ? 'All programs in this group' : department ? 'All programs in this department' : 'Everyone (all programs)';
-        if (select.selectedOptions[0]?.disabled) select.value = 'ALL';
-        document.getElementById('eventAudienceHelp').textContent = department
-            ? 'Program is optional. Leave it on all programs to include the whole department.'
-            : 'Choose a department, a program, or leave both on everyone.';
     }
-    document.getElementById('eventDepartment').addEventListener('change', () => {
-        document.getElementById('eventProgram').value = 'ALL';
-        updateEventAudience();
-    });
-    function selectEventProgram(code = 'ALL', preserveExisting = false) {
-        const select = document.getElementById('eventProgram');
-        select.querySelectorAll('[data-existing-program]').forEach(option => option.remove());
-        if (preserveExisting && eventProgramLabels[code] && !Array.from(select.options).some(option => option.value === code)) {
-            const option = new Option(code + ' - ' + eventProgramLabels[code] + ' (existing selection)', code);
-            option.dataset.existingProgram = '1';
-            select.add(option);
+
+    if (typeof GncMultiSelect !== 'undefined') {
+        if (evtDeptSelectEl) {
+            evtDeptSelect = new GncMultiSelect(evtDeptSelectEl, {
+                name: 'dept_ids[]',
+                allLabel: 'Everyone (All departments)',
+                allValue: 'ALL',
+                placeholder: 'Select departments...',
+                items: deptSelectItems,
+                onChange: function () { updateEventAudience(); }
+            });
         }
-        select.value = code;
-        if (!select.value) select.value = 'ALL';
+        if (evtProgSelectEl) {
+            evtProgSelect = new GncMultiSelect(evtProgSelectEl, {
+                name: 'programs[]',
+                allLabel: 'Everyone (All academic programs)',
+                allValue: 'ALL',
+                placeholder: 'Select programs...',
+                items: progSelectItems,
+                onChange: function () { updateEventAudience(); }
+            });
+        }
     }
 
     function resetForm() {
@@ -1110,8 +1186,8 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('eventId').value = '';
         document.getElementById('eventFormAction').value = 'create';
         document.getElementById('eventStatus').value = DEFAULT_STATUS;
-        document.getElementById('eventDepartment').value = '';
-        selectEventProgram();
+        if (evtDeptSelect) evtDeptSelect.deselectAll();
+        if (evtProgSelect) evtProgSelect.deselectAll();
         updateEventAudience();
         alertBox.classList.add('d-none');
         alertBox.textContent = '';
@@ -1120,6 +1196,8 @@ document.addEventListener('DOMContentLoaded', function () {
         syncAllDay();
         updateStatusHelp();
         updateCategoryDot();
+        endDateEl.min = '';
+        submitBtn.disabled = false;
     }
 
     // Open modal for a brand-new event
@@ -1245,8 +1323,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('eventEndDate').value = ed;
                 document.getElementById('eventEndTime').value = et;
                 document.getElementById('eventCategory').value = ev.category_id || '';
-                selectEventProgram(ev.program || 'ALL', true);
-                document.getElementById('eventDepartment').value = ev.audience_group && ev.audience_group !== 'all' ? 'group:' + ev.audience_group : ev.dept_id || '';
+                if (evtDeptSelect) evtDeptSelect.setSelected(ev.dept_ids || []);
+                if (evtProgSelect) evtProgSelect.setSelected(ev.programs || []);
                 updateEventAudience();
                 // If this role has no such option (e.g. an old "pending" event opened by a
                 // Super Admin), the select would go blank, so fall back to the default.
@@ -1292,7 +1370,9 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('tr.evt-row').forEach(function (row) {
             const okStatus = activeFilter === 'all' || row.dataset.status === activeFilter;
             const okText   = !q || (row.dataset.title || '').toLowerCase().indexOf(q) !== -1;
-            const okDept   = !dept || row.dataset.dept === dept;
+            let rowDepts = [];
+            try { rowDepts = JSON.parse(row.dataset.depts || '[]'); } catch (e) {}
+            const okDept   = !dept || rowDepts.length === 0 || rowDepts.includes(parseInt(dept, 10));
             const okCat    = !cat || row.dataset.category === cat;
             const show = okStatus && okText && okDept && okCat;
             row.style.display = show ? '' : 'none';
@@ -1319,7 +1399,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     form.addEventListener('submit', function (e) {
         e.preventDefault();
-        if (endDateEl.value && endDateEl.value < startDateEl.value) {
+        if (!endDateEl.disabled && endDateEl.value && endDateEl.value < startDateEl.value) {
             alertBox.textContent = 'The end date cannot be earlier than the start date.';
             alertBox.classList.remove('d-none');
             return;
@@ -1330,7 +1410,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Saving…';
+        submitBtn.textContent = {draft: 'Saving draft…', pending: 'Submitting…', published: 'Publishing…', archived: 'Saving…'}[statusSelect.value] || 'Saving…';
         alertBox.classList.add('d-none');
 
         const fd = new FormData(form);
@@ -1338,7 +1418,9 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    reloadWithToast(document.getElementById('eventFormAction').value === 'update' ? 'Event saved.' : 'Event added to the calendar.');
+                    form.dispatchEvent(new Event('event-form:saved'));
+                    const messages = {draft: 'Event saved as a draft. It is not live on the website.', pending: 'Event submitted for approval. It is not live yet.', published: 'Event published on the website.', archived: 'Event saved and hidden from the website.'};
+                    reloadWithToast(messages[statusSelect.value] || 'Event saved.');
                 } else {
                     alertBox.textContent = data.message || 'Something went wrong.';
                     alertBox.classList.remove('d-none');

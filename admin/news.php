@@ -288,18 +288,22 @@ include __DIR__ . '/../components/header-admin.php';
 <!-- ============================================================
      CREATE / EDIT MODAL — posts to /admin/action/create-news.php
 ============================================================ -->
-<div class="modal fade" id="newsModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
+<div class="modal fade" id="newsModal" tabindex="-1" aria-hidden="true" aria-labelledby="newsModalLabel" aria-describedby="newsModalIntro">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-fullscreen-sm-down">
     <div class="modal-content">
-      <form data-content-publish method="POST" action="/admin/action/create-news.php" enctype="multipart/form-data" id="news-form">
+      <form data-content-publish data-custom-publish-label method="POST" action="/admin/action/create-news.php" enctype="multipart/form-data" id="news-form" novalidate>
         <div class="modal-header">
-          <h5 class="modal-title" id="newsModalLabel">New Article</h5>
+          <div class="evt-modal-heading">
+            <span class="evt-modal-icon" aria-hidden="true"><i class="bi bi-newspaper"></i></span>
+            <div><h5 class="modal-title" id="newsModalLabel">New Article</h5>
+            <p id="newsModalIntro" class="evt-modal-intro">Write a story and choose when it goes live.</p></div>
+          </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
 
           <?php if (!empty($flashErrors)): ?>
-          <div class="alert alert-danger d-flex gap-2 align-items-start">
+          <div class="alert alert-danger d-flex gap-2 align-items-start" role="alert" tabindex="-1">
             <i class="bi bi-exclamation-triangle-fill mt-1"></i>
             <div>
               <?php foreach ($flashErrors as $err): ?>
@@ -313,6 +317,10 @@ include __DIR__ . '/../components/header-admin.php';
           <input type="hidden" name="action" id="modal-action" value="create">
           <input type="hidden" name="news_id" id="modal-news-id" value="">
           <input type="hidden" name="_review_id" value="<?= (int)($_GET['revise'] ?? 0) ?>">
+          <div id="announcement-form-alert" class="alert alert-danger d-none" role="alert" tabindex="-1"></div>
+          <p class="evt-required-note">Fields marked <span class="text-danger">*</span> are required. Pictures and the author name are optional.</p>
+          <section class="evt-form-section" aria-labelledby="news-content-heading">
+          <h6 id="news-content-heading">Article content</h6>
 
           <div class="mb-3">
             <label class="form-label" for="modal-title">Headline <span class="text-danger">*</span></label>
@@ -320,13 +328,17 @@ include __DIR__ . '/../components/header-admin.php';
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Story <span class="text-danger">*</span></label>
+            <label class="form-label" id="ann-message-label">Story <span class="text-danger">*</span></label>
             <div id="modal-content-editor"></div>
             <input type="hidden" name="content" id="modal-content-input">
-            <div class="form-text">Write the full article. You can use the toolbar to make text bold or add lists and links.</div>
+            <div class="form-text" id="ann-message-help">Start with the key news, then add the full story. Use the toolbar for formatting, lists, and links.</div>
+            <div class="invalid-feedback" id="ann-message-error" aria-live="polite"></div>
           </div>
 
-          <div class="ann-section-label">Cover picture</div>
+          </section>
+          <section class="evt-form-section" aria-labelledby="news-pictures-heading" data-warning-optional="true">
+          <h6 id="news-pictures-heading">Pictures <span class="ann-optional">Optional</span></h6>
+          <label class="form-label" for="modal-image-input">Cover picture</label>
           <div class="ann-image-box mb-3">
             <div id="modal-image-preview-wrap" style="display:none">
               <img id="modal-image-preview" src="" alt="Selected picture preview">
@@ -341,7 +353,7 @@ include __DIR__ . '/../components/header-admin.php';
             </div>
           </div>
 
-          <div class="ann-section-label">More pictures (gallery)</div>
+          <label class="form-label" for="modal-gallery-input">More pictures (gallery)</label>
           <div class="mb-3">
             <input type="file" name="gallery_images[]" id="modal-gallery-input" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" multiple>
             <div class="form-text">Optional. You can pick several photos at once — up to 10 at a time, 5 MB each.</div>
@@ -358,7 +370,9 @@ include __DIR__ . '/../components/header-admin.php';
             </div>
           </div>
 
-          <div class="ann-section-label">Details</div>
+          </section>
+          <section class="evt-form-section" aria-labelledby="news-details-heading">
+          <h6 id="news-details-heading">Article details</h6>
           <div class="row g-3 mb-3">
             <div class="col-12 col-sm-6">
               <label class="form-label" for="modal-category">Type</label>
@@ -369,14 +383,17 @@ include __DIR__ . '/../components/header-admin.php';
               </select>
             </div>
             <div class="col-12 col-sm-6">
-              <label class="form-label" for="modal-author">Author</label>
+              <label class="form-label" for="modal-author">Author <span class="ann-optional">Optional</span></label>
               <input type="text" name="author" id="modal-author" class="form-control" maxlength="255" placeholder="e.g. GNC Press Office">
               <div class="form-text">Optional name shown under the headline on the website.</div>
             </div>
           </div>
 
-          <div class="ann-section-label">Visibility</div>
+          </section>
+          <section class="evt-form-section" aria-labelledby="news-visibility-heading">
+          <h6 id="news-visibility-heading">Visibility</h6>
           <?php if ($canPublish): ?>
+          <label class="form-label" for="modal-status">What should happen when you save?</label>
           <select name="status" id="modal-status" class="form-select">
             <option value="draft">Save as draft — still working on it</option>
             <?php if (!$isSuperAdmin): ?>
@@ -385,15 +402,18 @@ include __DIR__ . '/../components/header-admin.php';
             <option value="published">Publish now — show on website</option>
             <option value="archived">Archive — hide from website</option>
           </select>
-          <div class="ann-status-help" id="modal-status-help"></div>
+          <div class="ann-status-help" id="modal-status-help" aria-live="polite"></div>
           <?php else: ?>
+          <input type="hidden" name="status" value="pending">
           <div class="alert alert-secondary mb-0 d-flex gap-2" style="font-size:.88rem">
             <i class="bi bi-info-circle mt-1"></i>
             <span>This will be sent for approval first. It appears on the public website once it is approved.</span>
           </div>
           <?php endif; ?>
+          </section>
         </div>
         <div class="modal-footer">
+          <span id="ann-save-intent" class="evt-save-intent" aria-live="polite"></span>
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-gnc-gold" id="modal-save-btn">
             <i class="bi bi-check-lg"></i> <span id="modal-save-label">Create Article</span>
@@ -590,6 +610,10 @@ include __DIR__ . '/../components/header-admin.php';
 }
 </style>
 
+<link rel="stylesheet" href="/assets/css/event-form.css?v=<?= filemtime(__DIR__ . '/../assets/css/event-form.css') ?>">
+<link rel="stylesheet" href="/assets/css/announcement-form.css?v=<?= filemtime(__DIR__ . '/../assets/css/announcement-form.css') ?>">
+<script src="/assets/js/announcement-form.js?v=<?= filemtime(__DIR__ . '/../assets/js/announcement-form.js') ?>"></script>
+
 <?php ob_start(); ?>
 <script>
 // NOTE: this runs via $extraScripts (echoed in footer-admin.php), AFTER
@@ -643,8 +667,8 @@ const statusHelpText = <?= json_encode($statusHelp) ?>;
 const modalStatusHelp = document.getElementById('modal-status-help');
 function updateStatusHelp() {
     // If the saved status has no matching option (e.g. an old "pending" article
-    // opened by a super admin), fall back to Publish now.
-    if (modalStatus && modalStatus.value === '') modalStatus.value = 'published';
+    // opened by a super admin), fall back to a draft.
+    if (modalStatus && modalStatus.value === '') modalStatus.value = 'draft';
     if (modalStatus && modalStatusHelp) modalStatusHelp.textContent = statusHelpText[modalStatus.value] || '';
 }
 modalStatus?.addEventListener('change', updateStatusHelp);
@@ -675,6 +699,7 @@ function selectNewsCategory(code = 'Others', preserveExisting = false) {
 
 function resetModalForm() {
     document.getElementById('news-form').reset();
+    document.querySelector('#news-form [name="allow_incomplete"]')?.remove();
     modalQuill.setContents([]);
     modalActionInput.value = 'create';
     modalIdInput.value = '';
@@ -867,9 +892,10 @@ document.getElementById('news-form').addEventListener('submit', (e) => {
         return;
     }
     // Show progress so people don't click twice while pictures upload
+    e.target.dispatchEvent(new Event('news-form:submitting'));
     setTimeout(() => {
         modalSaveBtn.disabled = true;
-        modalSaveLabel.textContent = 'Saving…';
+        modalSaveLabel.textContent = !modalStatus || modalStatus.value === 'pending' ? 'Submitting…' : modalStatus.value === 'published' ? 'Publishing…' : 'Saving…';
     }, 0);
 });
 
@@ -899,6 +925,8 @@ document.getElementById('news-form').addEventListener('submit', (e) => {
         input.setSelectionRange(end, end);
     }
 })();
+
+window.GncAnnouncementForm.init({quill: modalQuill, kind: 'news'});
 
 // Auto-reopen the modal on load: validation error, or ?modal=create / ?modal=edit&id=N
 <?php if ($modalMode === 'create'): ?>

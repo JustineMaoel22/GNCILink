@@ -20,7 +20,7 @@ if (!$dept) {
 $dean       = $dept ? publicDepartmentDean($dept) : ['photo_url' => null, 'name' => '', 'title' => '', 'bio' => '', 'phone' => '', 'email' => '', 'office' => '', 'hours' => ''];
 $programs   = $dept ? publicDepartmentPrograms((int)$dept['dept_id']) : [];
 $fbEmbedUrl = $dept ? publicDepartmentFacebookEmbedUrl((string)($dept['facebook_url'] ?? '')) : null;
-$useFacebookLinkCard = ($dept['slug'] ?? '') === 'cased' || ($dept['department_type'] ?? '') === 'basic-education';
+$useFacebookLinkCard = true;
 $logoUrl    = $dept['logo_url'] ?? null;
 $pageTitle  = $dept ? (string)$dept['dept_name'] : 'Department Not Found';
 $isGraduateSchool = ($dept['slug'] ?? '') === 'graduate-school';

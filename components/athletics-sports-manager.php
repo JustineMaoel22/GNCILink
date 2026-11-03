@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/../config/config.php';
 require_once __DIR__.'/../includes/content-publish-policy.php';
 function athleticsSportsDefaults(): array {
     return ['speed'=>1,'facebook_url'=>'','images'=>['hero'=>'/assets/images/athletics-and-sports-header.png','showcase'=>'/assets/images/athletic_scholar.png'],'texts'=>[
@@ -12,6 +13,7 @@ function athleticsSportsDefaults(): array {
         'facebook_kicker'=>'Stay Updated',
         'facebook_title'=>'Connect with Us',
         'facebook_description'=>'If you have concerns or need assistance feel free to message our page.',
+        'facebook_page_name'=>'GNC Sports Club',
     ],'sports'=>[
         ['id'=>'basketball','name'=>'Basketball','type'=>'','image'=>''],
         ['id'=>'indoor-volleyball','name'=>'Volleyball','type'=>'Indoor','image'=>''],
@@ -25,10 +27,11 @@ function athleticsSportsDefaults(): array {
     ]];
 }
 
-function athleticsSportsContent(): array {
+function athleticsSportsContent(?PDO $pdo = null): array {
     $stmt = null;
     try {
-        $stmt=getDB()->prepare("SELECT content FROM basic_education_content WHERE page_key='athletics-sports' AND field_key='page'");
+        $db = $pdo ?? getDB();
+        $stmt=$db->prepare("SELECT content FROM basic_education_content WHERE page_key='athletics-sports' AND field_key='page'");
         $stmt->execute();$value=$stmt->fetchColumn();
         if ($value !== false) {
             $content=json_decode($value,true,512,JSON_THROW_ON_ERROR);
@@ -69,6 +72,7 @@ function validateAthleticsSports(array $input,array $current): array {
     $texts=[];
     foreach (athleticsSportsDefaults()['texts'] as $key=>$default) {
         $value=$input['texts'][$key]??$current['texts'][$key]??$default;
+        if ($key === 'facebook_page_name' && !trim((string)$value)) $value = 'GNC Sports Club';
         if (!is_string($value) || strlen($value)> (str_ends_with($key,'title')?255:3000) || (!trim($value)&&!contentPublishAllowsIncomplete())) throw new InvalidArgumentException('Add a heading and description for each section.');
         $texts[$key]=trim($value);
     }
