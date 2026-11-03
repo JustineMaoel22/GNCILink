@@ -1090,7 +1090,7 @@ try {
             </div>
 
             <iframe src="/campus_navigator.html?v=<?= substr(hash_file('sha256', __DIR__ . '/campus_navigator.html'), 0, 12) ?>"
-                    class="gnc-map-frame gnc-reveal"
+                    class="gnc-map-frame"
                     title="GNC Campus Navigator"
                     loading="lazy">
             </iframe>
