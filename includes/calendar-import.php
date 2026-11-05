@@ -6,10 +6,57 @@ require_once __DIR__.'/event-audience.php';
 function calendarImportAudience(array $row, array $previous = []): array {
     $selection = array_key_exists('dept_id',$row) ? eventDepartmentSelection($row) : eventDepartmentSelection($previous);
     $program = $row['program'] ?? ($previous['program'] ?? 'ALL');
-    if (!is_string($program) || ($program !== 'ALL' && !isset(getAnnouncementProgramCategories()[$program]))) {
-        throw new InvalidArgumentException('Choose a College or Graduate School program. For Basic Education, select its department and leave Program on all programs.');
+    $multiple = array_key_exists('dept_ids', $row) || array_key_exists('programs', $row);
+    if (!is_string($program) || (!$multiple && $program!=='ALL' && !isset(getAnnouncementProgramCategories()[$program]))) throw new InvalidArgumentException('Choose College or Graduate School programs only. For Basic Education, select its departments.');
+    if (is_string($selection) && str_starts_with($selection, 'group:') && (!$multiple || (($row['dept_ids']??null)===[] && ($row['programs']??null)===[]))) {
+        return normalizeEventAudience($selection, $program) + ['dept_ids'=>[], 'programs'=>[]];
     }
-    return normalizeEventAudience($selection,$program);
+    $rawDepartments = array_key_exists('dept_ids',$row) ? $row['dept_ids'] : ($selection ? [$selection] : []);
+    $rawPrograms = array_key_exists('programs',$row) ? $row['programs'] : ($program !== 'ALL' ? [$program] : []);
+    if (!$multiple) {
+        if ($selection === eventDepartmentSelection($previous) && isset($previous['dept_ids'])) $rawDepartments = $previous['dept_ids'];
+        if ($program === ($previous['program'] ?? 'ALL') && isset($previous['programs'])) $rawPrograms = $previous['programs'];
+    }
+    if (!is_array($rawDepartments) || !is_array($rawPrograms) || count($rawDepartments)>100 || count($rawPrograms)>200) throw new InvalidArgumentException('Choose valid departments and programs.');
+    $deptIds=[];
+    foreach ($rawDepartments as $id) {
+        if ((!is_string($id)&&!is_int($id)) || !preg_match('/^[1-9][0-9]{0,9}$/D',(string)$id)) throw new InvalidArgumentException('Choose valid departments.');
+        $deptIds[]=(int)$id;
+    }
+    $deptIds=array_values(array_unique($deptIds));
+    if ($deptIds) {
+        if (!eventDepartmentsReady()) throw new InvalidArgumentException('Department targeting needs the Events department migration.');
+        $q=getDB()->prepare('SELECT COUNT(*) FROM departments WHERE dept_id IN ('.implode(',',array_fill(0,count($deptIds),'?')).')');$q->execute($deptIds);
+        if ((int)$q->fetchColumn()!==count($deptIds)) throw new InvalidArgumentException('Choose available departments.');
+    }
+    $codes=[];$validPrograms=getAnnouncementProgramCategories();
+    foreach ($rawPrograms as $code) {
+        if (!is_string($code) || $code==='ALL' || !isset($validPrograms[$code])) throw new InvalidArgumentException('Choose College or Graduate School programs only. For Basic Education, select its departments.');
+        $codes[]=$code;
+    }
+    $codes=array_values(array_unique($codes));
+    if ($deptIds && $codes) {
+        $q=getDB()->prepare('SELECT dept_id FROM programs WHERE program_code=?');
+        foreach ($codes as $code) {$q->execute([$code]);$department=$q->fetchColumn();if($department===false||!in_array((int)$department,$deptIds,true))throw new InvalidArgumentException('Choose programs belonging to the selected departments.');}
+    }
+    if ((count($deptIds)>1||count($codes)>1) && !calendarImportMultiAudienceReady(getDB())) throw new InvalidArgumentException('Run database/multi-audience-migration.sql to enable multiple departments and programs.');
+    return ['dept_ids'=>$deptIds,'programs'=>$codes,'dept_id'=>count($deptIds)===1?$deptIds[0]:null,'program'=>count($codes)===1?$codes[0]:'ALL','audience_group'=>'all'];
+}
+
+function calendarImportMultiAudienceReady(PDO $db): bool {
+    try {$db->query('SELECT event_id FROM event_departments LIMIT 0');$db->query('SELECT event_id FROM event_programs LIMIT 0');return true;}
+    catch(PDOException $e){if($e->getCode()==='42S02')return false;throw $e;}
+}
+
+/** Use existing audience tables without DDL or swallowed errors inside the import transaction. */
+function calendarImportSaveAudience(PDO $db,int $id,array $audience): void {
+    if (!calendarImportMultiAudienceReady($db)) return;
+    $db->prepare('DELETE FROM event_departments WHERE event_id=?')->execute([$id]);
+    $db->prepare('DELETE FROM event_programs WHERE event_id=?')->execute([$id]);
+    $q=$db->prepare('INSERT INTO event_departments(event_id,dept_id) VALUES(?,?)');
+    foreach($audience['dept_ids'] as $department)$q->execute([$id,$department]);
+    $q=$db->prepare('INSERT INTO event_programs(event_id,program_code) VALUES(?,?)');
+    foreach($audience['programs'] as $code)$q->execute([$id,$code]);
 }
 
 /** Match stored department names, compact slugs, derived acronyms, audience groups, and program categories; never guess between conflicting matches. */
@@ -362,11 +409,25 @@ function calendarImportCategories(PDO $db): array {
 function calendarEventSignature(array $event): string {
     $fields=[];
     foreach (['event_id','title','start_date','end_date','category_id','description','status','location','program','dept_id','audience_group','user_id','updated_at'] as $key) $fields[$key]=(string)($event[$key]??'');
+    foreach(['dept_ids','programs'] as $key)if(isset($event[$key])){$values=$event[$key];sort($values);$fields[$key]=$values;}
     return hash('sha256',json_encode($fields,JSON_UNESCAPED_UNICODE));
 }
 function calendarImportExisting(PDO $db, int $series): array {
     $q=$db->prepare('SELECT e.* FROM events e JOIN calendar_import_sources s ON s.event_id=e.event_id WHERE s.series_id=? ORDER BY e.start_date');
-    $q->execute([$series]); return $q->fetchAll(PDO::FETCH_ASSOC);
+    $q->execute([$series]);$rows=$q->fetchAll(PDO::FETCH_ASSOC);
+    if($rows&&calendarImportMultiAudienceReady($db)){
+        $ids=array_column($rows,'event_id');$audiences=[];
+        foreach(['dept_ids'=>['event_departments','dept_id'],'programs'=>['event_programs','program_code']] as $key=>[$table,$column]){
+            $q=$db->prepare("SELECT event_id,$column FROM $table WHERE event_id IN (".implode(',',array_fill(0,count($ids),'?')).") ORDER BY $column");$q->execute($ids);
+            foreach($q->fetchAll(PDO::FETCH_ASSOC) as $item)$audiences[$item['event_id']][$key][]=$key==='dept_ids'?(int)$item[$column]:$item[$column];
+        }
+        foreach($rows as &$row){
+            if(($row['audience_group']??'all')!=='all')continue;
+            $row['dept_ids']=$audiences[$row['event_id']]['dept_ids']??(!empty($row['dept_id'])?[(int)$row['dept_id']]:[]);
+            $row['programs']=$audiences[$row['event_id']]['programs']??(!empty($row['program'])&&$row['program']!=='ALL'?[$row['program']]:[]);
+        }unset($row);
+    }
+    return $rows;
 }
 function calendarTitleKey(string $title): string { return strtolower(trim((string)(preg_replace('/\s+/u',' ',$title)??$title))); }
 
@@ -380,6 +441,7 @@ function calendarImportCompare(array $rows, array $existing, array $all): array 
             $row['event_id']=$id; $row['action']='update'; $row['category_id']=$event['category_id'];
             $row['dept_id']=$event['dept_id']??null; $row['program']=$event['program']??'ALL';
             $row['audience_group']=$event['audience_group']??'all';
+            foreach(['dept_ids','programs'] as $key)if(isset($event[$key]))$row[$key]=$event[$key];
             if(empty($row['location_provided'])&&empty($row['location']))$row['location']=$event['location']??'';
             $row['warnings']=array_values(array_filter($row['warnings'],static fn($w)=>$w!=='Category needs review.'));
             if (!empty($row['missing_fields'])) {
@@ -475,6 +537,10 @@ function calendarImportApply(PDO $db, array $batch, array $rows, string $status,
             if($id && (!isset($existing[$id])||!hash_equals($row['signature'],calendarEventSignature($existing[$id]))))throw new InvalidArgumentException('An existing event changed since preview. Upload again before applying this import.');
             if($row['action']==='delete') {
                 if($calendarAction!=='delete'||!$id)throw new InvalidArgumentException('Invalid calendar deletion.');
+                if(calendarImportMultiAudienceReady($db)) {
+                    $db->prepare('DELETE FROM event_departments WHERE event_id=?')->execute([$id]);
+                    $db->prepare('DELETE FROM event_programs WHERE event_id=?')->execute([$id]);
+                }
                 $db->prepare('DELETE FROM calendar_import_sources WHERE event_id=? AND series_id=?')->execute([$id,$batch['series_id']]);
                 $db->prepare('DELETE FROM events WHERE event_id=?')->execute([$id]);
                 logActivity($actor,'DELETE','events',$id,'Deleted imported calendar event: '.$row['title']);continue;
@@ -501,6 +567,7 @@ function calendarImportApply(PDO $db, array $batch, array $rows, string $status,
                 $db->prepare('INSERT INTO calendar_import_sources(event_id,series_id) VALUES(?,?)')->execute([$id,$batch['series_id']]);
             }
             $all[]=['event_id'=>$id,'title'=>$row['title'],'start_date'=>$row['start_date']];
+            calendarImportSaveAudience($db,$id,$audience);
             logActivity($actor,$row['action']==='create'?'CREATE':'UPDATE','events',$id,'Calendar import: '.$row['title']);
             if($status==='published')logActivity($actor,'PUBLISH','events',$id,'Published reviewed calendar import.');
         }
@@ -580,7 +647,7 @@ function calendarImportHandle(PDO $db, string $action, int $userId): array {
         $db->prepare('INSERT INTO calendar_import_batches(token,series_id,user_id,base_revision,filename,preview_json) VALUES(?,?,?,?,?,?)')->execute([$token,$seriesId,$userId,$series['revision'],$safeFilename,json_encode(['rows'=>$rows,'existing'=>$existing],JSON_THROW_ON_ERROR|JSON_INVALID_UTF8_SUBSTITUTE)]);
         logActivity($userId,'IMPORT_PREVIEW','events',null,'Prepared calendar import preview ('.count($rows).' rows).');
         return ['success'=>true,'token'=>$token,'rows'=>$rows,'existing'=>$existing,'categories'=>$categories,
-            'departments'=>$db->query('SELECT dept_id,dept_name FROM departments ORDER BY dept_name')->fetchAll(PDO::FETCH_ASSOC),
+            'departments'=>$deptList??[],
             'programs'=>$programs,'departments_ready'=>eventDepartmentsReady(),'audience_groups_ready'=>eventAudienceGroupsReady()];
     }
     $token=$_POST['import_token']??'';

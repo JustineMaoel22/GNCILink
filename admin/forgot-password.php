@@ -21,6 +21,6 @@ require __DIR__.'/../components/auth-page-start.php';
 ?>
 <?php if($message):?><div class="alert alert-info" role="status"><i class="bi bi-envelope-check me-1" aria-hidden="true"></i> <?= $e($message) ?></div><?php endif;?>
 <?php if($error):?><div class="alert alert-danger" role="alert"><?= $e($error) ?></div><?php endif;?>
-<form method="post" data-auth-form><input type="hidden" name="csrf_token" value="<?= $e(generateCSRFToken()) ?>"><div class="form-group"><label for="email" class="form-label">Email Address</label><input type="email" id="email" name="email" class="form-control" maxlength="254" autocomplete="email" placeholder="e.g. admin@gmail.com" required></div><button class="btn-login" type="submit" data-loading-text="Sending request…">Send Reset Link</button></form>
+<form method="post" data-auth-form><input type="hidden" name="csrf_token" value="<?= $e(generateCSRFToken()) ?>"><div class="form-group"><label for="email" class="form-label">Email Address</label><input type="email" id="email" name="email" class="form-control" maxlength="254" autocomplete="email" placeholder="Enter your email address" value="<?= $e($submittedEmail ?? '') ?>" required></div><button class="btn-login" type="submit" data-loading-text="Sending request…">Send Reset Link</button></form>
 <p class="text-center mt-3 mb-0"><a href="/admin/login.php">Back to login</a></p>
 <?php require __DIR__.'/../components/auth-page-end.php';?>

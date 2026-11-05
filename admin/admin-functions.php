@@ -10,6 +10,7 @@
 
 require_once __DIR__ . '/settings-functions.php';
 require_once __DIR__ . '/../includes/content-publish-policy.php';
+require_once __DIR__ . '/../includes/announcement-categories.php';
 require_once __DIR__ . '/photo-check.php';
 require_once __DIR__ . '/../includes/image-framing.php';
 require_once __DIR__ . '/rich-text.php';
@@ -394,6 +395,7 @@ function uploadAnnouncementImage(?array $file): ?int {
  * Create announcement - Updated to use featured_image column
  */
 function createAnnouncement(array $data): ?int {
+    $ownsTransaction = false;
     try {
         $db = getDB();
         
@@ -416,6 +418,10 @@ function createAnnouncement(array $data): ?int {
         
         $program = normalizeProgramCategory($data['program'] ?? null);
         $deptId  = normalizeAnnouncementDept($data['dept_id'] ?? null);
+        $categoryIds = normalizeAnnouncementCategoryIds($db, $data['category_ids'] ?? (!empty($data['category_id']) ? [$data['category_id']] : []));
+        $data['category_id'] = $categoryIds[0] ?? null;
+        $ownsTransaction = !$db->inTransaction();
+        if ($ownsTransaction) $db->beginTransaction();
 
         $stmt = $db->prepare("
             INSERT INTO announcements 
@@ -446,11 +452,14 @@ function createAnnouncement(array $data): ?int {
         }
         
         rbacCreatedRecord('announcement',(int)$id);
+        saveAnnouncementCategories($db, (int)$id, $categoryIds);
         logActivity($_SESSION['user_id'], 'CREATE', 'announcements', $id, 'Created announcement: ' . $data['title']);
         if($status==='published')logActivity((int)$_SESSION['user_id'],'PUBLISH','announcements',(int)$id,'Published announcement: '.$data['title']);
         
+        if ($ownsTransaction) $db->commit();
         return $id;
     } catch (Exception $e) {
+        if ($ownsTransaction && $db->inTransaction()) $db->rollBack();
         $errorMsg = $e->getMessage();
         error_log('Create announcement error: ' . $errorMsg);
         error_log('Create announcement data: ' . json_encode($data));
@@ -462,11 +471,19 @@ function createAnnouncement(array $data): ?int {
  * Update announcement - Updated to use featured_image column
  */
 function updateAnnouncement(int $id, array $data): bool {
+    $ownsTransaction = false;
     try {
         $db = getDB();
         $announcement = getAnnouncementById($id);
         
         if (!$announcement) return false;
+        $categoryIds = array_key_exists('category_ids', $data)
+            ? normalizeAnnouncementCategoryIds($db, $data['category_ids'])
+            : ($announcement['category_ids'] ?? (!empty($announcement['category_id']) ? [(int)$announcement['category_id']] : []));
+        if (!array_key_exists('category_ids', $data) && array_key_exists('category_id', $data) && (int)$data['category_id'] !== (int)$announcement['category_id']) {
+            $categoryIds = normalizeAnnouncementCategoryIds($db, !empty($data['category_id']) ? [$data['category_id']] : []);
+        }
+        $data['category_id'] = $categoryIds[0] ?? null;
         
         // Check ownership for Content Editors
         if (rbacRole() === 'The Mirror' && (int)$announcement['user_id'] !== (int)$_SESSION['user_id']) {
@@ -490,6 +507,8 @@ function updateAnnouncement(int $id, array $data): bool {
             ? normalizeAnnouncementDept($data['dept_id'])
             : ($announcement['dept_id'] ?? null);
         
+        $ownsTransaction = !$db->inTransaction();
+        if ($ownsTransaction) $db->beginTransaction();
         $stmt = $db->prepare("
             UPDATE announcements
             SET title = ?, slug = ?, content = ?, category_id = ?, program = ?, dept_id = ?, featured_image = ?, status = ?, updated_at = NOW()
@@ -508,13 +527,16 @@ function updateAnnouncement(int $id, array $data): bool {
             $id
         ]);
         
+        saveAnnouncementCategories($db, $id, $categoryIds);
         logActivity($_SESSION['user_id'], 'UPDATE', 'announcements', $id, 'Updated announcement: ' . $data['title']);
         if($status==='published'){
             if($announcement['status']==='pending')logActivity((int)$_SESSION['user_id'],'APPROVE','announcements',$id,'Approved pending announcement.');
             logActivity((int)$_SESSION['user_id'],'PUBLISH','announcements',$id,'Published announcement changes.');
         }
+        if ($ownsTransaction) $db->commit();
         return true;
     } catch (Exception $e) {
+        if ($ownsTransaction && $db->inTransaction()) $db->rollBack();
         error_log('Update announcement error: ' . $e->getMessage());
         return false;
     }
@@ -539,7 +561,7 @@ function getAnnouncementById(int $id): ?array {
         $stmt->execute([$id]);
         $row=$stmt->fetch();
         if($row&&rbacRequestRoute()!==''&&rbacRole()==='The Mirror'&&(int)$row['user_id']!==(int)$_SESSION['user_id'])return null;
-        return $row?:null;
+        return $row ? attachAnnouncementCategories($db, [$row])[0] : null;
     } catch (Exception $e) {
         error_log('Get announcement error: ' . $e->getMessage());
         return null;
@@ -602,7 +624,7 @@ function getAnnouncements(array $filters = [], int $limit = 20, int $offset = 0)
         
         $stmt = $db->prepare($query);
         $stmt->execute($params);
-        return $stmt->fetchAll();
+        return attachAnnouncementCategories($db, $stmt->fetchAll());
     } catch (Exception $e) {
         error_log('Get announcements error: ' . $e->getMessage());
         return [];
@@ -2225,6 +2247,10 @@ function saveHistorySectionImage(string $sectionKey, ?array $file, bool $remove)
  * is called).
  */
 function saveSectionDraft(string $pageSlug, string $sectionKey, string $content): bool {
+    if ($pageSlug === 'alumni') {
+        require_once __DIR__ . '/../components/alumni-page-content.php';
+        $content = alumniPageValidate($sectionKey, $content);
+    }
     if ($pageSlug === 'contact-us') {
         require_once __DIR__ . '/../components/contact-page-content.php';
         $content = contactPageValidate($sectionKey, $content);
@@ -2254,6 +2280,10 @@ function saveSectionDraft(string $pageSlug, string $sectionKey, string $content)
  * (returns true) since the section is already published as-is.
  */
 function publishSection(string $pageSlug, string $sectionKey): bool {
+    if ($pageSlug === 'alumni') {
+        require_once __DIR__ . '/../components/alumni-page-content.php';
+        alumniPageValidate($sectionKey, (string)getSectionContent($pageSlug, $sectionKey, true));
+    }
     if ($pageSlug === 'contact-us') {
         require_once __DIR__ . '/../components/contact-page-content.php';
         contactPageValidate($sectionKey, (string)getSectionContent($pageSlug, $sectionKey, true));

@@ -14,6 +14,7 @@
  */
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/admin-functions.php';
+require_once __DIR__ . '/news-view.php';
 
 initSession();
 requireLogin();
@@ -41,25 +42,20 @@ unset($_SESSION['flash_errors'], $_SESSION['flash_old'], $_SESSION['flash_succes
 // ============================================================
 // LIST DATA
 // ============================================================
-$statusFilter   = $_GET['status'] ?? '';
-$categoryFilter = $_GET['category'] ?? '';
-$search         = trim($_GET['search'] ?? '');
-$filters        = [];
-if ($statusFilter !== '')   $filters['status']   = $statusFilter;
-if ($categoryFilter !== '') $filters['category'] = $categoryFilter;
-if ($search !== '')         $filters['search']   = $search;
-
-$newsList       = getNews($filters, 50, 0);
+$listFilters=newsFilters($_GET);$listError='';$listTotal=0;$listPages=1;$listGalleries=[];$newsList=[];
+$statusFilter=$listFilters['status'];$categoryFilter=$listFilters['category'];$search=$listFilters['search'];
+try{$result=newsListResults(getDB(),$listFilters,rbacRole(),(int)$_SESSION['user_id']);$newsList=$result['rows'];$listTotal=$result['total'];$listPages=$result['pages'];$listGalleries=$result['galleries'];}
+catch(Throwable $e){$listError='News articles could not be loaded. Please try again.';error_log('News management list unavailable.');}
 $newsCategories = getNewsCategories();
 $newsCreateCategories = array_diff_key($newsCategories, array_flip(['Updates', 'Job Opportunities', 'Scholarship']));
 $pinnedCount    = countPinnedItems();
 
 // Which modal (if any) should auto-open on load
-$modalMode    = $_GET['modal'] ?? '';   // '', 'create', or 'edit'
+$modalMode=is_string($_GET['modal']??null)&&in_array($_GET['modal'],['create','edit'],true)?$_GET['modal']:'';
 $modalEditing = null;
 $modalGallery = [];
 if ($modalMode === 'edit') {
-    $editId       = (int)($_GET['id'] ?? 0);
+    $editId=is_string($_GET['id']??null)?(int)$_GET['id']:0;
     $modalEditing = getNewsById($editId);
     if ($modalEditing) {
         $modalGallery = getNewsImages($editId);
@@ -67,13 +63,19 @@ if ($modalMode === 'edit') {
 }
 if (!empty($flashOld)) {
     $modalEditing = array_merge($modalEditing ?? [], $flashOld);
+    if(isset($_GET['revise'])){
+        $modalMode=($flashOld['action']??'')==='update'?'edit':'create';
+        if(!empty($flashOld['news_id'])){$savedNews=getNewsById((int)$flashOld['news_id']);if($savedNews)$modalEditing=array_merge($savedNews,$flashOld);$modalGallery=getNewsImages((int)$flashOld['news_id']);}
+    }
 }
+$revisionFeedback='';
+if(isset($_GET['revise'])&&!empty($flashOld)){$revision=rbacGetSubmission((int)$_GET['revise']);$revisionFeedback=$revision['reason']??'';}
 
 // ---- Friendly wording + helpers for non-technical admins ----
 $statusLabels = [
     'draft'     => 'Draft',
     'pending'   => 'Waiting for approval',
-    'published' => 'Live on website',
+    'published' => 'Published',
     'archived'  => 'Archived',
 ];
 $statusHelp = [
@@ -88,8 +90,11 @@ if (!function_exists('ann_url')) {
         return '?' . http_build_query($q);
     }
 }
-$baseQuery     = ['search' => $search, 'status' => $statusFilter, 'category' => $categoryFilter];
-$filtersActive = ($search !== '' || $statusFilter !== '' || $categoryFilter !== '');
+$baseQuery=$listFilters;
+$filtersActive=(bool)array_filter(array_intersect_key($listFilters,array_flip(['search','status','category','from','to','pinned'])),static fn($v)=>$v!=='');
+$ne=static fn($v)=>htmlspecialchars((string)$v,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+$newsJson=static fn($v,$flags=0)=>json_encode($v,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_INVALID_UTF8_SUBSTITUTE);
+$returnQuery=http_build_query($listFilters);$newsPreviewData=[];
 $canPublish    = hasPermission('publish_news');
 // Super admins are the approvers, so they never need "Send for approval".
 $isSuperAdmin = (($_SESSION['user_role'] ?? '') === 'Super Admin');
@@ -97,7 +102,7 @@ $isSuperAdmin = (($_SESSION['user_role'] ?? '') === 'Super Admin');
 $pageTitle = 'News';
 include __DIR__ . '/../components/header-admin.php';
 ?>
-
+<div class="announcement-management news-management">
 <div class="page-header">
     <div>
         <h1>News</h1>
@@ -122,58 +127,34 @@ include __DIR__ . '/../components/header-admin.php';
 <?php endif; ?>
 
 <?php if ($canPublish): ?>
-<div class="ann-pin-banner">
-    <div class="ann-pin-banner-icon"><i class="bi bi-pin-angle-fill"></i></div>
-    <div class="flex-grow-1">
-        <div class="fw-semibold">Homepage slideshow: <?= (int)$pinnedCount ?> of <?= MAX_PINNED_ITEMS ?> spots used</div>
-        <div class="ann-sub">Pin a news article to show it in the big slideshow on the homepage.<?= $pinnedCount >= MAX_PINNED_ITEMS ? ' All spots are taken — unpin one to pin another.' : '' ?></div>
+<section class="ann-pin-banner" aria-labelledby="ann-pin-heading">
+    <div class="ann-pin-heading">
+        <div><h2 id="ann-pin-heading"><i class="bi bi-pin-angle" aria-hidden="true"></i> Pinned news and announcement</h2><p>Five slots shared by Announcements, News, and Facebook Posts.</p></div>
+        <strong><?= (int)$pinnedCount ?> / <?= MAX_PINNED_ITEMS ?> used</strong>
     </div>
-    <div class="ann-pin-dots" aria-hidden="true">
+    <div class="ann-pin-meter" role="progressbar" aria-label="Occupied pinned content slots" aria-valuemin="0" aria-valuemax="<?= MAX_PINNED_ITEMS ?>" aria-valuenow="<?= (int)$pinnedCount ?>">
         <?php for ($i = 1; $i <= MAX_PINNED_ITEMS; $i++): ?><span class="<?= $i <= $pinnedCount ? 'on' : '' ?>"></span><?php endfor; ?>
     </div>
-</div>
+    <p class="ann-pin-help"><?= $pinnedCount >= MAX_PINNED_ITEMS ? 'All slots are used. Unpin an item below to make room for another post.' : (MAX_PINNED_ITEMS-$pinnedCount).' slots available. Pin a published article to feature it on the homepage.' ?></p>
+    <details class="ann-slideshow-manage" id="pinned-content"><summary>Manage pinned news and announcement <span>(<?= (int)$pinnedCount ?> items)</span></summary><ul>
+    <?php foreach(announcementPinnedItems(getDB()) as $item): ?>
+    <li><span><?= $ne(ucfirst($item['source']).' — '.($item['title']?:'Pinned item')) ?></span><div class="ann-pinned-actions"><form method="post" action="/admin/action/unpin-content.php" class="ann-inline-form"><input type="hidden" name="csrf_token" value="<?= $ne($csrfToken) ?>"><input type="hidden" name="action" value="unpin"><input type="hidden" name="source" value="<?= $ne($item['source']) ?>"><input type="hidden" name="item_id" value="<?= $ne($item['item_id']) ?>"><input type="hidden" name="return_to" value="news"><input type="hidden" name="return_query" value="<?= $ne($returnQuery) ?>"><button type="submit" class="btn btn-outline-secondary"><i class="bi bi-pin-angle" aria-hidden="true"></i> Unpin</button></form></div></li>
+    <?php endforeach; ?>
+    <?php if(!$pinnedCount): ?><li>No items are pinned.</li><?php endif; ?>
+    </ul></details>
+</section>
 <?php endif; ?>
 
-<div class="data-card">
-    <div class="data-card-header flex-wrap gap-2">
-        <span class="data-card-title"><i class="bi bi-newspaper me-1"></i> All News</span>
-        <form method="GET" class="ann-search ms-auto">
-            <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
-            <div class="ann-search-box">
-                <i class="bi bi-search"></i>
-                <input type="search" name="search" id="news-search" class="form-control form-control-sm"
-                       placeholder="Search by title or content…" value="<?= htmlspecialchars($search) ?>" autocomplete="off">
-            </div>
-            <select name="category" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Filter by category">
-                <option value="">All categories</option>
-                <?php foreach ($newsCategories as $code => $label): ?>
-                <option value="<?= htmlspecialchars($code) ?>" <?= $categoryFilter === $code ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </form>
-    </div>
-
-    <div class="ann-filters">
-        <div class="ann-chip-row">
-            <a class="ann-chip<?= $statusFilter === '' ? ' active' : '' ?>" href="<?= ann_url($baseQuery, ['status' => '']) ?>">All</a>
-            <?php foreach ($statusLabels as $key => $label): ?>
-            <a class="ann-chip<?= $statusFilter === $key ? ' active' : '' ?>" href="<?= ann_url($baseQuery, ['status' => $key]) ?>"><?= $key === 'pending' ? 'Waiting' : ($key === 'published' ? 'Live' : ($key === 'draft' ? 'Drafts' : $label)) ?></a>
-            <?php endforeach; ?>
-            <?php if ($filtersActive): ?>
-            <a class="ann-clear" href="?"><i class="bi bi-x-circle"></i> Clear filters</a>
-            <?php endif; ?>
-        </div>
-    </div>
-
+<?php include __DIR__.'/partials/news-filters.php'; ?>
     <div class="table-responsive">
         <table class="table table-hover mb-0 ann-table" id="news-table">
             <thead>
                 <tr>
-                    <th style="width:72px"></th>
-                    <th>Article</th>
-                    <th>Category</th>
-                    <th>Status</th>
-                    <th style="width:1%;white-space:nowrap">Actions</th>
+                    <th scope="col"><span class="visually-hidden">Picture</span></th>
+                    <th scope="col">Article</th>
+                    <th scope="col">Category</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -181,7 +162,8 @@ include __DIR__ . '/../components/header-admin.php';
                 <tr class="ann-empty-row"><td colspan="5">
                     <div class="ann-empty">
                         <i class="bi bi-newspaper"></i>
-                        <?php if ($filtersActive): ?>
+                        <?php if($listError): ?><p>Article data is unavailable. Reload to try again.</p>
+                        <?php elseif ($filtersActive): ?>
                             <p class="mb-2">No news articles match your search or filters.</p>
                             <a href="?" class="btn btn-sm btn-outline-secondary">Clear filters</a>
                         <?php else: ?>
@@ -199,17 +181,21 @@ include __DIR__ . '/../components/header-admin.php';
                     $byName     = $byline !== '' ? $byline : $postedBy;
                     $catCode    = $n['category'] ?? 'Others';
                     $catLabel   = $newsCategories[$catCode] ?? $catCode;
+                    $canEdit=hasPermission('edit_news')||(hasPermission('edit_own_news')&&$isOwner);
+                    $newsPreviewData[]=['id'=>(int)$n['news_id'],'title'=>$n['title'],'html'=>renderSectionContent($n['content']),'author'=>$byName?:'School editor','created'=>newsLocalTime($n['created_at'],'M j, Y · g:i A'),'published'=>!empty($n['published_at'])?newsLocalTime($n['published_at'],'M j, Y · g:i A'):'','category'=>$catLabel,'status'=>$statusLabels[$n['status']]??$n['status'],'canEdit'=>$canEdit,'images'=>array_values(array_filter(array_merge([$n['image_path']??null],array_column($listGalleries[$n['news_id']]??[],'file_path'))))];
                 ?>
                 <tr class="ann-row">
                     <td class="ann-img-cell">
+                        <button type="button" class="news-thumb-button" data-news-preview="<?= (int)$n['news_id'] ?>" aria-label="<?= $ne('Preview: '.$n['title']) ?>">
                         <?php if (!empty($n['image_path'])): ?>
-                        <img src="<?= htmlspecialchars($n['image_path']) ?>" alt="" class="ann-thumb">
+                        <img src="<?= htmlspecialchars($n['image_path']) ?>" alt="" class="ann-thumb" loading="lazy">
                         <?php else: ?>
                         <div class="ann-thumb ann-thumb-empty"><i class="bi bi-image"></i></div>
                         <?php endif; ?>
+                        </button>
                     </td>
                     <td class="ann-title-cell">
-                        <div class="ann-title"><?= htmlspecialchars($n['title']) ?></div>
+                        <button type="button" class="ann-title ann-preview-open" data-news-preview="<?= (int)$n['news_id'] ?>"><?= htmlspecialchars($n['title']) ?></button>
                         <div class="ann-sub">
                             <?= $byName !== '' ? 'By ' . htmlspecialchars($byName) . ' &middot; ' : '' ?><?= newsLocalTime($n['created_at'], 'M j, Y') ?>
                         </div>
@@ -218,24 +204,25 @@ include __DIR__ . '/../components/header-admin.php';
                         <?php endif; ?>
                     </td>
                     <td data-label="Category"><span class="program-badge"><?= htmlspecialchars($catLabel) ?></span></td>
-                    <td data-label="Status"><span class="status-badge <?= htmlspecialchars($n['status']) ?>"><?= htmlspecialchars($statusLabels[$n['status']] ?? ucfirst($n['status'])) ?></span></td>
+                    <td data-label="Status"><span class="status-badge <?= htmlspecialchars($n['status']) ?>"><?= htmlspecialchars($statusLabels[$n['status']] ?? ucfirst($n['status'])) ?></span><div class="ann-sub"><?= $ne(['draft'=>'Continue editing when ready.','pending'=>'Awaiting Super Admin review.','published'=>'Visible on the website.','archived'=>'Hidden; restore when ready.'][$n['status']]??'') ?></div></td>
                     <td class="ann-actions-cell">
                         <?php if ($canPublish): ?>
                         <form method="POST" action="/admin/action/create-news.php" class="ann-inline-form">
                             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                             <input type="hidden" name="action" value="<?= !empty($n['is_pinned']) ? 'unpin' : 'pin' ?>">
                             <input type="hidden" name="news_id" value="<?= $n['news_id'] ?>">
+                            <input type="hidden" name="return_query" value="<?= $ne($returnQuery) ?>">
                             <button type="submit"
                                     class="btn btn-sm btn-outline-secondary btn-pin-toggle<?= !empty($n['is_pinned']) ? ' is-pinned' : '' ?>"
                                     <?php if (empty($n['is_pinned']) && $pinnedCount >= MAX_PINNED_ITEMS): ?>
                                     disabled title="All <?= MAX_PINNED_ITEMS ?> slideshow spots are used. Unpin one first."
-                                    <?php elseif ($n['status'] === 'archived'): ?>
-                                    disabled title="Restore it first to show it in the slideshow."
+                                    <?php elseif (empty($n['is_pinned']) && $n['status'] !== 'published'): ?>
+                                    disabled title="Publish this article before pinning it."
                                     <?php else: ?>
                                     title="<?= !empty($n['is_pinned']) ? 'Remove from the homepage slideshow' : 'Show in the homepage slideshow' ?>"
                                     <?php endif; ?>>
                                 <i class="bi <?= !empty($n['is_pinned']) ? 'bi-pin-angle-fill' : 'bi-pin-angle' ?>"></i>
-                                <span class="visually-hidden"><?= !empty($n['is_pinned']) ? 'Unpin' : 'Pin' ?></span>
+                                <span><?= !empty($n['is_pinned']) ? 'Unpin' : 'Pin' ?></span>
                             </button>
                         </form>
                         <?php endif; ?>
@@ -244,15 +231,16 @@ include __DIR__ . '/../components/header-admin.php';
                             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                             <input type="hidden" name="action" value="<?= $n['status'] === 'archived' ? 'unarchive' : 'archive' ?>">
                             <input type="hidden" name="news_id" value="<?= $n['news_id'] ?>">
+                            <input type="hidden" name="return_query" value="<?= $ne($returnQuery) ?>">
                             <button type="submit" class="btn btn-sm btn-outline-secondary"
                                     title="<?= $n['status'] === 'archived' ? 'Bring it back as a draft' : 'Hide it from the website but keep it on record' ?>">
                                 <i class="bi <?= $n['status'] === 'archived' ? 'bi-arrow-counterclockwise' : 'bi-archive' ?>"></i>
-                                <span class="visually-hidden"><?= $n['status'] === 'archived' ? 'Restore' : 'Archive' ?></span>
+                                <span><?= $n['status'] === 'archived' ? 'Restore' : 'Archive' ?></span>
                             </button>
                         </form>
                         <?php endif; ?>
                         <?php if (hasPermission('edit_news') || (hasPermission('edit_own_news') && $isOwner)): ?>
-                        <?php $rowGallery = getNewsImages($n['news_id']); ?>
+                        <?php $rowGallery=$listGalleries[$n['news_id']]??[]; ?>
                         <button type="button" class="btn btn-sm btn-outline-secondary btn-edit-news" title="Edit this article"
                                 data-id="<?= $n['news_id'] ?>"
                                 data-title="<?= htmlspecialchars($n['title'], ENT_QUOTES) ?>"
@@ -262,16 +250,16 @@ include __DIR__ . '/../components/header-admin.php';
                                 data-image="<?= htmlspecialchars($n['image_path'] ?? '') ?>"
                                 data-gallery="<?= htmlspecialchars(json_encode($rowGallery), ENT_QUOTES) ?>"
                                 data-content-id="news-content-<?= $n['news_id'] ?>">
-                            <i class="bi bi-pencil"></i><span class="visually-hidden">Edit</span>
+                            <i class="bi bi-pencil"></i><span>Edit</span>
                         </button>
                         <!-- Raw content stashed in a hidden template (not JSON) -->
-                        <template id="news-content-<?= $n['news_id'] ?>"><?= $n['content'] ?></template>
+                        <template id="news-content-<?= $n['news_id'] ?>"><?= sectionToEditorHtml($n['content']) ?></template>
                         <?php endif; ?>
                         <?php if (hasPermission('delete_news') || (hasPermission('delete_own_news') && $isOwner)): ?>
                         <button type="button" class="btn btn-sm btn-outline-danger btn-delete-news" title="Delete this article"
                                 data-id="<?= $n['news_id'] ?>"
                                 data-title="<?= htmlspecialchars($n['title'], ENT_QUOTES) ?>">
-                            <i class="bi bi-trash"></i><span class="visually-hidden">Delete</span>
+                            <i class="bi bi-trash"></i><span>Delete</span>
                         </button>
                         <?php endif; ?>
                     </td>
@@ -280,10 +268,8 @@ include __DIR__ . '/../components/header-admin.php';
             </tbody>
         </table>
     </div>
-    <?php if (count($newsList) >= 50): ?>
-    <div class="ann-sub p-3" style="border-top:1px solid rgba(128,128,128,.2)">Showing the 50 most recent articles. Use the search box to find older ones.</div>
-    <?php endif; ?>
 </div>
+<?php include __DIR__.'/partials/news-pagination.php'; ?>
 
 <!-- ============================================================
      CREATE / EDIT MODAL — posts to /admin/action/create-news.php
@@ -315,8 +301,10 @@ include __DIR__ . '/../components/header-admin.php';
 
           <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
           <input type="hidden" name="action" id="modal-action" value="create">
+          <input type="hidden" name="return_query" value="<?= $ne($returnQuery) ?>">
           <input type="hidden" name="news_id" id="modal-news-id" value="">
           <input type="hidden" name="_review_id" value="<?= (int)($_GET['revise'] ?? 0) ?>">
+          <?php if($revisionFeedback): ?><div class="alert alert-warning" role="note"><strong>Revision feedback</strong><p class="mb-0"><?= nl2br($ne($revisionFeedback)) ?></p></div><?php endif; ?>
           <div id="announcement-form-alert" class="alert alert-danger d-none" role="alert" tabindex="-1"></div>
           <p class="evt-required-note">Fields marked <span class="text-danger">*</span> are required. Pictures and the author name are optional.</p>
           <section class="evt-form-section" aria-labelledby="news-content-heading">
@@ -355,7 +343,7 @@ include __DIR__ . '/../components/header-admin.php';
 
           <label class="form-label" for="modal-gallery-input">More pictures (gallery)</label>
           <div class="mb-3">
-            <input type="file" name="gallery_images[]" id="modal-gallery-input" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" multiple>
+            <input type="file" name="gallery_images[]" id="modal-gallery-input" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" multiple data-max-files="10" data-max-files-message="Choose a maximum of 10 gallery pictures at a time.">
             <div class="form-text">Optional. You can pick several photos at once — up to 10 at a time, 5 MB each.</div>
 
             <div id="modal-gallery-existing-wrap" class="mt-3" style="display:none">
@@ -375,7 +363,7 @@ include __DIR__ . '/../components/header-admin.php';
           <h6 id="news-details-heading">Article details</h6>
           <div class="row g-3 mb-3">
             <div class="col-12 col-sm-6">
-              <label class="form-label" for="modal-category">Type</label>
+              <label class="form-label" for="modal-category">News category</label>
               <select name="category" id="modal-category" class="form-select">
                 <?php foreach ($newsCreateCategories as $code => $label): ?>
                 <option value="<?= htmlspecialchars($code) ?>"><?= htmlspecialchars($label) ?></option>
@@ -404,7 +392,8 @@ include __DIR__ . '/../components/header-admin.php';
           </select>
           <div class="ann-status-help" id="modal-status-help" aria-live="polite"></div>
           <?php else: ?>
-          <input type="hidden" name="status" value="pending">
+          <label class="form-label" for="modal-status">What should happen when you save?</label>
+          <select name="status" id="modal-status" class="form-select mb-2"><option value="draft">Save as draft</option><option value="pending" selected>Submit for approval</option></select>
           <div class="alert alert-secondary mb-0 d-flex gap-2" style="font-size:.88rem">
             <i class="bi bi-info-circle mt-1"></i>
             <span>This will be sent for approval first. It appears on the public website once it is approved.</span>
@@ -414,6 +403,7 @@ include __DIR__ . '/../components/header-admin.php';
         </div>
         <div class="modal-footer">
           <span id="ann-save-intent" class="evt-save-intent" aria-live="polite"></span>
+          <button type="button" class="btn btn-outline-secondary" id="news-draft-preview">Preview article</button>
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-gnc-gold" id="modal-save-btn">
             <i class="bi bi-check-lg"></i> <span id="modal-save-label">Create Article</span>
@@ -609,10 +599,13 @@ include __DIR__ . '/../components/header-admin.php';
     .ann-actions-cell .btn { width: 44px; height: 44px; }
 }
 </style>
+<link rel="stylesheet" href="/assets/css/admin-announcements.css?v=<?= filemtime(__DIR__.'/../assets/css/admin-announcements.css') ?>">
 
 <link rel="stylesheet" href="/assets/css/event-form.css?v=<?= filemtime(__DIR__ . '/../assets/css/event-form.css') ?>">
 <link rel="stylesheet" href="/assets/css/announcement-form.css?v=<?= filemtime(__DIR__ . '/../assets/css/announcement-form.css') ?>">
+<link rel="stylesheet" href="/assets/css/admin-news.css?v=<?= filemtime(__DIR__.'/../assets/css/admin-news.css') ?>">
 <script src="/assets/js/announcement-form.js?v=<?= filemtime(__DIR__ . '/../assets/js/announcement-form.js') ?>"></script>
+</div>
 
 <?php ob_start(); ?>
 <script>
@@ -633,7 +626,7 @@ function annToast(msg, type) {
     setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 4500);
 }
 <?php if (!empty($flashSuccess)): ?>
-annToast(<?= json_encode($flashSuccess) ?>);
+annToast(<?= $newsJson($flashSuccess) ?>);
 <?php endif; ?>
 
 const newsModalEl = document.getElementById('newsModal');
@@ -663,7 +656,7 @@ const modalGalleryExist      = document.getElementById('modal-gallery-existing')
 const MAX_GALLERY_IMAGES = 10;
 
 // Plain-language hint under the Visibility dropdown
-const statusHelpText = <?= json_encode($statusHelp) ?>;
+const statusHelpText = <?= $newsJson($statusHelp) ?>;
 const modalStatusHelp = document.getElementById('modal-status-help');
 function updateStatusHelp() {
     // If the saved status has no matching option (e.g. an old "pending" article
@@ -684,7 +677,7 @@ function resetGalleryUI() {
 }
 
 // Preserve a removed type only when editing an article already using it.
-const savedNewsCategoryLabels = <?= json_encode($newsCategories, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+const savedNewsCategoryLabels = <?= $newsJson($newsCategories, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 function selectNewsCategory(code = 'Others', preserveExisting = false) {
     if (!modalCategory) return;
     modalCategory.querySelectorAll('[data-existing-category]').forEach(option => option.remove());
@@ -703,7 +696,7 @@ function resetModalForm() {
     modalQuill.setContents([]);
     modalActionInput.value = 'create';
     modalIdInput.value = '';
-    selectNewsCategory(<?= json_encode(isset($newsCreateCategories[$categoryFilter])?$categoryFilter:'Others') ?>);
+    selectNewsCategory(<?= $newsJson(isset($newsCreateCategories[$categoryFilter])?$categoryFilter:'Others') ?>);
     modalLabel.textContent = 'New Article';
     modalSaveLabel.textContent = 'Create Article';
     modalSaveBtn.disabled = false;
@@ -798,7 +791,7 @@ function openEditModal(btn) {
     modalTitleInput.value = btn.dataset.title || '';
     modalAuthorInput.value = btn.dataset.author || '';
     selectNewsCategory(btn.dataset.category || 'Others', true);
-    if (modalStatus) modalStatus.value = btn.dataset.status || 'draft';
+    if (modalStatus) modalStatus.value = <?= $canPublish?'true':'false' ?> ? (btn.dataset.status || 'draft') : 'pending';
     updateStatusHelp();
 
     const contentTpl = document.getElementById(btn.dataset.contentId);
@@ -899,67 +892,41 @@ document.getElementById('news-form').addEventListener('submit', (e) => {
     }, 0);
 });
 
-// ---- Live search: results update while typing, no button needed ----
-(function () {
-    const input = document.getElementById('news-search');
-    if (!input) return;
-    const form = input.closest('form');
-    let timer = null;
-    let lastValue = input.value;
-
-    input.addEventListener('input', () => {
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-            if (input.value.trim() === lastValue.trim()) return;
-            lastValue = input.value;
-            sessionStorage.setItem('newsSearchFocus', '1');
-            form.submit();
-        }, 400); // wait until the person pauses typing
-    });
-
-    // After the page reloads with results, put the cursor back at the end of the word
-    if (sessionStorage.getItem('newsSearchFocus') === '1') {
-        sessionStorage.removeItem('newsSearchFocus');
-        input.focus();
-        const end = input.value.length;
-        input.setSelectionRange(end, end);
-    }
-})();
-
 window.GncAnnouncementForm.init({quill: modalQuill, kind: 'news'});
 
 // Auto-reopen the modal on load: validation error, or ?modal=create / ?modal=edit&id=N
 <?php if ($modalMode === 'create'): ?>
 openCreateModal();
 <?php if (!empty($flashErrors)): ?>
-modalTitleInput.value = <?= json_encode($flashOld['title'] ?? '') ?>;
-modalQuill.root.innerHTML = <?= json_encode($flashOld['content'] ?? '') ?>;
-modalAuthorInput.value = <?= json_encode($flashOld['author'] ?? '') ?>;
-selectNewsCategory(<?= json_encode($flashOld['category'] ?? 'Others') ?>);
-if (modalStatus) modalStatus.value = <?= json_encode($flashOld['status'] ?? 'draft') ?>;
+modalTitleInput.value = <?= $newsJson($flashOld['title'] ?? '') ?>;
+modalQuill.root.innerHTML = <?= $newsJson(sectionToEditorHtml($flashOld['content'] ?? '')) ?>;
+modalAuthorInput.value = <?= $newsJson($flashOld['author'] ?? '') ?>;
+selectNewsCategory(<?= $newsJson($flashOld['category'] ?? 'Others') ?>);
+if (modalStatus) modalStatus.value = <?= $newsJson($flashOld['status'] ?? 'draft') ?>;
 updateStatusHelp();
 <?php endif; ?>
 <?php elseif ($modalMode === 'edit' && !empty($modalEditing)): ?>
 resetModalForm();
 modalActionInput.value = 'update';
-modalIdInput.value = <?= json_encode($modalEditing['news_id'] ?? ($_GET['id'] ?? '')) ?>;
+modalIdInput.value = <?= $newsJson($modalEditing['news_id'] ?? ($_GET['id'] ?? '')) ?>;
 modalLabel.textContent = 'Edit Article';
 modalSaveLabel.textContent = 'Save Changes';
-modalTitleInput.value = <?= json_encode($modalEditing['title'] ?? '') ?>;
-modalQuill.root.innerHTML = <?= json_encode($modalEditing['content'] ?? '') ?>;
-modalAuthorInput.value = <?= json_encode($modalEditing['author'] ?? '') ?>;
-selectNewsCategory(<?= json_encode($modalEditing['category'] ?? 'Others') ?>, true);
-if (modalStatus) modalStatus.value = <?= json_encode($modalEditing['status'] ?? 'draft') ?>;
+modalTitleInput.value = <?= $newsJson($modalEditing['title'] ?? '') ?>;
+modalQuill.root.innerHTML = <?= $newsJson(sectionToEditorHtml($modalEditing['content'] ?? '')) ?>;
+modalAuthorInput.value = <?= $newsJson($modalEditing['author'] ?? '') ?>;
+selectNewsCategory(<?= $newsJson($modalEditing['category'] ?? 'Others') ?>, true);
+if (modalStatus) modalStatus.value = <?= $newsJson($modalEditing['status'] ?? 'draft') ?>;
 updateStatusHelp();
 <?php if (!empty($modalEditing['image_path'])): ?>
-modalImagePreview.src = <?= json_encode($modalEditing['image_path']) ?>;
+modalImagePreview.src = <?= $newsJson($modalEditing['image_path']) ?>;
 modalImagePreviewWrap.style.display = 'block';
 modalRemoveWrap.style.display = 'block';
 <?php endif; ?>
-renderExistingGallery(<?= json_encode($modalGallery) ?>);
+renderExistingGallery(<?= $newsJson($modalGallery) ?>);
 newsModal.show();
 <?php endif; ?>
 </script>
+<script src="/assets/js/admin-news.js?v=<?= filemtime(__DIR__.'/../assets/js/admin-news.js') ?>"></script>
 <?php $extraScripts = ob_get_clean(); ?>
 
 <?php

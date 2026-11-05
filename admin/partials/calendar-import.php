@@ -15,11 +15,11 @@ $calendarImportSeries = $calendarImportReady ? $db->query("SELECT series_id,name
                 <div class="alert alert-warning">Calendar import needs a database update. Ask the developer to apply <code>database/calendar-import-migration.sql</code>.</div>
                 <?php else: ?>
                 <nav class="ci-steps" aria-label="Import progress">
-                    <?php foreach ([1=>'Upload document',2=>'Review activities',3=>'Verify & approve',4=>'Confirm import'] as $number=>$label): ?>
+                    <?php foreach ([1=>'Upload document',2=>'Review & approve',3=>'Confirm import'] as $number=>$label): ?>
                     <button type="button" data-ci-step="<?= $number ?>" class="ci-step<?= $number===1?' active':'' ?>"<?= $number===1?' aria-current="step"':'' ?>><span><?= $number ?></span><?= $label ?></button>
                     <?php endforeach; ?>
                 </nav>
-                <div id="calendarImportFileStatus" class="ci-file-status" role="status">Step 1 of 4 · Choose your calendar document to get started.</div>
+                <div id="calendarImportFileStatus" class="ci-file-status" role="status">Step 1 of 3 · Choose your calendar document to get started.</div>
                 <div id="calendarImportSummary" class="ci-summary d-none" aria-live="polite"></div>
                 <form id="calendarImportUpload" enctype="multipart/form-data">
                     <p>Upload a Word document (<code>.docx</code>) containing your calendar in tables, bulleted or numbered lists, or paragraphs. Related event details (Event Title, Date, Time, Location/Venue, and Description) are automatically grouped into complete events. Any missing or unclear details will be flagged for manual review before importing.</p>
@@ -74,7 +74,7 @@ $calendarImportSeries = $calendarImportReady ? $db->query("SELECT series_id,name
                     <?php if (!hasPermission('publish_event')): ?><p class="small text-muted mt-2">This request will be sent to Super Admin for approval. Events stay unchanged until approved.</p><?php endif; ?>
                 </div>
                 <div id="calendarImportPreview" class="d-none">
-                    <div class="ci-section-heading"><div><h6 id="calendarImportReviewHeading">Review extracted activities</h6><p id="calendarImportReviewHelp">Review detected titles, dates, times, locations, and descriptions. Use Edit to correct details, Merge to combine rows, Separate to split an entry, or Remove to discard false entries.</p></div><span id="calendarImportCount" class="small text-muted"></span></div>
+                    <div class="ci-section-heading"><div><h6 id="calendarImportReviewHeading">Review and approve activities</h6><p id="calendarImportReviewHelp">Review detected titles, dates, times, locations, and descriptions. Use Edit to correct details, Merge to combine rows, Separate to split an entry, or Remove to discard false entries.</p></div><span id="calendarImportCount" class="small text-muted"></span></div>
                     <div class="ci-toolbar">
                         <label class="ci-search"><span class="visually-hidden">Search event title</span><input id="ciSearch" class="form-control form-control-sm" type="search" placeholder="Search title, venue, department…"></label>
                         <label><span class="visually-hidden">Month</span><select id="ciMonth" class="form-select form-select-sm"><option value="">All months</option><?php for($m=1;$m<=12;$m++): ?><option value="<?= sprintf('%02d',$m) ?>"><?= date('F',mktime(0,0,0,$m,1,2026)) ?></option><?php endfor; ?></select></label>
@@ -139,5 +139,5 @@ $calendarImportSeries = $calendarImportReady ? $db->query("SELECT series_id,name
         </div>
     </div>
 </div>
-<script src="/assets/js/calendar-import.js" defer></script>
+<script src="/assets/js/calendar-import.js?v=<?= filemtime(__DIR__ . '/../../assets/js/calendar-import.js') ?>" defer></script>
 <link rel="stylesheet" href="/assets/css/calendar-import.css">

@@ -234,6 +234,7 @@ $title     = $article['title'] ?? 'Announcement not found';
 $bodyHtml  = $article ? announcementSanitizeHtml((string)$article['content']) : '';
 $dateRaw   = $article['published_at'] ?? $article['created_at'] ?? null;
 $dateText  = $dateRaw ? announcementLocalTime($dateRaw, 'F j, Y') : '';
+$article = attachAnnouncementCategories(getDB(), [$article])[0];
 $category  = trim((string)($article['category_name'] ?? ''));
 if ($category === '' && !empty($article['dept_name'])) $category = $article['dept_name'];
 if ($category === '' && !empty($article['program']) && $article['program'] !== 'ALL') $category = $article['program'];

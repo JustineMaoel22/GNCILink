@@ -41,6 +41,9 @@ Options -Indexes -MultiViews
     # Redirect index.php to homepage
     # Explicit short browser URLs. Keep in sync with includes/browser-routes.php.
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
+    RewriteRule ^alumni/?$ "pages/alumni.php" [END]
+
+    RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
     RewriteRule ^student-achievement/?$ "pages/student life/student-achievement.php" [END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]

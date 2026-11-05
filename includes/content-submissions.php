@@ -72,7 +72,7 @@ function rbacSafePreviewRoute(string $route): bool {
 function rbacRevisionFormData(string $route): array {
     $id=(int)($_GET['revise']??0);if(!$id)return [];
     $row=rbacGetSubmission($id);
-    if(!$row||(int)$row['user_id']!==(int)$_SESSION['user_id']||$row['route']!==$route||!in_array($row['status'],['draft','rejected','failed'],true))rbacFail('You cannot revise this submission.');
+    if(!$row||(int)$row['user_id']!==(int)$_SESSION['user_id']||$row['route']!==$route||!in_array($row['status'],['draft','rejected','needs_revision','failed'],true))rbacFail('You cannot revise this submission.');
     return rbacReadPayload($id)['post']??[];
 }
 function rbacSaveSubmission(string $kind,string $route,string $title,array $payload,int $target=0,int $resubmit=0,string $status='pending'): int {
@@ -82,7 +82,9 @@ function rbacSaveSubmission(string $kind,string $route,string $title,array $payl
     try {
         if($resubmit){
             $q=$db->prepare('SELECT * FROM rbac_submissions WHERE submission_id=? FOR UPDATE');$q->execute([$resubmit]);$old=$q->fetch();
-            if(!$old||(int)$old['user_id']!==(int)$_SESSION['user_id']||$old['route']!==$route||(int)($old['target_id']??0)!==$target||!in_array($old['status'],['draft','rejected','failed'],true))throw new RuntimeException('This submission cannot be revised by your account.');
+            if(!$old||(int)$old['user_id']!==(int)$_SESSION['user_id']||$old['route']!==$route||(int)($old['target_id']??0)!==$target||!in_array($old['status'],['draft','rejected','needs_revision','failed'],true))throw new RuntimeException('This submission cannot be revised by your account.');
+            $previous=rbacReadPayload($resubmit);
+            $payload['_review_history']=rbacFeedbackHistory($old,$previous);
             $db->prepare('UPDATE rbac_submissions SET title=?,status=?,reason=NULL,reviewed_by=NULL,reviewed_at=NULL,revision=revision+1,updated_at=NOW() WHERE submission_id=?')->execute([mb_substr($title,0,500),$status,$resubmit]);$id=$resubmit;
         }else{
             $db->prepare('INSERT INTO rbac_submissions(user_id,kind,route,target_id,title,status) VALUES(?,?,?,?,?,?)')->execute([(int)$_SESSION['user_id'],$kind,$route,$target?:null,mb_substr($title,0,500),$status]);$id=(int)$db->lastInsertId();
@@ -136,6 +138,11 @@ function rbacQueueCurrentRequest(string $route): void {
         }
         if(!$valid)rbacFail('Invalid request token. Reload and try again.');
         $post=$_POST;unset($post['csrf_token'],$post['facebook_confirmed'],$post['facebook_page_id'],$post['facebook_request_key'],$post['facebook_link']);
+        if($route==='/admin/action/create-announcement.php'&&(isset($post['category_ids_present'])||array_key_exists('category_ids',$post))){
+            require_once __DIR__.'/announcement-categories.php';
+            $post['category_ids']=normalizeAnnouncementCategoryIds(getDB(),$post['category_ids']??[]);
+            $post['category_id']=$post['category_ids'][0]??null;
+        }
         if(in_array($route,['/admin/action/create-news.php','/admin/action/create-announcement.php'],true)&&isset($post['content']))$post['content']=richTextNormalize((string)$post['content']);
         // Approval never implicitly publishes to Facebook.
         if(isset($post['publish_destination']))$post['publish_destination']='website';
@@ -152,11 +159,41 @@ function rbacQueueCurrentRequest(string $route): void {
     }catch(Throwable $e){rbacFail($e instanceof PDOException?'Submission could not be stored. No live content was changed.':$e->getMessage(),422);}
 }
 function rbacRejectSubmission(int $id,int $revision,string $reason): void {
-    if(!rbacIsSuper())throw new RuntimeException('Only Super Admin can reject submissions.');
-    $reason=trim($reason);if($reason===''||mb_strlen($reason)>2000)throw new InvalidArgumentException('Provide a rejection reason of 1–2,000 characters.');
-    $q=getDB()->prepare("UPDATE rbac_submissions SET status='rejected',reason=?,reviewed_by=?,reviewed_at=NOW(),updated_at=NOW() WHERE submission_id=? AND revision=? AND status='pending'");$q->execute([$reason,(int)$_SESSION['user_id'],$id,$revision]);
-    if($q->rowCount()!==1)throw new RuntimeException('The submission changed or has already been reviewed. Reload before reviewing.');
-    logActivity((int)$_SESSION['user_id'],'REJECT','rbac_submissions',$id,$reason);
+    rbacReviewDecision($id,$revision,$reason,'rejected');
+}
+function rbacFeedbackHistory(array $row,array $payload): array {
+    $history=$payload['_review_history']??[];
+    if(!$history&&!empty($row['reason']))$history[]=['status'=>$row['status'],'revision'=>(int)$row['revision'],'feedback'=>$row['reason'],'at'=>$row['reviewed_at']??$row['updated_at']];
+    return $history;
+}
+/** Revision requests retain a distinct state and feedback history in the existing payload. */
+function rbacReviewDecision(int $id,int $revision,string $reason,string $state): void {
+    if(!rbacIsSuper())throw new RuntimeException('Only Super Admin can review submissions.');
+    if(!in_array($state,['rejected','needs_revision'],true))throw new InvalidArgumentException('Invalid review decision.');
+    $reason=trim($reason);if($reason===''||mb_strlen($reason)>2000)throw new InvalidArgumentException('Provide feedback of 1–2,000 characters.');
+    $db=getDB();$db->beginTransaction();
+    try{
+        $q=$db->prepare('SELECT status,revision FROM rbac_submissions WHERE submission_id=? FOR UPDATE');$q->execute([$id]);$row=$q->fetch();
+        if(!$row||$row['status']!=='pending'||(int)$row['revision']!==$revision)throw new RuntimeException('The submission changed or has already been reviewed. Reload before reviewing.');
+        $payload=rbacReadPayload($id);
+        $payload['_review_history']=rbacFeedbackHistory($row,$payload);
+        $payload['_review_history'][]=['status'=>$state,'revision'=>$revision,'feedback'=>$reason,'at'=>date('Y-m-d H:i:s')];
+        rbacWritePayload($id,$payload);
+        $db->prepare('UPDATE rbac_submissions SET status=?,reason=?,reviewed_by=?,reviewed_at=NOW(),updated_at=NOW() WHERE submission_id=?')->execute([$state,$reason,(int)$_SESSION['user_id'],$id]);
+        if(!logActivity((int)$_SESSION['user_id'],$state==='needs_revision'?'REQUEST_REVISION':'REJECT','rbac_submissions',$id,$reason))throw new RuntimeException('The review could not be recorded. Please try again.');
+        $db->commit();
+    }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
+}
+function rbacSubmitSaved(int $id,int $revision): void {
+    $db=getDB();$db->beginTransaction();
+    try{
+        $q=$db->prepare('SELECT * FROM rbac_submissions WHERE submission_id=? FOR UPDATE');$q->execute([$id]);$row=$q->fetch();
+        if(!$row||(int)$row['user_id']!==(int)$_SESSION['user_id']||(int)$row['revision']!==$revision||!in_array($row['status'],['draft','rejected','needs_revision','failed'],true))throw new RuntimeException('This submission cannot be submitted again. Reload and check its status.');
+        $payload=rbacReadPayload($id);$payload['_review_history']=rbacFeedbackHistory($row,$payload);rbacWritePayload($id,$payload);
+        $db->prepare("UPDATE rbac_submissions SET status='pending',reason=NULL,reviewed_by=NULL,reviewed_at=NULL,revision=revision+1,updated_at=NOW() WHERE submission_id=?")->execute([$id]);
+        if(!logActivity((int)$_SESSION['user_id'],'RESUBMIT','rbac_submissions',$id,'Sent saved proposal for approval.'))throw new RuntimeException('The submission could not be recorded. Please try again.');
+        $db->commit();
+    }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
 }
 function rbacDeleteSubmission(int $id,int $revision): void {
     $row=rbacGetSubmission($id);

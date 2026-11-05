@@ -33,6 +33,15 @@ Do not mix SQL, permission logic, and markup unnecessarily. Refactor in small ba
 - Apply identical authorization and input validation to visual-editor and conventional admin endpoints.
 
 ## Data and database changes
+
+Announcement topic tags use `announcement_categories` through
+`includes/announcement-categories.php`. The legacy `announcements.category_id`
+retains the primary tag. Announcement saves synchronize both atomically, and
+admin/public category filters and the Campus/Alumni galleries match any selected
+tag without duplicating the announcement. See `docs/announcement-categories.md`
+for the additive migration and verification commands.
+
+Shared raster uploads are preprocessed in `includes/image-upload.php`: with PHP Imagick enabled, large images fit within 1920 × 1080 without cropping, retaining format, transparency, animation and photo-check metadata. Existing Administration images can be optimized using the CLI-only `scripts/optimize-administration-images.php`, with verified original backups and unchanged URLs. See `docs/image-optimization.md` for setup and recovery.
 - Inventory impacted tables, foreign keys, indexes, code references, and backups first.
 - Prefer additive migrations and phased cleanup. Never drop tables or columns simply because they look unused.
 - Supply a rollback strategy, identify irreversible operations, and obtain explicit approval before destructive production work.

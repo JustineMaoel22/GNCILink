@@ -1,14 +1,15 @@
 <?php
+require_once __DIR__ . '/announcement-categories.php';
 
-function campusEventPosts(PDO $db, array $query): array {
-    // Keep both post types in one dated feed, independent of the calendar month.
+function campusEventPosts(PDO $db, array $query, string $category = 'School Event', bool $includeEvents = false): array {
+    // Keep categorized public posts in one dated feed, independent of the calendar month.
+    $announcementCategory = announcementCategoryCondition($db, 'a', true);
     $feedSql = "SELECT a.announcement_id AS post_id, 'announcement' AS post_type,
             a.title, a.slug, COALESCE(a.published_at, a.created_at) AS post_date,
             m.file_path AS image_path, NULL AS permalink_url
         FROM announcements a
-        JOIN categories c ON c.category_id = a.category_id
         LEFT JOIN media_library m ON m.media_id = a.featured_image
-        WHERE a.status = 'published' AND c.category_name = ?
+        WHERE a.status = 'published' AND $announcementCategory
         UNION ALL
         SELECT n.news_id AS post_id, 'news' AS post_type,
             n.title, n.slug, COALESCE(n.published_at, n.created_at) AS post_date,
@@ -25,7 +26,17 @@ function campusEventPosts(PDO $db, array $query): array {
         JOIN categories c ON c.category_id = f.category_id
         LEFT JOIN media_library m ON m.media_id = f.image_media_id
         WHERE c.category_name = ?";
-    $params = ['School Event', 'School Event', 'School Event'];
+    $params = [$category, $category, $category];
+    if ($includeEvents) {
+        $feedSql .= " UNION ALL
+            SELECT e.event_id AS post_id, 'event' AS post_type,
+                e.title, NULL AS slug, COALESCE(e.start_date,e.created_at) AS post_date,
+                m.file_path AS image_path, NULL AS permalink_url
+            FROM events e JOIN categories c ON c.category_id=e.category_id
+            LEFT JOIN media_library m ON m.media_id=e.media_id
+            WHERE e.status='published' AND c.category_name=?";
+        $params[] = $category;
+    }
     $count = $db->prepare("SELECT COUNT(*) FROM ($feedSql) AS school_posts");
     $count->execute($params);
     $total = (int)$count->fetchColumn();

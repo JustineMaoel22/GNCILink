@@ -37,17 +37,16 @@ unset($_SESSION['flash_errors'], $_SESSION['flash_old'], $_SESSION['flash_succes
 // ============================================================
 // LIST DATA
 // ============================================================
-$statusFilter  = $facebookPostsPage ? '' : ($_GET['status'] ?? '');
-$programFilter = $facebookPostsPage ? '' : ($_GET['program'] ?? '');
-$search        = trim($_GET['search'] ?? '');
+require_once __DIR__.'/announcement-view.php';
+$listFilters=announcementFilters($_GET);$listError='';$listTotal=0;$listPages=1;$listGalleries=[];
+$statusFilter = $facebookPostsPage?'':$listFilters['status'];
+$programFilter=$facebookPostsPage?'':$listFilters['program'];
+$search=$listFilters['search'];
 $sourceFilter = $facebookPostsPage ? 'facebook' : 'website';
-$filters       = [];
-if ($statusFilter !== '') $filters['status'] = $statusFilter;
-if ($programFilter !== '') $filters['program'] = $programFilter;
-if ($search !== '') $filters['search'] = $search;
 
 // Source filter: "facebook" hides website announcements entirely.
-$announcements = ($sourceFilter === 'facebook') ? [] : getAnnouncements($filters, 50, 0);
+$announcements=[];
+if(!$facebookPostsPage){try{$list=announcementList(getDB(),$listFilters);$announcements=$list['rows'];$listTotal=$list['total'];$listPages=$list['pages'];$listGalleries=$list['galleries'];}catch(Throwable $e){$listError='Announcements could not be loaded. Please try again.';error_log('Announcements list unavailable.');}}
 $announcementAudiences = getAnnouncementAudiencesBatch(getDB(), $announcements);
 $pinnedCount   = countPinnedItems();
 
@@ -74,12 +73,12 @@ try {
 $departmentNames = array_column($departments, 'dept_name', 'dept_id');
 
 // Which modal (if any) should auto-open on load
-$modalMode    = $facebookPostsPage ? '' : ($_GET['modal'] ?? '');   // '', 'create', or 'edit'
+$modalMode = !$facebookPostsPage&&is_string($_GET['modal']??null)&&in_array($_GET['modal'],['create','edit'],true)?$_GET['modal']:'';   // '', 'create', or 'edit'
 $modalEditing = null;
 $modalGallery = [];
 $modalAudience = ['dept_ids' => [], 'programs' => []];
 if ($modalMode === 'edit') {
-    $modalEditing = getAnnouncementById((int)($_GET['id'] ?? 0));
+    $modalEditing = getAnnouncementById(is_string($_GET['id']??null)?(int)$_GET['id']:0);
     if ($modalEditing && !empty($modalEditing['announcement_id'])) {
         $modalGallery = getAnnouncementImages((int)$modalEditing['announcement_id']);
         $modalAudience = getAnnouncementAudience(getDB(), (int)$modalEditing['announcement_id'], $modalEditing['dept_id'] ?? null, $modalEditing['program'] ?? null);
@@ -87,6 +86,7 @@ if ($modalMode === 'edit') {
 }
 if (!empty($flashOld)) {
     $modalEditing = array_merge($modalEditing ?? [], $flashOld);
+    if (isset($flashOld['category_ids_present'])) $modalEditing['category_ids'] = $flashOld['category_ids'] ?? [];
     if (isset($flashOld['dept_ids']) || isset($flashOld['programs'])) {
         $modalAudience = [
             'dept_ids' => isset($flashOld['dept_ids']) ? (array)$flashOld['dept_ids'] : ($modalAudience['dept_ids'] ?? []),
@@ -100,7 +100,7 @@ if (!empty($flashOld)) {
 $statusLabels = [
     'draft'     => 'Draft',
     'pending'   => 'Waiting for approval',
-    'published' => 'Live on website',
+    'published' => 'Published',
     'archived'  => 'Archived',
 ];
 $statusHelp = [
@@ -115,8 +115,8 @@ if (!function_exists('ann_url')) {
         return '?' . http_build_query($q);
     }
 }
-$baseQuery = ['search' => $search, 'source' => $sourceFilter, 'status' => $statusFilter, 'program' => $programFilter];
-$filtersActive = ($search !== '' || $statusFilter !== '' || $programFilter !== '');
+$baseQuery=$facebookPostsPage?['search'=>$search,'source'=>$sourceFilter]:$listFilters;
+$filtersActive=$facebookPostsPage?($search!==''):(bool)array_filter(array_intersect_key($listFilters,array_flip(['search','status','category','dept','program','from','to','pinned'])),fn($v)=>$v!=='');
 $canPublish    = hasPermission('publish_announcement');
 $facebookPublishingReady = facebookPublishingReady();
 $facebookConnection = facebookPublishingConnection();
@@ -133,7 +133,7 @@ $isSuperAdmin  = (($_SESSION['user_role'] ?? '') === 'Super Admin');
 $pageTitle = $facebookPostsPage ? 'Facebook Posts' : 'Announcements';
 include __DIR__ . '/../components/header-admin.php';
 ?>
-
+<div class="<?= $facebookPostsPage?'facebook-management':'announcement-management' ?>">
 <div class="page-header">
     <div>
         <h1><?= $pageTitle ?></h1>
@@ -158,18 +158,29 @@ include __DIR__ . '/../components/header-admin.php';
 <?php endif; ?>
 
 <?php if ($canPublish): ?>
-<div class="ann-pin-banner">
-    <div class="ann-pin-banner-icon"><i class="bi bi-pin-angle-fill"></i></div>
-    <div class="flex-grow-1">
-        <div class="fw-semibold">Homepage slideshow: <?= (int)$pinnedCount ?> of <?= MAX_PINNED_ITEMS ?> spots used</div>
-        <div class="ann-sub">Pin an announcement, news item, or Facebook post to show it in the big slideshow on the homepage.<?= $pinnedCount >= MAX_PINNED_ITEMS ? ' All spots are taken — unpin one to pin another.' : '' ?></div>
+<section class="ann-pin-banner" aria-labelledby="ann-pin-heading">
+    <div class="ann-pin-heading">
+        <div><h2 id="ann-pin-heading"><i class="bi bi-pin-angle" aria-hidden="true"></i> Pinned news and announcement</h2>
+        <p>Five slots shared by Announcements, News, and Facebook Posts.</p></div>
+        <strong><?= (int)$pinnedCount ?> / <?= MAX_PINNED_ITEMS ?> used</strong>
     </div>
-    <div class="ann-pin-dots" aria-hidden="true">
+    <div class="ann-pin-meter" role="progressbar" aria-label="Occupied pinned content slots" aria-valuemin="0" aria-valuemax="<?= MAX_PINNED_ITEMS ?>" aria-valuenow="<?= (int)$pinnedCount ?>">
         <?php for ($i = 1; $i <= MAX_PINNED_ITEMS; $i++): ?><span class="<?= $i <= $pinnedCount ? 'on' : '' ?>"></span><?php endfor; ?>
     </div>
-</div>
+    <p class="ann-pin-help"><?= $pinnedCount >= MAX_PINNED_ITEMS ? 'All slots are used. Unpin an item below to make room for another post.' : (MAX_PINNED_ITEMS - $pinnedCount) . ' slots available. Pin a post to feature it on the homepage.' ?></p>
+
+<?php if(!$facebookPostsPage): ?>
+<details class="ann-slideshow-manage" id="pinned-content"><summary>Manage pinned news and announcement <span>(<?= (int)$pinnedCount ?> items)</span></summary><ul>
+<?php foreach(announcementPinnedItems(getDB()) as $pinnedItem): $module=($pinnedItem['source']??'')==='news'?'/admin/news.php':(($pinnedItem['source']??'')==='facebook'?'/admin/facebook-posts.php':'/admin/announcement.php?pinned=1'); ?>
+<li><span><?= htmlspecialchars(['announcement'=>'Announcement','news'=>'News','facebook'=>'Facebook post'][$pinnedItem['source']].' — '.($pinnedItem['title']??'Pinned item'),ENT_QUOTES,'UTF-8') ?></span><div class="ann-pinned-actions"><a href="<?= htmlspecialchars($module,ENT_QUOTES,'UTF-8') ?>">Manage</a><form method="post" action="/admin/action/unpin-content.php" class="ann-inline-form"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken,ENT_QUOTES,'UTF-8') ?>"><input type="hidden" name="action" value="unpin"><input type="hidden" name="source" value="<?= htmlspecialchars($pinnedItem['source'],ENT_QUOTES,'UTF-8') ?>"><input type="hidden" name="item_id" value="<?= htmlspecialchars($pinnedItem['item_id'],ENT_QUOTES,'UTF-8') ?>"><button type="submit" class="btn btn-outline-secondary"><i class="bi bi-pin-angle" aria-hidden="true"></i> Unpin</button></form></div></li>
+<?php endforeach; ?>
+<?php if(!$pinnedCount): ?><li>No slideshow items are pinned.</li><?php endif; ?>
+</ul></details>
+<?php endif; ?>
+</section>
 <?php endif; ?>
 
+<?php if(!$facebookPostsPage): include __DIR__.'/partials/announcement-filters.php'; else: ?>
 <div class="data-card">
     <div class="data-card-header flex-wrap gap-2">
         <span class="data-card-title"><i class="bi bi-<?= $facebookPostsPage ? 'facebook' : 'megaphone-fill' ?> me-1"></i> <?= $facebookPostsPage ? 'Facebook Posts' : 'All Announcements' ?></span>
@@ -210,6 +221,7 @@ include __DIR__ . '/../components/header-admin.php';
     </div>
     <?php endif; ?>
 
+<?php endif; ?>
     <div class="table-responsive">
         <table class="table table-hover mb-0 ann-table" id="announcements-table">
             <thead>
@@ -227,7 +239,8 @@ include __DIR__ . '/../components/header-admin.php';
                 <tr class="ann-empty-row"><td colspan="6">
                     <div class="ann-empty">
                         <i class="bi bi-megaphone"></i>
-                        <?php if ($filtersActive): ?>
+                        <?php if (!$facebookPostsPage&&$listError): ?><p>Announcement data is unavailable. Please reload to try again.</p>
+                        <?php elseif ($filtersActive): ?>
                             <p class="mb-2"><?= $facebookPostsPage ? 'No Facebook posts match your search.' : 'No announcements match your search or filters.' ?></p>
                             <a href="?" class="btn btn-sm btn-outline-secondary">Clear filters</a>
                         <?php else: ?>
@@ -246,13 +259,13 @@ include __DIR__ . '/../components/header-admin.php';
                 <tr class="ann-row">
                     <td class="ann-img-cell">
                         <?php if (!empty($a['image_path'])): ?>
-                        <img src="<?= htmlspecialchars($a['image_path']) ?>" alt="" class="ann-thumb">
+                        <img src="<?= htmlspecialchars($a['image_path']) ?>" alt="" class="ann-thumb" loading="lazy">
                         <?php else: ?>
                         <div class="ann-thumb ann-thumb-empty"><i class="bi bi-image"></i></div>
                         <?php endif; ?>
                     </td>
                     <td class="ann-title-cell">
-                        <div class="ann-title"><?= htmlspecialchars($a['title']) ?></div>
+                        <button type="button" class="ann-title ann-preview-open" data-preview-id="<?= (int)$a['announcement_id'] ?>"><?= htmlspecialchars($a['title']) ?></button>
                         <div class="ann-sub">
                             <?= $authorName !== '' ? 'By ' . htmlspecialchars($authorName) . ' &middot; ' : '' ?><?= date('M j, Y', strtotime($a['created_at'])) ?>
                         </div>
@@ -263,33 +276,21 @@ include __DIR__ . '/../components/header-admin.php';
                     <td data-label="Category"><?= htmlspecialchars($a['category_name'] ?? '') ?: '<span class="text-muted">—</span>' ?></td>
                     <td data-label="For">
                         <div class="ann-for">
-                            <div class="audience-tag-list mb-1">
-                                <?php
-                                $aAud = $announcementAudiences[$a['announcement_id']] ?? ['dept_ids' => [], 'programs' => []];
-                                $aDeptNames = [];
-                                foreach ($aAud['dept_ids'] as $did) {
-                                    if (isset($departmentNames[$did])) $aDeptNames[] = $departmentNames[$did];
-                                }
-                                if (empty($aDeptNames)): ?>
-                                    <span class="audience-tag">All departments</span>
-                                <?php else: foreach ($aDeptNames as $dName): ?>
-                                    <span class="audience-tag audience-tag-dept" title="<?= htmlspecialchars($dName) ?>"><?= htmlspecialchars(mb_strlen($dName) > 26 ? mb_substr($dName, 0, 24) . '…' : $dName) ?></span>
-                                <?php endforeach; endif; ?>
-                            </div>
-                            <div class="audience-tag-list">
-                                <?php if (empty($aAud['programs'])): ?>
-                                    <span class="program-badge program-badge-all">All programs</span>
-                                <?php else: foreach ($aAud['programs'] as $pCode): ?>
-                                    <span class="program-badge" title="<?= htmlspecialchars($programCategories[$pCode] ?? $pCode) ?>"><?= htmlspecialchars($pCode) ?></span>
-                                <?php endforeach; endif; ?>
-                            </div>
+<?php
+$aAud=$announcementAudiences[$a['announcement_id']]??['dept_ids'=>[],'programs'=>[]];
+$aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]))$aDeptNames[]=$departmentNames[$did];
+?>
+<?php foreach([[$aDeptNames,'department','All departments'],[array_map(fn($code)=>$programCategories[$code]??$code,$aAud['programs']),'program','All programs']] as [$names,$kind,$all]): ?>
+<?php if(count($names)>1): ?><details class="ann-audience-details"><summary><?= count($names) ?> <?= $kind ?>s</summary><ul><?php foreach($names as $name): ?><li><?= htmlspecialchars($name) ?></li><?php endforeach; ?></ul></details><?php else: ?><span class="ann-audience-single"><?= htmlspecialchars($names[0]??$all) ?></span><?php endif; ?>
+<?php endforeach; ?>
                         </div>
                     </td>
                     <td data-label="Status"><span class="status-badge <?= htmlspecialchars($a['status']) ?>"><?= htmlspecialchars($statusLabels[$a['status']] ?? ucfirst($a['status'])) ?></span>
                         <?php if (isset($facebookDeliveries[$a['announcement_id']])): $delivery = $facebookDeliveries[$a['announcement_id']]; ?>
-                        <div class="small mt-1">Facebook: <?= htmlspecialchars($delivery['state']) ?> · Page <?= htmlspecialchars($delivery['page_id']) ?></div>
-                        <?php if ($delivery['post_url']): ?><a class="small" target="_blank" rel="noopener noreferrer" href="<?= htmlspecialchars(facebookPublishingViewPostUrl($delivery['post_url'], $delivery['post_id'] ?? '')) ?>">View Facebook post</a><?php endif; ?>
-                        <?php if ($delivery['last_error']): ?><div class="small text-danger"><?= htmlspecialchars($delivery['last_error']) ?></div><?php endif; ?>
+                        <details class="ann-facebook-status"><summary>Facebook: <?= htmlspecialchars(['published'=>'Published separately','failed'=>'Delivery failed','sending'=>'Sending','unknown'=>'Needs verification','ready'=>'Not sent'][$delivery['state']]??ucfirst($delivery['state'])) ?></summary><p>Website and Facebook statuses are separate. Viewing this page does not send another post.</p>
+                        <?php if($delivery['post_url']): ?><a target="_blank" rel="noopener noreferrer" href="<?= htmlspecialchars(facebookPublishingViewPostUrl($delivery['post_url'],$delivery['post_id']??'')) ?>">View Facebook post</a><?php endif; ?>
+                        <?php if($delivery['last_error']): ?><p class="text-danger">The last delivery needs attention. Ask a Super Admin to check Facebook Integration.</p><?php endif; ?>
+                        <details><summary>Delivery identifiers</summary><p>Page: <?= htmlspecialchars($delivery['page_id']) ?> &middot; Post: <?= htmlspecialchars($delivery['post_id']??'Not recorded') ?></p></details></details>
                         <?php endif; ?>
                     </td>
                     <td class="ann-actions-cell">
@@ -309,7 +310,7 @@ include __DIR__ . '/../components/header-admin.php';
                                     title="<?= !empty($a['is_pinned']) ? 'Remove from the homepage slideshow' : 'Show in the homepage slideshow' ?>"
                                     <?php endif; ?>>
                                 <i class="bi <?= !empty($a['is_pinned']) ? 'bi-pin-angle-fill' : 'bi-pin-angle' ?>"></i>
-                                <span class="visually-hidden"><?= !empty($a['is_pinned']) ? 'Unpin' : 'Pin' ?></span>
+                                <span><?= !empty($a['is_pinned']) ? 'Unpin' : 'Pin' ?></span>
                             </button>
                         </form>
                         <?php endif; ?>
@@ -321,16 +322,17 @@ include __DIR__ . '/../components/header-admin.php';
                             <button type="submit" class="btn btn-sm btn-outline-secondary"
                                     title="<?= $a['status'] === 'archived' ? 'Bring it back as a draft' : 'Hide it from the website but keep it on record' ?>">
                                 <i class="bi <?= $a['status'] === 'archived' ? 'bi-arrow-counterclockwise' : 'bi-archive' ?>"></i>
-                                <span class="visually-hidden"><?= $a['status'] === 'archived' ? 'Restore' : 'Archive' ?></span>
+                                <span><?= $a['status'] === 'archived' ? 'Restore' : 'Archive' ?></span>
                             </button>
                         </form>
                         <?php endif; ?>
                         <?php if (hasPermission('edit_announcement') || (hasPermission('edit_own_announcement') && $isOwner)): ?>
-                        <?php $rowGallery = getAnnouncementImages((int)$a['announcement_id']); ?>
+                        <?php $rowGallery=$listGalleries[$a['announcement_id']]??[]; ?>
                         <button type="button" class="btn btn-sm btn-outline-secondary btn-edit-announcement" title="Edit this announcement"
                                 data-id="<?= $a['announcement_id'] ?>"
                                 data-title="<?= htmlspecialchars($a['title'], ENT_QUOTES) ?>"
                                 data-category="<?= (int)($a['category_id'] ?? 0) ?>"
+                                data-categories='<?= json_encode($a['category_ids'] ?? []) ?>'
                                 data-program="<?= htmlspecialchars($a['program'] ?? 'ALL') ?>"
                                 data-dept="<?= (int)($a['dept_id'] ?? 0) ?>"
                                 data-depts='<?= json_encode($aAud['dept_ids']) ?>'
@@ -339,7 +341,7 @@ include __DIR__ . '/../components/header-admin.php';
                                 data-image="<?= htmlspecialchars($a['image_path'] ?? '') ?>"
                                 data-gallery="<?= htmlspecialchars(json_encode($rowGallery), ENT_QUOTES) ?>"
                                 data-content-id="ann-content-<?= $a['announcement_id'] ?>">
-                            <i class="bi bi-pencil"></i><span class="visually-hidden">Edit</span>
+                            <i class="bi bi-pencil"></i><span>Edit</span>
                         </button>
                         <!-- Raw content stashed in a hidden template (not JSON) -->
                         <template id="ann-content-<?= $a['announcement_id'] ?>"><?= $a['content'] ?></template>
@@ -348,7 +350,7 @@ include __DIR__ . '/../components/header-admin.php';
                         <button type="button" class="btn btn-sm btn-outline-danger btn-delete-announcement" title="Delete this announcement"
                                 data-id="<?= $a['announcement_id'] ?>"
                                 data-title="<?= htmlspecialchars($a['title'], ENT_QUOTES) ?>">
-                            <i class="bi bi-trash"></i><span class="visually-hidden">Delete</span>
+                            <i class="bi bi-trash"></i><span>Delete</span>
                         </button>
                         <?php endif; ?>
                     </td>
@@ -362,7 +364,7 @@ include __DIR__ . '/../components/header-admin.php';
                 <tr class="ann-row">
                     <td class="ann-img-cell">
                         <?php if (!empty($fb['image_path'])): ?>
-                        <img src="<?= htmlspecialchars($fb['image_path']) ?>" alt="" class="ann-thumb">
+                        <img src="<?= htmlspecialchars($fb['image_path']) ?>" alt="" class="ann-thumb" loading="lazy">
                         <?php else: ?>
                         <div class="ann-thumb ann-thumb-empty"><i class="bi bi-facebook"></i></div>
                         <?php endif; ?>
@@ -418,11 +420,12 @@ include __DIR__ . '/../components/header-admin.php';
             </tbody>
         </table>
     </div>
-    <?php if (count($announcements) >= 50 || count($fbPosts) >= 50): ?>
+    <?php if ($facebookPostsPage && count($fbPosts) >= 50): ?>
     <div class="ann-sub p-3" style="border-top:1px solid rgba(128,128,128,.2)">Showing the 50 most recent <?= $facebookPostsPage ? 'Facebook posts' : 'announcements' ?>. Use the search box to find older ones.</div>
     <?php endif; ?>
 </div>
 
+<?php if(!$facebookPostsPage): include __DIR__.'/partials/announcement-pagination.php'; endif; ?>
 <!-- ============================================================
      CREATE / EDIT MODAL — posts to /admin/action/create-announcement.php
 ============================================================ -->
@@ -509,16 +512,13 @@ include __DIR__ . '/../components/header-admin.php';
 
           </section>
           <section class="evt-form-section" aria-labelledby="ann-audience-heading">
-          <h6 id="ann-audience-heading">Category &amp; audience</h6>
+          <h6 id="ann-audience-heading">Categories &amp; audience</h6>
           <div class="row g-3 mb-3">
             <div class="col-12">
-              <label class="form-label" for="modal-category">Type</label>
-              <select name="category_id" id="modal-category" class="form-select">
-                <option value="">Not set</option>
-                <?php foreach ($categories as $c): ?>
-                <option value="<?= $c['category_id'] ?>"><?= htmlspecialchars($c['category_name']) ?></option>
-                <?php endforeach; ?>
-              </select>
+              <label class="form-label fw-semibold" id="ann-category-label">Categories</label>
+              <input type="hidden" name="category_ids_present" value="1">
+              <div id="modal-category-multiselect"></div>
+              <div class="form-text">Select one or more categories. Leave empty for no category.</div>
             </div>
             <div class="col-12 col-md-6">
               <label class="form-label fw-semibold" id="ann-dept-label">Departments</label>
@@ -579,6 +579,7 @@ include __DIR__ . '/../components/header-admin.php';
         <div class="modal-footer">
           <span id="ann-save-intent" class="evt-save-intent" aria-live="polite"></span>
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <?php if(!$facebookPostsPage): ?><button type="button" class="btn btn-outline-secondary" id="ann-draft-preview">Preview content</button><?php endif; ?>
           <button type="submit" class="btn btn-gnc-gold" id="modal-save-btn">
             <i class="bi bi-check-lg"></i> <span id="modal-save-label">Create Announcement</span>
           </button>
@@ -857,6 +858,9 @@ include __DIR__ . '/../components/header-admin.php';
     .ann-toast { right: max(20px, env(safe-area-inset-right)); }
 }
 </style>
+<?php if(!$facebookPostsPage): ?><link rel="stylesheet" href="/assets/css/admin-announcements.css?v=<?= (int)filemtime(__DIR__.'/../assets/css/admin-announcements.css') ?>">
+<script src="/assets/js/admin-announcements.js?v=<?= (int)filemtime(__DIR__.'/../assets/js/admin-announcements.js') ?>" defer></script><?php endif; ?>
+</div>
 <link rel="stylesheet" href="/assets/css/multi-audience-select.css?v=<?= filemtime(__DIR__ . '/../assets/css/multi-audience-select.css') ?>">
 <script src="/assets/js/multi-audience-select.js?v=<?= filemtime(__DIR__ . '/../assets/js/multi-audience-select.js') ?>"></script>
 <link rel="stylesheet" href="/assets/css/event-form.css?v=<?= filemtime(__DIR__ . '/../assets/css/event-form.css') ?>">
@@ -892,7 +896,10 @@ const announcementModalEl = document.getElementById('announcementModal');
 const announcementModal   = new bootstrap.Modal(announcementModalEl);
 
 const modalTitleInput   = document.getElementById('modal-title');
-const modalCategory     = document.getElementById('modal-category');
+const modalCategory = new GncMultiSelect(document.getElementById('modal-category-multiselect'), {
+    name: 'category_ids[]', allLabel: 'No categories selected',
+    items: <?= json_encode(array_map(static fn($c) => ['value'=>(string)$c['category_id'], 'label'=>$c['category_name']], $categories), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>
+});
 
 const deptSelectItems = <?= json_encode(array_values(array_map(function($d) {
     return ['value' => (string)$d['dept_id'], 'label' => $d['dept_name']];
@@ -1042,6 +1049,7 @@ function resetModalForm() {
     modalActionInput.value = 'create';
     modalIdInput.value = '';
     if (annDeptSelect) annDeptSelect.deselectAll();
+    if (modalCategory) modalCategory.deselectAll();
     if (annProgSelect) annProgSelect.deselectAll();
     updateAudienceHelp();
     modalLabel.textContent = 'New Announcement';
@@ -1157,7 +1165,7 @@ function openEditModal(btn) {
     modalSaveLabel.textContent = 'Save Changes';
 
     modalTitleInput.value = btn.dataset.title || '';
-    if (modalCategory) modalCategory.value = btn.dataset.category || '';
+    if (modalCategory) { let ids=[];try{ids=JSON.parse(btn.dataset.categories||'[]');}catch(e){}modalCategory.setSelected(ids.length?ids:(btn.dataset.category&&btn.dataset.category!=='0'?[btn.dataset.category]:[])); }
     let depts = [];
     try { depts = JSON.parse(btn.dataset.depts || '[]'); } catch (e) {}
     let progs = [];
@@ -1356,7 +1364,7 @@ openCreateModal();
 <?php if (!empty($flashErrors)): ?>
 modalTitleInput.value = <?= json_encode($flashOld['title'] ?? '') ?>;
 modalQuill.root.innerHTML = <?= json_encode($flashOld['content'] ?? '') ?>;
-if (modalCategory) modalCategory.value = <?= json_encode($flashOld['category_id'] ?? '') ?>;
+if (modalCategory) modalCategory.setSelected(<?= json_encode($flashOld['category_ids'] ?? (!empty($flashOld['category_id']) ? [$flashOld['category_id']] : [])) ?>);
 if (annDeptSelect) annDeptSelect.setSelected(<?= json_encode($modalAudience['dept_ids'] ?? []) ?>);
 if (annProgSelect) annProgSelect.setSelected(<?= json_encode($modalAudience['programs'] ?? []) ?>);
 if (modalStatus) modalStatus.value = <?= json_encode($flashOld['status'] ?? 'draft') ?>;
@@ -1370,7 +1378,7 @@ modalLabel.textContent = 'Edit Announcement';
 modalSaveLabel.textContent = 'Save Changes';
 modalTitleInput.value = <?= json_encode($modalEditing['title'] ?? '') ?>;
 modalQuill.root.innerHTML = <?= json_encode($modalEditing['content'] ?? '') ?>;
-if (modalCategory) modalCategory.value = <?= json_encode($modalEditing['category_id'] ?? '') ?>;
+if (modalCategory) modalCategory.setSelected(<?= json_encode($modalEditing['category_ids'] ?? (!empty($modalEditing['category_id']) ? [$modalEditing['category_id']] : [])) ?>);
 if (annDeptSelect) annDeptSelect.setSelected(<?= json_encode($modalAudience['dept_ids'] ?? []) ?>);
 if (annProgSelect) annProgSelect.setSelected(<?= json_encode($modalAudience['programs'] ?? []) ?>);
 if (modalStatus) modalStatus.value = <?= json_encode($modalEditing['status'] ?? 'draft') ?>;

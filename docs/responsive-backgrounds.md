@@ -1,6 +1,6 @@
 # Device-specific Content Editor backgrounds
 
-Select a background in the Content Editor, choose Desktop, Tablet, or Mobile, then use **Background (device)**. Replacement images, horizontal/vertical alignment, Cover/Contain sizing and crop zoom apply only to that device. Switching device closes the previous controls. **Remove override** restores the original background for that device. Ordinary content photos keep their existing editing controls.
+Select a background in the Content Editor, choose Desktop, Tablet, or Mobile, then use **Background (device)**. Replacement images, horizontal/vertical alignment, Cover/Contain sizing and crop zoom apply only to that device by default. Enable **Use the same background on desktop, tablet and mobile** to copy the current image and settings to all three devices. Replacements and adjustments made while enabled apply to all devices; uncheck it to edit a device independently. Matching explicit overrides are recognized when reopening the controls. Switching device closes the previous controls. **Remove override** restores the original background for that device; with sharing enabled, **Remove all device overrides** restores all three originals. Ordinary content photos keep their existing editing controls.
 
 Existing published images remain the fallback; installing this feature does not change them. A saved device override is independent of the original image and other device overrides. The homepage's legacy separate phone image also remains its fallback.
 

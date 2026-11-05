@@ -14,7 +14,7 @@
 (function () {
     'use strict';
 
-    var HANDLER = new URL('action/photo-check-handler.php', window.location.href).href;
+    var HANDLER = '/admin/action/photo-check-handler.php';
     console.info('[photo-check] script loaded');
     var PERSON_NAMES = { photo: 1, dean_photo: 1 };    // <input type="file" name="...">
     var PERSON_IDS   = { 'adm-person-photo': 1, 'adm-office-photo': 1 };   // Administration modals (no name attribute)

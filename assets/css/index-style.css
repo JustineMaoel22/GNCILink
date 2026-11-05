@@ -1368,14 +1368,14 @@ a.gnc-programs-count:hover {
 .gnc-map-frame {
     display: block;
     width: 100%;
-    max-width: 1100px;
+    max-width: 1200px;
     margin: 0 auto;
     border: 0;
     border-radius: 18px;
     background: #F9F6F1;
-    /* phones & tablets: height follows the width (chips + 2:3 portrait map) */
-    height: auto;
-    aspect-ratio: 2 / 3.3;
+    /* Leave room for the directory, map toolbar and route status on phones. */
+    height: clamp(760px, 95svh, 900px);
+    aspect-ratio: auto;
 }
 @media (max-width: 767px) {
     .gnc-campus-map { padding-top: 2rem !important; padding-bottom: 2rem !important; }
@@ -1383,16 +1383,16 @@ a.gnc-programs-count:hover {
     .gnc-campus-map .text-center { padding: 0 8px; }
     .gnc-map-frame { border-radius: 14px; }
 }
-/* tablets: keep the portrait map at a comfortable width */
+/* tablets: use the available width for the directory and map */
 @media (min-width: 576px) and (max-width: 991.98px) {
-    .gnc-map-frame { max-width: 640px; aspect-ratio: 2 / 3.1; }
+    .gnc-map-frame { max-width: 100%; aspect-ratio: auto; }
 }
 /* desktop: wide frame, side list + map */
 @media (min-width: 992px) {
     .gnc-map-frame {
         aspect-ratio: auto;
-        height: min(82vh, 780px);
-        min-height: 520px;
+        height: min(85vh, 820px);
+        min-height: 640px;
     }
 }
 /* landscape phones: use the screen height */

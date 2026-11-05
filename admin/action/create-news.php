@@ -8,21 +8,28 @@
  */
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../admin-functions.php';
+require_once __DIR__ . '/../news-view.php';
 
 initSession();
 requireLogin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: /admin/news.php');
+    header('Location: '.newsReturnUrl($_POST));
     exit;
 }
 
 $postAction = $_POST['action'] ?? '';
 
-if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
+if (!verifyCSRFToken(is_string($_POST['csrf_token']??null)?$_POST['csrf_token']:'')) {
     $_SESSION['flash_errors'] = ['Your session timed out for safety. Please try again.'];
-    header('Location: /admin/news.php');
+    header('Location: '.newsReturnUrl($_POST));
     exit;
+}
+if(!is_string($postAction)||!in_array($postAction,['create','update','delete','pin','unpin','archive','unarchive'],true)){
+    $_SESSION['flash_errors']=['Choose a valid article action.'];header('Location: '.newsReturnUrl($_POST));exit;
+}
+if($postAction!=='create'&&(!is_string($_POST['news_id']??null)||!preg_match('/^[1-9]\d{0,9}$/D',$_POST['news_id']))){
+    $_SESSION['flash_errors']=['Choose a valid news article.'];header('Location: '.newsReturnUrl($_POST));exit;
 }
 
 // Super admins are the approvers, so they never send items for approval.
@@ -39,19 +46,19 @@ if ($postAction === 'delete') {
     if ($existing) {
         $isOwner = $existing['user_id'] == ($_SESSION['user_id'] ?? null);
         if (hasPermission('delete_news') || (hasPermission('delete_own_news') && $isOwner)) {
-            deleteNews($delId);
-            $_SESSION['flash_success'] = 'The news article “' . ($existing['title'] ?? '') . '” was deleted.';
+            if(deleteNews($delId))$_SESSION['flash_success'] = 'The news article “' . ($existing['title'] ?? '') . '” was deleted.';
+            else $_SESSION['flash_errors']=['The article could not be deleted. Please try again.'];
         } else {
             $_SESSION['flash_errors'] = ['Your account is not allowed to delete this news article.'];
         }
     }
 
-    header('Location: /admin/news.php');
+    header('Location: '.newsReturnUrl($_POST));
     exit;
 }
 
 // ============================================================
-// PIN / UNPIN (homepage slideshow — max 3 items, shared with Announcements)
+// PIN / UNPIN (five slots shared with Announcements and Facebook Posts)
 // ============================================================
 if ($postAction === 'pin' || $postAction === 'unpin') {
     $pinId = (int)($_POST['news_id'] ?? 0);
@@ -61,18 +68,21 @@ if ($postAction === 'pin' || $postAction === 'unpin') {
     } elseif ($pinId) {
         try {
             if ($postAction === 'pin') {
-                pinNews($pinId);
-                $_SESSION['flash_success'] = 'Done! The article is now pinned to the homepage slideshow.';
+                $pinArticle=getNewsById($pinId);
+                if(!$pinArticle||$pinArticle['status']!=='published')$_SESSION['flash_errors']=['Publish this article before pinning it.'];
+                elseif(empty($pinArticle['is_pinned'])&&countPinnedItems()>=MAX_PINNED_ITEMS)$_SESSION['flash_errors']=['All five pinned content slots are used. Unpin an item first.'];
+                elseif(pinNews($pinId))$_SESSION['flash_success']='Article added to pinned news and announcement.';
+                else $_SESSION['flash_errors']=['The article could not be pinned. Please try again.'];
             } else {
-                unpinNews($pinId);
-                $_SESSION['flash_success'] = 'The article was removed from the homepage slideshow.';
+                if(unpinNews($pinId))$_SESSION['flash_success']='Article removed from pinned news and announcement.';
+                else $_SESSION['flash_errors']=['The article could not be unpinned. Please try again.'];
             }
         } catch (Exception $e) {
-            $_SESSION['flash_errors'] = [$e->getMessage()];
+            $_SESSION['flash_errors'] = ['The pin change could not be saved. Please reload and try again.'];
         }
     }
 
-    header('Location: /admin/news.php');
+    header('Location: '.newsReturnUrl($_POST));
     exit;
 }
 
@@ -112,7 +122,7 @@ if ($postAction === 'archive' || $postAction === 'unarchive') {
         }
     }
 
-    header('Location: /admin/news.php');
+    header('Location: '.newsReturnUrl($_POST));
     exit;
 }
 
@@ -140,9 +150,13 @@ if ($postAction === 'create' || $postAction === 'update') {
         }
     }
 
-    $title   = trim($_POST['title'] ?? '');
-    $content = trim($_POST['content'] ?? '');
-    $author  = trim($_POST['author'] ?? '');
+    foreach(['title','content','author','category','status'] as $field)if(isset($_POST[$field])&&!is_string($_POST[$field]))$errors[]='Check the article fields and try again.';
+    $title=is_string($_POST['title']??null)?trim($_POST['title']):'';
+    $content=is_string($_POST['content']??null)?trim($_POST['content']):'';
+    $author=is_string($_POST['author']??null)?trim($_POST['author']):'';
+    if(mb_strlen($title)>500)$errors[]='Keep the headline within 500 characters.';
+    if(mb_strlen($author)>255)$errors[]='Keep the author name within 255 characters.';
+    if(!in_array($_POST['status']??'draft',['draft','pending','published','archived'],true))$errors[]='Choose a valid publication status.';
 
     if (empty($errors)) {
         if ($title === '' && !contentPublishAllowsIncomplete()) $errors[] = 'Please type a headline for the article.';
@@ -217,7 +231,7 @@ if ($postAction === 'create' || $postAction === 'update') {
                 }
             }
         } catch (Exception $e) {
-            $errors[] = $e->getMessage();
+            $errors[] = $e instanceof PDOException ? 'The article could not be saved. Please try again.' : $e->getMessage();
         }
     }
 
@@ -237,7 +251,7 @@ if ($postAction === 'create' || $postAction === 'update') {
         } else {
             $_SESSION['flash_success'] = 'Saved as a draft. Visitors cannot see it yet.';
         }
-        header('Location: /admin/news.php');
+        header('Location: '.newsReturnUrl($_POST));
         exit;
     }
 
@@ -245,10 +259,10 @@ if ($postAction === 'create' || $postAction === 'update') {
     // flagged to reopen, and their submitted values preserved.
     $_SESSION['flash_errors'] = $errors;
     $_SESSION['flash_old']    = $_POST;
-    header('Location: /admin/news.php?modal=' . ($isUpdate ? 'edit&id=' . $id : 'create'));
+    header('Location: '.newsReturnUrl($_POST,['modal'=>$isUpdate?'edit':'create','id'=>$isUpdate?$id:null]));
     exit;
 }
 
 // Unknown action
-header('Location: /admin/news.php');
+header('Location: '.newsReturnUrl($_POST));
 exit;

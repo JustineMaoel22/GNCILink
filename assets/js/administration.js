@@ -5,22 +5,37 @@ document.querySelectorAll('[data-hss-flip]').forEach(function (card) {
     });
 });
 
-document.addEventListener("DOMContentLoaded", function() {
-    const observerOptions = {
-        root: null,
-        rootMargin: '0px',
-        threshold: 0.15
-    };
+// Reveal each card once; no scroll handlers or continuously running effects.
+(function () {
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (motion.matches || !('IntersectionObserver' in window)) return;
 
-    const observer = new IntersectionObserver((entries, observer) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('is-visible');
-                observer.unobserve(entry.target);
-            }
+    const elements = document.querySelectorAll('.admin-section .reveal-up, .admin-section .reveal-scale');
+    const observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            const element = entry.target;
+            element.classList.remove('admin-scroll-pending');
+            element.classList.add('admin-scroll-revealing');
+            element.addEventListener('animationend', function finish(event) {
+                if (event.target !== element) return;
+                element.classList.remove('admin-scroll-revealing');
+                element.removeEventListener('animationend', finish);
+            });
+            observer.unobserve(element);
         });
-    }, observerOptions);
+    }, { threshold: 0.08 });
 
-    const animatedElements = document.querySelectorAll('.reveal-up, .reveal-scale');
-    animatedElements.forEach(el => observer.observe(el));
-});
+    elements.forEach(function (element) {
+        element.classList.add('admin-scroll-pending');
+        observer.observe(element);
+    });
+
+    if (motion.addEventListener) motion.addEventListener('change', function () {
+        if (!motion.matches) return;
+        observer.disconnect();
+        elements.forEach(function (element) {
+            element.classList.remove('admin-scroll-pending', 'admin-scroll-revealing');
+        });
+    });
+})();

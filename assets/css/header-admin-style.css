@@ -130,6 +130,7 @@ body {
     font-size: 0.85rem; font-weight: 700; color: var(--gnc-green);
     flex-shrink: 0;
 }
+.sidebar-profile-picture { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .sidebar-user-name { font-size: 0.8rem; font-weight: 600; color: #fff; }
 .sidebar-user-role { font-size: 0.7rem; color: rgba(255,255,255,0.5); }
 .sidebar-logout {
@@ -173,6 +174,24 @@ body {
     transition: background var(--transition);
 }
 .topbar-icon-btn:hover { background: #e8e8e8; }
+.admin-notifications{position:relative}
+.notifications-panel{position:absolute;right:0;top:calc(100% + 12px);width:370px;max-width:calc(100vw - 24px);max-height: min(520px,calc(100dvh - 84px));overflow-y:auto;background:#fff;border:1px solid #e1e7e3;border-radius:var(--admin-card-radius);box-shadow:var(--admin-dialog-shadow);color:#212529}
+.notifications-panel[hidden],.topbar-notif-dot[hidden]{display:none}
+.notifications-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid #e1e7e3}
+.notifications-heading h2{margin:0;font-size:.95rem;font-weight:700}
+.notifications-heading button{border:0;background:transparent;color:var(--gnc-green);font:600 .75rem 'Inter',sans-serif;cursor:pointer;padding:5px 0}
+.notifications-heading button:disabled{color:#68766d;cursor:default}
+.notifications-message{padding:20px 16px;margin:0;font-size:.82rem;color:#56675d;line-height:1.5}
+.notifications-list{list-style:none;margin:0;padding:0}
+.notification-item{display:block;padding:14px 16px;border-bottom:1px solid #edf0ee;color:#212529;text-decoration:none;overflow-wrap:anywhere;line-height:1.5}
+.notification-item strong,.notification-item span,.notification-item small{display:block}
+.notification-item strong{font-size:.8rem;color:var(--gnc-green)}
+.notification-item span{font-size:.8rem;margin-top:3px}
+.notification-item small{font-size:.7rem;color:#56675d;margin-top:5px}
+.notification-item.is-unread{background:#f0f7f2;box-shadow:inset 3px 0 var(--gnc-green)}
+.notification-item:hover{background:#e8f1eb;color:#212529}
+.admin-notifications :focus-visible{outline:2px solid var(--gnc-green);outline-offset:-3px}
+@media(max-width:540px){.notifications-panel{position:fixed;top:calc(var(--topbar-height) + 8px);left:12px;right:12px;width:auto;max-width:none}}
 .topbar-notif-dot {
     position: absolute; top: 6px; right: 6px;
     width: 8px; height: 8px; border-radius: 50%;

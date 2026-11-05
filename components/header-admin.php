@@ -7,6 +7,9 @@
 // Ensure user is logged in before rendering
 requireLogin();
 $currentUser = getCurrentUser();
+require_once __DIR__.'/../includes/profile-picture.php';
+require_once __DIR__.'/../includes/admin-notifications.php';
+$currentProfilePicture=profilePictureUrl((int)$_SESSION['user_id']);
 $currentPage = basename($_SERVER['PHP_SELF'], '.php');
 $csrfToken   = generateCSRFToken();
 
@@ -170,7 +173,7 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
     <div class="sidebar-footer">
         <div class="sidebar-user">
             <div class="sidebar-avatar">
-                <?= strtoupper(substr($currentUser['first_name'] ?? 'A', 0, 1)) ?>
+                <?php if($currentProfilePicture): ?><img class="sidebar-profile-picture" src="<?= htmlspecialchars($currentProfilePicture,ENT_QUOTES,'UTF-8') ?>" alt="Your profile picture"><?php else: ?><?= htmlspecialchars(strtoupper(substr($currentUser['first_name'] ?? 'A', 0, 1)),ENT_QUOTES,'UTF-8') ?><?php endif; ?>
             </div>
             <div>
                 <div class="sidebar-user-name"><?= htmlspecialchars(($currentUser['first_name'] ?? '') . ' ' . ($currentUser['last_name'] ?? '')) ?></div>
@@ -198,14 +201,23 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
     </div>
 
     <div class="topbar-right">
-        <?php if (hasPermission('manage_approvals')): ?>
-        <a href="/admin/submissions.php" class="topbar-icon-btn" title="Pending Approvals" style="text-decoration:none">
-            <i class="bi bi-bell-fill"></i>
-            <?php if (($pendingCount ?? 0) > 0): ?>
-                <span class="topbar-notif-dot"></span>
-            <?php endif; ?>
-        </a>
-        <?php endif; ?>
+        <?php $adminNotifications=adminNotifications(); $notificationEscape=static fn($value)=>htmlspecialchars((string)$value,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8'); ?>
+        <div class="admin-notifications" data-user="<?= (int)$_SESSION['user_id'] ?>">
+            <button type="button" class="topbar-icon-btn" id="notifications-toggle" title="Notifications" aria-label="Notifications" aria-expanded="false" aria-controls="notifications-panel">
+                <i class="bi bi-bell-fill" aria-hidden="true"></i><span class="topbar-notif-dot" hidden></span>
+            </button>
+            <section id="notifications-panel" class="notifications-panel" aria-labelledby="notifications-title" hidden>
+                <div class="notifications-heading"><h2 id="notifications-title">Notifications</h2><button type="button" id="notifications-read">Mark all read</button></div>
+                <?php if($adminNotifications['unavailable']): ?><p class="notifications-message" role="status">Some notifications could not be loaded. Refresh to try again.</p><?php endif; ?>
+                <?php if(!$adminNotifications['items']&&!$adminNotifications['unavailable']): ?><p class="notifications-message">You're all caught up. No notifications right now.</p><?php endif; ?>
+                <ul class="notifications-list">
+                <?php foreach($adminNotifications['items'] as $notification): ?>
+                    <li><a class="notification-item" data-notification-key="<?= $notificationEscape($notification['key']) ?>" href="<?= $notificationEscape($notification['url']) ?>"><strong><?= $notificationEscape($notification['title']) ?></strong><span><?= $notificationEscape($notification['detail']) ?></span><?php if($notification['date']): ?><small><?= $notificationEscape(date('M j, Y, g:i A',strtotime($notification['date']))) ?></small><?php endif; ?></a></li>
+                <?php endforeach; ?>
+                </ul>
+            </section>
+        </div>
+        <script src="/assets/js/admin-notifications.js?v=<?= (int)filemtime(__DIR__.'/../assets/js/admin-notifications.js') ?>" defer></script>
         <a href="/" target="_blank" class="topbar-icon-btn" title="View Public Site" style="text-decoration:none">
             <i class="bi bi-box-arrow-up-right"></i>
         </a>

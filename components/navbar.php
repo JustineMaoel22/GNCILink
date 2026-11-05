@@ -254,7 +254,7 @@ $studentLifeGroups = [
     ]],
     ['heading' => 'Our Community', 'items' => [
         ['label' => 'Student Achievements', 'href' => '/pages/student%20life/student-achievement.php'],
-        ['label' => 'Alumni', 'href' => '/coming-soon.php'],
+        ['label' => 'Alumni', 'href' => '/pages/alumni.php'],
     ]],
 ];
 

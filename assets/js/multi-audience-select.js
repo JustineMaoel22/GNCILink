@@ -218,11 +218,12 @@
             }
 
             // Click outside to close
-            document.addEventListener('click', (e) => {
+            this.outsideClick = (e) => {
                 if (this.wrapper && !this.wrapper.contains(e.target)) {
                     this.closeDropdown();
                 }
-            });
+            };
+            document.addEventListener('click', this.outsideClick);
         }
 
         toggleDropdown() {
@@ -373,6 +374,11 @@
             this.syncCheckboxesState();
             this.updateTags();
             if (triggerChange) this.fireChange();
+        }
+
+        destroy() {
+            document.removeEventListener('click', this.outsideClick);
+            if (this.wrapper) this.wrapper._gncMsInstance = null;
         }
 
         getSelected() {

@@ -406,7 +406,7 @@ $photoFallback  = '/assets/images/logos/gnc-logo-v1.svg';
     <link href="/assets/css/navbar-style.css" rel="stylesheet">
     <link href="/assets/css/footer-style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-    <link href="/assets/css/administration-style.css?v=8" rel="stylesheet">
+    <link href="/assets/css/administration-style.css?v=<?= filemtime(__DIR__ . '/../../assets/css/administration-style.css') ?>" rel="stylesheet">
     <link href="/assets/css/skeleton-style.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
@@ -414,15 +414,6 @@ $photoFallback  = '/assets/images/logos/gnc-logo-v1.svg';
 
     <?php $activeSection = 'about'; ?>
     <?php include_once __DIR__ . '/../../components/navbar.php'; ?>
-
-    <!-- Opening transition: panels wipe up to reveal the page (pure CSS, never blocks clicks) -->
-    <div class="admin-open" aria-hidden="true">
-        <i style="--n:0"></i><i style="--n:1"></i><i style="--n:2"></i><i style="--n:3"></i><i style="--n:4"></i><i style="--n:5"></i>
-        <div class="admin-open-label">
-            <img src="/assets/images/logos/gnc-logo-v1.svg" alt="">
-            <span>Administration</span>
-        </div>
-    </div>
 
     <section class="admin-intro">
         <div class="admin-hero">
@@ -483,7 +474,7 @@ $photoFallback  = '/assets/images/logos/gnc-logo-v1.svg';
 
                                     <div class="hss-front-body">
                                         <div class="hss-photo">
-                                            <img src="<?= htmlspecialchars($office['image'] ?: $photoFallback); ?>" alt="<?= htmlspecialchars($office['name']); ?>"<?= !empty($office['id']) ? ceMark('data-ve-img="office-photo" data-ve-id="' . (int)$office['id'] . '"') : '' ?>>
+                                            <img src="<?= htmlspecialchars($office['image'] ?: $photoFallback); ?>" alt="<?= htmlspecialchars($office['name']); ?>" loading="<?= $i < 2 ? 'eager' : 'lazy' ?>" decoding="async"<?= !empty($office['id']) ? ceMark('data-ve-img="office-photo" data-ve-id="' . (int)$office['id'] . '"') : '' ?>>
                                         </div>
 
                                         <ul class="hss-contact-list">
@@ -578,7 +569,7 @@ $photoFallback  = '/assets/images/logos/gnc-logo-v1.svg';
 
                             <div class="admin-photo-card">
                                 <div class="skeleton-wrap" style="height: 100%;">
-                                    <img src="<?= htmlspecialchars($person['image'] ?: $photoFallback); ?>" alt="<?= htmlspecialchars($person['name']); ?>"<?= !empty($person['id']) ? ceMark('data-ve-img="person-photo" data-ve-id="' . (int)$person['id'] . '"') : '' ?>>
+                                    <img src="<?= htmlspecialchars($person['image'] ?: $photoFallback); ?>" alt="<?= htmlspecialchars($person['name']); ?>" loading="<?= $i < 4 ? 'eager' : 'lazy' ?>" decoding="async"<?= !empty($person['id']) ? ceMark('data-ve-img="person-photo" data-ve-id="' . (int)$person['id'] . '"') : '' ?>>
                                 </div>
 
                                 <div class="admin-wave" aria-hidden="true">
@@ -610,6 +601,6 @@ $photoFallback  = '/assets/images/logos/gnc-logo-v1.svg';
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="/assets/js/skeleton-loader.js"></script>
-    <script src="/assets/js/administration.js"></script>
+    <script src="/assets/js/administration.js?v=<?= filemtime(__DIR__ . '/../../assets/js/administration.js') ?>"></script>
 </body>
 </html>

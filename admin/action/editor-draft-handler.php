@@ -53,7 +53,7 @@ try {
         $draft=editorDraftLoad($db,$userId,$key);
         if(!$draft||(int)$draft['revision']!==$revision)edReply(['error'=>'Save the draft before submitting it.'],409);
         $resubmit=0;
-        if($reviewId){$old=rbacGetSubmission($reviewId);if($old&&(int)$old['user_id']===$userId&&in_array($old['status'],['draft','rejected','failed'],true))$resubmit=$reviewId;}
+        if($reviewId){$old=rbacGetSubmission($reviewId);if($old&&(int)$old['user_id']===$userId&&in_array($old['status'],['draft','rejected','needs_revision','failed'],true))$resubmit=$reviewId;}
         $id=rbacSaveSubmission('snapshot','/admin/content-edit.php','Page changes: '.$page,['page'=>$page,'route'=>$route,'snapshot'=>$draft['snapshot']],0,$resubmit);
         edReply(['success'=>true,'submission_id'=>$id,'message'=>'Submitted for Super Admin approval. Visitors still see the published page.']);
     }

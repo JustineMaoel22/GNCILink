@@ -42,9 +42,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if((row.title||'').length>500||(row.location||'').length>500||(row.description||'').length>10000)issues.push('An event field is too long.');
         if(!dateValid(row.start_date)||(row.end_date&&!dateValid(row.end_date)))issues.push('Enter valid dates (1900–2050).');
         if(!categories.some(cat=>String(cat.category_id)===String(row.category_id)))issues.push('Choose a category.');
-        if(row.dept_id?.startsWith?.('group:')){if(!groupsReady||!['group:basic-education','group:college'].includes(row.dept_id)||row.program!=='ALL')issues.push('Choose a valid department group with all programs.');}
-        else if(row.dept_id&&(!departmentsReady||!departments.some(dept=>String(dept.dept_id)===String(row.dept_id))))issues.push('Choose an available department.');
-        if(row.program&&row.program!=='ALL'&&!programs.some(program=>program.code===row.program&&(!row.dept_id||String(program.dept_id)===String(row.dept_id))))issues.push('Choose a program in the selected department.');
+        const selectedDepartments=departmentIds(row),selectedPrograms=programIds(row);
+        if(row.dept_id?.startsWith?.('group:')&&!Array.isArray(row.dept_ids)&&!groupsReady)issues.push('Choose valid departments.');
+        if(selectedDepartments.some(id=>!departmentsReady||!departments.some(dept=>String(dept.dept_id)===id)))issues.push('Choose available departments.');
+        if(selectedPrograms.some(code=>!programs.some(program=>program.code===code&&(!selectedDepartments.length||selectedDepartments.includes(String(program.dept_id))))))issues.push('Choose College or Graduate School programs in the selected departments.');
         for(const key of ['start_time','end_time'])if(row[key]&&!timeValid(row[key]))issues.push('Correct the event time.');
         const start=`${row.start_date} ${row.start_time||'00:00'}`, end=row.end_date||(row.end_time?row.start_date:'');
         if(end&&`${end} ${row.end_time||'00:00'}`<start)issues.push('End must be after the start.');
@@ -58,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(/date is missing|invalid date range/i.test(message))return !dateValid(row.start_date)||!!(row.end_date&&!dateValid(row.end_date));
             if(/time is unclear|time is tba|time range|several time/i.test(message))return !row.timeCorrected;
             if(/location is marked as tba/i.test(message))return /^(?:tba|tbd|to be announced|to be determined|\?+)$/i.test((row.location||'').trim());
-            if(/several departments/i.test(message))return !row.dept_id&&(!row.program||row.program==='ALL');
+            if(/several departments/i.test(message))return !departmentIds(row).length&&!programIds(row).length;
             return true;
         })])];
     }
@@ -86,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return (!q||haystack.includes(q))
                 &&(!$('ciMonth').value||row.start_date?.slice(5,7)===$('ciMonth').value)
                 &&(!$('ciYear').value||row.start_date?.slice(0,4)===$('ciYear').value)
-                &&(!deptFilter||(deptFilter==='general'?!row.dept_id:String(row.dept_id)===deptFilter))
+                &&(!deptFilter||(deptFilter==='general'?!departmentIds(row).length:departmentIds(row).includes(deptFilter)))
                 &&(!$('ciCategory').value||($('ciCategory').value==='uncategorized'?!row.category_id:String(row.category_id)===$('ciCategory').value))
                 &&(!$('ciStatus').value||state(row)===$('ciStatus').value)
                 &&(!$('ciWarningsOnly').checked||warnings(row).length);
@@ -155,6 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(key==='dept_id')row.audience_group='all';
         row[key]=value;row.include=false;row.reviewed=false;if(['start_time','end_time'].includes(key))row.timeCorrected=true;dirty=true;updateSummary();
         const badge=body.querySelector(`tr[data-row-index="${row.index}"] .ci-badge`);if(badge){badge.textContent=label(row);badge.className=`ci-badge ${state(row)}`;}
+        const approveButton=body.querySelector(`tr[data-row-index="${row.index}"] .ci-approve-action`);if(approveButton){approveButton.textContent='Approve';approveButton.className='btn btn-sm btn-outline-success ci-approve-action';}
         const list=body.querySelector('.ci-editor [data-editor-issues]');if(list)list.replaceChildren(...warnings(row).map(message=>el('li',message)));
     }
     function categorySelect(row) {
@@ -175,7 +177,25 @@ document.addEventListener('DOMContentLoaded', () => {
         programs.filter(program=>!department||String(program.dept_id)===String(department)).forEach(program=>input.append(new Option(`${program.code} — ${program.name}`,program.code)));
         input.value=value||'ALL';if(input.selectedIndex<0)input.value='ALL';
     }
-    const audienceName=row=>[({'group:basic-education':'All Basic Education','group:college':'All College'})[row.dept_id]||departments.find(dept=>String(dept.dept_id)===String(row.dept_id))?.dept_name,row.program&&row.program!=='ALL'?row.program:''].filter(Boolean).join(' · ');
+    function departmentIds(row){
+        if(Array.isArray(row.dept_ids))return row.dept_ids.map(String);
+        const group=String(row.dept_id||'');
+        if(group.startsWith('group:'))return departments.filter(dept=>group==='group:basic-education'?dept.department_type==='basic-education':dept.department_type!=='basic-education'&&dept.slug!=='graduate-school'&&dept.dept_name!=='Graduate School').map(dept=>String(dept.dept_id));
+        return row.dept_id?[String(row.dept_id)]:[];
+    }
+    const programIds=row=>Array.isArray(row.programs)?row.programs:row.program&&row.program!=='ALL'?[row.program]:[];
+    function setAudience(row,deptIds,codes){
+        row.dept_ids=[...new Set(deptIds.map(String))];row.programs=[...new Set(codes)];row.audience_group='all';
+        row.dept_id=row.dept_ids.length===1?row.dept_ids[0]:'';
+        change(row,'program',row.programs.length===1?row.programs[0]:'ALL');
+        const main=body.querySelector(`tr[data-row-index="${row.index}"]`);let pill=main?.querySelector('.ci-dept-pill');
+        if(main&&!pill){let meta=main.querySelector('.ci-meta-details');if(!meta){meta=el('div',undefined,'ci-meta-details');main.querySelector('.ci-title').parentElement.append(meta);}pill=el('span',undefined,'ci-detail-pill ci-dept-pill');meta.append(pill);}
+        if(pill)pill.textContent=audienceName(row)||'All departments / All programs';
+    }
+    const audienceName=row=>{
+        if(!Array.isArray(row.dept_ids)&&String(row.dept_id).startsWith('group:'))return row.dept_id==='group:basic-education'?'All Basic Education':'All College';
+        return [...departmentIds(row).map(id=>departments.find(dept=>String(dept.dept_id)===id)?.dept_name||id),...programIds(row)].join(' / ');
+    };
     function approve(targets,cleanOnly=false,individual=false) {
         let accepted=0,skipped=0;
         for(const row of targets){
@@ -224,8 +244,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 primary.description=[primary.description,other.description].filter(Boolean).join('\n');
             }
             if(!primary.category_id&&other.category_id)primary.category_id=other.category_id;
-            if(!primary.dept_id&&other.dept_id){primary.dept_id=other.dept_id;primary.program=other.program||'ALL';}
-            else if((!primary.program||primary.program==='ALL')&&other.program&&other.program!=='ALL'&&(!other.dept_id||String(other.dept_id)===String(primary.dept_id)))primary.program=other.program;
+            if(Array.isArray(primary.dept_ids)||Array.isArray(other.dept_ids)||Array.isArray(primary.programs)||Array.isArray(other.programs)){
+                const ids=[...new Set([...departmentIds(primary),...departmentIds(other)])],codes=[...new Set([...programIds(primary),...programIds(other)])];
+                primary.dept_ids=ids;primary.programs=codes;primary.dept_id=ids.length===1?ids[0]:'';primary.program=codes.length===1?codes[0]:'ALL';primary.audience_group='all';
+            } else {
+                if(!primary.dept_id&&other.dept_id){primary.dept_id=other.dept_id;primary.program=other.program||'ALL';}
+                else if((!primary.program||primary.program==='ALL')&&other.program&&other.program!=='ALL'&&(!other.dept_id||String(other.dept_id)===String(primary.dept_id)))primary.program=other.program;
+            }
             if(!primary.event_id&&other.event_id){primary.event_id=other.event_id;primary.action=other.action;}
             primary.source=[primary.source,other.source].filter(Boolean).join('\n');
         }
@@ -291,18 +316,26 @@ document.addEventListener('DOMContentLoaded', () => {
             input.addEventListener('input',()=>{input.classList.remove('ci-field-flagged');change(row,key,input.value);});wrapper.append(input);grid.append(wrapper);
         }
         if(row.action!=='archive'){
-            const departmentLabel=el('label'),department=el('select',undefined,'form-select form-select-sm');department.dataset.field='dept_id';
-            departmentLabel.append(el('span','Department'));
-            if(flags.has('dept_id')){departmentLabel.append(el('span','Needs review','ci-flag-inline'));department.classList.add('ci-field-flagged');}
-            const programLabel=el('label','Program (optional)'),program=el('select',undefined,'form-select form-select-sm');program.dataset.field='program';
-            fillDepartments(department,row.dept_id);fillPrograms(program,row.dept_id,row.program);
-            department.addEventListener('change',()=>{department.classList.remove('ci-field-flagged');change(row,'dept_id',department.value);fillPrograms(program,department.value,row.program);if(program.value!==row.program)change(row,'program',program.value);render();});
-            program.addEventListener('change',()=>{change(row,'program',program.value);render();});
-            departmentLabel.append(department);if(!departmentsReady)departmentLabel.append(el('small','Run database/migrate-event-departments.php to enable departments.','text-muted'));
-            programLabel.append(program);grid.append(departmentLabel,programLabel);
+            const departmentLabel=el('div',undefined,'ci-wide'),department=el('div');department.id='ci-departments-'+row.index;
+            const deptHeading=el('label','Departments');deptHeading.id='ci-departments-label-'+row.index;departmentLabel.append(deptHeading,department);
+            const programLabel=el('div',undefined,'ci-wide'),program=el('div');program.id='ci-programs-'+row.index;
+            const programHeading=el('label','Academic programs (College and Graduate School only)');programHeading.id='ci-programs-label-'+row.index;programLabel.append(programHeading,program);
+            const selectedDepartments=departmentIds(row);
+            const availablePrograms=ids=>programs.filter(item=>!ids.length||ids.includes(String(item.dept_id))).map(item=>({value:item.code,label:item.name,badge:item.code}));
+            const programPicker=new GncMultiSelect(program,{name:'ci-programs[]',allLabel:'All programs',items:availablePrograms(selectedDepartments),initialValues:programIds(row),onChange:codes=>setAudience(row,departmentPicker.getSelected(),codes)});
+            const departmentPicker=new GncMultiSelect(department,{name:'ci-departments[]',allLabel:'All departments',items:departments.map(item=>({value:String(item.dept_id),label:item.dept_name})),initialValues:selectedDepartments,onChange:ids=>{
+                const items=availablePrograms(ids),allowed=new Set(items.map(item=>item.value)),codes=programPicker.getSelected().filter(code=>allowed.has(code));
+                programPicker.config.items=items;programPicker.renderOptions();
+                programPicker.allCheckbox.addEventListener('change',()=>{if(programPicker.allCheckbox.checked)programPicker.deselectAll();else programPicker.syncCheckboxesState();});
+                programPicker.setSelected(codes,false);programPicker.filterOptions(programPicker.searchInput.value);
+                setAudience(row,ids,codes);
+            }});
+            departmentLabel.append(el('small','Select several departments, or leave empty for all departments.','text-muted'));
+            programLabel.append(el('small','Select several programs. Basic Education is targeted through its departments.','text-muted'));
+            grid.append(departmentLabel,programLabel);
             const wrapper=el('label','Save action','ci-wide'),target=el('select',undefined,'form-select form-select-sm');target.append(new Option('Add new event',0));
             existing.forEach(event=>target.append(new Option(`Update #${event.event_id}: ${event.title} (${event.start_date.slice(0,10)})`,event.event_id)));target.value=row.event_id||0;
-            target.addEventListener('change',()=>{change(row,'event_id',Number(target.value));const old=existing.find(event=>Number(event.event_id)===row.event_id);if(old){row.category_id=old.category_id;row.dept_id=old.audience_group&&old.audience_group!=='all'?'group:'+old.audience_group:old.dept_id||'';row.audience_group='all';row.program=old.program||'ALL';}render();});wrapper.append(target);grid.append(wrapper);
+            target.addEventListener('change',()=>{change(row,'event_id',Number(target.value));const old=existing.find(event=>Number(event.event_id)===row.event_id);if(old){row.category_id=old.category_id;row.dept_id=old.audience_group&&old.audience_group!=='all'?'group:'+old.audience_group:old.dept_id||'';row.audience_group='all';row.program=old.program||'ALL';delete row.dept_ids;delete row.programs;if(Array.isArray(old.dept_ids))row.dept_ids=[...old.dept_ids];if(Array.isArray(old.programs))row.programs=[...old.programs];}render();});wrapper.append(target);grid.append(wrapper);
         }
         td.append(grid);const list=el('ul',undefined,'small mt-3 mb-2');list.dataset.editorIssues='';list.setAttribute('aria-live','polite');warnings(row).forEach(message=>list.append(el('li',message)));td.append(list);
         const source=el('details',undefined,'small my-2');source.append(el('summary','Document source and previous values'),el('p',row.source||''));if(row.previous)source.append(el('p',`Previously: ${row.previous.title}; ${row.previous.start_date}; ${row.previous.location||''}; ${row.previous.description||''}`));td.append(source);
@@ -334,6 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function render() {
         const years=new Set(Array.from($('ciYear').options,option=>option.value));
         rows.forEach(row=>{const year=row.start_date?.slice(0,4);if(year&&!years.has(year)){years.add(year);$('ciYear').append(new Option(year,year));}});
+        body.querySelectorAll('.gnc-ms-wrap').forEach(wrap=>wrap._gncMsInstance?.destroy());
         body.replaceChildren();const filtered=matches(),visible=pageRows();
         visible.forEach(row=>{
             const tr=el('tr');tr.dataset.rowIndex=row.index;
@@ -399,7 +433,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const category=el('td');category.append(categorySelect(row));
             const status=el('td');status.append(el('span',label(row),`ci-badge ${state(row)}`));
-            const action=el('td',undefined,'ci-row-actions');
+            const actionCell=el('td',undefined,'ci-actions-cell'),action=el('div',undefined,'ci-row-actions');
+            actionCell.append(action);
             if(!row.excluded){
                 const quickApprove=button(
                     row.include?'Approved ✓':'Approve',
@@ -415,6 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     row.include?'btn btn-sm btn-success':'btn btn-sm btn-outline-success'
                 );
                 quickApprove.title=row.include?'Click to unapprove':'Approve this activity for import';
+                quickApprove.classList.add('ci-approve-action');
                 action.append(quickApprove);
             }
             const edit=button(editing===row.index?'Close':'Edit',()=>{editing=editing===row.index?null:row.index;render();});
@@ -429,19 +465,20 @@ document.addEventListener('DOMContentLoaded', () => {
             removeBtn.title='Remove this entry from the import preview';
             action.append(removeBtn);
 
-            tr.append(checkCell,title,dates,category,status,action);body.append(tr);if(editing===row.index)body.append(editor(row));
+            tr.append(checkCell,title,dates,category,status,actionCell);body.append(tr);if(editing===row.index)body.append(editor(row));
         });
+        if(editing!==null&&document.getElementById('ci-departments-'+editing))GncAdminFormAudience.enhance([['ci-departments-'+editing,'ci-departments-label-'+editing,'Search departments'],['ci-programs-'+editing,'ci-programs-label-'+editing,'Search programs']]);
         if(!visible.length){const tr=el('tr'),td=el('td','No activities match these filters.','text-center text-muted py-4');td.colSpan=6;tr.append(td);body.append(tr);}
         $('ciPageInfo').textContent=`Showing ${filtered.length?(page-1)*pageSize()+1:0}–${Math.min(page*pageSize(),filtered.length)} of ${filtered.length} matching · ${rows.length} total · Page ${page} of ${Math.max(1,Math.ceil(filtered.length/pageSize()))}`;
         $('ciPrevious').disabled=page===1;$('ciNext').disabled=page*pageSize()>=filtered.length;updateSummary();
     }
     function setStep(next) {
-        if(busy||(next>1&&!token)||management)return;if(step!==next)show('calendarImportError',false);step=next;
-        show('calendarImportUpload',step===1);show('calendarImportManagement',step===1);show('calendarImportPreview',step===2||step===3);show('ciFinal',step===4);show('calendarImportSummary',!!token);show('ciBack',step>1);show('ciContinue',step<4&&!!token);show('calendarImportConfirm',step===4);
+        if(busy||next<1||next>3||(next>1&&!token)||management)return;if(step!==next)show('calendarImportError',false);step=next;
+        show('calendarImportUpload',step===1);show('calendarImportManagement',step===1);show('calendarImportPreview',step===2);show('ciFinal',step===3);show('calendarImportSummary',!!token);show('ciBack',step>1);show('ciContinue',step<3&&!!token);show('calendarImportConfirm',step===3);
         document.querySelectorAll('[data-ci-step]').forEach(node=>{const number=Number(node.dataset.ciStep);node.classList.toggle('active',number===step);node.disabled=number>1&&!token;node.removeAttribute('aria-current');if(number===step)node.setAttribute('aria-current','step');});
-        $('calendarImportReviewHeading').textContent=step===3?'Verify and approve activities':'Review extracted activities';
-        $('calendarImportReviewHelp').textContent=step===3?'Click any summary card above to filter by status. Once all desired activities are Approved, continue to confirm import.':'Clean activities have been automatically approved! Click "Needs Review" above to inspect any flagged items, or use Edit, Merge, Separate, and Remove as needed.';
-        $('ciContinue').textContent=step===2?'Continue to verification':step===3?'Review final summary':'Continue review';render();
+        $('calendarImportReviewHeading').textContent='Review and approve activities';
+        $('calendarImportReviewHelp').textContent='Clean activities are automatically approved. Use Needs Review to inspect flagged items, correct details with Edit, and approve the activities you want to import. Pending and excluded activities are left out. Continue to the final summary when ready.';
+        $('ciContinue').textContent=step===2?'Review final summary':'Continue review';render();
     }
     async function request(action,data=new FormData(),useToken=token) {
         data.set('ajax_action',action);data.set('csrf_token',$('csrfToken').value);if(useToken)data.set('import_token',useToken);
@@ -539,7 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('ciBulkDepartment').addEventListener('change',()=>fillPrograms($('ciBulkProgram'),$('ciBulkDepartment').value,$('ciBulkProgram').value));
     $('ciApplyAudience').addEventListener('click',()=>{
         const targets=rows.filter(row=>selected.has(row.index)&&row.action!=='archive');
-        targets.forEach(row=>{change(row,'dept_id',$('ciBulkDepartment').value);change(row,'program',$('ciBulkProgram').value);});
+        targets.forEach(row=>{delete row.dept_ids;delete row.programs;change(row,'dept_id',$('ciBulkDepartment').value);change(row,'program',$('ciBulkProgram').value);if(!String(row.dept_id).startsWith('group:')){row.dept_ids=row.dept_id?[String(row.dept_id)]:[];row.programs=row.program!=='ALL'?[row.program]:[];}});
         feedback(`Department/program changed for ${targets.length} activities. Review them before approving.`);render();
     });
     $('calendarImportSelectValid').addEventListener('click',()=>approve(rows.filter(row=>!row.excluded&&!row.include),true));
@@ -559,10 +596,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     $('calendarManageArchive').addEventListener('click',()=>manageCalendar('archive'));$('calendarManageDelete')?.addEventListener('click',()=>manageCalendar('delete'));$('calendarManageReviewed').addEventListener('change',updateSummary);
     confirm.addEventListener('click',async()=>{
-        if(busy||confirm.disabled||(!management&&step!==4))return;busy=true;updateSummary();show('calendarImportError',false);confirm.textContent='Saving…';
+        if(busy||confirm.disabled||(!management&&step!==3))return;busy=true;updateSummary();show('calendarImportError',false);confirm.textContent='Saving…';
         try{
             const data=new FormData();if(management)data.set('reviewed_all',$('calendarManageReviewed').checked?'1':'0');
-            const fields=['source_index','action','event_id','title','description','location','start_date','end_date','start_time','end_time','category_id','dept_id','program','include','reviewed'];
+            const fields=['source_index','action','event_id','title','description','location','start_date','end_date','start_time','end_time','category_id','dept_id','program','dept_ids','programs','include','reviewed'];
             data.set('import_rows',JSON.stringify(rows.map(row=>Object.fromEntries(fields.map(key=>[key,row[key]])))));data.set('import_status',$('ciImportStatus')?.value||'draft');
             const result=await request('import_confirm',data);finished=true;dirty=false;sessionStorage.setItem('calendarImportMessage',result.message);window.location.reload();
         }catch(e){showError(e.message);}finally{busy=false;updateSummary();confirm.textContent=management?(management==='delete'?'Confirm Delete Calendar':'Confirm Archive Calendar'):'Confirm Import';}
@@ -573,7 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     modal.addEventListener('hidden.bs.modal',()=>{
         const oldToken=token;token='';rows=[];selected.clear();categories=[];existing=[];management='';editing=null;dirty=false;finished=false;allowClose=false;page=1;if(oldToken)request('import_cancel',new FormData(),oldToken).catch(()=>{});
-        show('calendarManagePreview',false);show('calendarImportError',false);confirm.classList.remove('btn-danger');confirm.classList.add('btn-gnc-gold');confirm.textContent='Confirm Import';$('ciFeedback').textContent='';$('calendarImportFileStatus').textContent='Step 1 of 4 · Choose your calendar document to get started.';updateSelectedFileMeta(null);setStep(1);
+        show('calendarManagePreview',false);show('calendarImportError',false);confirm.classList.remove('btn-danger');confirm.classList.add('btn-gnc-gold');confirm.textContent='Confirm Import';$('ciFeedback').textContent='';$('calendarImportFileStatus').textContent='Step 1 of 3 · Choose your calendar document to get started.';updateSelectedFileMeta(null);setStep(1);
     });
     window.addEventListener('beforeunload',event=>{if(dirty&&!finished){event.preventDefault();event.returnValue='';}});setStep(1);
 });

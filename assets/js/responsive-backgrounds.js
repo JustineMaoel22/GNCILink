@@ -30,7 +30,7 @@
         const selector=selectorFor(node)+pseudo;
         const source=kind==='image'?localImage(node.getAttribute('src')||''):sourceOf(css.backgroundImage)||localImage(node.getAttribute('data-bg')||'');
         const configured=published[selector]||changes[selector];
-        const emptyEditable=node.matches('.career-panel-bg,[data-ve-sports-background-area]')||(kind==='image'&&node.parentElement?.matches('[data-dept-banner-image]'));
+        const emptyEditable=node.matches('.career-panel-bg,[data-ve-sports-background-area],[data-ve-alumni-qr]')||(kind==='image'&&node.parentElement?.matches('[data-dept-banner-image]'));
         if((!source&&!configured&&!emptyEditable)||(kind==='image'&&!imageBackground(node)))return null;
         if(!targets.has(selector)||targets.get(selector).node!==node)targets.set(selector,{selector,node,pseudo,kind,source,layers:css.backgroundImage==='none'&&source?'url('+JSON.stringify(source)+')':css.backgroundImage,position:kind==='image'?css.objectPosition:css.backgroundPosition,fit:kind==='image'?css.objectFit:css.backgroundSize});
         return targets.get(selector);
@@ -60,6 +60,7 @@
         return Array.from(targets.values()).find(item=>item.node.isConnected&&node.contains(item.node))||register(node.querySelector?.('.career-panel-bg,[data-ve-sports-background-area]'))||null;
     }
     function value(selector,currentDevice=device()){
+        if(resolve(selector)?.node.hasAttribute('data-shared-image'))currentDevice='desktop';
         return Object.prototype.hasOwnProperty.call(changes[selector]||{},currentDevice)?changes[selector][currentDevice]?.value:published[selector]?.[currentDevice]||null;
     }
     function frame(target,currentDevice=device()){

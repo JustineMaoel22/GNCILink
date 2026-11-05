@@ -13,7 +13,7 @@
             const image = el('modal-image-input'), gallery = el('modal-gallery-input'), link = el('facebook-link');
             let baseline = '', opened = false, submitting = false, allowClose = false, confirming = false;
             const fields = [title, image, gallery, link, news ? el('modal-author') : null].filter(Boolean);
-            const audienceIds = news ? [] : ['modal-dept-multiselect', 'modal-program-multiselect'];
+            const audienceIds = news ? [] : ['modal-category-multiselect', 'modal-dept-multiselect', 'modal-program-multiselect'];
             editor.setAttribute('aria-labelledby', 'ann-message-label');
             editor.setAttribute('aria-describedby', 'ann-message-help ann-message-error');
             editor.setAttribute('aria-required', 'true');
@@ -100,6 +100,7 @@
                 editor.removeAttribute('aria-invalid'); el('modal-content-editor').classList.remove('ann-message-invalid'); el('ann-message-error').textContent = '';
                 alert.classList.add('d-none');
                 if (!news) window.GncAdminFormAudience.enhance([
+                    ['modal-category-multiselect', 'ann-category-label', 'Search categories…'],
                     ['modal-dept-multiselect', 'ann-dept-label', 'Search departments…'],
                     ['modal-program-multiselect', 'ann-program-label', 'Search academic programs…']
                 ]);

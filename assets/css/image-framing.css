@@ -4,6 +4,7 @@
 .image-frame-help { margin: 0 0 18px; color: #55655c; }
 .image-frame-preview { position: relative; width: min(100%,calc(55dvh * var(--image-frame-ratio,1.77778))); margin-inline: auto; overflow: hidden; background: #e6ebe7; border-radius: 8px; touch-action: none; cursor: grab; user-select: none; outline-offset: 3px; }
 .image-frame-preview.is-dragging { cursor: grabbing; }
+.image-frame-preview.image-frame-preview-circle { border-radius: 50%; }
 .image-frame-preview img { position: absolute; display: block; max-width: none !important; max-height: none !important; object-fit: fill !important; pointer-events: none; user-select: none; transform: none !important; }
 .image-frame-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 .image-frame-controls input { flex: 1; min-width: 80px; accent-color: #1f5e2c; }

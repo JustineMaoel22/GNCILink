@@ -22,7 +22,7 @@ function rbacRouteAllowed(string $role, string $route): bool {
     return in_array($route, ['/admin/admin-dash.php','/admin/settings.php','/admin/account-password.php','/admin/announcement.php','/admin/news.php','/admin/submissions.php','/admin/facebook-posts.php',
         '/admin/action/create-announcement.php','/admin/action/create-news.php','/admin/auth/logout.php',
         '/admin/action/content-completeness-handler.php','/admin/change-password.php',
-        '/admin/help.php','/admin/action/onboarding-handler.php'],true);
+        '/admin/help.php','/admin/action/onboarding-handler.php','/admin/action/profile-picture-handler.php'],true);
 }
 function rbacRequestRoute(): string {
     $file=realpath($_SERVER['SCRIPT_FILENAME'] ?? '');

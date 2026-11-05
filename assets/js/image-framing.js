@@ -41,7 +41,7 @@
         // The editor and its iframe have separate API instances. A framed
         // background uses pixel sizes, so the other instance cannot rely on
         // background-size: cover to recognize it as an editable crop.
-        if (framed.has(el) || el.hasAttribute('data-image-framed')) return true;
+        if (framed.has(el) || el.hasAttribute('data-image-framed') || el.hasAttribute('data-responsive-background-active')) return true;
         const css = el.ownerDocument.defaultView.getComputedStyle(el);
         return el.tagName === 'IMG' ? css.objectFit === 'cover' || (css.objectFit === 'contain' && fitOf(el) === 'contain') : css.backgroundSize.split(',').some(size => size.trim() === 'cover');
     }
@@ -198,6 +198,7 @@
         if(text!==undefined)el.textContent=text;return el;
     }
     function baseRatio(target,input) {
+        if(input&&input.getAttribute('data-image-frame-shape')==='circle')return 1;
         if ((input && input.getAttribute('data-image-frame-ratio') === 'natural') ||
             (target && target.closest('[data-image-frame-ratio="natural"]'))) return null;
         // Sports images can extend beyond their clipped card; crop to the visible card.
@@ -215,7 +216,7 @@
         try { return window.VEImageFraming || (window.parent !== window && window.parent.VEImageFraming) || null; }
         catch (_) { return null; }
     }
-    async function dialog({src,target=null,ratio=16/9,file=null,fit=fitOf(target)}) {
+    async function dialog({src,target=null,ratio=16/9,file=null,fit=fitOf(target),shape=null}) {
         if(!file&&target){try{const editor=visualEditor();if(editor&&editor.background&&editor.background(target))return null;}catch(_){}}
         const picture=await natural(src), original=current(target,src), value=copy(original), undo=snapshot(target);
         if (ratio === null) ratio = picture.naturalWidth / picture.naturalHeight;
@@ -227,6 +228,7 @@
             const help=element('p',{class:'image-frame-help'},'Drag the photo to position it. Use + and − to zoom. The frame keeps its aspect ratio.');
             const preview=element('div',{class:'image-frame-preview',tabindex:'0','aria-label':'Image preview. Drag to move the image, or use the arrow keys.'});
             preview.style.aspectRatio=String(ratio);preview.style.setProperty('--image-frame-ratio',String(ratio));
+            if(shape==='circle')preview.classList.add('image-frame-preview-circle');
             const img=element('img',{src,alt:'',draggable:'false'});preview.append(img);
             const controls=element('div',{class:'image-frame-controls'});
             const minus=element('button',{type:'button','aria-label':'Zoom out'},'−'), plus=element('button',{type:'button','aria-label':'Zoom in'},'+');
@@ -401,7 +403,7 @@
                 const assignedTarget=uploadTargets.get(input);
                 const target=findTarget(assignedTarget)||assignedTarget||findTarget(input.closest('form,.modal,.card')||input.parentElement);
                 input._gncFramingCancelled=false;
-                for(const file of pictures){if(files.has(file))continue;const src=nativeObjectURL(file);sources.set(src,file);const value=await dialog({src,target:null,file,ratio:baseRatio(target,input),fit:fitOf(target)});URL.revokeObjectURL(src);sources.delete(src);if(!value){input._gncFramingCancelled=true;input.value='';break;}}
+                for(const file of pictures){if(files.has(file))continue;const src=nativeObjectURL(file);sources.set(src,file);const value=await dialog({src,target:null,file,ratio:baseRatio(target,input),fit:fitOf(target),shape:input.getAttribute('data-image-frame-shape')});URL.revokeObjectURL(src);sources.delete(src);if(!value){input._gncFramingCancelled=true;input.value='';break;}}
                 input._gncInternalChange=true;
                 try{input.dispatchEvent(new Event('change',{bubbles:true}));}finally{input._gncInternalChange=false;}
             }).catch(err=>{console.error('Image framing:',err);input._gncFramingCancelled=true;input.value='';input._gncInternalChange=true;try{input.dispatchEvent(new Event('change',{bubbles:true}));}finally{input._gncInternalChange=false;}});

@@ -717,12 +717,85 @@
       @media (max-height: 560px) {
         #zoom button { width: 36px; height: 36px; }
       }
+      /* Directory, canvas and controls each have their own space. */
+      #stage { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 0; padding: 0; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--card); }
+      .map-directory { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 24px 16px; background: var(--cream); border-right: 1px solid var(--line); overflow-y: auto; }
+      .map-eyebrow { display: block; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
+      .directory-heading h1 { color: var(--green); font-size: 19px; line-height: 1.3; margin: 8px 0; }
+      .directory-heading p { color: var(--muted); font-size: 12px; line-height: 1.65; margin: 0 0 20px; }
+      #chips { flex: none; flex-direction: column; flex-wrap: nowrap; overflow: visible; gap: 6px; padding: 3px; align-items: stretch; }
+      #chips .chip { width: 100%; min-height: 44px; padding: 10px; gap: 9px; line-height: 1.4; border-color: transparent; border-radius: 6px; box-shadow: none; font-size: 12px; text-align: left; }
+      #chips .chip i { flex: none; width: 8px; height: 8px; }
+      #chips .chip b { margin-left: auto; font-size: 10px; opacity: .75; }
+      #chips .chip.on { border-color: var(--green); }
+      #chips .chip:focus-visible { outline-offset: 0; }
+      .map-directory #legend { position: static; margin: auto 0 0; padding: 20px 3px 0; max-width: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; background: transparent; backdrop-filter: none; pointer-events: auto; font-size: 12px; line-height: 1.8; }
+      .map-directory #legend-buildings { display: none; }
+      .map-directory #legend-rooms { display: block; margin: 0; }
+      .map-directory #legend h4 { font-size: 10px; margin-bottom: 8px; }
+      .map-directory #legend b { min-width: 42px; }
+      .map-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+      .map-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--card); }
+      .map-toolbar-title { min-width: 0; }
+      .map-toolbar-title strong { display: block; color: var(--green); font-size: 14px; }
+      .map-toolbar-title span { display: block; color: var(--muted); font-size: 11px; margin-top: 4px; }
+      #zoom { position: static; flex-flow: row wrap; align-content: center; gap: 4px; max-height: none; flex-shrink: 0; }
+      #zoom button { width: 44px; height: 44px; border-radius: 6px; box-shadow: none; background: var(--cream); }
+      .map-panel:has(.gl-on) #zoom .gl-only { display: flex; }
+      #mapwrap { width: 100%; border: 0; border-radius: 0; box-shadow: none; min-height: 160px; }
+      .map-route { padding: 14px 18px; border-top: 1px solid var(--line); background: var(--card); min-height: 76px; }
+      .route-idle p { font-size: 12px; line-height: 1.5; color: var(--muted); margin: 5px 0 0; }
+      #hud { display: none; position: static; max-width: none; transform: none !important; padding: 0; gap: 12px; border-radius: 0; box-shadow: none; background: transparent; color: var(--green); opacity: 1; white-space: normal; transition: none; }
+      #hud.on { display: flex; justify-content: space-between; transform: none !important; }
+      #hud.on + .route-idle { display: none; }
+      #hud > div { min-width: 0; }
+      #hud small { color: var(--muted); font-size: 10px; margin-bottom: 5px; }
+      #hud strong { font-size: 15px; overflow-wrap: anywhere; }
+      #clr { min-height: 44px; flex: none; border: 1px solid var(--line); border-radius: 6px; background: var(--cream); color: var(--green); }
+      #clr:hover { background: #e9eee8; }
+      .office-location-map #stage { grid-template-columns: minmax(0, 1fr); border: 0; border-radius: 0; }
+      .office-location-map .map-directory { display: none; }
+      @media (max-width: 759px) {
+        #stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); border-radius: 12px; }
+        .map-directory { padding: 14px 12px 8px; border-right: 0; border-bottom: 1px solid var(--line); overflow: hidden; }
+        .directory-heading .map-eyebrow { display: none; }
+        .directory-heading h1 { font-size: 16px; margin: 0 0 4px; }
+        .directory-heading p { font-size: 11px; margin-bottom: 10px; }
+        #chips { flex-direction: row; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; padding: 3px 3px 7px; scrollbar-width: thin; }
+        #chips .chip { width: auto; border-color: var(--line); white-space: nowrap; }
+        #chips .chip b { margin-left: 4px; }
+        .map-directory #legend { padding: 0; margin: 4px 0 0; border: 0; }
+        .map-directory #legend-toggle { display: block; min-height: 44px; padding: 4px 3px; text-align: left; }
+        .map-directory #legend:not(.is-expanded) #legend-rooms { display: none; }
+        .map-directory #legend.is-expanded #legend-rooms { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 0 3px 8px; }
+        .map-directory #legend-rooms h4 { display: none; }
+        .map-directory #legend span { white-space: nowrap; }
+        .map-directory #legend b { min-width: 30px; }
+        .map-toolbar { padding: 10px 12px; flex-wrap: wrap; gap: 8px; }
+        .map-toolbar-title { display: flex; align-items: baseline; gap: 10px; flex-basis: 100%; }
+        .map-toolbar-title span { margin: 0; }
+        #zoom { gap: 5px; }
+        .map-route { padding: 12px; }
+        .office-location-map #stage { grid-template-rows: minmax(0, 1fr); }
+      }
+      @media (max-height: 480px) and (min-width: 600px) {
+        #stage { grid-template-columns: 190px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+        .map-directory { overflow-y: auto; padding: 12px; }
+        .directory-heading p, .map-toolbar-title span { display: none; }
+        #chips { flex-direction: column; overflow: visible; }
+        .map-toolbar { padding: 6px 10px; }
+        .map-toolbar-title { flex-basis: auto; }
+        #mapwrap { min-height: 80px; }
+        .map-route { min-height: 62px; padding: 8px 12px; }
+        .office-location-map #stage { grid-template-columns: minmax(0, 1fr); }
+      }
     </style>
   </head>
   <body>
     <div id="stage">
-      <div id="chips" role="toolbar" aria-label="Choose a building"></div>
-      <div id="mapwrap">
+      <aside class="map-directory" aria-label="Campus directory">
+        <div class="directory-heading"><span class="map-eyebrow">Explore GNCI</span><h1>Campus directory</h1><p>Choose a destination for directions from the main gate.</p></div>
+        <div id="chips" role="group" aria-label="Choose a building"></div>
         <div id="legend" aria-label="Map legend">
           <button type="button" id="legend-toggle" aria-expanded="false" aria-controls="legend-buildings legend-rooms">Legend</button>
           <div id="legend-buildings">
@@ -742,24 +815,20 @@
             ><span><b>300</b>3rd Floor</span><span><b>400</b>4th Floor</span>
           </div>
         </div>
-        <div id="hud" aria-live="polite">
-          <div>
-            <small>Route from main gate</small><strong id="status"></strong>
-          </div>
-          <button id="clr" type="button">Clear</button>
+      </aside>
+      <main class="map-panel" aria-label="Campus navigator">
+        <header class="map-toolbar">
+          <div class="map-toolbar-title"><strong>Campus map</strong><span>Drag to explore</span></div>
+        <div id="zoom" role="group" aria-label="Map controls">
+          <button type="button" id="zin" aria-label="Zoom in" title="Zoom in">+</button
+          ><button type="button" id="zout" aria-label="Zoom out" title="Zoom out">&minus;</button
+          ><button type="button" id="zrst" class="rst" aria-label="Reset map view" title="Reset map view">&#8634;</button
+          ><button type="button" id="rotl" class="gl-only" aria-label="Rotate map left" title="Rotate left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button
+          ><button type="button" id="rotr" class="gl-only" aria-label="Rotate map right" title="Rotate right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button
+          ><button type="button" id="tilt" class="gl-only rst" aria-label="Switch to flat top-down view" title="Toggle 2D / 3D">2D</button>
         </div>
-        <div id="zoom" role="group" aria-label="Map zoom">
-          <button type="button" id="zin" aria-label="Zoom in">+</button
-          ><button type="button" id="zout" aria-label="Zoom out">&minus;</button
-          ><button type="button" id="zrst" class="rst" aria-label="Reset zoom">
-            &#8634;
-          </button
-          ><button type="button" id="rotl" class="gl-only" aria-label="Rotate map left"
-            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button
-          ><button type="button" id="rotr" class="gl-only" aria-label="Rotate map right"
-            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button
-          ><button type="button" id="tilt" class="gl-only rst" aria-label="Switch to flat top-down view">2D</button>
-        </div>
+        </header>
+        <div id="mapwrap">
         <div id="gl" tabindex="0" role="application" aria-label="3D campus map. Drag to pan, pinch or scroll to zoom, right-drag or use the rotate buttons to turn the map."></div>
         <svg
           id="map"
@@ -1139,6 +1208,14 @@
           </g>
         </svg>
       </div>
+        <footer class="map-route">
+          <div id="hud" aria-live="polite">
+            <div><small>Route from main gate</small><strong id="status"></strong></div>
+            <button id="clr" type="button">Clear route</button>
+          </div>
+          <div class="route-idle"><span class="map-eyebrow">Start at the main gate</span><p>Select a building on the map or in the directory to see your route.</p></div>
+        </footer>
+      </main>
     </div>
     <script>
       var B = {
@@ -1196,9 +1273,14 @@
       document.getElementById('legend-toggle').addEventListener('click', function () {
         var expanded = document.getElementById('legend').classList.toggle('is-expanded');
         this.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        this.textContent = expanded ? 'Hide legend' : 'Legend';
+        this.textContent = officeMap ? (expanded ? 'Hide legend' : 'Legend') : (expanded ? 'Hide room guide' : 'Room guide');
       });
       var officeMap = document.documentElement.classList.contains('office-location-map');
+      if (officeMap) document.getElementById('mapwrap').appendChild(document.getElementById('legend'));
+      else {
+        document.getElementById('legend-toggle').textContent = 'Room guide';
+        document.getElementById('legend-toggle').setAttribute('aria-controls', 'legend-rooms');
+      }
       var officeBuilding = null;
       function setOfficeBuilding(id) {
         if (!officeMap) return;
@@ -1218,6 +1300,7 @@
         c.type = "button";
         c.className = "chip";
         c.id = "c-" + id;
+        c.setAttribute('aria-pressed', 'false');
         c.style.setProperty("--c", META[id][1]);
         c.innerHTML = "<i></i>" + B[id].name + " <b>" + META[id][0] + "</b>";
         c.addEventListener("click", function () {
@@ -1236,6 +1319,7 @@
         });
         document.querySelectorAll(".chip").forEach(function (e) {
           e.classList.remove("on");
+          e.setAttribute('aria-pressed', 'false');
         });
         hud.classList.remove("on");
         if (!keepView && window.fitView) fitView(true);
@@ -1266,6 +1350,7 @@
         document.getElementById("b-" + id).classList.add("sel");
         var _c = document.getElementById("c-" + id);
         _c.classList.add("on");
+        _c.setAttribute('aria-pressed', 'true');
         if (_c.scrollIntoView)
           try {
             _c.scrollIntoView({

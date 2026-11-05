@@ -191,17 +191,38 @@
         if(!result.ok)throw Error(result.error||'Could not publish device backgrounds.');responsiveBackgroundChanges={};if(backgroundApi())backgroundApi().accept(result.settings);
     }
     function responsiveBackgroundOptions(target){
+        if(target.node.hasAttribute('data-ve-alumni-qr')){
+            pickFile('image/jpeg,image/png,image/webp',function(file){
+                if(!/^image\/(jpeg|png|webp)$/.test(file.type)||file.size>5*MB){toast('Choose a JPG, PNG, or WebP QR image up to 5 MB.','error');return;}
+                stageResponsiveBackground(target,{path:previewUrl(file),kind:'background',fit:'contain',x:50,y:50,zoom:1},file,'desktop');
+            },false,null,true,true);
+            return;
+        }
         var api=backgroundApi(),device=S.device,setting=api.frame(target,device),current=api.value(target.selector,device);
-        var box=h('div',{class:'ve-pop-form'},[h('strong',{text:'Background · '+device.charAt(0).toUpperCase()+device.slice(1)}),h('p',{class:'ve-pop-hint',text:'Only this device changes. Other devices keep their backgrounds. Save draft or Publish when ready.'})]);
-        function stage(){var old=responsiveBackgroundChanges[target.selector]&&responsiveBackgroundChanges[target.selector][device];stageResponsiveBackground(target,Object.assign({},setting),old&&old.file,device);}
+        var devices=['desktop','tablet','mobile'];
+        var allDevices=devices.every(function(d){var value=api.value(target.selector,d);return value&&same(value,setting);});
+        var hint=h('p',{class:'ve-pop-hint'});
+        var box=h('div',{class:'ve-pop-form'},[h('strong',{text:'Background · '+device.charAt(0).toUpperCase()+device.slice(1)}),hint]);
+        function scope(){return allDevices?devices:[device];}
+        function stage(){var old=responsiveBackgroundChanges[target.selector]&&responsiveBackgroundChanges[target.selector][device];scope().forEach(function(d){stageResponsiveBackground(target,Object.assign({},setting),old&&old.file,d);});}
+        var share=h('input',{type:'checkbox',class:'form-check-input','aria-label':'Use the same background on desktop, tablet and mobile',checked:allDevices,disabled:!setting.path});
+        var replaceButton,removeButton;
+        function describeScope(){
+            hint.textContent=allDevices?'Image, position, sizing and zoom apply to desktop, tablet and mobile. Save draft or Publish when ready.':'Only this device changes. Other devices keep their backgrounds. Save draft or Publish when ready.';
+            if(replaceButton)replaceButton.textContent=allDevices?'Replace background on all devices':'Replace '+device+' background';
+            if(removeButton){removeButton.textContent=allDevices?'Remove all device overrides (use originals)':'Remove '+device+' override (use original)';removeButton.disabled=!scope().some(function(d){return api.value(target.selector,d)||responsiveBackgroundChanges[target.selector]?.[d];});}
+        }
+        share.addEventListener('change',function(){allDevices=share.checked;if(allDevices)stage();describeScope();});
+        box.appendChild(h('label',{class:'form-check d-flex align-items-center gap-2 mb-2'},[share,h('span',{text:'Use the same background on desktop, tablet and mobile'})]));
+        describeScope();
         [['x','Horizontal alignment',0,100,1],['y','Vertical alignment',0,100,1],['zoom','Crop / zoom',1,4,.05]].forEach(function(field){var input=h('input',{type:'range',min:field[2],max:field[3],step:field[4],value:setting[field[0]],'aria-label':field[1]});input.addEventListener('input',function(){setting[field[0]]=Number(input.value);stage();});box.appendChild(h('label',{class:'ve-pop-label',text:field[1]}));box.appendChild(input);});
         var fit=h('select',{class:'form-select form-select-sm','aria-label':'Background sizing'},[h('option',{value:'cover',text:'Cover (fill the section)'}),h('option',{value:'contain',text:'Contain (show the full image)'})]);fit.value=setting.fit;fit.addEventListener('change',function(){setting.fit=fit.value;stage();});box.appendChild(fit);
-        box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-gnc',text:'Replace '+device+' background',on:{click:function(){closePop();pickResponsiveBackground(target,device);}}}));
-        box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Remove '+device+' override (use original)',disabled:!current&&!responsiveBackgroundChanges[target.selector]?.[device],on:{click:function(){stageResponsiveBackground(target,null,null,device);closePop();}}}));popBelowToolbar(box);
+        replaceButton=h('button',{type:'button',class:'btn btn-sm btn-gnc',on:{click:function(){closePop();pickResponsiveBackground(target,device,scope());}}});box.appendChild(replaceButton);
+        removeButton=h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',disabled:!current&&!responsiveBackgroundChanges[target.selector]?.[device],on:{click:function(){scope().forEach(function(d){stageResponsiveBackground(target,null,null,d);});closePop();}}});box.appendChild(removeButton);describeScope();popBelowToolbar(box);
     }
-    function pickResponsiveBackground(target,device){
+    function pickResponsiveBackground(target,device,devices){
         var api=backgroundApi();if(!api)return;
-        pickFile('image/jpeg,image/png,image/webp,image/gif',function(file){var frame=api.frame(target,device),crop=window.GNCImageFraming&&window.GNCImageFraming.fileSettings(file);if(crop)Object.assign(frame,crop);frame.path=previewUrl(file);stageResponsiveBackground(target,frame,file,device);},false,null,true,true);
+        pickFile('image/jpeg,image/png,image/webp,image/gif',function(file){var frame=api.frame(target,device),crop=window.GNCImageFraming&&window.GNCImageFraming.fileSettings(file);if(crop)Object.assign(frame,crop);frame.path=previewUrl(file);(devices||[device]).forEach(function(d){stageResponsiveBackground(target,Object.assign({},frame),file,d);});},false,null,true,true);
     }
     var textPlacements = {}, textLayout = null, inlineSelection = null;
     function textPlacementCount() { return Object.keys(textPlacements).reduce(function(n,key){return n+Object.keys(textPlacements[key]).length;},0); }
@@ -228,9 +249,15 @@
         });
     }
     window.VEImageFraming = {
-        background:function(target){var found=backgroundTarget(target);if(!found)return false;responsiveBackgroundOptions(found);return true;},
+        background:function(target){var found=backgroundTarget(target);if(!found)return false;select({kind:'responsive-background',el:found.node});responsiveBackgroundOptions(found);return true;},
         stageFile: function(target,file,value) {
-            if(backgroundTarget(target))return;
+            var background=backgroundTarget(target),api=backgroundApi();
+            if(background&&api){
+                var frame=Object.assign({},api.frame(background,S.device),value);
+                var pending=responsiveBackgroundChanges[background.selector]&&responsiveBackgroundChanges[background.selector][S.device];
+                stageResponsiveBackground(background,frame,pending&&pending.file||file,S.device);
+                return;
+            }
             if(S.adapter && S.adapter.fileFramingStaged)S.adapter.fileFramingStaged(target,file,value);
         },
         stage: function (path, value, original) {
@@ -638,6 +665,8 @@
                 if (pa) { e.preventDefault(); if (S.adapter.onLink) S.adapter.onLink(pa); }
                 return;
             }
+            var backgroundControl=t.closest('[data-ve-background-for]');
+            if(backgroundControl){var backgroundArea=doc.getElementById(backgroundControl.getAttribute('data-ve-background-for'));var controlledBackground=backgroundArea&&backgroundTarget(backgroundArea);if(controlledBackground){e.preventDefault();select({kind:'responsive-background',el:controlledBackground.node});responsiveBackgroundOptions(controlledBackground);return;}}
             var directBackground=t.closest('[data-ve-history-background],[data-ve-sports-background]'),resolvedBackground=directBackground&&backgroundTarget(directBackground);
             if(resolvedBackground){e.preventDefault();select({kind:'responsive-background',el:resolvedBackground.node});responsiveBackgroundOptions(resolvedBackground);return;}
             var d = S.adapter.pick(t, e);
@@ -763,7 +792,7 @@
     }
     function renderToolbar() {
         tb.innerHTML = '';
-        var items = S.sel && S.adapter.toolbar ? S.adapter.toolbar(S.sel) : [];
+        var items = S.sel && S.sel.kind !== 'responsive-background' && S.adapter.toolbar ? S.adapter.toolbar(S.sel) : [];
         var textTarget = S.sel && S.sel.el;
         var layoutMedia = textTarget && textTarget.hasAttribute('data-gnc-layout-media');
         var isRich = S.sel && S.sel.el && S.sel.el.__ve && S.sel.el.__ve.rich;
@@ -853,7 +882,7 @@
         var deviceBackground = S.sel && backgroundTarget(S.sel.area || S.sel.el);
         if (deviceBackground && S.sel.kind !== 'field' && S.sel.kind !== 'rich') {
             items = (items || []).filter(function (item) { return !/image|picture|background|photo|banner/i.test(item.label || item.title || ''); });
-            items.unshift({ icon: 'image', label: 'Background (' + S.device + ')', run: function () { responsiveBackgroundOptions(deviceBackground); } });
+            items.unshift({ icon: 'image', label: deviceBackground.node.hasAttribute('data-ve-alumni-qr') ? 'Replace QR code' : 'Background (' + S.device + ')', run: function () { responsiveBackgroundOptions(deviceBackground); } });
         }
 
         if (!items || !items.length) { tb.hidden = true; return; }
@@ -874,7 +903,7 @@
     function placeTb(force) {
         var s = S.sel;
         if (!s || !s.el || !s.el.isConnected || tb.hidden) return;
-        var fr = S.frame.getBoundingClientRect(), r = s.el.getBoundingClientRect();
+        var fr = S.frame.getBoundingClientRect(), r = (s.toolbarEl || s.el).getBoundingClientRect();
         var tw = tb.offsetWidth, th = tb.offsetHeight, top, left;
         var offTop = r.bottom < 0, offBottom = r.top > fr.height;
         if (s.anchor === 'bottom') {
@@ -1372,11 +1401,12 @@
 
     function SectionsAdapter() {
         var page = C.page.slug;
+        var voices = page === 'alumni' && window.GNCAlumniVoicesEditor ? window.GNCAlumniVoicesEditor({doc:function(){return S.doc;},makeField:makeField,pickFile:pickFile,preview:previewUrl,close:closePop,select:select,refresh:chrome,send:send,notify:toast,confirm:function(message){return window.AdminDialogs.confirm(message);}}) : null;
         var photos = {};
         var enrollmentImages = {}, enrollmentChanges = {};
         var enrollmentCanvas = null, enrollmentBase = '', enrollmentRevision = '';
         function enrollmentCanvasDirty() { return enrollmentCanvas !== null && JSON.stringify(enrollmentCanvas) !== enrollmentBase; }
-        function mediaChangeCount() { return Object.keys(photos).length + Object.keys(enrollmentChanges).length + (enrollmentCanvasDirty() ? 1 : 0); }
+        function mediaChangeCount() { return Object.keys(photos).length + Object.keys(enrollmentChanges).length + (enrollmentCanvasDirty() ? 1 : 0) + (voices ? voices.dirty() : 0); }
         function enrollmentCard(id) { return S.doc.querySelector('[data-ve-enrollment-step="'+cssEsc(id)+'"]'); }
         function paintEnrollmentCanvas(doc) {
             var grid = doc.querySelector('[data-ve-enrollment-grid]');
@@ -1550,7 +1580,7 @@
                         toast('Published. Your changes are live now.', 'ok');
                     });
                 });
-            }, Promise.resolve()).then(function () { renderToolbar(); });
+            }, Promise.resolve()).then(function () { return voices ? voices.publish() : null; }).then(function () { renderToolbar(); });
         }
         var secs = (C.sections || []).map(function (s) {
             return { key: s.key, title: s.title, html: s.html || '', has_draft: !!s.has_draft, review: s.review_status || 'none',
@@ -1572,6 +1602,17 @@
         function byEl(el) { for (var i = 0; i < secs.length; i++) if (secs[i].el === el) return secs[i]; return null; }
         function html(s) { return cleanHtml(s.el.innerHTML); }
         function plainSection(el) { return el.hasAttribute('data-ve-admission-label') || el.hasAttribute('data-ve-plain-section'); }
+        function addAlumniAction() {
+            var section=secs.find(function(s){return s.key==='actions';});
+            if(!section||!section.el||locked(section)||S.busy)return;
+            if(html(section).length>4800){toast('Remove or shorten existing buttons before adding another.','error');return;}
+            var link=S.doc.createElement('a');link.href='#';link.textContent='New button';
+            section.el.appendChild(link);section.dirty=html(section)!==section.base;markEmpty(section.el);
+            section.el.focus();
+            var range=S.doc.createRange();range.selectNodeContents(link);
+            var selection=S.win.getSelection();selection.removeAllRanges();selection.addRange(range);
+            select({kind:'rich',el:section.el,sec:section,alumniAction:link,prevent:false});chrome();
+        }
 
         function bind(s) {
             var el = s.el;
@@ -1597,6 +1638,9 @@
             if (!s.el) return;
             s.el.setAttribute('contenteditable', locked(s) ? 'false' : (plainSection(s.el) ? PLAIN : 'true'));
             s.el.classList.toggle('ve-locked', locked(s));
+            if(page==='alumni'&&s.key==='actions'){
+                var add=s.el.ownerDocument.querySelector('[data-ve-alumni-add-action]');if(add)add.disabled=locked(s);
+            }
             s.el.title = locked(s) ? 'Waiting for approval, so it can’t be changed right now.' : '';
             admissionItemControls(s);
         }
@@ -1954,7 +1998,8 @@
             outline: true,
             startFallback: function () { loadSrcdoc(fallbackHtml()); },
             draftState: function (value) {
-                if (!value) return {secs:secs.map(function(s){return Object.assign({},s,{html:s.el&&!s.removed?html(s):s.html});}),photos:photos,enrollmentImages:enrollmentImages,enrollmentChanges:enrollmentChanges,enrollmentCanvas:enrollmentCanvas,enrollmentBase:enrollmentBase,enrollmentRevision:enrollmentRevision,admissionBaseOrders:admissionBaseOrders,orders:admissionOrders()};
+                if (!value) return {secs:secs.map(function(s){return Object.assign({},s,{html:s.el&&!s.removed?html(s):s.html});}),photos:photos,enrollmentImages:enrollmentImages,enrollmentChanges:enrollmentChanges,enrollmentCanvas:enrollmentCanvas,enrollmentBase:enrollmentBase,enrollmentRevision:enrollmentRevision,admissionBaseOrders:admissionBaseOrders,orders:admissionOrders(),alumniVoices:voices?voices.state():null};
+                if (voices && value.alumniVoices) voices.state(value.alumniVoices);
                 photos=value.photos;enrollmentImages=value.enrollmentImages;enrollmentChanges=value.enrollmentChanges;enrollmentCanvas=value.enrollmentCanvas;enrollmentBase=value.enrollmentBase;enrollmentRevision=value.enrollmentRevision;admissionBaseOrders=value.admissionBaseOrders;
                 secs=value.secs.map(function(s){s.el=S.doc.querySelector('[data-ve-section="'+cssEsc(s.key)+'"]');return s;});
                 secs.forEach(function(s){
@@ -1963,7 +2008,11 @@
                 });
                 paintEnrollmentCanvas(S.doc);
             },
+            fileFramingStaged: function (target,file,value) {
+                if(voices)voices.fileFramingStaged(target,file,value);
+            },
             draftRebind: function () {
+                if (voices) voices.render();
                 secs.forEach(function(s){if(!s.el||s.removed)return;var base=s.base,dirty=s.dirty;bind(s);s.base=base;s.dirty=dirty;});
                 $$('[data-admission-scope]',S.doc).forEach(admissionControls);
                 secs.forEach(markAdmissionChanges);
@@ -1971,6 +2020,7 @@
                 Object.keys(enrollmentChanges).forEach(function(key){var el=S.doc.querySelector('[data-ve-img="enrollment-illustration"][data-ve-key="'+cssEsc(key)+'"] img');if(el)el.src=enrollmentChanges[key].preview||enrollmentImages[key].default;});
             },
             mount: function (doc) {
+                if (voices) voices.mount(doc);
                 try { enrollmentImages=JSON.parse(doc.getElementById('veEnrollmentIllustrations').textContent); } catch (_) { enrollmentImages={}; }
                 if (enrollmentCanvas === null && doc.getElementById('veEnrollmentSteps')) {
                     var canvas=JSON.parse(doc.getElementById('veEnrollmentSteps').textContent);
@@ -2013,6 +2063,11 @@
                 select({ kind: 'rich', el: s.el, sec: s, noCaret: locked(s), prevent: false });
             },
             pick: function (t, event) {
+                if (voices) { var voicePick=voices.pick(t); if (voicePick) return voicePick; }
+                if (page === 'alumni') { var alumniPost=postPick(t); if(alumniPost)return alumniPost; }
+                if(page==='alumni'&&t.closest('[data-ve-alumni-add-action]')){addAlumniAction();return {kind:'none'};}
+                var alumniAction=page==='alumni'&&t.closest('.alumni-actions a');
+                if(alumniAction){var actionSection=byEl(sectionElOf(alumniAction));if(actionSection)return {kind:'rich',el:actionSection.el,sec:actionSection,alumniAction:alumniAction,prevent:false,noCaret:locked(actionSection)};}
                 var enrollmentText=t.closest('[data-ve-field="enrollment-step-text"]');if(enrollmentText)return {kind:'field',el:enrollmentText,prevent:false};
                 if (t.closest('[data-ve-enrollment-add]')) { addEnrollmentCard(); return {kind:'none'}; }
                 if(t.closest('[data-ve-admission-drag-item],[data-ve-admission-drag-category]'))return {kind:'none'};
@@ -2058,6 +2113,8 @@
                 return s ? { kind: 'rich', el: el, sec: s, prevent: false, noCaret: locked(s) } : null;
             },
             toolbar: function (sel) {
+                if (voices) { var voiceTools=voices.toolbar(sel); if (voiceTools) return voiceTools; }
+                if (page === 'alumni' && sel.kind === 'post') return postToolbar(sel);
                 if (sel.kind === 'enrollment-step-field' || sel.kind === 'enrollment-step') return enrollmentStepTools(sel.id,true);
                 if (sel.kind === 'enrollment-illustration') return enrollmentTools(sel).concat(sel.key.indexOf('basic-')===0?enrollmentStepTools(sel.key.slice(6),false):[]);
                 if(sel.kind==='field'&&sel.el.matches('[data-ve-field="enrollment-step-text"]'))return [{type:'chip',text:sel.el.getAttribute('data-ve-label')||'Enrollment text'}];
@@ -2105,6 +2162,24 @@
                         run('Discarding…', function () { return sendReview({ action: 'discard', page: page, section_key: s.key }).then(function (res) { if (res.ok) { apply(s, res, true); toast(res.message, 'ok'); } else toast(res.error, 'error'); }); });
                     } });
                 }
+                if(page==='alumni'&&s&&s.key==='actions'&&!locked(s)){
+                    it.push({type:'sep'},{icon:'plus-lg',label:'Add button',run:addAlumniAction});
+                    if(sel.alumniAction&&sel.alumniAction.isConnected)it.push({icon:'link-45deg',label:sel.alumniAction.getAttribute('href')&&sel.alumniAction.getAttribute('href')!=='#'?'Edit link':'Add link',title:'Add or change button link',primary:true,run:function(){
+                        var button=sel.alumniAction;
+                        askText({label:'Button link',value:button.getAttribute('href')==='#'?'':button.getAttribute('href'),placeholder:'https://example.com or /contact-us',max:500,required:true,hint:'Enter a website address, a /page path, mailto: address, or tel: number.',done:function(value){
+                            if(S.busy||locked(s)||!button.isConnected)return;
+                            var href=safeHref(value);
+                            if(!href){toast('Use https://, mailto:, tel: or a /page path for the button link.','error');return;}
+                            button.setAttribute('href',href);s.dirty=html(s)!==s.base;
+                            select({kind:'rich',el:s.el,sec:s,alumniAction:button,prevent:false});chrome();
+                        }});
+                    }});
+                    if(sel.alumniAction&&sel.alumniAction.isConnected)it.push({icon:'trash',label:'Remove button',danger:true,run:function(){
+                        confirmPop('Remove this button?','It will be removed from the website when you publish.','Remove button',function(){
+                            sel.alumniAction.remove();s.dirty=html(s)!==s.base;markEmpty(s.el);select({kind:'rich',el:s.el,sec:s,prevent:false});chrome();
+                        });
+                    }});
+                }
                 return it;
             },
             dirtyCount: function () { return secs.filter(function (s) { return s.dirty && !(s.isNew && s.removed); }).length + mediaChangeCount() + admissionOrderCount(); },
@@ -2146,6 +2221,11 @@
                         h('span', { class: 've-dot ve-dot-' + (c.tone || 'ok') }), h('strong', { text: s.title }), h('small', { text: c.text })]);
                 })));
                 openPop(box, x, y);
+            },
+            onLink: async function (link) {
+                if(page!=='alumni'||!link.hasAttribute('data-alumni-events-page'))return false;
+                if(await guardDirty())loadFrame(link.getAttribute('href'));
+                return true;
             }
         };
         return A;

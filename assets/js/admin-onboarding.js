@@ -4,7 +4,7 @@
     if (!source || window.self !== window.top) return;
     const config = JSON.parse(source.textContent);
     config.steps = config.steps.filter(step => !step.optional || document.querySelector(step.selector));
-    let dialog, card, ring, title, description, progress, error, back, next, skip;
+    let dialog, card, ring, title, description, progress, meter, error, back, next, skip;
     let index = 0, busy = false, previousFocus, sidebarWasOpen, overlayWasOpen, mainScroll;
     const sidebar = document.getElementById('gnc-sidebar');
     const overlay = document.getElementById('sidebar-overlay');
@@ -38,6 +38,7 @@
         const step = config.steps[index];
         title.textContent = step.title; description.textContent = step.text;
         progress.textContent = 'Step '+(index+1)+' of '+config.steps.length;
+        meter.max = config.steps.length; meter.value = index+1;
         back.disabled = index === 0; next.textContent = index === config.steps.length-1 ? 'Finish' : 'Next';
         error.textContent = config.persist ? '' : 'Progress saving is unavailable. You can still explore this guide.';
         place();
@@ -77,6 +78,7 @@
         dialog=node('dialog','gnc-tour');dialog.setAttribute('aria-labelledby','gncTourTitle');dialog.setAttribute('aria-describedby','gncTourText');
         ring=node('div','gnc-tour-ring');ring.setAttribute('aria-hidden','true');
         card=node('div','gnc-tour-card');progress=node('div','gnc-tour-progress');progress.setAttribute('aria-live','polite');
+        meter=node('progress','gnc-tour-meter');meter.setAttribute('aria-label','Walkthrough progress');
         title=node('h2');title.id='gncTourTitle';description=node('p');description.id='gncTourText';
         error=node('p','gnc-tour-error');error.setAttribute('role','alert');
         if (!config.persist) error.textContent='Progress saving is unavailable. You can still explore this guide.';
@@ -86,7 +88,7 @@
         skip.addEventListener('click',()=>finish('skipped'));
         back.addEventListener('click',()=>{if(index>0){index--;render();}});
         next.addEventListener('click',()=>{if(index===config.steps.length-1)finish('completed');else{index++;render();}});
-        [progress,title,description,error,actions].forEach(el=>card.appendChild(el));
+        [progress,meter,title,description,error,actions].forEach(el=>card.appendChild(el));
         dialog.append(ring,card);document.body.appendChild(dialog);dialog.showModal();render();next.focus();
         dialog.addEventListener('cancel',event=>{event.preventDefault();finish('skipped');});
     }

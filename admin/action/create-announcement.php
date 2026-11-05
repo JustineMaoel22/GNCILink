@@ -245,6 +245,8 @@ if ($postAction === 'create' || $postAction === 'update') {
                 // Unique request key is reserved in the same transaction as the saved announcement.
                 getDB()->prepare('INSERT INTO facebook_publishing_requests (request_key,user_id,announcement_id,created_at) VALUES (?,?,0,NOW())')->execute([$requestKey, $_SESSION['user_id']]);
             }
+            $categoryIds = normalizeAnnouncementCategoryIds(getDB(), isset($_POST['category_ids_present']) || array_key_exists('category_ids', $_POST)
+                ? ($_POST['category_ids'] ?? []) : (!empty($_POST['category_id']) ? [$_POST['category_id']] : []));
             $audience = normalizeMultiAudienceInput(
                 $_POST['dept_ids'] ?? ($_POST['dept_id'] ?? null),
                 $_POST['programs'] ?? ($_POST['program'] ?? null)
@@ -283,7 +285,8 @@ if ($postAction === 'create' || $postAction === 'update') {
                 'title'       => $title,
                 'content'     => $content,
                 'allow_incomplete' => ($_POST['allow_incomplete'] ?? '') === '1',
-                'category_id' => !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
+                'category_id' => $categoryIds[0] ?? null,
+                'category_ids' => $categoryIds,
                 'program'     => $program,
                 'dept_id'     => $deptId, // validated in create/updateAnnouncement
             ];

@@ -1,79 +1,93 @@
 <?php
-require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/admin-functions.php';
-initSession();
-requireLogin();
-$canManageWebsiteSettings = hasPermission('manage_settings');
-$error = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!$canManageWebsiteSettings) rbacFail('Your role cannot change website settings.',403);
-    try {
+require_once __DIR__.'/../config/config.php';
+require_once __DIR__.'/admin-functions.php';
+initSession();requireLogin();
+header('Cache-Control: no-store, private');
+$canManageWebsiteSettings=hasPermission('manage_settings');
+$directSave=rbacIsSuper();
+$ajax=($_SERVER['HTTP_X_REQUESTED_WITH']??'')==='XMLHttpRequest';
+$jsonResponse=$directSave&&($ajax||!empty($_SESSION['_rbac_worker']));
+$error='';$failedAction='';
+$definitions=[
+    'save_page_suggestions'=>['key'=>'page_suggestions_enabled','read'=>'pageSuggestionsEnabled','save'=>'savePageSuggestionsSetting','section'=>'website-preferences','title'=>'Suggested pages popup'],
+    'save_ai_image_checker'=>['key'=>'ai_image_checker_enabled','read'=>'aiImageCheckerEnabled','save'=>'saveAiImageCheckerSetting','section'=>'ai-features','title'=>'AI image checker'],
+];
+if($_SERVER['REQUEST_METHOD']==='POST'){
+    if(!$canManageWebsiteSettings)rbacFail('Your role cannot change website settings.',403);
+    try{
         $action=$_POST['action']??'save_ai_image_checker';
-        if ($action==='save_page_suggestions') savePageSuggestionsSetting($_POST);
-        elseif ($action==='save_ai_image_checker') saveAiImageCheckerSetting($_POST);
-        else throw new InvalidArgumentException('Unknown settings action.');
-        $_SESSION['settings_saved'] = true;
-        header('Location: /admin/settings.php');
-        exit;
-    } catch (InvalidArgumentException $e) {
-        http_response_code(422);
-        $error = $e->getMessage();
-    } catch (Throwable $e) {
-        error_log('Admin settings save failed: ' . $e->getMessage());
-        http_response_code(500);
-        $error = 'Could not save settings. Please try again.';
-    }
+        if(!is_string($action)||!isset($definitions[$action]))throw new InvalidArgumentException('Choose a valid settings action.');
+        $definition=$definitions[$action];$failedAction=$action;
+        $definition['save']($_POST);
+        if($jsonResponse){
+            $stored=$definition['read']();
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success'=>true,'value'=>$stored?'1':'0','message'=>$definition['title'].' saved.']);exit;
+        }
+        $_SESSION['settings_saved']=$action;
+        header('Location: /admin/settings.php#'.$definition['section'],true,303);exit;
+    }catch(InvalidArgumentException $exception){http_response_code(422);$error=$exception->getMessage();}
+    catch(Throwable $exception){http_response_code(500);error_log('Admin settings save could not be confirmed.');$error='Could not confirm the save. Your selection has been kept. Retry or reload to check the current setting.';}
+    if($jsonResponse){header('Content-Type: application/json; charset=utf-8');echo json_encode(['success'=>false,'error'=>$error]);exit;}
 }
-$enabled = $canManageWebsiteSettings ? aiImageCheckerEnabled() : true;
-$suggestionsEnabled = $canManageWebsiteSettings ? pageSuggestionsEnabled() : true;
-$saved = !empty($_SESSION['settings_saved']);
-unset($_SESSION['settings_saved']);
-$pageTitle = 'Settings';
-require __DIR__ . '/../components/header-admin.php';
+$states=[];
+if($canManageWebsiteSettings)foreach($definitions as $action=>$definition){
+    $value=null;
+    try{$value=$definition['read']();}catch(Throwable $exception){error_log('Admin setting unavailable: '.$definition['key']);}
+    $selected=$value;
+    if($failedAction===$action&&is_string($_POST[$definition['key']]??null)&&in_array($_POST[$definition['key']],['0','1'],true))$selected=$_POST[$definition['key']]==='1';
+    $states[$action]=['saved'=>$value,'selected'=>$selected];
+}
+$connectionLabel='Status unavailable';$connectionTone='neutral';
+if($canManageWebsiteSettings){
+    try{
+        // The stored connection is authoritative for configuration, not live token health.
+        $connection=getDB()->query('SELECT enabled FROM facebook_publishing_connection WHERE connection_id=1')->fetchColumn();
+        $connected=$connection!==false&&(int)$connection===1;
+        $connectionLabel=$connected?'Connected':'Disconnected';$connectionTone=$connected?'success':'neutral';
+    }catch(PDOException $exception){if($exception->getCode()==='42S02')$connectionLabel='Needs setup';}
+}
+$saved=$_SESSION['settings_saved']??null;unset($_SESSION['settings_saved']);
+$pageTitle='Settings';require __DIR__.'/../components/header-admin.php';
+$e=fn($value)=>htmlspecialchars((string)$value,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
 ?>
-<div class="page-header">
-    <div>
-        <h1>Settings</h1>
-        <p>Manage preferences for the admin panel.</p>
-    </div>
+<link rel="stylesheet" href="/assets/css/admin-settings.css?v=<?= (int)filemtime(__DIR__.'/../assets/css/admin-settings.css') ?>">
+<div class="settings-page">
+<div class="page-header"><div><h1>Settings</h1><p>Manage account security, connected services and website preferences.</p></div><a class="settings-help" href="/admin/help.php?topic=account-security"><i class="bi bi-question-circle" aria-hidden="true"></i> Settings help</a></div>
+<?php if($saved): ?><div class="alert alert-success" role="status"><?= $e(is_string($saved)&&isset($definitions[$saved])?$definitions[$saved]['title'].' saved.':'Settings saved.') ?></div><?php endif; ?>
+<?php if($error): ?><div class="alert alert-danger" role="alert"><?= $e($error) ?></div><?php endif; ?>
+<?php if($canManageWebsiteSettings&&!$directSave): ?><p class="settings-approval-note"><i class="bi bi-info-circle" aria-hidden="true"></i> Website changes are submitted for Super Admin approval. The current website stays unchanged until approval.</p><?php endif; ?>
+<section class="data-card settings-card" id="account-security" aria-labelledby="account-security-title">
+<header class="settings-section-heading"><span class="settings-icon"><i class="bi bi-shield-lock" aria-hidden="true"></i></span><div><h2 id="account-security-title">Account &amp; Security</h2><p>Keep your own account secure.</p></div><span class="settings-scope">Your account</span></header>
+<div class="settings-profile" id="profile-picture">
+<?php if(isset($_SESSION['profile_picture_notice'])): ?><p class="settings-feedback-success" role="status"><?= $e($_SESSION['profile_picture_notice']) ?></p><?php unset($_SESSION['profile_picture_notice']);endif; ?>
+<?php if(isset($_SESSION['profile_picture_error'])): ?><p class="settings-feedback-error" role="alert"><?= $e($_SESSION['profile_picture_error']) ?></p><?php unset($_SESSION['profile_picture_error']);endif; ?>
+<div class="settings-profile-row"><div class="settings-profile-preview"><?php if($currentProfilePicture): ?><img src="<?= $e($currentProfilePicture) ?>" alt="Your current profile picture"><?php else: ?><span aria-hidden="true"><?= $e(strtoupper(substr($currentUser['first_name']??'A',0,1))) ?></span><?php endif; ?></div><div><h3>Profile picture</h3><p>Personalize your account picture in the admin sidebar. This changes only your own profile.</p></div></div>
+<form action="/admin/action/profile-picture-handler.php" method="post" enctype="multipart/form-data" class="settings-profile-form"><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="profile_action" value="upload"><label for="profile-picture-file">Choose a new picture</label><input type="file" class="form-control" id="profile-picture-file" data-image-frame-shape="circle" data-image-upload-hint="true" name="profile_picture" accept="image/jpeg,image/png,image/webp" aria-describedby="profile-picture-help" required><p id="profile-picture-help">JPG, PNG or WebP, up to 5 MB. Pictures are resized and shown in a circle.</p><button class="btn btn-gnc" type="submit">Save profile picture</button></form>
+<?php if($currentProfilePicture): ?><form action="/admin/action/profile-picture-handler.php" method="post" class="settings-profile-remove"><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="profile_action" value="remove"><button class="btn btn-outline-secondary" type="submit">Remove picture</button></form><?php endif; ?>
 </div>
-<section class="data-card p-4 mb-4"><h2 class="data-card-title">Account Security</h2><p>Update your own password using your current password. Other sessions and remembered devices will be revoked after the change.</p><a href="/admin/account-password.php" class="btn btn-outline-secondary">Change Password</a></section>
-<?php if ($canManageWebsiteSettings): ?>
-<section class="data-card p-4 mb-4">
-    <h2 class="data-card-title">Facebook Integration</h2>
-    <p>Connect the test Facebook Page and review announcement publishing deliveries.</p>
-    <a href="/admin/facebook-integration.php" class="btn btn-outline-secondary">Manage Facebook Integration</a>
+<div class="settings-config-row"><div><h3>Password</h3><p>Change your password using your current password. Choose a unique password you do not use elsewhere.</p><p class="settings-impact"><i class="bi bi-shield-check" aria-hidden="true"></i> Changing it signs out other active sessions and revokes remembered devices.</p></div><a class="btn btn-gnc" href="/admin/account-password.php">Change Password <i class="bi bi-arrow-right" aria-hidden="true"></i></a></div>
 </section>
-<?php if ($saved): ?><div class="alert alert-success" role="status">Settings saved.</div><?php endif; ?>
-<?php if ($error !== ''): ?><div class="alert alert-danger" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
-<section class="data-card p-4 mb-4" aria-labelledby="page-suggestions-heading" style="max-width:760px">
-    <h2 id="page-suggestions-heading" class="data-card-title mb-2"><i class="bi bi-chat-square-text me-2" aria-hidden="true"></i>Suggested pages popup</h2>
-    <p class="text-muted small" id="page-suggestions-description">Show visitors the “You May Also Like” popup with suggested pages. Turning this off hides the popup across the website when pages are loaded.</p>
-    <form method="post" action="/admin/settings.php">
-        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-        <input type="hidden" name="action" value="save_page_suggestions">
-        <input type="hidden" name="page_suggestions_enabled" value="0">
-        <div class="form-check form-switch mb-4">
-            <input type="checkbox" class="form-check-input" role="switch" id="page-suggestions" name="page_suggestions_enabled" value="1" aria-describedby="page-suggestions-description"<?= $suggestionsEnabled?' checked':'' ?>>
-            <label class="form-check-label" for="page-suggestions">Enable suggested pages popup</label>
-        </div>
-        <button type="submit" class="btn-gnc-primary">Save settings</button>
-    </form>
+<?php if($canManageWebsiteSettings): ?>
+<section class="data-card settings-card" id="integrations" aria-labelledby="integrations-title">
+<header class="settings-section-heading"><span class="settings-icon"><i class="bi bi-plug" aria-hidden="true"></i></span><div><h2 id="integrations-title">Integrations</h2><p>Manage connected services.</p></div><span class="settings-scope">Website-wide</span></header>
+<div class="settings-config-row"><div><h3>Facebook <span class="settings-badge settings-badge-<?= $connectionTone ?>"><?= $e($connectionLabel) ?></span></h3><p>Connect the school Facebook Page and review announcement publishing deliveries.</p><p class="settings-detail">Status reflects the saved connection. Open integration management to review access and publishing details.</p></div><a class="btn btn-outline-secondary" href="/admin/facebook-integration.php">Manage Facebook Integration <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></div>
 </section>
-<section class="data-card p-4" aria-labelledby="image-checker-heading" style="max-width:760px">
-    <h2 id="image-checker-heading" class="data-card-title mb-2"><i class="bi bi-image me-2" aria-hidden="true"></i>AI image checker</h2>
-    <p class="text-muted small" id="image-checker-description">Check uploaded people photos for non-person images and AI-generated content. This setting applies to all admin users. File type and size limits always apply.</p>
-    <form method="post" action="/admin/settings.php">
-        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-        <div class="mb-4">
-            <label class="form-label" for="ai-image-checker">AI image checker</label>
-            <select class="form-select" id="ai-image-checker" name="ai_image_checker_enabled" aria-describedby="image-checker-description" style="max-width:240px">
-                <option value="1"<?= $enabled ? ' selected' : '' ?>>On</option>
-                <option value="0"<?= !$enabled ? ' selected' : '' ?>>Off</option>
-            </select>
-        </div>
-        <button type="submit" class="btn-gnc-primary">Save settings</button>
-    </form>
+<?php foreach($definitions as $action=>$definition):
+    $isAi=$action==='save_ai_image_checker';$state=$states[$action];$known=$state['saved']!==null;$checked=$state['selected']===true;
+?>
+<section class="data-card settings-card" id="<?= $definition['section'] ?>" aria-labelledby="<?= $definition['section'] ?>-title">
+<header class="settings-section-heading"><span class="settings-icon"><i class="bi bi-<?= $isAi?'image':'sliders' ?>" aria-hidden="true"></i></span><div><h2 id="<?= $definition['section'] ?>-title"><?= $isAi?'AI Features':'Website Preferences' ?></h2><p><?= $isAi?'Control optional photo checking.':'Choose how visitors experience the website.' ?></p></div><span class="settings-scope"><?= $isAi?'All administrators':'Public website' ?></span></header>
+<form method="post" action="/admin/settings.php" class="settings-preference" data-settings-form data-direct-save="<?= $directSave?'1':'0' ?>" data-saved-value="<?= $known?($state['saved']?'1':'0'):'' ?>" data-initial-error="<?= $failedAction===$action&&$error?'1':'0' ?>">
+<input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="action" value="<?= $action ?>"><input type="hidden" name="<?= $definition['key'] ?>" value="0">
+<div class="settings-config-row"><div><h3 id="<?= $definition['key'] ?>-label"><?= $e($definition['title']) ?></h3><p id="<?= $definition['key'] ?>-description"><?= $isAi?'Check uploaded people photos for non-person images and signs of AI-generated content. The result is an estimate, not proof.':'Show visitors the You May Also Like popup with suggested pages. Turning it off hides the popup when pages are loaded.' ?></p><p class="settings-impact"><?= $isAi?'Applies to all admin users. File type and size checks stay active even when this checker is disabled.':'This setting affects the public website.' ?></p></div><label class="settings-toggle" for="<?= $definition['key'] ?>"><input type="checkbox" role="switch" id="<?= $definition['key'] ?>" name="<?= $definition['key'] ?>" value="1" aria-labelledby="<?= $definition['key'] ?>-label" aria-describedby="<?= $definition['key'] ?>-description"<?= $checked?' checked':'' ?><?= !$known?' disabled':'' ?>><span data-settings-value><?= $known?($checked?'Enabled':'Disabled'):'Unavailable' ?></span></label></div>
+<?php if($isAi): ?><p class="settings-ai-notice" data-ai-notice<?= $checked?' hidden':'' ?>><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> With this checker disabled, people photos will not be checked for unsuitable or AI-generated content. File type and size limits still apply.</p><?php endif; ?>
+<?php if(!$known): ?><p class="settings-feedback settings-feedback-error" role="alert">The current setting could not be loaded. <a href="/admin/settings.php#<?= $definition['section'] ?>">Reload to try again</a>.</p><?php endif; ?>
+<div class="settings-save-row"><p class="settings-change-status" data-settings-status role="status">Each setting is saved separately.</p><button class="btn btn-gnc" type="submit" data-save-label="<?= $directSave?'Save changes':'Submit for approval' ?>"<?= !$known?' disabled':'' ?>><?= $directSave?'Save changes':'Submit for approval' ?></button></div>
+<p class="settings-feedback" data-settings-feedback role="status" hidden></p>
+</form>
 </section>
-<?php endif; ?>
-<?php require __DIR__ . '/../components/footer-admin.php'; ?>
+<?php endforeach; endif; ?>
+</div>
+<script src="/assets/js/admin-settings.js?v=<?= (int)filemtime(__DIR__.'/../assets/js/admin-settings.js') ?>"></script>
+<?php require __DIR__.'/../components/footer-admin.php'; ?>

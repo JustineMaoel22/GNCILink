@@ -1,0 +1,83 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+const {spawn, spawnSync} = require('node:child_process');
+const docker = args => {
+    const r=spawnSync('docker',['compose','exec','-T','--user','www-data','web','php','cache/activity-log-session.php',...args],{encoding:'utf8',windowsHide:true});
+    if(r.status!==0) throw Error(r.stderr||r.stdout);
+    return r.stdout;
+};
+const sessions = [];
+const session = role => {const s=JSON.parse(docker([role]));sessions.push(s);return s;};
+const profile=fs.mkdtempSync(path.join(os.tmpdir(),'gnci-logs-'));
+const browser=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+async function until(fn,message){for(let end=Date.now()+30000;Date.now()<end;){if(await fn())return;await delay(100);}throw Error(message);}
+let socket;
+(async()=>{
+    const admin=session('Super Admin');
+    await until(()=>fs.existsSync(path.join(profile,'DevToolsActivePort')),'Chrome unavailable');
+    const port=fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0];
+    const tabs=await(await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+    socket=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);
+    await new Promise(r=>socket.addEventListener('open',r,{once:true}));
+    let serial=0;const pending=new Map();
+    socket.addEventListener('message',e=>{const p=JSON.parse(e.data);if(p.id&&pending.has(p.id)){pending.get(p.id)(p);pending.delete(p.id);}});
+    const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++serial;pending.set(id,p=>p.error?reject(Error(JSON.stringify(p.error))):resolve(p.result));socket.send(JSON.stringify({id,method,params}));});
+    const evaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
+    const base='http://localhost:8080';
+    await send('Page.enable');await send('Network.enable');
+    await send('Network.setCookie',{...admin,url:base,httpOnly:true});
+    const visit=async route=>{await send('Page.navigate',{url:base+route});await until(()=>evaluate("document.readyState==='complete'"),'Page load timeout');};
+    await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+    await visit('/admin/logs.php?size=10&page=2');
+    await until(()=>evaluate("Boolean(document.querySelector('[data-log-open]'))"),'Logs unavailable');
+    assert.equal(await evaluate("document.querySelectorAll('[data-log-row]').length"),10);
+    assert.match(await evaluate("document.querySelector('.logs-pagination').innerText"),/Page 2 of/);
+    const state=await evaluate('location.href');
+    await evaluate("document.querySelector('[data-log-open]').click()");
+    assert.equal(await evaluate("document.querySelector('dialog').open"),true);
+    assert.equal(await evaluate("document.activeElement.id"),'logs-close');
+    assert.equal(await evaluate("document.querySelector('.logs-technical').open"),false);
+    assert.ok(await evaluate("document.getElementById('detail-description').textContent.length"));
+    await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27,nativeVirtualKeyCode:27});
+    await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27,nativeVirtualKeyCode:27});
+    await until(()=>evaluate("!document.querySelector('dialog').open"),'Escape did not close');
+    assert.equal(await evaluate('location.href'),state);
+    await until(()=>evaluate("document.activeElement.hasAttribute('data-log-open')"),'Focus not restored');
+    const detailUrl=await evaluate("document.querySelector('[data-log-open]').getAttribute('href')");
+    await visit(detailUrl);
+    assert.equal(await evaluate("document.querySelector('#log-details').hidden"),false);
+    await visit('/admin/logs.php');
+    fs.writeFileSync('cache/logs-desktop.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+    for(const width of [820,390]){
+        await send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});
+        await delay(350); // Let the shared sidebar's breakpoint transition settle.
+        assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,`Overflow at ${width}`);
+        if(width===390) assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-log-row]')).display"),'block');
+        fs.writeFileSync(`cache/logs-${width}.png`,Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+    }
+    await evaluate("document.querySelector('.logs-more').open=true");
+    assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
+    await evaluate("document.querySelector('[data-log-open]').click()");
+    assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
+    fs.writeFileSync('cache/logs-modal-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+    await evaluate("document.getElementById('logs-close').click()");
+    await visit('/admin/logs.php?q=no-such-entry-gnci-qa');
+    assert.match(await evaluate("document.querySelector('.logs-empty').innerText"),/No activities match/);
+    await visit('/admin/logs.php?source=security');
+    assert.ok(await evaluate("document.querySelectorAll('[data-log-row]').length>0"));
+    assert.equal(await evaluate("document.querySelector('.logs-tabs [aria-current]').textContent"),'Login & security');
+    await visit('/admin/logs.php?from%5B%5D=x&action%5B%5D=x&detail%5B%5D=x');
+    assert.equal(await evaluate("Boolean(document.querySelector('.logs-table'))"),true);
+    const editor=session('Content Editor');
+    await send('Network.setCookie',{...editor,url:base,httpOnly:true});
+    const forbidden=await evaluate("fetch('/admin/logs.php').then(async r=>({status:r.status,text:await r.text()}))");
+    assert.equal(forbidden.status,403); assert.ok(!forbidden.text.includes('activity-log-data'));
+    await send('Network.deleteCookies',{name:admin.name,url:base});
+    const guest=await evaluate("fetch('/admin/logs.php',{redirect:'follow'}).then(r=>r.url)");
+    assert.ok(/\/(?:admin\/login\.php|login)(?:[?#]|$)/.test(guest), 'Guest redirects to login');
+    console.log('Browser checks passed: database records, page 2, details, Escape, focus restoration, 1440/820/390px overflow, mobile cards, empty state, security source, malformed inputs, editor 403 and guest redirect.');
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{
+    for(const s of sessions)docker(['destroy',s.value]);
+    socket?.close();browser.kill();
+});

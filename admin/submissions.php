@@ -3,10 +3,12 @@ require_once __DIR__.'/../config/config.php';
 require_once __DIR__.'/admin-functions.php';
 require_once __DIR__.'/../includes/content-submissions.php';
 initSession();requireLogin();
+header('Cache-Control: no-store, private');
+require_once __DIR__.'/approval-view.php';
 $error='';$success=$_SESSION['flash_success']??'';unset($_SESSION['flash_success']);
 $ready=rbacSubmissionsReady();$super=rbacIsSuper();$userId=(int)$_SESSION['user_id'];
 if(isset($_GET['media'])){
-    $row=$ready?rbacGetSubmission((int)$_GET['media']):null;
+    $row=$ready&&is_string($_GET['media'])?rbacGetSubmission((int)$_GET['media']):null;
     if(!$row||(!$super&&(int)$row['user_id']!==$userId))rbacFail('Submission not found.',404);
     $files=rbacReadPayload((int)$row['submission_id'])['files']??[];$field=$_GET['field']??'';$file=is_string($field)?($files[$field]??null):null;
     if(!$file)rbacFail('Media not found.',404);
@@ -14,103 +16,96 @@ if(isset($_GET['media'])){
 }
 if($_SERVER['REQUEST_METHOD']==='POST'){
     try{
-        if(!verifyCSRFToken($_POST['csrf_token']??''))throw new RuntimeException('Invalid request token. Reload and try again.');
+        if(!is_string($_POST['csrf_token']??null)||!verifyCSRFToken($_POST['csrf_token']))throw new RuntimeException('Invalid request token. Reload and try again.');
         if(!$ready)throw new RuntimeException('Approval storage is not set up.');
-        $id=(int)($_POST['submission_id']??0);$row=rbacGetSubmission($id);
+        $id=is_string($_POST['submission_id']??null)?(int)$_POST['submission_id']:0;$row=rbacGetSubmission($id);
         if(!$row||(!$super&&(int)$row['user_id']!==$userId))throw new RuntimeException('Submission not found.');
-        $revision=(int)($_POST['revision']??0);$action=$_POST['action']??'';
+        $revision=is_string($_POST['revision']??null)?(int)$_POST['revision']:0;$action=$_POST['action']??'';
         if($action==='approve')$success=rbacApproveRequest($id,$revision);
-        elseif($action==='reject'){rbacRejectSubmission($id,$revision,(string)($_POST['reason']??''));$success='Submission rejected. The author can see your reason and revise it.';}
+        elseif(in_array($action,['reject','request_revision'],true)){
+            if(!is_string($_POST['reason']??null))throw new InvalidArgumentException('Provide feedback for the author.');
+            rbacReviewDecision($id,$revision,$_POST['reason'],$action==='reject'?'rejected':'needs_revision');
+            $success=$action==='reject'?'Submission rejected. Your feedback is available to the author.':'Revision requested. The author can review your feedback and resubmit.';
+        }
         elseif($action==='delete'&&((int)$row['user_id']===$userId||$super)){
             rbacDeleteSubmission($id,$revision);
-            $_SESSION['flash_success']='Submission deleted.';header('Location: /admin/submissions.php');exit;
+            $success='Submission deleted. Published content is unchanged.';
         }
         elseif($action==='submit'&&(int)$row['user_id']===$userId){
-            $q=getDB()->prepare("UPDATE rbac_submissions SET status='pending',reason=NULL,reviewed_by=NULL,reviewed_at=NULL,updated_at=NOW() WHERE submission_id=? AND revision=? AND status IN ('draft','rejected','failed','uncertain')");$q->execute([$id,$revision]);if($q->rowCount()!==1)throw new RuntimeException('This submission changed. Reload before submitting.');
-            logActivity($userId,'RESUBMIT','rbac_submissions',$id,'Sent saved proposal for approval.');$success='Submitted for Super Admin approval.';
+            rbacSubmitSaved($id,$revision);$success='Submitted for Super Admin approval.';
         }else throw new RuntimeException('This action is not available to your role.');
-        $_SESSION['flash_success']=$success;header('Location: /admin/submissions.php?id='.$id);exit;
+        $_SESSION['flash_success']=$success;
+        $return=[];foreach(['q','status','type','author','from','to','sort','page','size'] as $key)$return[$key]=$_POST['return_'.$key]??'';
+        $return=approvalFilters($return);if($action!=='delete')$return['id']=$id;
+        header('Location: /admin/submissions.php?'.http_build_query($return));exit;
     }catch(Throwable $e){$error=$e instanceof PDOException?'The review could not be saved. Please try again.':$e->getMessage();}
 }
-$selected=(int)($_GET['id']??0);$rows=[];
-if($ready){$sql='SELECT s.*,u.first_name,u.last_name FROM rbac_submissions s LEFT JOIN users u ON u.user_id=s.user_id WHERE 1=1';$params=[];if(!$super){$sql.=' AND s.user_id=?';$params[]=$userId;}if($selected){$sql.=' AND s.submission_id=?';$params[]=$selected;}$sql.=' ORDER BY s.updated_at DESC,s.submission_id DESC LIMIT 100';$q=getDB()->prepare($sql);$q->execute($params);$rows=$q->fetchAll();}
+
+$filters=approvalFilters($_GET);
+$counts=$authors=$rows=[];$total=0;$pages=1;$selectedRow=null;$payload=[];$queueError='';$reviewError='';$legacyCount=0;
+$selected=is_string($_GET['id']??null)?max(0,(int)$_GET['id']):0;
+if($_SERVER['REQUEST_METHOD']==='POST'&&$error!==''){
+    $return=[];foreach(['q','status','type','author','from','to','sort','page','size'] as $key)$return[$key]=$_POST['return_'.$key]??'';
+    $filters=approvalFilters($return);$selected=$id??0;
+}
+if($ready){
+    try{
+        $queue=approvalQueue(getDB(),$filters,$super,$userId);extract($queue,EXTR_OVERWRITE);
+    }catch(Throwable $e){$queueError='The review queue could not be loaded. Please try again.';error_log('Approval queue unavailable.');}
+    if($selected){
+        try{
+            $q=getDB()->prepare('SELECT s.*,u.first_name,u.last_name FROM rbac_submissions s LEFT JOIN users u ON u.user_id=s.user_id WHERE s.submission_id=?'.($super?'':' AND s.user_id=?'));
+            $q->execute($super?[$selected]:[$selected,$userId]);$selectedRow=$q->fetch(PDO::FETCH_ASSOC)?:null;
+            if(!$selectedRow){http_response_code(404);$reviewError='This submission is unavailable or you do not have access to it.';}
+            else $payload=rbacReadPayload($selected);
+        }catch(Throwable $e){$selectedRow=null;$reviewError='The proposal could not be loaded. Please try again.';error_log('Approval proposal unavailable.');}
+    }
+}
+if($super&&pageReviewReady()){
+    try{$legacyCount=(int)getDB()->query("SELECT COUNT(*) FROM page_sections WHERE review_status='pending'")->fetchColumn();}catch(Throwable $e){}
+}
 $pageTitle=$super?'Approvals':'My Submissions';require __DIR__.'/../components/header-admin.php';
-$e=fn($value)=>htmlspecialchars((string)$value,ENT_QUOTES,'UTF-8');
-$counts=array_count_values(array_column($rows,'status'));
+$e=fn($v)=>htmlspecialchars((string)$v,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+$reviewUrl=fn($changes=[])=>'/admin/submissions.php?'.http_build_query(array_merge($filters,$changes));
+$statuses=approvalStatuses();$types=approvalTypes();
+$active=count(array_filter(array_intersect_key($filters,array_flip(['q','status','type','author','from','to'])),fn($v)=>$v!==''));
 ?>
 <link rel="stylesheet" href="/assets/css/admin-approvals.css?v=<?= (int)filemtime(__DIR__.'/../assets/css/admin-approvals.css') ?>">
 <div class="approval-page">
-<div class="page-header"><div><h1><?= $e($pageTitle) ?></h1><p><?= $super?'Review proposed content before it reaches the public website.':'Track drafts, approvals and rejection reasons. Published content stays unchanged until Super Admin approves.' ?></p></div></div>
-<?php if($error):?><div class="alert alert-danger" role="alert"><?= $e($error) ?></div><?php endif;?>
-<?php if($success):?><div class="alert alert-success" role="status"><?= $e($success) ?></div><?php endif;?>
-<?php if(!$ready):?><div class="alert alert-warning">Approval storage needs developer setup: import <code>sql/rbac-migration.sql</code>. No proposed changes are applied while storage is unavailable.</div><?php endif;?>
-<?php if($selected):?><p><a href="/admin/submissions.php">View all submissions</a></p><?php endif;?>
-<?php if(!$rows):?><div class="data-card approval-empty"><i class="bi bi-inbox" aria-hidden="true"></i><h2>No submissions yet</h2><p><?= $super?'Content submitted for review will appear here.':'Your saved drafts and submissions will appear here.' ?></p></div><?php endif;?>
-<?php if($rows):?>
-<div class="approval-overview" aria-label="<?= $selected?'Selected submission summary':'Recent submissions summary' ?>">
- <?php foreach(['pending'=>'Awaiting approval','approved'=>'Approved','rejected'=>'Needs revision'] as $state=>$label):?><div class="data-card approval-stat approval-stat-<?= $e($state) ?>"><span><?= $e($label) ?></span><strong><?= (int)($counts[$state]??0) ?></strong></div><?php endforeach;?>
+<div class="page-header"><div><h1><?= $e($pageTitle) ?></h1><p><?= $super?'Review proposals, give clear feedback and approve changes when they are ready.':'Follow your proposals, review feedback and send revisions for approval.' ?></p></div><span class="approval-header-note"><i class="bi bi-shield-check" aria-hidden="true"></i> Published content stays unchanged until approval</span></div>
+<?php if($error): ?><div class="alert alert-danger" role="alert"><?= $e($error) ?></div><?php endif; ?>
+<?php if($success): ?><div class="alert alert-success" role="status"><?= $e($success) ?></div><?php endif; ?>
+<?php if(!$ready): ?><div class="alert alert-warning" role="alert">Approval storage is unavailable. Contact your system administrator. No changes can be approved here until it is restored.</div><?php endif; ?>
+<?php if($queueError): ?><div class="alert alert-danger" role="alert"><?= $e($queueError) ?> <a href="<?= $e($reviewUrl()) ?>">Retry</a></div><?php endif; ?>
+<nav class="approval-overview" aria-label="Filter submissions by status">
+<?php foreach(['pending'=>'Awaiting approval','approved'=>'Approved','needs_revision'=>'Needs revision'] as $state=>$label): ?>
+<a class="data-card approval-stat approval-stat-<?= $e($state) ?><?= $filters['status']===$state?' active':'' ?>" href="<?= $e($reviewUrl(['status'=>$state,'page'=>1])) ?>"<?= $filters['status']===$state?' aria-current="page"':'' ?>><span><?= $e($label) ?></span><strong><?= $queueError||!$ready?'—':number_format((int)($counts[$state]??0)) ?></strong></a>
+<?php endforeach; ?>
+</nav>
+<form class="data-card approval-toolbar" method="get" action="/admin/submissions.php" id="approval-filters">
+<div class="approval-filter-main"><label for="approval-search">Search submissions<input class="form-control" id="approval-search" name="q" type="search" maxlength="200" value="<?= $e($filters['q']) ?>" placeholder="Search title, author or content type"></label><label for="approval-status">Status<select class="form-select" id="approval-status" name="status"><option value="">All statuses</option><?php foreach($statuses as $key=>$label): ?><option value="<?= $e($key) ?>"<?= $filters['status']===$key?' selected':'' ?>><?= $e($label) ?></option><?php endforeach; ?></select></label><button class="btn btn-gnc" type="submit">Apply filters</button><a class="btn btn-outline-secondary" href="/admin/submissions.php">Clear filters</a></div>
+<details class="approval-more"<?= $filters['type']||$filters['author']||$filters['from']||$filters['to']?' open':'' ?>><summary>More filters <span>Content type, author and submission date</span></summary><div class="approval-filter-grid">
+<label for="approval-type">Content type<select class="form-select" name="type" id="approval-type"><option value="">All content</option><?php foreach($types as $key=>$label): ?><option value="<?= $key ?>"<?= $filters['type']===$key?' selected':'' ?>><?= $e($label) ?></option><?php endforeach; ?></select></label>
+<label for="approval-author">Submitted by<select class="form-select" name="author" id="approval-author"><option value="">All authors</option><?php foreach($authors as $author): ?><option value="<?= (int)$author['user_id'] ?>"<?= $filters['author']===(string)$author['user_id']?' selected':'' ?>><?= $e(approvalAuthor($author)) ?></option><?php endforeach; ?></select></label>
+<label for="approval-from">From date<input class="form-control" type="date" id="approval-from" name="from" value="<?= $e($filters['from']) ?>"></label><label for="approval-to">To date<input class="form-control" type="date" id="approval-to" name="to" value="<?= $e($filters['to']) ?>"></label>
+</div></details>
+<div class="approval-preferences"><label for="approval-sort">Sort by<select class="form-select" id="approval-sort" name="sort"><?php foreach(['priority'=>'Pending first · oldest first','newest'=>'Newest first','oldest'=>'Oldest first'] as $key=>$label): ?><option value="<?= $key ?>"<?= $filters['sort']===$key?' selected':'' ?>><?= $e($label) ?></option><?php endforeach; ?></select></label><label for="approval-size">Rows per page<select class="form-select" id="approval-size" name="size"><?php foreach([10,25,50,100] as $size): ?><option<?= $filters['size']===$size?' selected':'' ?>><?= $size ?></option><?php endforeach; ?></select></label></div>
+</form>
+<?php if($super): ?><aside class="approval-page-text"><div><h2>Page text changes <span><?= $legacyCount ?> awaiting review</span></h2><p>Review individual page sections in the Content Editor. These are separate from the proposals below.</p></div><a class="btn btn-outline-secondary" href="/admin/content-edit.php?page=review">Review page text <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></aside><?php endif; ?>
+<div class="approval-results"><h2>Review queue</h2><p role="status"><?= number_format($total) ?> matching <?= $total===1?'submission':'submissions' ?><?= $active?' · '.$active.' active '.($active===1?'filter':'filters'):'' ?></p></div>
+<?php if($ready&&!$queueError&&!$rows): ?><div class="data-card approval-empty"><i class="bi bi-inbox" aria-hidden="true"></i><h3><?= $active?'No matching submissions':'Your queue is clear' ?></h3><p><?= $active?'Try another search or widen your filters.':'New proposals will appear here when they are submitted.' ?></p><?php if($active): ?><a href="/admin/submissions.php">Clear filters</a><?php endif; ?></div><?php endif; ?>
+<?php if($rows): ?>
+<div class="data-card approval-list"><table class="table approval-table"><caption class="visually-hidden">Submitted proposals. Open Review submission to inspect content and take action.</caption><thead><tr><th scope="col">Content</th><th scope="col">Submitted by</th><th scope="col">Submitted</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Review</span></th></tr></thead><tbody>
+<?php foreach($rows as $item): ?>
+<tr<?= $item['status']==='pending'?' class="approval-row-pending"':'' ?>><td data-label="Content"><span class="approval-type"><?= $e($types[$item['content_type']]) ?></span><strong class="approval-row-title"><?= $e($item['title']) ?></strong><?php if((int)$item['revision']>1): ?><span class="approval-row-revision">Revision <?= (int)$item['revision'] ?></span><?php endif; ?></td><td data-label="Submitted by"><?= $e(approvalAuthor($item)) ?></td><td data-label="Submitted"><time title="<?= $e($item['created_at']) ?>"><?= $e(approvalDate($item['created_at'])) ?></time></td><td data-label="Status"><span class="approval-status approval-status-<?= $e($item['status']) ?>"><?= $e($statuses[$item['status']]??$item['status']) ?></span></td><td class="approval-row-action"><a class="btn btn-outline-secondary" data-review-open href="<?= $e($reviewUrl(['id'=>(int)$item['submission_id']])) ?>#submission-review" aria-label="<?= $e('Review submission: '.$item['title']) ?>">Review submission <i class="bi bi-arrow-right" aria-hidden="true"></i></a></td></tr>
+<?php endforeach; ?>
+</tbody></table></div>
+<nav class="approval-pagination" aria-label="Submission pagination"><p>Showing <?= number_format(($filters['page']-1)*$filters['size']+1) ?>–<?= number_format(min($total,$filters['page']*$filters['size'])) ?> of <?= number_format($total) ?></p><div><?php if($filters['page']>1): ?><a class="btn btn-outline-secondary" href="<?= $e($reviewUrl(['page'=>1])) ?>">First</a><a class="btn btn-outline-secondary" rel="prev" href="<?= $e($reviewUrl(['page'=>$filters['page']-1])) ?>">Previous</a><?php endif; ?><span>Page <?= number_format($filters['page']) ?> of <?= number_format($pages) ?></span><?php if($filters['page']<$pages): ?><a class="btn btn-outline-secondary" rel="next" href="<?= $e($reviewUrl(['page'=>$filters['page']+1])) ?>">Next</a><a class="btn btn-outline-secondary" href="<?= $e($reviewUrl(['page'=>$pages])) ?>">Last</a><?php endif; ?></div></nav>
+<?php endif; ?>
+<p id="approval-loading" role="status" hidden>Loading submission…</p><p id="approval-load-error" class="alert alert-danger" role="alert" hidden>Could not open the review. <a href="<?= $e($reviewUrl()) ?>" id="approval-retry">Open submission page</a></p>
+<?php if($reviewError): ?><p class="alert alert-danger" role="alert"><?= $e($reviewError) ?></p><?php endif; ?>
+<?php if($selectedRow): $row=$selectedRow;try{include __DIR__.'/partials/submission-review.php';}catch(Throwable $e){error_log('Approval preview unavailable.');?><p class="alert alert-danger" role="alert">Some proposal details could not be loaded. Reload before taking any action.</p><?php } endif; ?>
+<dialog id="approval-dialog" aria-labelledby="review-title"><div id="approval-dialog-content"></div></dialog>
 </div>
-<div class="data-card approval-toolbar">
- <div><h2><?= $selected?'Submission details':'Review queue' ?></h2><p><?= $selected?'Review the content and choose an action.':'Your most recent 100 submissions, updated first.' ?></p></div>
- <div class="approval-filters"><label class="approval-search"><span class="visually-hidden">Search submissions</span><i class="bi bi-search" aria-hidden="true"></i><input type="search" id="approval-search" class="form-control" placeholder="Search title, author or type…"></label><label><span class="visually-hidden">Filter by status</span><select id="approval-status" class="form-select"><option value="">All statuses</option><?php foreach(['pending','approved','rejected','draft','failed','processing','uncertain'] as $state):?><option value="<?= $state ?>"><?= ucfirst($state) ?></option><?php endforeach;?></select></label></div>
-</div>
-<p class="approval-results text-muted small" id="approval-results" role="status"><?= count($rows) ?> submission<?= count($rows)===1?'':'s' ?> shown</p>
-<?php endif;?>
-<?php foreach($rows as $row):$id=(int)$row['submission_id'];$payload=rbacReadPayload($id);$typeLabel=rbacSubmissionLabel($row,$payload);?>
-<section class="data-card approval-card mb-4" id="submission-<?= $id ?>" data-approval-status="<?= $e($row['status']) ?>" data-approval-search="<?= $e($row['title'].' '.$row['first_name'].' '.$row['last_name'].' '.$typeLabel) ?>">
- <div class="approval-card-heading">
- <div class="approval-heading-main"><span class="approval-type"><?= $e($typeLabel) ?></span><h2 class="data-card-title"><?= $e($row['title']) ?></h2></div>
- <span class="approval-status approval-status-<?= $e($row['status']) ?>"><span aria-hidden="true"></span><?= $e(ucfirst($row['status'])) ?></span>
- </div>
- <div class="approval-meta"><span><i class="bi bi-person" aria-hidden="true"></i> <?= $e($row['first_name'].' '.$row['last_name']) ?></span><span><i class="bi bi-clock" aria-hidden="true"></i> <?= $e($row['updated_at']) ?></span><span>#<?= $id ?> &middot; Revision <?= (int)$row['revision'] ?></span></div>
- <?php if($row['reason']):?><div class="alert alert-<?= $row['status']==='rejected'?'danger':'warning' ?>"><?= nl2br($e($row['reason'])) ?></div><?php endif;?>
- <?php if($row['status']==='pending'&&!$super):?><p class="text-muted">Waiting for Super Admin approval. Your submission is saved and will appear on the website after approval.</p><?php endif;?>
- <?php if($row['kind']==='snapshot'):
-    $url='/admin/content-edit.php?'.http_build_query(['page'=>$payload['page'],'review_submission'=>$id,'route'=>$payload['route']]);?>
- <a class="btn btn-outline-secondary mb-3" href="<?= $e($url) ?>"><?= $super?'Review proposed page changes':'Open saved page changes' ?></a>
- <?php if($super&&$row['status']==='pending'):?><p class="small text-muted">Review the saved canvas, then use Approve and publish inside the Content Editor. Nothing is published by opening it.</p><?php endif;?>
- <?php else:?>
- <details class="approval-preview"<?= $selected?' open':'' ?>><summary><span><i class="bi bi-file-earmark-text" aria-hidden="true"></i> Proposed content</span><span class="approval-preview-hint">View details</span></summary><dl class="approval-fields">
- <?php foreach($payload['post']??[] as $field=>$value):
-    // Transport fields and crop metadata belong to the saved request, not its content preview.
-    if(str_starts_with($field,'_')||str_ends_with($field,'_id')||in_array($field,['action','ajax_action','csrf_token','status','allow_incomplete','facebook_confirmed','facebook_request_key','image_framing','image_framing_json','publish_destination','import_token'],true))continue;
-    if(is_array($value)){
-        $items=[];array_walk_recursive($value,static function($item)use(&$items){if(is_scalar($item))$items[]=(string)$item;});
-        $value=implode(', ',$items);
-    }
-    $preview=trim(strip_tags((string)$value));if($preview==='')continue;
- ?><dt><?= $e(ucwords(str_replace('_',' ',$field))) ?></dt><dd style="white-space:pre-wrap;overflow-wrap:anywhere"><?= $e(mb_substr($preview,0,12000)) ?></dd><?php endforeach;?>
- </dl>
- <?php if(($row['route']??'')==='/admin/events.php'&&($payload['post']['ajax_action']??'')==='import_confirm'):
-    include __DIR__.'/partials/calendar-import-review.php';
- endif;?>
- <?php foreach($payload['files']??[] as $field=>$file):$media='/admin/submissions.php?'.http_build_query(['media'=>$id,'field'=>$field]);?>
- <div class="approval-attachment"><?php if(str_starts_with($file['mime'],'image/')):?><img src="<?= $e($media) ?>" alt="Submitted image" loading="lazy"><?php else:?><i class="bi bi-paperclip" aria-hidden="true"></i><?php endif;?><a href="<?= $e($media) ?>" target="_blank" rel="noopener"><?= $e($file['name']) ?><span class="visually-hidden"> (opens in a new tab)</span></a></div>
- <?php endforeach;?></details>
- <?php endif;?>
- <div class="approval-actions">
- <?php if($super&&in_array($row['status'],['pending','uncertain'],true)&&$row['kind']==='request'):?>
- <form method="post" data-review-confirm="<?= $row['status']==='uncertain'?'Verify first that this item is not already published on the website, then retry approval?':'Approve and apply these changes to the website?' ?>"><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="submission_id" value="<?= $id ?>"><input type="hidden" name="revision" value="<?= (int)$row['revision'] ?>"><input type="hidden" name="action" value="approve"><button class="btn btn-gnc-gold"><?= $row['status']==='uncertain'?'Retry approval':'Approve and apply' ?></button></form>
- <?php endif;?>
- <?php if((int)$row['user_id']===$userId&&in_array($row['status'],['draft','rejected','failed','uncertain'],true)):?>
- <?php if($row['kind']==='request'&&in_array($row['route'],['/admin/action/create-news.php','/admin/action/create-announcement.php'],true)):$kind=str_contains($row['route'],'create-news')?'news':'announcement';$post=$payload['post'];$url='/admin/'.$kind.'.php?'.http_build_query(['modal'=>($post['action']??'')==='update'?'edit':'create','id'=>$row['target_id'],'revise'=>$id]);?><a class="btn btn-outline-secondary" href="<?= $e($url) ?>">Revise submission</a><?php endif;?>
- <form method="post" data-review-confirm="Submit this saved proposal for Super Admin approval?"><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="submission_id" value="<?= $id ?>"><input type="hidden" name="revision" value="<?= (int)$row['revision'] ?>"><input type="hidden" name="action" value="submit"><button class="btn btn-outline-secondary">Submit for approval</button></form>
- <?php endif;?>
- <?php if(((int)$row['user_id']===$userId||$super)&&$row['status']!=='processing'):?>
- <form method="post" data-review-confirm="Delete this submission from your queue? Published website content will not be affected."><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="submission_id" value="<?= $id ?>"><input type="hidden" name="revision" value="<?= (int)$row['revision'] ?>"><input type="hidden" name="action" value="delete"><button class="btn btn-outline-danger"><i class="bi bi-trash" aria-hidden="true"></i> Delete submission</button></form>
- <?php endif;?>
- </div>
- <?php if($super&&$row['status']==='pending'):?>
- <details class="approval-reject"><summary>Reject with reason</summary><form method="post" data-review-confirm="Reject this submission and send your reason to the author?"><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="submission_id" value="<?= $id ?>"><input type="hidden" name="revision" value="<?= (int)$row['revision'] ?>"><input type="hidden" name="action" value="reject"><label class="form-label" for="reason-<?= $id ?>">What should the author change?</label><textarea class="form-control mb-2" id="reason-<?= $id ?>" name="reason" maxlength="2000" placeholder="e.g. Please update the event date and attach the official poster." required></textarea><p class="small text-muted">This reason will be visible to the author so they can revise and resubmit.</p><button class="btn btn-outline-danger">Confirm rejection</button></form></details>
- <?php endif;?>
- <?php if(in_array($row['status'],['processing','uncertain'],true)):?><p class="text-warning mt-3">Execution needs verification. Check the actual content before submitting another request; this request cannot be executed twice.</p><?php endif;?>
-</section>
-<?php endforeach;?>
-<div class="data-card approval-empty" id="approval-no-results" hidden><i class="bi bi-search" aria-hidden="true"></i><h2>No matching submissions</h2><p>Try another search or choose a different status.</p></div>
-<?php if($super):?><div class="data-card p-4 mb-4"><h2 class="data-card-title">Existing page-text review queue</h2><p>Previously submitted page-text changes remain available in the Content Editor.</p><a class="btn btn-outline-secondary" href="/admin/content-edit.php?page=review">Review page text</a></div><?php endif;?>
-</div>
-<script>
-(()=>{const search=document.getElementById('approval-search'),status=document.getElementById('approval-status');if(!search||!status)return;const cards=[...document.querySelectorAll('[data-approval-status]')];function filter(){const term=search.value.trim().toLocaleLowerCase();let count=0;cards.forEach(card=>{card.hidden=!(card.dataset.approvalSearch.toLocaleLowerCase().includes(term)&&(!status.value||card.dataset.approvalStatus===status.value));if(!card.hidden)count++;});document.getElementById('approval-results').textContent=count+' submission'+(count===1?'':'s')+' shown';document.getElementById('approval-no-results').hidden=count!==0;}search.addEventListener('input',filter);status.addEventListener('change',filter);})();
-document.addEventListener('submit',async event=>{const form=event.target;if(!form.matches('[data-review-confirm]'))return;event.preventDefault();if(await AdminDialogs.confirm(form.dataset.reviewConfirm,{title:'Confirm review',confirmText:'Continue'})){form.querySelector('button').disabled=true;HTMLFormElement.prototype.submit.call(form);}});
-</script>
-<?php require __DIR__.'/../components/footer-admin.php';?>
+<script src="/assets/js/admin-approvals.js?v=<?= (int)filemtime(__DIR__.'/../assets/js/admin-approvals.js') ?>"></script>
+<?php require __DIR__.'/../components/footer-admin.php'; ?>

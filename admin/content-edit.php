@@ -75,6 +75,7 @@ $customSlugs = ['home', 'college-departments', 'programs', 'administration', 'gr
 
 // Where each page appears on the public website (shown as "View live page")
 $publicUrls = [
+    'alumni'                     => '/pages/alumni.php',
     'enrollment-procedures'      => '/pages/admission/enrollment-procedures.php',
     'contact-us'                 => '/pages/contact-us.php',
     'basic-education-admission-requirements' => '/pages/admission/basic-education-admission-req.php',
@@ -169,6 +170,13 @@ foreach ($textPages as $sp) {
             ensureCollegeAdmissionHeadingSection();
         }
         $sectionsBySlug[$sp['slug']] = getPageSectionsDetailed($sp['slug']);
+        if ($sp['slug'] === 'alumni') {
+            $sectionsBySlug[$sp['slug']] = array_values(array_filter($sectionsBySlug[$sp['slug']], static function ($section) {
+                if (in_array($section['section_key'], ['voices_data', 'hero_image', 'events_image', 'survey_image'], true)) return false;
+                if ($section['section_key'] === 'stories') return trim(strip_tags($section['draft_content'] ?? $section['content'] ?? '')) !== '';
+                return true;
+            }));
+        }
         if (in_array($sp['slug'],['college-admission-requirements','basic-education-admission-requirements'],true)) {
             $sectionsBySlug[$sp['slug']] = array_values(array_filter($sectionsBySlug[$sp['slug']],static fn($section) => $section['status']==='published'));
         }
@@ -233,6 +241,28 @@ if ($editorMode) {
     if ($canManagePages && !in_array('scholarships',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'scholarships','title'=>'Scholarship Opportunities','group'=>'Admissions','icon'=>'mortarboard'];
     if ($canManagePages && !in_array('tuition-fees',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'tuition-fees','title'=>'Tuition and Fees','group'=>'Admissions','icon'=>'file-earmark-pdf'];
     if ($postModules && $canManagePages) $pickerPages[] = ['slug' => 'updates', 'title' => 'News, announcements & events', 'group' => 'Posts', 'icon' => 'megaphone'];
+
+    // Follow the public navbar, retaining only pages already allowed above.
+    $navbarPageGroups = [
+        'Homepage' => ['home'],
+        'About' => ['history', 'vision-mission', 'core-values', 'logo-meaning', 'administration'],
+        'Academics' => ['basic-education', 'basic-education-departments', 'college-departments', 'programs', 'graduate-school'],
+        'Admissions' => ['basic-education-admission-requirements', 'college-admission-requirements', 'enrollment-procedures', 'tuition-fees', 'scholarships', 'online-payment-guide'],
+        'Student Life' => ['student-organizations', 'community-activities', 'athletics-sports', 'faqs', 'student-achievements', 'alumni'],
+        'News & Announcements' => ['updates'],
+        'Contact Us' => ['contact-us'],
+    ];
+    $navbarPageOrder = [];
+    foreach ($navbarPageGroups as $group => $slugs) {
+        foreach ($slugs as $slug) $navbarPageOrder[$slug] = ['group' => $group, 'order' => count($navbarPageOrder)];
+    }
+    foreach ($pickerPages as &$pickerPage) {
+        $pickerPage['group'] = $navbarPageOrder[$pickerPage['slug']]['group'] ?? 'Other pages';
+    }
+    unset($pickerPage);
+    usort($pickerPages, static function ($a, $b) use ($navbarPageOrder) {
+        return ($navbarPageOrder[$a['slug']]['order'] ?? PHP_INT_MAX) <=> ($navbarPageOrder[$b['slug']]['order'] ?? PHP_INT_MAX);
+    });
 
     $veTitle   = $activeSlug === 'home' ? 'Homepage' : ($titleOf[$activeSlug] ?? $activeSlug);
     $publicUrl = $publicUrls[$activeSlug] ?? '';
@@ -632,6 +662,7 @@ include __DIR__ . '/../components/header-admin.php';
 <script src="/assets/js/editor-feedback.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/editor-feedback.js'),0,12) ?>"></script>
 <script src="/assets/js/department-card-order.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/department-card-order.js'),0,12) ?>"></script>
 <script src="/assets/js/editor-drafts.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/editor-drafts.js'),0,12) ?>"></script>
+<?php if ($activeSlug === 'alumni'): ?><script src="/assets/js/alumni-voices-editor.js?v=<?= filemtime(__DIR__ . '/../assets/js/alumni-voices-editor.js') ?>"></script><?php endif; ?>
 <script src="/assets/js/content-edit.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/content-edit.js'),0,12) ?>"></script>
 
 <?php else: ?>

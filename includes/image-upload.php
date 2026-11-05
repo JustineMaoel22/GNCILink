@@ -1,5 +1,7 @@
 <?php
 const IMAGE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
+const IMAGE_UPLOAD_MAX_WIDTH = 1920;
+const IMAGE_UPLOAD_MAX_HEIGHT = 1080;
 
 /** Check PDF header, final cross-reference pointer and EOF without trusting the filename. */
 function uploadPdfSignatureValid(string $path): bool {
@@ -56,19 +58,30 @@ function imageUploadEnvironment(): array {
     ];
 }
 
-/** Optimize large raster photos in place, retaining format, alpha and animation. */
+/** Fit raster uploads within 1080p without cropping/upscaling; preserve format, alpha and animation. */
 function imageUploadOptimizePath(string $path): void {
     clearstatcache(true, $path);
-    if (filesize($path) <= IMAGE_UPLOAD_MAX_BYTES) return;
-    if (!class_exists('Imagick') || !method_exists('Imagick', 'pingImage')) throw new RuntimeException('Automatic image optimization is unavailable. Please use an image up to 5 MB.');
+    $originalSize = filesize($path);
     $info = @getimagesize($path);
     if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP, IMAGETYPE_GIF], true)) {
+        if ($originalSize <= IMAGE_UPLOAD_MAX_BYTES) return;
         throw new InvalidArgumentException('Use a JPG, PNG, WebP or GIF photo for automatic optimization. Other images must be up to 5 MB.');
+    }
+    $needsResize = $info[0] > IMAGE_UPLOAD_MAX_WIDTH || $info[1] > IMAGE_UPLOAD_MAX_HEIGHT;
+    if (!class_exists('Imagick') || !method_exists('Imagick', 'pingImage')) {
+        // Preserve existing upload compatibility on hosts without an image processor.
+        if ($originalSize <= IMAGE_UPLOAD_MAX_BYTES) return;
+        throw new RuntimeException('Automatic image optimization requires the PHP Imagick extension. Please use an image up to 5 MB.');
     }
     $probe = new Imagick();
     $probe->pingImage($path);
     $frames = $probe->getNumberImages();
+    // A portrait may fit before EXIF rotation but exceed the height limit afterwards.
+    if (in_array($probe->getImageOrientation(), [5, 6, 7, 8], true)) {
+        $needsResize = $info[1] > IMAGE_UPLOAD_MAX_WIDTH || $info[0] > IMAGE_UPLOAD_MAX_HEIGHT;
+    }
     $probe->clear();
+    if (!$needsResize && $originalSize <= IMAGE_UPLOAD_MAX_BYTES) return;
     if ($frames > 100 || $info[0] * $info[1] * $frames > 80000000 || max($info[0], $info[1]) > 20000) {
         throw new InvalidArgumentException('This image is too large to optimize. Please use a smaller photo.');
     }
@@ -81,6 +94,10 @@ function imageUploadOptimizePath(string $path): void {
         }
         foreach ($image as $frame) {
             $frame->autoOrient();
+            $scale = min(1, IMAGE_UPLOAD_MAX_WIDTH / $frame->getImageWidth(), IMAGE_UPLOAD_MAX_HEIGHT / $frame->getImageHeight());
+            if ($scale < 1) {
+                $frame->resizeImage(max(1, (int)round($frame->getImageWidth() * $scale)), max(1, (int)round($frame->getImageHeight() * $scale)), Imagick::FILTER_LANCZOS, 1);
+            }
             $frame->setImagePage(0, 0, 0, 0);
         }
         $resize = static function (Imagick $frames, float $scale): void {
@@ -91,13 +108,13 @@ function imageUploadOptimizePath(string $path): void {
         };
         // PNG compression is lossless: lowering JPEG-style quality does not shrink its pixels.
         // Size these formats before encoding instead of recompressing the same full-size image.
-        if (in_array($info[2], [IMAGETYPE_PNG, IMAGETYPE_GIF], true)) {
+        if (!$needsResize && in_array($info[2], [IMAGETYPE_PNG, IMAGETYPE_GIF], true)) {
             $scale = min(.9, sqrt(IMAGE_UPLOAD_MAX_BYTES * .9 / filesize($path)));
             $resize($image, max(.25, $scale));
         }
         for ($attempt = 0; $attempt < 6; $attempt++) {
             foreach ($image as $frame) {
-                $frame->setImageCompressionQuality(max(65, 92 - $attempt * 7));
+                $frame->setImageCompressionQuality(max(65, 82 - $attempt * 5));
                 $frame->setOption('png:compression-level', '4');
             }
             $image->setFirstIterator();
@@ -116,7 +133,7 @@ function imageUploadOptimizePath(string $path): void {
     }
 }
 
-/** Optimize oversized originals before enforcing the common saved-image cap. */
+/** Optimize large dimensions as well as oversized files before validating saved uploads. */
 function imageUploadPrepare(?array $file): ?array {
     if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) return $file;
     $path = $file['tmp_name'] ?? '';
@@ -125,11 +142,12 @@ function imageUploadPrepare(?array $file): ?array {
     $file['size'] = filesize($path);
     $file['type'] = $mime;
     if (!str_starts_with($mime, 'image/')) return $file;
-    if ($file['size'] > IMAGE_UPLOAD_MAX_BYTES) {
+    $info = @getimagesize($path);
+    if ($info) {
         $originalHash = hash_file('sha256', $path);
         imageUploadOptimizePath($path);
         $newHash = hash_file('sha256', $path);
-        $GLOBALS['imageUploadOriginalHashes'][$newHash] = $originalHash;
+        $GLOBALS['imageUploadOriginalHashes'][$newHash] = $GLOBALS['imageUploadOriginalHashes'][$originalHash] ?? $originalHash;
         $file['size'] = filesize($path);
     }
     return $file;

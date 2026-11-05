@@ -49,7 +49,9 @@
 .ci-flag-chip { display: inline-block; font-size: .68rem; font-weight: 600; color: #7a5200; background: #fff3cd; border: 1px solid #f0d58c; border-radius: .35rem; padding: .1rem .45rem; }
 .ci-flag-inline { display: inline-block; margin-left: .4rem; font-size: .68rem; font-weight: 600; color: #7a5200; background: #fff3cd; border-radius: .25rem; padding: .05rem .35rem; }
 .ci-field-flagged { border-color: #d99b26 !important; background-color: #fffdf5 !important; }
-.ci-row-actions { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; }
+.ci-row-actions { display: flex; flex-wrap: nowrap; gap: .3rem; align-items: center; }
+.ci-row-actions > .btn { flex-shrink: 0; white-space: nowrap; }
+.ci-row-actions > .ci-approve-action { width: 100px; }
 .ci-badge { display: inline-block; border-radius: 1rem; padding: .2rem .5rem; font-size: .7rem; white-space: nowrap; background: #eef1ee; color: #526057; }
 .ci-badge.approved { background: #e7f4e9; color: #236532; }
 .ci-badge.needs { background: #fff1cb; color: #755813; }
@@ -85,6 +87,17 @@
     .ci-table td:nth-child(4) { grid-column: 2; grid-row: 3; }
     .ci-table td:nth-child(5) { grid-column: 3; grid-row: 2; }
     .ci-table td:nth-child(6) { grid-column: 3; grid-row: 1; }
+    .ci-table td.ci-actions-cell { grid-column: 2 / -1; grid-row: 4; }
+    .ci-row-actions { flex-wrap: wrap; }
     .ci-table .ci-editor { display: block; }.ci-table .ci-editor > td { display: block; width: 100%; }
     .ci-description { max-width: 100%; }.ci-table .ci-title { font-size: .8rem; }
 }
+/* Import row audience pickers use the shared multi-selection component. */
+.ci-editor .gnc-ms-trigger { flex-wrap: nowrap; padding: 6px 10px; }
+.ci-editor .gnc-ms-tags-area { flex: 1 1 0; max-height: 106px; overflow-y: auto; }
+.ci-editor .gnc-ms-arrow { display: none; }
+.ci-editor .evt-audience-toggle { flex-shrink: 0; min-height: 36px; padding: 6px 10px; border: 1px solid var(--ci-border); border-radius: 6px; color: var(--ci-green); background: #fff; font-size: .8rem; }
+.ci-editor .gnc-ms-dropdown { position: static; margin-top: 8px; box-shadow: none; }
+.ci-editor .gnc-ms-list { max-height: 210px; overscroll-behavior: contain; }
+.ci-editor-grid .gnc-ms-option { display: flex; align-items: center; }
+.ci-editor-grid .gnc-ms-option input { margin-top: 0; }

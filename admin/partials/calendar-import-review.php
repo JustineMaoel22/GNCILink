@@ -14,12 +14,16 @@ $calendarReviewDepartments=getDB()->query('SELECT dept_id,dept_name FROM departm
 <p class="text-muted">Only the activities below were approved in the import preview. Approving this submission publishes additions and updates, and hides any explicitly selected removals.</p>
 <?php endif; ?>
 <div class="table-responsive"><table class="table"><thead><tr><th>Action</th><th>Event</th><th>Date &amp; time</th><th>Location</th><th>Category</th><th>Description</th></tr></thead><tbody>
-<?php foreach($calendarReviewRows as $calendarReviewEvent): ?>
+<?php foreach($calendarReviewRows as $calendarReviewEvent):
+$calendarReviewDeptNames=array_map(static fn($id)=>$calendarReviewDepartments[$id]??('Department #'.(int)$id),$calendarReviewEvent['dept_ids']??[]);
+$calendarReviewAudience=['basic-education'=>'All Basic Education','college'=>'All College'][$calendarReviewEvent['audience_group']??'all']??($calendarReviewDeptNames?implode(', ',$calendarReviewDeptNames):($calendarReviewDepartments[$calendarReviewEvent['dept_id']??0]??'All departments'));
+$calendarReviewPrograms=!empty($calendarReviewEvent['programs'])?implode(', ',$calendarReviewEvent['programs']):($calendarReviewEvent['program']??'ALL');
+?>
 <tr><td><?= $e(ucfirst($calendarReviewEvent['action'])) ?><?= $calendarReviewEvent['event_id']?' #'.(int)$calendarReviewEvent['event_id']:'' ?></td>
 <td><?= $e($calendarReviewEvent['title']??'Previously imported event') ?></td>
 <td><?= $e($calendarReviewEvent['start_date']??'') ?><?= !empty($calendarReviewEvent['end_date'])?' – '.$e($calendarReviewEvent['end_date']):'' ?></td>
 <td><?= $e($calendarReviewEvent['location']??'') ?></td>
-<td><?= $e($calendarReviewCategories[$calendarReviewEvent['category_id']??0]??'—') ?><div class="small text-muted"><?= $e(['basic-education'=>'All Basic Education','college'=>'All College'][$calendarReviewEvent['audience_group']??'all']??($calendarReviewDepartments[$calendarReviewEvent['dept_id']??0]??'All departments')) ?> · <?= $e($calendarReviewEvent['program']??'ALL') ?></div></td>
+<td><?= $e($calendarReviewCategories[$calendarReviewEvent['category_id']??0]??'—') ?><div class="small text-muted"><?= $e($calendarReviewAudience) ?> · <?= $e($calendarReviewPrograms) ?></div></td>
 <td style="white-space:pre-wrap;overflow-wrap:anywhere"><?= $e($calendarReviewEvent['description']??'') ?></td></tr>
 <?php endforeach; ?>
 </tbody></table></div>

@@ -7,18 +7,22 @@
 .gnc-tour::backdrop { background: transparent; }
 .gnc-tour-ring {
     position: fixed; pointer-events: none; border: 3px solid #eaba3b;
-    border-radius: 8px; box-shadow: 0 0 0 9999px rgba(0,0,0,.62);
+    border-radius: var(--admin-control-radius); box-shadow: 0 0 0 9999px rgba(6,32,24,.58);
 }
 .gnc-tour-card {
     position: fixed; width: min(420px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
-    overflow-y: auto; padding: 22px; border-radius: 14px; background: #fff;
-    box-shadow: 0 12px 36px rgba(0,0,0,.3); border-top: 4px solid #eaba3b;
+    overflow-y: auto; padding: 22px; border-radius: var(--admin-card-radius); background: #fff;
+    box-shadow: var(--admin-dialog-shadow); border: 1px solid #dfe6e1; border-top: 4px solid var(--gnc-gold);
 }
-.gnc-tour-card h2 { font-size: 1.25rem; color: #094024; margin: 8px 0 12px; }
-.gnc-tour-card p { line-height: 1.6; font-size: .95rem; }
-.gnc-tour-progress { color: #68736c; font-size: .8rem; }
+.gnc-tour-card h2 { font-size: 1.05rem; font-weight: 700; color: var(--admin-primary); margin: 16px 0 10px; }
+.gnc-tour-card p { line-height: 1.8; font-size: .85rem; margin-bottom: 16px; }
+.gnc-tour-progress { color: #5c6b62; font-size: .75rem; }
+.gnc-tour-meter { display: block; width: 100%; height: 5px; margin-top: 10px; border: 0; border-radius: 4px; overflow: hidden; background: #e7ede9; accent-color: var(--admin-primary); }
+.gnc-tour-meter::-webkit-progress-bar { background: #e7ede9; }
+.gnc-tour-meter::-webkit-progress-value { background: var(--admin-primary); }
+.gnc-tour-meter::-moz-progress-bar { background: var(--admin-primary); }
 .gnc-tour-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.gnc-tour-actions button { min-height: 42px; }
+.gnc-tour-actions button { min-height: 42px; font-size: .8rem; display: inline-flex; align-items: center; justify-content: center; }
 .gnc-tour-error { color: #a42828; }
 .gnc-tour-actions button:focus-visible { outline: 3px solid #094024; outline-offset: 3px; }
 @media (max-width: 575px) { .gnc-tour-card { padding: 16px; } }

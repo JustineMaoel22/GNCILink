@@ -1,6 +1,7 @@
 <?php
 /** Explicit browser routes. File paths remain the CMS and authorization identity. */
 return [
+    "/alumni" => "/pages/alumni.php",
     "/account-password" => "/admin/account-password.php",
     "/activity-logs" => "/admin/logs.php",
     "/admin-help" => "/admin/help.php",

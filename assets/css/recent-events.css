@@ -1,0 +1,96 @@
+/* Cards shared by Campus Events and Alumni. */
+.campus-recent-events {
+    padding: 0 0 4rem;
+    background: #F9F6F1;
+    font-family: 'Inter', sans-serif;
+    scroll-margin-top: 100px;
+}
+.campus-recent-events h2 {
+    margin: 0 0 2rem;
+    color: #1F5E2C;
+    text-align: center;
+    font: 700 clamp(1.5rem, 3vw, 2rem)/1.3 'Noto Serif', serif;
+}
+.campus-recent-events h2::after {
+    content: '';
+    display: block;
+    width: 52px;
+    height: 3px;
+    margin: .6rem auto 0;
+    background: #EABA3B;
+}
+.campus-recent-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
+.campus-recent-card {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    min-height: 250px;
+    aspect-ratio: 1.6;
+    overflow: hidden;
+    border-radius: 8px;
+    color: #fff;
+    background: #0b4228;
+    text-decoration: none;
+    isolation: isolate;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+.campus-recent-image, .campus-recent-placeholder {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -2;
+}
+.campus-recent-image { transition: transform .3s ease; }
+.campus-recent-placeholder { display: grid; place-items: center; background: linear-gradient(135deg, #37764a, #0b4228); font-size: 5rem; color: #ffffff45; }
+.campus-recent-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, #001b0d12 10%, #003c2670 45%, #003c26fa 100%);
+    z-index: -1;
+}
+.campus-recent-card:hover { color: #fff; transform: translateY(-4px); box-shadow: 0 12px 24px #09402430; }
+.campus-recent-card:hover .campus-recent-image { transform: scale(1.04); }
+.campus-recent-card:focus-visible { outline: 3px solid #d3a63a; outline-offset: 4px; }
+.campus-recent-date {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 5px;
+    background: #1F5E2Cee;
+    font-size: .65rem;
+    line-height: 1.25;
+}
+.campus-recent-date strong { font-size: 1.6rem; line-height: 1.1; }
+.campus-recent-content { width: 100%; padding: 1.1rem; }
+.campus-recent-type { display: block; margin-bottom: .25rem; color: #e0eadd; font-size: .7rem; }
+.campus-recent-content h3 { margin: 0 0 .5rem; font-size: 1rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.campus-recent-meta { display: flex; align-items: center; gap: .4rem; color: #dce7df; font-size: .7rem; }
+.campus-recent-empty { margin: 0; text-align: center; color: #5d6b62; }
+.campus-recent-pagination { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .5rem; margin-top: 2rem; }
+.campus-recent-pagination a { display: grid; place-items: center; min-width: 32px; min-height: 32px; padding: .25rem; border-radius: 4px; color: #1F5E2C; background: #fff; text-decoration: none; font-size: .85rem; }
+.campus-recent-pagination a:hover, .campus-recent-pagination a[aria-current="page"] { background: #1F5E2C; color: #fff; }
+@media (max-width: 991px) {
+    .campus-recent-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 575px) {
+    .campus-recent-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .campus-recent-card, .campus-recent-image { transition: none; }
+    .campus-recent-card:hover, .campus-recent-card:hover .campus-recent-image { transform: none; }
+}
+
+
+/* Shared responsive cards retain square edges and never force grid overflow. */
+.campus-recent-card { aspect-ratio: auto; min-width: 0; width: 100%; border-radius: 0; }
+.campus-recent-grid > * { min-width: 0; }
+.campus-recent-date, .campus-recent-pagination a { border-radius: 0; }
+.campus-recent-content h3 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+@media (pointer: coarse) { .campus-recent-pagination a { min-width: 44px; min-height: 44px; } }

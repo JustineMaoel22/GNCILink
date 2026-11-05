@@ -158,7 +158,7 @@ if ($db) {
             LEFT JOIN media_library m ON a.featured_image = m.media_id
             WHERE a.status = 'published'
         ");
-        $allAnnRows = $stmt->fetchAll();
+        $allAnnRows = attachAnnouncementCategories($db, $stmt->fetchAll());
         $pubAnnAudiences = getAnnouncementAudiencesBatch($db, $allAnnRows);
         foreach ($allAnnRows as $ann) {
             $excerpt = strip_tags($ann['content']);
@@ -174,6 +174,7 @@ if ($db) {
                 'date'          => $ann['published_at'] ?? $ann['created_at'],
                 'link'          => '/announcement-article.php?slug=' . urlencode($ann['slug']),
                 'category_id'   => $ann['category_id'],
+                'category_ids'  => $ann['category_ids'],
                 'category_name' => $ann['category_name'],
                 'program'       => $ann['program'],
                 'dept_id'       => $ann['dept_id'] ?? null,
@@ -385,7 +386,7 @@ $matchesFilters = function ($item, $skipCategory = false, $skipType = false) use
     }
     if (!$skipCategory && $selectedCategory !== null) {
         $itemCategory = is_string($selectedCategory) ? ($item['news_category'] ?? null) : (int)($item['category_id'] ?? 0);
-        if ($itemCategory !== $selectedCategory) return false;
+        if ($itemCategory !== $selectedCategory && !(is_int($selectedCategory) && in_array($selectedCategory, $item['category_ids'] ?? [], true))) return false;
     }
     if ($selectedDepartment !== null) {
         if (!empty($item['dept_id']) && (int)$item['dept_id'] !== (int)$calendarDepartments[$selectedDepartment]['dept_id']) return false;
@@ -418,7 +419,7 @@ foreach ($feedItems as $fi) {
     if (!$matchesFilters($fi, true, true)) continue;
     $group = $fi['type_key'];
     $cid = $group === 'news' ? ($fi['news_category'] ?? '') : (string)($fi['category_id'] ?? '');
-    if ($cid !== '') $catCounts[$group][$cid] = ($catCounts[$group][$cid] ?? 0) + 1;
+    foreach ($fi['category_ids'] ?? ($cid !== '' ? [$cid] : []) as $categoryId) $catCounts[$group][$categoryId] = ($catCounts[$group][$categoryId] ?? 0) + 1;
 }
 
 // ---------------------------------------------------------------

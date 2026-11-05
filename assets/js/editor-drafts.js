@@ -142,6 +142,7 @@
             load:async function(url){
                 if(!options.adapter().draftState)return;
                 var target=new URL(url || '/',location.origin);['ce_preview','_','_ve','add_org'].forEach(function(key){target.searchParams.delete(key);});target.hash='';target.searchParams.sort();
+                if(options.page==='alumni')target.searchParams.delete('event_page');
                 var previousRoute=target.pathname+target.search;
                 // The directory is one ordered collection; page/filter changes share its draft.
                 if(options.page==='student-organizations'&&!(options.reviewing&&options.reviewing())&&/\/student-org(?:\.php)?$/.test(target.pathname))['p','category','archived'].forEach(function(key){target.searchParams.delete(key);});

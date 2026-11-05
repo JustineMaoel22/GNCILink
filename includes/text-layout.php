@@ -31,6 +31,7 @@ function textLayoutRoute(string $route): string {
     parse_str($parts['query'] ?? '', $query);
     if ($programSlug !== null) $query['slug'] = $programSlug;
     foreach (['ce_preview','_','_ve','section','add_org'] as $key) unset($query[$key]);
+    if ($path === '/pages/alumni.php') unset($query['event_page']);
     foreach ($query as $key => $value) if (!is_string($value) || strlen($key) > 80 || strlen($value) > 200) throw new InvalidArgumentException('Invalid page parameters.');
     ksort($query);
     return $path . ($query ? '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986) : '');
