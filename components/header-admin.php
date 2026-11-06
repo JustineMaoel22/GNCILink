@@ -30,8 +30,10 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/header-admin-style.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/header-admin-style.css') ?>">
+    <script src="/assets/js/admin-appearance.js?v=<?= (int)filemtime(__DIR__ . '/../assets/js/admin-appearance.js') ?>" data-user="<?= (int)$_SESSION['user_id'] ?>"></script>
     <link rel="stylesheet" href="/assets/css/admin-dialogs.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/admin-dialogs.css') ?>">
     <script src="/assets/js/admin-dialogs.js?v=<?= (int)filemtime(__DIR__ . '/../assets/js/admin-dialogs.js') ?>"></script>
+    <?php if (rbacIsSuper()): ?><script src="/assets/js/admin-publish-confirmation.js?v=<?= (int)filemtime(__DIR__.'/../assets/js/admin-publish-confirmation.js') ?>"></script><?php endif; ?>
     <?php include_once __DIR__ . '/image-framing-assets.php'; ?>
     <meta name="cms-csrf" content="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
     <link rel="stylesheet" href="/assets/css/content-completeness.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/content-completeness.css') ?>">
@@ -109,9 +111,8 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
                 try { $cePending = (int)getDB()->query("SELECT COUNT(*) FROM page_sections WHERE review_status = 'pending'")->fetchColumn(); } catch (Exception $e) {}
             }
             ?>
-            <a href="/admin/content-edit.php<?= $cePending > 0 ? '?page=review' : '' ?>" class="sidebar-link <?= $currentPage === 'content-edit' ? 'active' : '' ?>">
+            <a href="/admin/content-edit.php" class="sidebar-link <?= $currentPage === 'content-edit' ? 'active' : '' ?>">
                 <i class="bi bi-grid-1x2"></i> Content Editor
-                <?php if ($cePending > 0): ?><span class="sidebar-badge"><?= $cePending ?></span><?php endif; ?>
             </a>
         </li>
         <?php endif; ?>
@@ -129,6 +130,7 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
                 try {
                     $db = getDB();
                     $pendingCount = rbacIsSuper() && function_exists('rbacSubmissionsReady') && rbacSubmissionsReady() ? $db->query("SELECT COUNT(*) FROM rbac_submissions WHERE status='pending'")->fetchColumn() : 0;
+                    $pendingCount += $cePending ?? 0;
                     /* Legacy content remains in the existing review panels.
                     $pendingCount = $db->query("
                         SELECT COUNT(*) FROM (
@@ -169,21 +171,6 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
     <div class="sidebar-section-label">Support</div>
     <ul class="sidebar-nav"><li><a href="/admin/help.php" data-onboarding-help class="sidebar-link <?= $currentPage === 'help' ? 'active' : '' ?>"><i class="bi bi-question-circle"></i> Help / User Guide</a></li></ul>
 
-    <!-- User Footer -->
-    <div class="sidebar-footer">
-        <div class="sidebar-user">
-            <div class="sidebar-avatar">
-                <?php if($currentProfilePicture): ?><img class="sidebar-profile-picture" src="<?= htmlspecialchars($currentProfilePicture,ENT_QUOTES,'UTF-8') ?>" alt="Your profile picture"><?php else: ?><?= htmlspecialchars(strtoupper(substr($currentUser['first_name'] ?? 'A', 0, 1)),ENT_QUOTES,'UTF-8') ?><?php endif; ?>
-            </div>
-            <div>
-                <div class="sidebar-user-name"><?= htmlspecialchars(($currentUser['first_name'] ?? '') . ' ' . ($currentUser['last_name'] ?? '')) ?></div>
-                <div class="sidebar-user-role"><?= htmlspecialchars($currentUser['role'] ?? '') ?></div>
-            </div>
-            <a href="/admin/auth/logout.php" class="sidebar-logout" title="Logout">
-                <i class="bi bi-box-arrow-right"></i>
-            </a>
-        </div>
-    </div>
 </aside>
 
 <!-- ============================================================
@@ -221,9 +208,24 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
         <a href="/" target="_blank" class="topbar-icon-btn" title="View Public Site" style="text-decoration:none">
             <i class="bi bi-box-arrow-up-right"></i>
         </a>
-        <a href="/admin/settings.php" class="topbar-icon-btn" title="Settings" aria-label="Settings" style="text-decoration:none"<?= $currentPage === 'settings' ? ' aria-current="page"' : '' ?>>
-            <i class="bi bi-gear-fill"></i>
-        </a>
+        <div class="topbar-user">
+            <button type="button" class="topbar-profile-toggle" id="profile-toggle" aria-label="Profile options" aria-expanded="false" aria-controls="profile-panel">
+            <span class="topbar-avatar">
+                <?php if($currentProfilePicture): ?><img class="topbar-profile-picture" src="<?= htmlspecialchars($currentProfilePicture,ENT_QUOTES,'UTF-8') ?>" alt="Your profile picture"><?php else: ?><?= htmlspecialchars(strtoupper(substr($currentUser['first_name'] ?? 'A', 0, 1)),ENT_QUOTES,'UTF-8') ?><?php endif; ?>
+            </span>
+            <span class="topbar-user-details">
+                <span class="topbar-user-name"><?= htmlspecialchars(($currentUser['first_name'] ?? '') . ' ' . ($currentUser['last_name'] ?? '')) ?></span>
+                <span class="topbar-user-role"><?= htmlspecialchars($currentUser['role'] ?? '') ?></span>
+            </span>
+            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+            </button>
+            <div class="topbar-profile-panel" id="profile-panel" hidden>
+                <div class="topbar-profile-options">
+                    <a href="/admin/settings.php"<?= $currentPage === 'settings' ? ' aria-current="page"' : '' ?>><i class="bi bi-gear-fill" aria-hidden="true"></i> Settings</a>
+                    <a href="/admin/auth/logout.php" class="topbar-logout"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> Logout</a>
+                </div>
+            </div>
+        </div>
     </div>
 </header>
 
@@ -265,6 +267,36 @@ function showToast(message, type = 'success') {
 
 // CSRF token for AJAX
 const CSRF_TOKEN = '<?= $csrfToken ?>';
+
+// Profile options: hover on desktop, click/tap or keyboard on any device.
+(() => {
+    const root = document.querySelector('.topbar-user');
+    const toggle = document.getElementById('profile-toggle');
+    const panel = document.getElementById('profile-panel');
+    let pinned = false;
+    const show = open => {
+        panel.hidden = !open;
+        toggle.setAttribute('aria-expanded', String(open));
+    };
+    const close = () => { pinned = false; show(false); };
+    toggle.addEventListener('click', () => { pinned = !pinned; show(pinned); });
+    root.addEventListener('pointerenter', event => {
+        if (event.pointerType === 'mouse') show(true);
+    });
+    root.addEventListener('pointerleave', event => {
+        if (event.pointerType === 'mouse' && !pinned && !panel.contains(document.activeElement)) show(false);
+    });
+    root.addEventListener('focusout', event => {
+        if (!root.contains(event.relatedTarget)) close();
+    });
+    document.addEventListener('click', event => { if (!root.contains(event.target)) close(); });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !panel.hidden) {
+            close(); toggle.focus();
+        }
+    });
+    panel.querySelector('.topbar-logout').addEventListener('click', () => { close(); toggle.focus(); });
+})();
 
 // Confirm logout before ending the session.
 let logoutConfirmationPending = false;

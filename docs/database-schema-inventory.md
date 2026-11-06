@@ -1,5 +1,8 @@
 # Database schema and PHP dependency inventory
 
+This is the historical export inventory. For the subsequent reviewed local
+removal of three obsolete tables, see [unused-table-cleanup.md](unused-table-cleanup.md).
+
 Audit date: 2026-10-20 (Asia/Manila). Source: `database/gnc_admin (51).sql`, export header 2026-10-20 02:26 AM, session time zone UTC. Local MySQL: 8.0.46.
 
 Export SHA-256: `4f46ab31cb167769b0a93db889b82b0f8bf07d3166631e01a8f62d0c5cce4ead`.

@@ -64,7 +64,7 @@ function publicDepartmentDean(?array $dept): array {
         'name'      => $dept['dean_name']   ?? '',
         'title'     => $dept['dean_title']  ?? '',
         'bio'       => $dept['dean_bio']    ?? '',
-        'phone'     => $dept['dean_phone']  ?? '',
+        'phone'     => contactNumberDisplay($dept['dean_phone'] ?? ''),
         'email'     => $dept['dean_email']  ?? '',
         'office'    => $dept['dean_office'] ?? '',
         'hours'     => $dept['dean_hours']  ?? '',

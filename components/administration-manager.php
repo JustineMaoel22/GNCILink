@@ -23,6 +23,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
     </div>
 <?php else: ?>
 
+<p class="small"><a href="/admin/personnel.php">Review shared personnel identities</a></p>
 <div id="adm-root">
     <div class="adm-tabs" id="adm-tabs" role="tablist" aria-label="Administration sections"></div>
     <div id="adm-alert" class="alert d-none" role="status"></div>
@@ -102,7 +103,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
           </div>
           <div class="col-md-6">
             <label class="form-label" for="adm-office-email">Email address <span class="adm-opt">optional</span></label>
-            <input type="email" class="form-control" id="adm-office-email" maxlength="255" placeholder="e.g. registrar@gnc.edu.ph">
+            <input type="email" class="form-control" id="adm-office-email" maxlength="255" placeholder="you@example.com">
           </div>
           <div class="col-md-6">
             <label class="form-label" for="adm-office-location">Where the office is <span class="adm-opt">optional</span></label>
@@ -548,6 +549,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
     var editingPerson = null;
     function openPerson(p) {
         editingPerson = p;
+        $('adm-person-photo').dataset.profileKey = 'person:' + (p ? p.id : 0);
         $('adm-person-title').textContent = p ? 'Edit this person' : 'Add a new person';
         $('adm-person-name').value = p ? p.name : '';
         $('adm-person-role').value = p ? p.role : '';
@@ -578,12 +580,14 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
     var editingOffice = null;
     function openOffice(o) {
         editingOffice = o;
+        $('adm-office-photo').dataset.profileKey = 'office:' + (o ? o.id : 0);
         var c = (o && o.contact) || {};
         $('adm-office-title').textContent = o ? 'Edit this office' : 'Add a new office';
         $('adm-office-name').value     = o ? o.office : '';
         $('adm-office-head').value     = o ? o.name : '';
         $('adm-office-role').value     = o ? o.role : '';
         $('adm-office-phone').value    = c.phone || '';
+        if(window.GNCContact) window.GNCContact.refresh($('adm-office-phone'));
         $('adm-office-email').value    = c.email || '';
         $('adm-office-location').value = c.location || '';
         $('adm-office-hours').value    = c.hours || '';

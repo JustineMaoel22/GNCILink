@@ -25,6 +25,12 @@ if (!verifyCSRFToken(is_string($_POST['csrf_token']??null)?$_POST['csrf_token']:
     header('Location: '.newsReturnUrl($_POST));
     exit;
 }
+if($postAction==='bulk_delete'){
+    require_once __DIR__.'/../../includes/content-bulk-delete.php';
+    try{$count=deleteSelectedContent('news',$_POST['ids']??null);$_SESSION['flash_success']=$count.' selected news article(s) deleted.';}
+    catch(Throwable $e){$_SESSION['flash_errors']=[$e instanceof PDOException?'The selected articles could not be deleted. Nothing was changed.':$e->getMessage()];}
+    header('Location: '.newsReturnUrl($_POST));exit;
+}
 if(!is_string($postAction)||!in_array($postAction,['create','update','delete','pin','unpin','archive','unarchive'],true)){
     $_SESSION['flash_errors']=['Choose a valid article action.'];header('Location: '.newsReturnUrl($_POST));exit;
 }

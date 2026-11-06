@@ -155,7 +155,7 @@
         if (S.publishing && S.allowIncomplete) fd.append('allow_incomplete', '1');
         Object.keys(fields || {}).forEach(function (k) { if (fields[k] !== undefined && fields[k] !== null) fd.append(k, fields[k]); });
         Object.keys(files || {}).forEach(function (k) { if (files[k]) fd.append(k, files[k], files[k].name); });
-        return fetch(url, { method: 'POST', credentials: 'same-origin', body: fd }).then(function (res) {
+        return (presence ? presence.fetch : fetch)(url, { method: 'POST', credentials: 'same-origin', body: fd }).then(function (res) {
             return res.json().catch(function () {
                 if (res.status === 413) return { error: 'The upload exceeds the hosting request limit. Images must be at most 5 MB each. Upload fewer images at once or ask your hosting provider to increase the request limit.' };
                 return { error: 'The server sent an unexpected reply (code ' + res.status + '). Please reload the page and try again.' };
@@ -163,12 +163,20 @@
                 if(j.submitted){j.success=false;j.error=j.message;}
                 j.ok = res.ok && j.success !== false && !j.error;
                 if (!j.ok && !j.error) j.error = 'Something went wrong. Please try again.';
+                if(S.publishing && fields && fields.action!=='record_publication'){
+                    if(j.ok)S.publicationWrites++;else S.publicationFailed=true;
+                }
+                // A committed server write establishes a new baseline, including partial publishes.
+                if (j.ok && editHistory && !/editor-draft-handler\.php/.test(url) && !/^(get|load|list|read|fetch|check|preview)/.test(String(fields && fields.action || ''))) {
+                    editHistory.committed();
+                }
                 return j;
             });
         }, function (error) {
+            if(S.publishing)S.publicationFailed=true;
             console.error('Upload request failed:',error);
             if(error && error.code==='IMAGE_UPLOAD_PREPARATION')return {ok:false,error:error.message};
-            return { ok: false, error: 'We could not reach the server. Please check your internet connection and try again.' };
+            return { ok: false, error: error.message || 'We could not reach the server. Please check your internet connection and try again.' };
         });
     }
     function sendContent(fields, files) { return send(C.contentHandler, fields, files); }
@@ -291,7 +299,7 @@
         sel: null, adapter: null, device: 'desktop', fallback: false,
         busy: false, scrollKeep: null, loadCount: 0, hoverEl: null
     };
-    var editorFeedback = null, drafts = null;
+    var editorFeedback = null, drafts = null, editHistory = null, presence = null;
     function unsavedPageChanges() { return drafts && drafts.supported() ? drafts.unsaved() : S.adapter && S.adapter.dirtyCount() > 0; }
     var tb = $('#veTb'), pop = $('#vePop'), statusEl = $('#veStatus'), loader = $('#veLoader');
     var btnSecondary = $('#veSecondary'), btnPrimary = $('#vePrimary');
@@ -301,6 +309,7 @@
     function pickFile(accept, cb, personPhoto, uploadTarget, preserveImage, responsiveHandled, frameRatio) {
         var deviceTarget=!personPhoto&&/image/i.test(accept||'')&&uploadTarget&&backgroundTarget(uploadTarget),device=S.device;
         if(deviceTarget&&!responsiveHandled){pickResponsiveBackground(deviceTarget,device);return;}
+        fileInput.__pcContext = null;
         fileInput.removeAttribute('data-image-frame-ratio');
         if(frameRatio==='natural')fileInput.setAttribute('data-image-frame-ratio','natural');
         fileInput.value = '';
@@ -312,8 +321,9 @@
         fileInput.onchange = function () { var f = fileInput.files && fileInput.files[0]; if (f) cb(f); };
         fileInput.click();
     }
-    function pickPersonPhoto(cb, uploadTarget) {
+    function pickPersonPhoto(cb, uploadTarget, personContext) {
         pickFile('image/jpeg,image/png,image/webp', cb, true, uploadTarget);
+        fileInput.__pcContext = personContext;
     }
     function previewUrl(file) { var url=URL.createObjectURL(file);if(window.GNCEditorDrafts)window.GNCEditorDrafts.trackUrl(url,file);return url; }
 
@@ -329,14 +339,15 @@
         var header = pdfManager && D.querySelector('.ve-top');
         var top = header ? Math.max(8, header.getBoundingClientRect().bottom + 8) : 8;
         // Long PDF lists scroll within the available canvas, leaving Publish reachable.
-        pop.style.maxHeight = pdfManager ? Math.max(0, window.innerHeight - top - 8) + 'px' : '';
+        pop.style.maxHeight = pdfManager || pop.classList.contains('ve-pop-contact') ? Math.max(0, window.innerHeight - top - 8) + 'px' : '';
         var w = pop.offsetWidth, hgt = pop.offsetHeight;
         pop.style.left = Math.max(8, Math.min(x, window.innerWidth - w - 8)) + 'px';
         pop.style.top = Math.max(top, Math.min(y, window.innerHeight - hgt - 8)) + 'px';
     }
     function repositionPdfPop() {
-        if (!pop.hidden && pop.classList.contains('ve-pop-pdfs')) placePop(parseFloat(pop.style.left) || 8, parseFloat(pop.style.top) || 8);
+        if (!pop.hidden && (pop.classList.contains('ve-pop-pdfs') || pop.classList.contains('ve-pop-contact'))) placePop(parseFloat(pop.style.left) || 8, parseFloat(pop.style.top) || 8);
     }
+    D.addEventListener('contact-control-ready',function(event){if(pop.contains(event.target)){pop.classList.add('ve-pop-contact');placePop(parseFloat(pop.style.left)||8,parseFloat(pop.style.top)||8);}});
     window.addEventListener('resize', repositionPdfPop);
     // Showing Cancel or draft actions can wrap the toolbar without a window resize.
     var popHeader = D.querySelector('.ve-top');
@@ -347,6 +358,7 @@
         pop.innerHTML = ''; pop.appendChild(content);
         pop.classList.toggle('ve-pop-wide', !!wide);
         pop.classList.toggle('ve-pop-pdfs', content.classList.contains('ve-tuition-pdfs'));
+        pop.classList.toggle('ve-pop-contact', !!content.querySelector('.contact-control'));
         pop.hidden = false; popOnClose = onClose || null;
         // A thumbnail's floating crop control must not cover the form's actions.
         [D, S.doc].forEach(function (doc) {
@@ -444,7 +456,7 @@
     function askText(opts) {
         var input = h(opts.multiline ? 'textarea' : 'input', { class: 'form-control form-control-sm', type: 'text', value: opts.value || '', placeholder: opts.placeholder || '', rows: 3, maxlength: opts.max || 500 });
         if (opts.multiline) input.value = opts.value || '';
-        var go = function () { var v = input.value.trim(); if (opts.required && !v) { input.focus(); return; } closePop(); opts.done(v); };
+        var go = function () { if (input.__contact && !input.__contact.validate()) return; var v = input.value.trim(); if (opts.required && !v) { (input.__contact ? input.__contact.input : input).focus(); return; } closePop(); opts.done(v); };
         input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !opts.multiline) { e.preventDefault(); go(); } });
         var row = h('div', { class: 've-pop-row' }, [
             h('button', { type: 'button', class: 'btn btn-sm btn-gnc', text: opts.cta || 'Apply', on: { click: go } })
@@ -455,6 +467,7 @@
             var offset = opts.anchor.ownerDocument === D ? {left:0,top:0} : S.frame.getBoundingClientRect();
             openPop(form, offset.left + anchor.left, offset.top + anchor.bottom + 8);
         } else popBelowToolbar(form);
+        if (opts.contact && window.GNCContact) window.GNCContact.bind(input, {extensionOnly:opts.contact === 'extension',required:opts.required}).input.focus();
         return input;
     }
 
@@ -532,8 +545,11 @@
         return u.pathname + u.search + u.hash;
     }
     /** Load (or reload) the page. keepScroll puts the reader back where they were. */
-    function loadFrame(url, keepScroll) {
+    var frameNavigation=0;
+    function loadFrame(url, keepScroll, presenceReady) {
         if (S.publishing) { S.publishReload = {url:url, keepScroll:keepScroll}; return; }
+        if(presence && !presenceReady){var navigation=++frameNavigation;loader.hidden=false;return presence.open(url||S.url).then(function(){if(navigation===frameNavigation)loadFrame(url,keepScroll,true);});}
+        if (editHistory) editHistory.reset();
         discardImagePositions();
         closePop(); select(null);
         if (url) S.url = url;
@@ -544,6 +560,7 @@
         S.frame.src = withParam(S.url, '_ve', Date.now());
     }
     function loadSrcdoc(html) {
+        if (editHistory) editHistory.reset();
         S.fallback = true; loader.hidden = false;
         S.frame.srcdoc = html;
     }
@@ -582,6 +599,7 @@
         S.win.addEventListener('scroll', positionStatus, { passive: true });
         if (window.GNCImageFraming) window.GNCImageFraming.watch(doc);
         injectStyle(doc); bindDoc(doc);
+        if(presence)presence.bind(doc);
         var again = S.adapter.mount(doc);
         applyResponsiveBackgrounds();
         doc.addEventListener('gnc:background-change',function(){if(backgroundApi()){responsiveBackgroundChanges=backgroundApi().changes();chrome();refreshBannerThumbs();}});
@@ -603,8 +621,8 @@
         if (S.adapter.afterMount) S.adapter.afterMount();
         if (drafts && drafts.supported()) {
             loader.hidden = false; S.busy = true;
-            drafts.load(S.url).finally(function () { S.busy = false; loader.hidden = true; chrome(); });
-        }
+            drafts.load(S.url).finally(function () { S.busy = false; loader.hidden = true; if (editHistory) { editHistory.bind(doc); editHistory.start(); } if(presence)presence.sync(); chrome(); });
+        } else if (editHistory) { editHistory.bind(doc); editHistory.start(); }
     });
 
     // ══════════════════ fields: plain-text editing in place ══════════════════
@@ -631,17 +649,24 @@
     }
     function markEmpty(el) { el.classList.toggle('ve-empty', readField(el) === ''); }
     /** Make an element on the page a plain-text field. onChange(el, text) runs on every edit. */
+    function contactFieldKind(el) {
+        var key=el.getAttribute('data-ve-section') || '';
+        if (el.getAttribute('data-ve-field')==='dean-phone' || key==='contact_phone' || /^direct_[0-9]+_number$/.test(key)) return 'number';
+        return /^local_[0-9]+_number$/.test(key) ? 'extension' : '';
+    }
     function makeField(el, onChange, locked) {
         var ro = !!locked;
         el.setAttribute('contenteditable', ro ? 'false' : (el.hasAttribute('data-ve-blocks') || el.hasAttribute('data-ve-overview') || el.hasAttribute('data-ve-rich') ? 'true' : PLAIN));
         el.setAttribute('spellcheck', 'true');
         el.__ve = {
+            contactLocked:ro,
             field: true, max: parseInt(el.getAttribute('data-ve-max') || '0', 10) || 0,
             multi: el.hasAttribute('data-ve-multiline'), blocks: el.hasAttribute('data-ve-blocks'),
             overview: el.hasAttribute('data-ve-overview'),
             rich: el.hasAttribute('data-ve-rich'),
             label: el.getAttribute('data-ve-label') || '', onChange: onChange
         };
+        if(contactFieldKind(el)) el.setAttribute('contenteditable','false');
         markEmpty(el);
     }
     /** Keep pasted/new paragraphs looking like the page's own paragraphs. */
@@ -663,6 +688,14 @@
             if (S.preview) {                      // Preview: nothing is editable; links still move between pages
                 var pa = t.closest ? t.closest('a') : null;
                 if (pa) { e.preventDefault(); if (S.adapter.onLink) S.adapter.onLink(pa); }
+                return;
+            }
+            var contact=t.closest('[data-ve-field],[data-ve-section]'), contactKind=contact && contactFieldKind(contact);
+            if(contactKind && contact.__ve) {
+                e.preventDefault();
+                if(S.busy || contact.__ve.contactLocked || (contact.__ve.sec && contact.__ve.sec.review==='pending')) return;
+                askText({label:contactKind==='extension'?'Local Number / Extension':'Contact number',value:readField(contact),contact:contactKind,anchor:contact,required:contact.hasAttribute('data-ve-section'),
+                    done:function(value){contact.textContent=value;contact.dispatchEvent(new contact.ownerDocument.defaultView.Event('input',{bubbles:true}));}});
                 return;
             }
             var backgroundControl=t.closest('[data-ve-background-for]');
@@ -1172,17 +1205,36 @@
         if (editorFeedback) editorFeedback.refresh();
         if(textLayout)textLayout.refresh();
         if(S.adapter.renderDock)S.adapter.renderDock();
+        if(editHistory)editHistory.refresh();
+        if(presence)presence.refresh();
     }
     /** Run an async save with the buttons locked and a status message. */
     function run(label, fn) {
         if (S.busy) return Promise.resolve();
         S.publishing = /^Publishing/.test(label);
+        S.publicationWrites=0;S.publicationFailed=false;
         S.busy = true; setStatus(label, 'busy'); chrome();
+        var publicationCancelled = false, publicationFailed = false;
+        var publicationPage = S.publishing ? (function () {
+            var entity = entityRoute(S.url), choice = $('#veSub');
+            return {page:entity ? entity.page : C.page.slug,sub:entity ? entity.sub || '' : '',route:S.url,
+                title:choice && choice.selectedIndex >= 0 ? choice.options[choice.selectedIndex].textContent.trim() : C.page.title};
+        })() : null;
         return Promise.resolve().then(function () {
+            if (/^Publishing/.test(label) && window.AdminPublish) return window.AdminPublish.begin().then(function (confirmed) {
+                if (!confirmed) { publicationCancelled = true; throw new Error('Publication cancelled. Your changes are still in the editor.'); }
+            });
+        }).then(function () {
             if (/^Publishing/.test(label)) return publishResponsiveBackgrounds().then(publishTextPlacements).then(function(){if(imagePositionCount())return publishImagePositions();});
         }).then(fn).catch(function (e) {
+            publicationFailed = true;
             console.error(e); toast(e.message || 'Something went wrong. Please try again.', 'error');
         }).then(async function () {
+            if (publicationCancelled) { S.publishNavigation=null; S.publishing=false; S.allowIncomplete=false; S.busy=false; if(presence)await presence.release(); chrome(); return; }
+            if(publicationPage && !publicationFailed && !S.publicationFailed && S.publicationWrites>0 && !S.adapter.dirtyCount()){
+                var recorded=await send('/admin/action/editor-draft-handler.php',Object.assign({action:'record_publication'},publicationPage));
+                if(!recorded.ok)toast('The page was published, but its Recent Content entry could not be recorded.','warn');
+            }
             if(C.reviewSubmission && !C.requiresApproval && /^Publishing/.test(label) && !S.adapter.dirtyCount()) {
                 var approved=await send('/admin/action/editor-draft-handler.php',{action:'complete_review',page:C.page.slug,route:new URL(S.url,location.origin).pathname+new URL(S.url,location.origin).search,review_submission:C.reviewSubmission});
                 if(!approved.ok)throw Error(approved.error);C.reviewSubmission=0;
@@ -1190,10 +1242,13 @@
             if ((/^Publishing/.test(label) || /^Sending/.test(label)) && drafts && drafts.hasDraft() && !S.adapter.dirtyCount()) await drafts.clear();
             else if (/^Publishing/.test(label) && drafts && drafts.hasDraft() && S.adapter.dirtyCount()) await drafts.save();
             S.publishing = false;
+            if(presence)await presence.release();
+            if (/^Publishing/.test(label) && window.AdminPublish) window.AdminPublish.end();
             S.allowIncomplete = false;
             S.busy = false; chrome();
             if (S.publishReload) { var pendingReload=S.publishReload;S.publishReload=null;if(!S.adapter.dirtyCount())loadFrame(pendingReload.url,pendingReload.keepScroll); }
-        }).catch(function (e) { S.publishing = false; S.allowIncomplete = false; S.publishReload=null; S.busy = false; toast(e.message, 'error'); chrome(); });
+            if(S.publishNavigation){var navigation=S.publishNavigation;S.publishNavigation=null;reloadEditor(navigation.msg,navigation.route,navigation.preserveSettings);}
+        }).catch(function (e) { if(presence)presence.release(); if (/^Publishing/.test(label) && window.AdminPublish) window.AdminPublish.end(); S.publishNavigation=null; S.publishing = false; S.allowIncomplete = false; S.publishReload=null; S.busy = false; toast(e.message, 'error'); chrome(); });
     }
     function shortcutSave() {
         var draftButton = $('#veSaveDraft');
@@ -1313,6 +1368,8 @@
     }
     /** Reload the editor screen, optionally on another page: ({page, sub, program}). */
     function reloadEditor(msg, route, preserveSettings) {
+        // Complete the publication summary before navigating away from this batch.
+        if(S.publishing){S.publishNavigation={msg:msg,route:route,preserveSettings:preserveSettings};return;}
         if (/^Published\./.test(msg || '') && drafts && drafts.hasDraft()) {
             drafts.clear().then(function () { reloadEditor(msg, route, preserveSettings); }).catch(function (e) { toast('Published, but the saved draft could not be removed: ' + e.message, 'error'); });
             return;
@@ -1636,7 +1693,7 @@
         }
         function setLock(s) {
             if (!s.el) return;
-            s.el.setAttribute('contenteditable', locked(s) ? 'false' : (plainSection(s.el) ? PLAIN : 'true'));
+            s.el.setAttribute('contenteditable', locked(s) || contactFieldKind(s.el) ? 'false' : (plainSection(s.el) ? PLAIN : 'true'));
             s.el.classList.toggle('ve-locked', locked(s));
             if(page==='alumni'&&s.key==='actions'){
                 var add=s.el.ownerDocument.querySelector('[data-ve-alumni-add-action]');if(add)add.disabled=locked(s);
@@ -2602,7 +2659,7 @@
                 } else if (sel.kind === 'image') {
                     var has = !!(presImg && presImg.getAttribute('src')) && !presRemove;
                     it.push({ icon: 'image', label: 'Replace photo', primary: true, run: function () {
-                        pickPersonPhoto(function (f) { presFile = f; presRemove = false; presImg.src = previewUrl(f); presImg.style.opacity = ''; renderToolbar(); chrome(); }); } });
+                        pickPersonPhoto(function (f) { presFile = f; presRemove = false; presImg.src = previewUrl(f); presImg.style.opacity = ''; renderToolbar(); chrome(); }, null, function () { return {name:pres.name,key:'president:1'}; }); } });
                     if (has) it.push({ icon: 'trash', title: 'Remove the photo', danger: true, run: function () { presRemove = true; presFile = null; presImg.style.opacity = '.25'; renderToolbar(); chrome(); } });
                     if (presFile) it.push({ type: 'chip', tone: 'warn', icon: 'pencil', text: 'New photo, not saved yet' });
                     if (presRemove) it.push({ type: 'chip', tone: 'warn', icon: 'pencil', text: 'Photo will be removed' });
@@ -2819,7 +2876,7 @@
                 office: h('input', { class: 'form-control form-control-sm', maxlength: 255, value: o ? o.office : '' }),
                 head: h('input', { class: 'form-control form-control-sm', maxlength: 255, value: o ? o.name : '' }),
                 role: h('input', { class: 'form-control form-control-sm', maxlength: 500, value: o ? o.role : '' }),
-                phone: h('input', { class: 'form-control form-control-sm', maxlength: 100, value: c.phone || '' }),
+                phone: h('input', { class: 'form-control form-control-sm', 'data-contact-number':'', value: c.phone || '' }),
                 email: h('input', { class: 'form-control form-control-sm', maxlength: 255, value: c.email || '' }),
                 loc: h('input', { class: 'form-control form-control-sm', maxlength: 255, value: c.location || '' }),
                 hours: h('textarea', { class: 'form-control form-control-sm', rows: 2 }),
@@ -2829,6 +2886,7 @@
             var photo = null, pname = h('small', { class: 've-pop-hint', text: o && o.image ? 'Keeps the current photo unless you choose a new one.' : '' });
             var go = h('button', { type: 'button', class: 'btn btn-sm btn-gnc', text: o ? 'Apply changes' : 'Add office', on: { click: function () {
                 if (!f.office.value.trim() || !f.head.value.trim()) { toast('Please fill in the office name and the head’s name.', 'error'); return; }
+                if(f.phone.__contact && !f.phone.__contact.validate()) return;
                 closePop(); done({ office_name: f.office.value, head_name: f.head.value, head_role: f.role.value, phone: f.phone.value, email: f.email.value, location: f.loc.value, hours: f.hours.value, services: f.svc.value }, photo);
             } } });
             return h('div', { class: 've-pop-form ve-grid2' }, [
@@ -2836,7 +2894,7 @@
                 formField('Office name', f.office), formField('Head of office', f.head), formField('Position', f.role), formField('Phone', f.phone),
                 formField('Email', f.email), formField('Location', f.loc), formField('Operating hours (one per line)', f.hours), formField('Services (one per line)', f.svc),
                 h('div', { class: 've-span2 ve-pop-row' }, [
-                    h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Choose photo', on: { click: function () { pickPersonPhoto(function (file) { photo = file; pname.textContent = 'New photo: ' + file.name; }); } } }), go]),
+                    h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Choose photo', on: { click: function () { pickPersonPhoto(function (file) { photo = file; pname.textContent = 'New photo: ' + file.name; }, null, function () { return {name:f.head.value,key:'office:'+(o?o.id:0)}; }); } } }), go]),
                 h('div', { class: 've-span2' }, [pname])]);
         }
         function personForm(done) {
@@ -2845,7 +2903,7 @@
             var photo = null, pn = h('small', { class: 've-pop-hint', text: 'A photo is optional. You can add one later.' });
             return h('div', { class: 've-pop-form' }, [h('div', { class: 've-pop-label', text: 'Add a person' }), formField('Name', name), formField('Position', role),
                 h('div', { class: 've-pop-row' }, [
-                    h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Choose photo', on: { click: function () { pickPersonPhoto(function (f) { photo = f; pn.textContent = 'Photo: ' + f.name; }); } } }),
+                    h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Choose photo', on: { click: function () { pickPersonPhoto(function (f) { photo = f; pn.textContent = 'Photo: ' + f.name; }, null, function () { return {name:name.value,key:'person:0'}; }); } } }),
                     h('button', { type: 'button', class: 'btn btn-sm btn-gnc', text: 'Add to page', on: { click: function () {
                         if (!name.value.trim()) { name.focus(); return; } closePop(); done({ name: name.value, role: role.value }, photo); } } })]), pn]);
         }
@@ -2896,7 +2954,11 @@
                 var m = photoOf(sel).map; var e = m[sel.id] || (m[sel.id] = {}); e.file = f; e.remove = false;
                 if (img) { img.src = previewUrl(f); img.style.opacity = ''; }
                 renderToolbar(); chrome();
-            }, img);
+            }, img, function () {
+                var found = sel.kind === 'office' ? officeBy(sel.id) : personBy(sel.id);
+                var base = found && (found.o || found.p), edit = photoOf(sel).get() || {};
+                return {name:sel.kind === 'office' ? ((edit.details || {}).head_name || (base && base.name) || '') : (edit.name || (base && base.name) || ''),key:sel.kind+':'+sel.id};
+            });
         }
         function removePhoto(sel) {
             var m = photoOf(sel).map; var e = m[sel.id] || (m[sel.id] = {}); e.file = null; e.remove = true;
@@ -3142,7 +3204,8 @@
             select(null);
             if(L.itemType==='uniform')renderUniformPreview();else renderFacilityPreview();
             renderStrip();chrome();
-            if(save!==false && drafts && drafts.supported())return savePageDraft();
+            // Uniform edits wait for an explicit Save Draft or Publish action.
+            if((L.itemType==='uniform'?save===true:save!==false) && drafts && drafts.supported())return savePageDraft();
             toast((L.itemType==='uniform'?'Uniform':'Facility')+' changes are unpublished. Save draft or Publish when ready.','ok');
         }
         function persistFacilityDraft(save) { return persistListDraft(LISTS.facility,save); }
@@ -3300,7 +3363,7 @@
         function commit(L, rows, okMsg) {
             if(Object.keys(slideTextEdits).length){toast('Publish or discard the pending slide text edits before changing slide order or count.','error');return Promise.resolve();}
             if(Object.keys(slideReplacements).length){toast('Publish or discard the pending slide replacements before changing slide names, order or count.','error');return Promise.resolve();}
-            return run('Saving slides…', function () {
+            return run('Publishing slides…', function () {
                 return postRows(L, rows).then(function (res) {
                     if (!res.ok) { toast(res.error, 'error'); return; }
                     afterSave(L, res);
@@ -3313,7 +3376,7 @@
         function commitSequential(L, base, newRows) {
             if(Object.keys(slideTextEdits).length){toast('Publish or discard the pending slide text edits before adding slides.','error');return Promise.resolve();}
             if(Object.keys(slideReplacements).length){toast('Publish or discard the pending slide replacements before adding slides.','error');return Promise.resolve();}
-            return run('Uploading…', function () {
+            return run('Publishing slides…', function () {
                 var cur = base.slice(), done = 0, last = null;
                 return newRows.reduce(function (p, nr, idx) {
                     return p.then(function (go) {
@@ -3390,7 +3453,7 @@
                 var v = input.value.trim();
                 if (L.itemType === 'uniform') {
                     var urow = uniformWorkingRows()[i];
-                    if (v !== (urow.title || '')) { urow.title = v; closePop(); persistListDraft(L); } else closePop();
+                    urow.title = v; closePop(); persistListDraft(L, true);
                     return;
                 }
                 // A facility name is optional; a blank name is allowed.
@@ -4636,6 +4699,7 @@
                             } else showPic(sel.el, previewUrl(f));
                             renderToolbar(); chrome();
                         }, !logo && !banner, banner ? sel.el.ownerDocument.querySelector('[data-dept-banner-image]') : sel.el);
+                        if (!logo && !banner) fileInput.__pcContext = function () { return {name:dVal('dean_name'),key:'dean:'+DD.dept_id}; };
                     } });
                     if (logo && sel.el.closest('[data-dept-header-logo]')) it.push({ icon: 'trash', label: 'Remove header logo', danger: true, run: function () { toggleHeaderPart('logo'); } });
                     else if (has) it.push({ icon: 'trash', title: 'Remove the picture', danger: true, run: function () {
@@ -5076,6 +5140,7 @@
             if(!await guardDirty('You have unsaved organization changes. Leave without saving them?')||S.busy)return;
             S.busy=true;chrome();
             try {
+                if(presence)await presence.open(withParam(url,'ce_preview','1'));
                 var response=await fetch(withParam(url,'ce_preview','1'),{credentials:'same-origin',cache:'no-store'});
                 if(!response.ok)throw new Error('Could not load the organization page. Try again.');
                 var next=new DOMParser().parseFromString(await response.text(),'text/html'),main=next.querySelector('main'),json=next.getElementById('veOrgData');
@@ -6126,6 +6191,37 @@
         };
     }
     withImagePositions(S.adapter);
+    if(window.GNCEditorPresence)presence=window.GNCEditorPresence.create({
+        page:C.page.slug,csrf:C.csrf,dirty:function(){return !!S.adapter.dirtyCount();},
+        recover:function(){if(drafts&&drafts.supported()&&!S.busy)return run('Saving recovery draft…',function(){return drafts.save(true);});},
+        preview:function(){return S.preview;},busy:function(){return S.busy;},publishing:function(){return S.publishing;}
+    });
+    if (window.GNCEditorHistory) {
+        editHistory = window.GNCEditorHistory.create({
+            document:function(){return S.doc;},
+            blocked:function(){return S.busy || S.preview || !loader.hidden || !S.doc || !S.adapter.draftState;},
+            read:function(){return {adapter:S.adapter.draftState(),positions:imagePositions,text:textPlacements,backgrounds:responsiveBackgroundChanges};},
+            beforeRestore:function(){closePop();select(null);discardImagePositions();inlineSelection=null;},
+            write:function(value){
+                S.adapter.draftState(value.adapter);
+                imagePositions=value.positions; textPlacements=value.text; responsiveBackgroundChanges=value.backgrounds;
+                if(S.adapter.draftRebind)S.adapter.draftRebind();
+                $$('.ve-selected,.ve-hover',S.doc).forEach(function(el){el.classList.remove('ve-selected','ve-hover');});
+                Object.keys(imagePositions).forEach(function(path){previewImagePosition(path,imagePositions[path].value);});
+                applyTextPlacements();applyResponsiveBackgrounds();renderToolbar();
+            },
+            buttons:function(undo,redo){
+                var disabled=S.busy || S.preview || !loader.hidden;
+                $('#veUndo').disabled=disabled || !undo;$('#veRedo').disabled=disabled || !redo;
+            },
+            refresh:chrome
+        });
+        D.addEventListener('keydown',editHistory.shortcut,true);
+        $('#veUndo').addEventListener('mousedown',function(e){e.preventDefault();});
+        $('#veRedo').addEventListener('mousedown',function(e){e.preventDefault();});
+        $('#veUndo').addEventListener('click',editHistory.undo);
+        $('#veRedo').addEventListener('click',editHistory.redo);
+    }
     if (window.GNCEditorDrafts) drafts=window.GNCEditorDrafts.create({
         reviewing:function(){return !!C.reviewSubmission;},
         page:C.page.slug,adapter:function(){return S.adapter;},document:function(){return S.doc;},
@@ -6177,7 +6273,7 @@
     // Bootstrap modals opened from inside the side panel must sit above the editor, so lift them to <body>.
     D.addEventListener('show.bs.modal', function (e) { var m = e.target; if (m && m.parentNode !== D.body) D.body.appendChild(m); });
 
-    window.VE = { state: S, adapter: function () { return S.adapter; }, cleanHtml: cleanHtml };   // handy for support and tests
+    window.VE = { state: S, adapter: function () { return S.adapter; }, cleanHtml: cleanHtml, presence: function(){return presence;} };   // handy for support and tests
     setStatus('Opening the page…', 'busy');
     if (!S.url && S.adapter.startFallback) S.adapter.startFallback(); else loadFrame(S.url);
 })();

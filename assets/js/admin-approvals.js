@@ -55,7 +55,7 @@
             if (opener) opener.focus();
             else {
                 const url = new URL(location.href);
-                url.searchParams.delete('id');url.hash = '';
+                url.searchParams.delete('id');url.searchParams.delete('source');url.hash = '';
                 history.replaceState(null, '', url);
                 document.querySelector('[data-review-open]')?.focus();
             }

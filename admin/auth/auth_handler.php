@@ -67,7 +67,7 @@ function loginUser(array $user): void {
     logActivity((int)$user['user_id'],'LOGIN',null,null,'Successful login.');
 }
 function sendOTPEmailPHPMailer(string $email,string $firstName,string $otp,?int $id=null): bool {
-    return authSendMail($email,$firstName,'GNC Admin Panel - One-Time Password (OTP)',"Your GNCILink verification code is: $otp\n\nThis code expires in ".(int)ceil(OTP_EXPIRY/60)." minutes. Do not share it with anyone. If you did not request this code, contact your administrator.",$id);
+    return authSendMail($email,$firstName,'GNC Admin Panel - One-Time Password (OTP)',"Your GNCILink verification code is: $otp\n\nThis code expires in ".(int)ceil(OTP_EXPIRY/60)." minutes. Do not share it with anyone. If you did not request this code, contact your administrator.",$id,authBuildOtpEmailHtml($firstName,$otp,(int)ceil(OTP_EXPIRY/60)));
 }
 function generateRememberToken(int $id): bool {
     $token=bin2hex(random_bytes(32));getDB()->prepare('UPDATE users SET remember_token=?,remember_token_expires_at=DATE_ADD(NOW(),INTERVAL 30 DAY) WHERE user_id=?')->execute([hash('sha256',$token),$id]);

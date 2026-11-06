@@ -12,9 +12,11 @@
     const achievementResults = /\/student-achievement\.php$/.test(location.pathname) && location.hash === '#more-achievements';
     const orgResults = /\/student-org(?:\.php)?$/.test(location.pathname)
         && ['category', 'p'].some(key => new URLSearchParams(location.search).has(key));
+    const administrationCategory = /\/(?:pages\/about\/administration\.php|administration)\/?$/.test(location.pathname)
+        && new URLSearchParams(location.search).has('section');
     if (editorPreview) root.classList.add('gnc-editor-preview');
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (editorPreview || newsResults || achievementResults || orgResults
+    if (editorPreview || newsResults || achievementResults || orgResults || administrationCategory
         || motion.matches || root.classList.contains('gnc-intro-on')) {
         overlay.remove();
         return;

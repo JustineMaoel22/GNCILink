@@ -1,0 +1,16 @@
+.announcement-management .ann-actions-cell .btn.content-icon-action,
+.ann-actions-cell .btn.content-icon-action,
+.facebook-management .fb-row-actions .btn.content-icon-action,
+.evt-table .evt-actions-cell .btn.content-icon-action {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; min-height: 38px; padding: 0; gap: 0; flex: 0 0 auto;
+}
+.content-action-wrap { display: inline-block; vertical-align: top; border-radius: 6px; }
+.content-action-wrap:focus-visible { outline: 2px solid var(--admin-primary,#176b42); outline-offset: 2px; }
+.evt-table tr.evt-row > td.evt-actions-cell { justify-content: flex-start; }
+@media(max-width:600px) {
+    .announcement-management .ann-actions-cell .btn.content-icon-action,
+    .ann-actions-cell .btn.content-icon-action,
+    .facebook-management .fb-row-actions .btn.content-icon-action,
+    .evt-table .evt-actions-cell .btn.content-icon-action { width: 42px; height: 42px; min-height: 42px; }
+}

@@ -22,7 +22,7 @@ require __DIR__ . '/../components/auth-page-start.php';
     <input type="hidden" name="csrf_token" value="<?= $e(generateCSRFToken()) ?>">
     <div class="form-group">
         <label class="form-label" for="email">Email Address</label>
-        <input class="form-control" type="email" id="email" name="email" placeholder="Enter your email address" autocomplete="username" inputmode="email" maxlength="254" aria-describedby="email-error" required>
+        <input class="form-control" type="email" id="email" name="email" placeholder="you@example.com" autocomplete="username" inputmode="email" maxlength="254" aria-describedby="email-error" required>
         <p class="field-error" id="email-error" aria-live="polite"></p>
     </div>
     <div class="form-group">

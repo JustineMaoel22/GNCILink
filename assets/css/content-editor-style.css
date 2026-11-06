@@ -1026,6 +1026,23 @@ body.ve-drawer-open .ve-backdrop { display: block; }
 /* ── Visual Editor: Preview / Cancel, page options, posts panel ── */
 .ve-tool.is-on { background: #dff1e5; color: var(--ve-green); border-color: #bfdcc9; }
 .ve-tool-danger { color: #b91c1c; }
+.ve-tool:disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
+.ve-presence { position: relative; }
+.ve-presence-panel { position: absolute; right: 0; top: calc(100% + 8px); width: min(300px,calc(100vw - 28px)); padding: 16px; border: 1px solid var(--ve-line); border-radius: 12px; background: #fff; color: var(--ve-ink); box-shadow: 0 10px 30px #0002; z-index: 30; }
+.ve-presence-panel[hidden],.ve-presence-warning[hidden] { display: none; }
+.ve-presence-panel ul { list-style: none; padding: 0; margin: 12px 0; max-height: 250px; overflow-y: auto; }
+.ve-presence-panel li { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px; }
+.ve-presence-panel strong,.ve-presence-panel small { display: block; }
+.ve-presence-panel small,.ve-presence-panel p { color: #64736a; font-size: 12px; margin: 3px 0 0; }
+.ve-presence-panel .is-editing { color: var(--ve-green); font-weight: 700; }
+.ve-presence-avatar { position: relative; overflow: hidden; display: grid; place-items: center; flex: 0 0 34px; height: 34px; border-radius: 50%; background: #e7f1e9; color: #185b34; font-weight: 700; }
+.ve-presence-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.ve-presence-warning { flex: 0 0 auto; padding: 8px 16px; border-bottom: 1px solid #e6d4a5; background: #fff8e7; color: #754b14; font-size: 13px; }
+.ve-presence-warning.is-conflict { background: #fff0ed; color: #943b26; }
+.ve-tool #vePresenceCount { display: inline; }
+.ve-presence-recovery { margin-left: 10px; padding: 2px 8px; border: 1px solid currentColor; border-radius: 6px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.ve-presence-recovery:disabled { opacity: .5; cursor: default; }
+@media(max-width:1024px) { .ve-presence-panel { position: fixed; top: auto; right: 14px; left: 14px; width: auto; } }
 .ve-tool-danger:hover { background: #fde8e8; color: #991b1b; }
 body.ve-previewing .ve-dock, body.ve-previewing .ve-tb { display: none !important; }
 .ve-drawer-embed { flex: 1; min-height: 0; display: flex; background: #fff; }

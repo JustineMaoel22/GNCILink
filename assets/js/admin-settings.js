@@ -2,6 +2,38 @@
     'use strict';
     const forms = [...document.querySelectorAll('[data-settings-form]')];
     let navigating = false;
+    const pictureInput = document.getElementById('profile-picture-file');
+    const picturePreview = document.querySelector('.settings-profile-preview');
+    let pictureChanged = false;
+    if (pictureInput && picturePreview) {
+        const savedPreview = [...picturePreview.childNodes].map(node => node.cloneNode(true));
+        const help = document.getElementById('profile-picture-help');
+        const savedHelp = help?.textContent;
+        let previewUrl;
+        pictureInput.addEventListener('change', () => {
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            previewUrl = null;
+            const file = pictureInput.files?.[0];
+            pictureChanged = false;
+            picturePreview.replaceChildren(...savedPreview.map(node => node.cloneNode(true)));
+            if (help) help.textContent = savedHelp;
+            if (!file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) return;
+            const image = document.createElement('img');
+            image.alt = 'Preview of your new profile picture';
+            previewUrl = URL.createObjectURL(file);
+            image.src = previewUrl;
+            picturePreview.replaceChildren(image);
+            const framing = window.GNCImageFraming;
+            const frame = framing?.fileSettings(file);
+            if (frame) framing.apply(image, frame);
+            pictureChanged = true;
+            if (help) help.textContent = 'Preview only. Select Save profile picture to keep this photo.';
+        });
+        pictureInput.form.addEventListener('submit', () => { navigating = true; });
+        window.addEventListener('pagehide', event => {
+            if (!event.persisted && previewUrl) URL.revokeObjectURL(previewUrl);
+        });
+    }
     const changed = form => {
         const input = form.querySelector('[role="switch"]');
         return form.dataset.savedValue !== '' && (input.checked ? '1' : '0') !== form.dataset.savedValue;
@@ -13,8 +45,9 @@
         const known = form.dataset.savedValue !== '';
         const status = form.querySelector('[data-settings-status]');
         form.querySelector('[data-settings-value]').textContent = known ? (input.checked ? 'Enabled' : 'Disabled') : 'Unavailable';
-        form.querySelector('button[type="submit"]').disabled = !known || busy || (!dirty && form.dataset.initialError !== '1');
-        status.textContent = busy ? 'Saving changes…' : dirty ? 'Unsaved changes' : 'No unsaved changes';
+        const button = form.querySelector('button[type="submit"]');
+        if (button) button.disabled = !known || busy || (!dirty && form.dataset.initialError !== '1');
+        status.textContent = busy ? 'Saving changes…' : dirty ? 'Unsaved changes' : form.dataset.autoSave === '1' ? 'Changes save automatically.' : 'No unsaved changes';
         status.classList.toggle('settings-dirty', dirty);
         const notice = form.querySelector('[data-ai-notice]');
         if (notice) notice.hidden = input.checked;
@@ -28,6 +61,7 @@
             feedback.hidden = true;
             delete form.dataset.initialError;
             update(form);
+            if (form.dataset.autoSave === '1') form.requestSubmit();
         });
         form.addEventListener('submit', async event => {
             if (form.dataset.saving === '1') { event.preventDefault(); return; }
@@ -45,7 +79,7 @@
             form.setAttribute('aria-busy', 'true');
             feedback.hidden = true;
             input.disabled = true;
-            button.textContent = 'Saving…';
+            if (button) button.textContent = 'Saving…';
             update(form);
             try {
                 const response = await fetch(form.getAttribute('action'), {
@@ -66,8 +100,12 @@
                 feedback.setAttribute('role', 'status');
             } catch (error) {
                 form.dataset.initialError = '1';
+                if (form.dataset.autoSave === '1') {
+                    input.checked = form.dataset.savedValue === '1';
+                    delete form.dataset.initialError;
+                }
                 feedback.textContent = (error.name === 'TimeoutError' || error.name === 'TypeError')
-                    ? 'The save could not be confirmed. Your selection is still here. Retry or reload to check the current setting.'
+                    ? (form.dataset.autoSave === '1' ? 'The save could not be confirmed. Reload to check the current setting before trying again.' : 'The save could not be confirmed. Your selection is still here. Retry or reload to check the current setting.')
                     : error.message;
                 feedback.classList.remove('settings-feedback-success');
                 feedback.classList.add('settings-feedback-error');
@@ -76,14 +114,14 @@
                 delete form.dataset.saving;
                 input.disabled = false;
                 form.removeAttribute('aria-busy');
-                button.textContent = button.dataset.saveLabel;
+                if (button) button.textContent = button.dataset.saveLabel;
                 feedback.hidden = false;
                 update(form);
             }
         });
     });
     window.addEventListener('beforeunload', event => {
-        if (!navigating && forms.some(form => changed(form) || form.dataset.saving === '1')) {
+        if (!navigating && (pictureChanged || forms.some(form => changed(form) || form.dataset.saving === '1'))) {
             event.preventDefault();event.returnValue = '';
         }
     });
@@ -93,7 +131,7 @@
             delete form.dataset.saving;
             form.removeAttribute('aria-busy');
             const button = form.querySelector('button[type="submit"]');
-            button.textContent = button.dataset.saveLabel;
+            if (button) button.textContent = button.dataset.saveLabel;
             update(form);
         });
     });

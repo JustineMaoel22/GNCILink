@@ -146,6 +146,7 @@ include __DIR__ . '/../components/header-admin.php';
 <?php endif; ?>
 
 <?php include __DIR__.'/partials/news-filters.php'; ?>
+<?php $bulkDeleteKind='news';$bulkDeleteTable='news-table';$bulkDeleteCsrf=$csrfToken;include __DIR__.'/../components/content-bulk-actions.php'; ?>
     <div class="table-responsive">
         <table class="table table-hover mb-0 ann-table" id="news-table">
             <thead>
@@ -186,6 +187,8 @@ include __DIR__ . '/../components/header-admin.php';
                 ?>
                 <tr class="ann-row">
                     <td class="ann-img-cell">
+                        <div class="bulk-select-media">
+                        <?php if (hasPermission('delete_news') || (hasPermission('delete_own_news') && $isOwner)): ?><input type="checkbox" class="form-check-input m-0" data-bulk-item value="<?= (int)$n['news_id'] ?>" aria-label="Select article <?= htmlspecialchars($n['title'],ENT_QUOTES) ?>"><?php endif; ?>
                         <button type="button" class="news-thumb-button" data-news-preview="<?= (int)$n['news_id'] ?>" aria-label="<?= $ne('Preview: '.$n['title']) ?>">
                         <?php if (!empty($n['image_path'])): ?>
                         <img src="<?= htmlspecialchars($n['image_path']) ?>" alt="" class="ann-thumb" loading="lazy">
@@ -193,6 +196,7 @@ include __DIR__ . '/../components/header-admin.php';
                         <div class="ann-thumb ann-thumb-empty"><i class="bi bi-image"></i></div>
                         <?php endif; ?>
                         </button>
+                        </div>
                     </td>
                     <td class="ann-title-cell">
                         <button type="button" class="ann-title ann-preview-open" data-news-preview="<?= (int)$n['news_id'] ?>"><?= htmlspecialchars($n['title']) ?></button>
@@ -417,7 +421,7 @@ include __DIR__ . '/../components/header-admin.php';
 <!-- ============================================================
      DELETE CONFIRMATION MODAL
 ============================================================ -->
-<div class="modal fade" id="deleteNewsModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="deleteNewsModal" data-delete-password-modal tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered" style="max-width:420px">
     <div class="modal-content">
       <form method="POST" action="/admin/action/create-news.php" id="delete-news-form">
@@ -429,6 +433,7 @@ include __DIR__ . '/../components/header-admin.php';
           <h5 class="fw-bold mb-2">Delete this article?</h5>
           <p class="mb-1"><strong id="delete-news-title"></strong></p>
           <p class="text-muted mb-3" style="font-size:.85rem">It will be removed from the website. This cannot be undone.</p>
+          <div class="text-start mb-3"><label class="form-label" for="delete-news-password">Your current password</label><input type="password" class="form-control" name="current_password" id="delete-news-password" autocomplete="current-password" maxlength="4096" required></div>
           <div class="d-flex gap-2 justify-content-center">
             <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
             <button type="submit" class="btn btn-danger px-4" id="delete-news-btn"><i class="bi bi-trash3 me-1"></i> Delete</button>
@@ -439,6 +444,9 @@ include __DIR__ . '/../components/header-admin.php';
   </div>
 </div>
 
+<script src="/assets/js/content-delete-password.js?v=<?= filemtime(__DIR__.'/../assets/js/content-delete-password.js') ?>"></script>
+<link rel="stylesheet" href="/assets/css/content-row-actions.css?v=<?= filemtime(__DIR__.'/../assets/css/content-row-actions.css') ?>">
+<script src="/assets/js/content-row-actions.js?v=<?= filemtime(__DIR__.'/../assets/js/content-row-actions.js') ?>"></script>
 <style>
 /* ---------- Shared look (same as Announcements) ---------- */
 .ann-sub { font-size: .78rem; color: #8a8f8c; }

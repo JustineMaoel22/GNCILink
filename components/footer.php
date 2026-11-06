@@ -1,16 +1,20 @@
-<?php require_once __DIR__ . '/../includes/privacy.php'; ?>
+<?php require_once __DIR__ . '/../includes/privacy.php';
+require_once __DIR__ . '/../includes/contact-number.php'; ?>
 <?php include_once __DIR__ . '/image-framing-assets.php'; ?>
 <link rel="stylesheet" href="/assets/css/content-rich-text.css?v=<?= filemtime(__DIR__.'/../assets/css/content-rich-text.css') ?>">
 <?php include_once __DIR__ . '/office-map-modal.php'; ?>
 <?php
 // Visitor counter: read current numbers (recording happens via api/track-visit.php)
 $gncVisitorStats = ['today' => 0, 'total' => 0];
+$gncFooterPhone = '045-123-4567';
 try {
     if (!function_exists('getDB')) {
         require_once __DIR__ . '/../config/config.php';
     }
     require_once __DIR__ . '/visitor-counter.php';
     $gncVisitorStats = gncVisitorStats(getDB());
+    $gncFooterPhoneValue = getDB()->query("SELECT ps.content FROM page_sections ps JOIN pages p ON p.page_id=ps.page_id WHERE p.slug='contact-us' AND ps.section_key='contact_phone' AND ps.status='published' LIMIT 1")->fetchColumn();
+    if (is_string($gncFooterPhoneValue)) $gncFooterPhone = contactNumberDisplay(trim(html_entity_decode(strip_tags($gncFooterPhoneValue), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
 } catch (Throwable $e) {
     // Footer still renders with zeros if the database is unavailable.
 }
@@ -59,7 +63,6 @@ if (!function_exists('gncResolvePopularUrl')) {
 }
 
 ?>
-<?php include_once __DIR__ . '/visitor-feedback.php'; ?>
 <?php include_once __DIR__ . '/recommendations.php'; ?>
 <?php if (!defined('GNC_RECOMMENDATIONS_RENDERED')): ?>
 <script src="/assets/js/recommendation-engine.js?v=1" defer></script>
@@ -98,7 +101,7 @@ if (!function_exists('gncResolvePopularUrl')) {
                         </li>
                         <li>
                             <span class="gnc-footer-contact-icon" aria-hidden="true"><i class="bi bi-telephone-fill"></i></span>
-                            <span class="gnc-footer-contact-text"><a href="tel:0451234567">(045) 123-4567</a></span>
+                            <span class="gnc-footer-contact-text"><?php if (contactNumberTel($gncFooterPhone) !== ''): ?><a href="<?= htmlspecialchars(contactNumberTel($gncFooterPhone), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($gncFooterPhone, ENT_QUOTES, 'UTF-8') ?></a><?php else: ?><?= htmlspecialchars($gncFooterPhone, ENT_QUOTES, 'UTF-8') ?><?php endif; ?></span>
                         </li>
                         <li>
                             <span class="gnc-footer-contact-icon" aria-hidden="true"><i class="bi bi-envelope-fill"></i></span>

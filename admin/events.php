@@ -77,6 +77,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
     }
 
     try {
+        if($action==='bulk_delete'){
+            require_once __DIR__.'/../includes/content-bulk-delete.php';
+            $count=deleteSelectedContent('event',$_POST['ids']??null);
+            echo json_encode(['success'=>true,'message'=>$count.' selected event(s) deleted.']);exit;
+        }
         if (in_array($action, ['import_preview', 'import_manage_preview', 'import_confirm', 'import_cancel'], true)) {
             echo json_encode(calendarImportHandle($db, $action, (int)$userId), JSON_INVALID_UTF8_SUBSTITUTE);
             exit;
@@ -326,7 +331,7 @@ foreach ($monthEvents as $ev) {
 // All events list (most recent first) for the management table below
 try {
     $allEvents = $db->query("
-        SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, e.category_id, e.program," . ($eventDepartmentsReady ? 'e.dept_id,' : 'NULL AS dept_id,') . ($eventAudienceGroupsReady?'e.audience_group,':"'all' AS audience_group,") . "
+        SELECT e.event_id, e.user_id, e.title, e.start_date, e.end_date, e.status, e.category_id, e.program," . ($eventDepartmentsReady ? 'e.dept_id,' : 'NULL AS dept_id,') . ($eventAudienceGroupsReady?'e.audience_group,':"'all' AS audience_group,") . "
                c.category_name, c.category_color,
                CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,'')) AS author
         FROM events e
@@ -413,9 +418,6 @@ include __DIR__ . '/../components/header-admin.php';
                         <i class="bi bi-calendar-check"></i> Back to today
                     </a>
                 <?php endif; ?>
-                <button type="button" class="btn btn-sm btn-gnc-gold ms-auto" id="addEventBtn">
-                    <i class="bi bi-plus-lg"></i> Add Event
-                </button>
             </div>
             <div class="evt-hint"><i class="bi bi-cursor"></i> Click a date to add an event &middot; click an event to edit it</div>
 
@@ -463,7 +465,6 @@ include __DIR__ . '/../components/header-admin.php';
                     <div class="evt-empty">
                         <i class="bi bi-calendar-plus"></i>
                         <p class="mb-2">Nothing scheduled in <?= htmlspecialchars($monthLabel) ?> yet.</p>
-                        <button type="button" class="btn btn-sm btn-gnc-gold js-add-event"><i class="bi bi-plus-lg"></i> Add an event</button>
                     </div>
                 <?php else: foreach ($monthEvents as $ev):
                     $evStart = strtotime($ev['start_date']);
@@ -540,8 +541,9 @@ include __DIR__ . '/../components/header-admin.php';
                 <button type="button" class="evt-chip" data-filter="draft">Drafts <span><?= $evtCounts['draft'] ?></span></button>
                 <button type="button" class="evt-chip" data-filter="archived">Hidden <span><?= $evtCounts['archived'] ?></span></button>
             </div>
+            <?php $bulkDeleteKind='event';$bulkDeleteTable='events-table';$bulkDeleteCsrf=$evtCsrfToken;include __DIR__.'/../components/content-bulk-actions.php'; ?>
             <div class="table-responsive">
-                <table class="table table-hover mb-0 evt-table">
+                <table class="table table-hover mb-0 evt-table" id="events-table">
                     <thead>
                         <tr>
                             <th>Event</th>
@@ -557,7 +559,6 @@ include __DIR__ . '/../components/header-admin.php';
                         <tr><td colspan="6"><div class="evt-empty">
                             <i class="bi bi-calendar-plus"></i>
                             <p class="mb-2">You haven't added any events yet.</p>
-                            <button type="button" class="btn btn-sm btn-gnc-gold js-add-event"><i class="bi bi-plus-lg"></i> Add your first event</button>
                         </div></td></tr>
                         <?php else: foreach ($allEvents as $ev):
                             $evStart = strtotime($ev['start_date']);
@@ -587,7 +588,7 @@ include __DIR__ . '/../components/header-admin.php';
                             data-programs='<?= json_encode($evAud['programs']) ?>'
                             class="evt-row<?= $isPast ? ' evt-past' : '' ?>">
                             <td class="evt-title-cell" data-label="Event">
-                                <div class="evt-row-title"><?= htmlspecialchars($ev['title']) ?></div>
+                                <div class="evt-row-title bulk-select-media"><?php if(hasPermission('delete_event')||(hasPermission('delete_own_event')&&(int)$ev['user_id']===(int)$_SESSION['user_id'])): ?><input type="checkbox" class="form-check-input m-0" data-bulk-item value="<?= (int)$ev['event_id'] ?>" aria-label="Select event <?= htmlspecialchars($ev['title'],ENT_QUOTES) ?>"><?php endif; ?><span><?= htmlspecialchars($ev['title']) ?></span></div>
                                 <?php if ($authorName !== ''): ?><div class="evt-row-sub">Added by <?= htmlspecialchars($authorName) ?></div><?php endif; ?>
                             </td>
                             <td data-label="When" style="font-size:.85rem">
@@ -780,7 +781,7 @@ include __DIR__ . '/../components/header-admin.php';
 
 <?php include __DIR__ . '/partials/calendar-import.php'; ?>
 <!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteEventModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="deleteEventModal" data-delete-password-modal tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width:420px">
         <div class="modal-content evt-del-content">
             <div class="modal-body text-center p-4">
@@ -790,6 +791,7 @@ include __DIR__ . '/../components/header-admin.php';
                     <strong id="deleteEventTitle"></strong>
                 </p>
                 <p class="text-muted mb-3" style="font-size:.85rem">This action cannot be undone.</p>
+                <div class="text-start mb-3"><label class="form-label" for="delete-event-password">Your current password</label><input type="password" class="form-control" name="current_password" id="delete-event-password" autocomplete="current-password" maxlength="4096" required></div>
                 <div id="deleteEventError" class="alert alert-danger py-2 d-none" style="font-size:.85rem"></div>
                 <div class="d-flex gap-2 justify-content-center">
                     <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
@@ -803,6 +805,9 @@ include __DIR__ . '/../components/header-admin.php';
 </div>
 
 <link rel="stylesheet" href="/assets/css/multi-audience-select.css?v=<?= filemtime(__DIR__ . '/../assets/css/multi-audience-select.css') ?>">
+<script src="/assets/js/content-delete-password.js?v=<?= filemtime(__DIR__.'/../assets/js/content-delete-password.js') ?>"></script>
+<link rel="stylesheet" href="/assets/css/content-row-actions.css?v=<?= filemtime(__DIR__.'/../assets/css/content-row-actions.css') ?>">
+<script src="/assets/js/content-row-actions.js?v=<?= filemtime(__DIR__.'/../assets/js/content-row-actions.js') ?>"></script>
 <script src="/assets/js/multi-audience-select.js?v=<?= filemtime(__DIR__ . '/../assets/js/multi-audience-select.js') ?>"></script>
 <link rel="stylesheet" href="/assets/css/event-form.css?v=<?= filemtime(__DIR__ . '/../assets/css/event-form.css') ?>">
 <script src="/assets/js/admin-form-audience.js?v=<?= filemtime(__DIR__ . '/../assets/js/admin-form-audience.js') ?>"></script>
@@ -1026,7 +1031,6 @@ include __DIR__ . '/../components/header-admin.php';
     .page-header > div { flex: 1 1 100%; }
     .page-header h1 { font-size: 1.4rem; }
     #addEventBtnTop { width: 100%; padding: .65rem 1rem; font-size: 1rem; }
-    #addEventBtn { display: none; }               /* the big top button + tapping a date already cover this */
 
     .evt-calendar-grid { padding: .75rem .5rem; gap: 3px; }
     .evt-cal-dow { font-size: .62rem; }
@@ -1201,7 +1205,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Open modal for a brand-new event
-    document.querySelectorAll('#addEventBtn, #addEventBtnTop, .js-add-event').forEach(function (b) {
+    document.querySelectorAll('#addEventBtnTop').forEach(function (b) {
         b.addEventListener('click', function () {
             resetForm();
             eventModal.show();
@@ -1241,6 +1245,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const deleteErrorEl   = document.getElementById('deleteEventError');
     const deleteConfirmBtn = document.getElementById('deleteEventConfirmBtn');
     let pendingDeleteId = null;
+    document.getElementById('delete-event-password').addEventListener('keydown',function(event){if(event.key==='Enter'&&!event.isComposing){event.preventDefault();if(!deleteConfirmBtn.disabled)deleteConfirmBtn.click();}});
 
     document.querySelectorAll('.evt-delete-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -1256,12 +1261,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     deleteConfirmBtn.addEventListener('click', function () {
         if (!pendingDeleteId) return;
+        const password=document.getElementById('delete-event-password');
+        if(!password.reportValidity())return;
         deleteConfirmBtn.disabled = true;
         deleteConfirmBtn.textContent = 'Deleting…';
 
         const fd = new FormData();
         fd.append('ajax_action', 'delete');
         fd.append('event_id', pendingDeleteId);
+        fd.append('current_password',password.value);password.value='';
         fd.append('csrf_token', document.getElementById('csrfToken').value);
 
         const fail = (msg) => {
@@ -1277,7 +1285,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (data.success) {
                     reloadWithToast('Event deleted.');
                 } else {
-                    fail(data.message || 'Could not delete event.');
+                    fail(data.message || data.error || 'Could not delete event.');
                 }
             })
             .catch(() => fail('A network error occurred.'));
@@ -1350,7 +1358,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.querySelectorAll('tr.evt-row').forEach(function (row) {
         row.addEventListener('click', function (e) {
-            if (e.target.closest('button')) return;
+            if (e.target.closest('button,input,select,textarea,label,a')) return;
             loadEventForEdit(row.dataset.eventId);
         });
     });

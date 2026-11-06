@@ -21,15 +21,16 @@ $db->exec('CREATE TEMPORARY TABLE rbac_submissions(submission_id INT PRIMARY KEY
 $db->exec("INSERT INTO rbac_submissions VALUES(1,1,'My pending','pending',1,NOW(),NOW()),(2,2,'Other pending','pending',1,NOW(),NOW()),(3,2,'Another pending','pending',1,NOW(),NOW()),(4,1,'My revision','needs_revision',2,NOW(),NOW()),(5,2,'Other revision','needs_revision',3,NOW(),NOW()),(6,1,'Rejected proposal','rejected',1,NOW(),NOW()),(7,1,'Draft proposal','draft',1,NOW(),NOW())");
 $db->exec('CREATE TEMPORARY TABLE page_sections(section_id INT PRIMARY KEY,review_status VARCHAR(20))');
 $db->exec("INSERT INTO page_sections VALUES(1,'pending'),(2,'pending'),(3,'none')");
-$db->exec('CREATE TEMPORARY TABLE activity_logs(log_id INT PRIMARY KEY,user_id INT,action VARCHAR(255),table_name VARCHAR(100),description TEXT,created_at DATETIME)');
-$db->exec("INSERT INTO activity_logs VALUES(1,1,'FACEBOOK_PUBLISH','news','Published news',NOW()),(2,2,'UPDATE','users','password=private-test-value',NOW())");
+$db->exec('CREATE TEMPORARY TABLE pages(slug VARCHAR(100),title VARCHAR(255),page_type VARCHAR(30))');
+$db->exec('CREATE TEMPORARY TABLE activity_logs(log_id INT AUTO_INCREMENT PRIMARY KEY,user_id INT,action VARCHAR(255),table_name VARCHAR(100),record_id INT NULL,description TEXT,created_at DATETIME)');
+$db->exec("INSERT INTO activity_logs(log_id,user_id,action,table_name,description,created_at) VALUES(1,1,'FACEBOOK_PUBLISH','news','Published news',NOW()),(2,2,'UPDATE','users','password=private-test-value',NOW())");
 foreach(['Super Admin','Content Editor','The Mirror','Content Admin','Office Staff'] as $role){
     $_SESSION=['user_id'=>1,'user_role'=>$role];$d=roleDashboardData($db);$own=rbacRole()==='The Mirror';$super=rbacIsSuper();
     dashCheck(!$d['errors'],'All summaries loaded');
     dashCheck($d['stats']['total_announcements']===($own?2:5),'Role-scoped announcement count');
     dashCheck($d['stats']['total_news']===($own?1:3),'Role-scoped news count');
     dashCheck($d['stats']['published_content']===($own?2:7),'Published count across permitted modules');
-    dashCheck($d['stats']['pending_approvals']===($super?3:1),'Proposal counts use actual queue');
+    dashCheck($d['stats']['pending_approvals']===($super?5:1),'Approval count includes page text and proposals');
     dashCheck(($d['submission_counts']['needs_revision']??0)===($super?2:1),'Revision state count');
     dashCheck($d['recent'][0]['title']==='Newest news','News is included and ordered by last update even with announcements');
     dashCheck(count($d['recent'])<=6&&count($d['submissions'])<=6,'Bounded recent lists');
@@ -47,6 +48,32 @@ dashCheck(dashboardContentUrl(['type'=>'event','id'=>3])==='/admin/events.php','
 dashCheck(dashTimeAgo('2026-11-04 12:00:00',strtotime('2026-11-04 12:01:00'))==='1 min ago','Relative timestamps');
 dashCheck(dashTimeAgo('2026-11-04 12:00:00',strtotime('2026-11-04 11:00:00'))!=='Just now','Future dates are not labelled just now');
 // Analytics use existing normalization and historical URL grouping.
+$_SESSION=['user_id'=>1,'user_role'=>'Super Admin'];
+$db->exec("INSERT INTO pages VALUES('history','History','sections'),('programs','Programs','sections')");
+recordWebsitePublication($db,['page'=>'history','sub'=>'','title'=>'History','route'=>'/pages/about/gnc-history.php?ce_preview=1&token=not-retained']);
+$db->exec("UPDATE activity_logs SET created_at='2100-01-01 10:00:00' WHERE table_name='website_pages'");
+$_SESSION['user_id']=2;
+recordWebsitePublication($db,['page'=>'history','sub'=>'','title'=>'Updated History','route'=>'/pages/about/gnc-history.php']);
+$historyId=(int)$db->lastInsertId();$db->exec("UPDATE activity_logs SET created_at='2100-01-02 10:00:00' WHERE log_id=$historyId");
+recordWebsitePublication($db,['page'=>'programs','sub'=>'bscs','title'=>'Computer Science','route'=>'/pages/academics/college/program.php?slug=bscs&ce_preview=1']);
+$programId=(int)$db->lastInsertId();$db->exec("UPDATE activity_logs SET created_at='2099-12-01 10:00:00' WHERE log_id=$programId");
+$db->exec("INSERT INTO activity_logs(user_id,action,table_name,description,created_at) VALUES(1,'UPDATE','page_sections','Saved draft for history/intro','2101-01-01 10:00:00'),(1,'PUBLISH','website_pages','invalid-json','2101-01-01 10:00:00'),(1,'PUBLISH','page_sections','Published history/intro','2098-01-01 10:00:00')");
+$d=roleDashboardData($db);$pageRows=array_values(array_filter($d['recent'],fn($item)=>$item['type']==='page'));
+dashCheck(count($pageRows)===2,'Repeated page publications and legacy sections group into one row per page');
+dashCheck($d['recent'][0]['title']==='Updated History'&&(int)$d['recent'][0]['author_id']===2,'Latest publisher and publication time drive the row');
+dashCheck(count($d['recent'])<=6&&$pageRows[0]['status']==='published','Published page rows share the six-item content limit');
+dashCheck(dashboardContentUrl($pageRows[1])==='/admin/content-edit.php?page=programs&sub=bscs','Entity publication links open the correct subpage');
+dashCheck(!str_contains($db->query("SELECT description FROM activity_logs WHERE table_name='website_pages' ORDER BY log_id LIMIT 1")->fetchColumn(),'not-retained'),'Preview and secret query fields are not retained');
+$_SESSION=['user_id'=>1,'user_role'=>'Content Editor'];
+$visible=dashboardPublishedPages($db);
+dashCheck(count($visible)===(hasPermission('manage_page_content')?2:1)&&$visible[0]['page']==='history','Editor page summaries follow existing page permissions');
+$_SESSION['user_role']='The Mirror';
+dashCheck(dashboardPublishedPages($db)===[],'The Mirror cannot see page publication summaries');
+try{recordWebsitePublication($db,['page'=>'history','route'=>'/pages/about/gnc-history.php','title'=>'History']);throw new LogicException('Unauthorized recording allowed.');}catch(RuntimeException $expected){dashCheck(true,'Only Super Admin records direct publications');}
+$_SESSION['user_role']='Super Admin';
+try{websitePublicationMetadata(['page'=>'history','route'=>'https://example.com/','title'=>'Bad']);throw new LogicException('External route accepted.');}catch(InvalidArgumentException $expected){dashCheck(true,'External editor routes rejected');}
+dashCheck(activityLogDescription(['action'=>'PUBLISH','table_name'=>'website_pages','description'=>json_encode(['title'=>'History','page'=>'history'])])==='Published website page: History','Publication logs retain a readable description');
+
 $db->exec('CREATE TEMPORARY TABLE page_visits(page_id INT PRIMARY KEY,page_url VARCHAR(255),page_title VARCHAR(255),visit_count INT,last_visited DATETIME)');
 $db->exec('CREATE TEMPORARY TABLE page_visits_daily(page_id INT,visit_date DATE,views INT)');
 $db->exec('CREATE TEMPORARY TABLE site_visitors(visitor_hash VARCHAR(64),visit_date DATE)');
@@ -54,11 +81,20 @@ $db->exec("INSERT INTO page_visits VALUES(1,'/pages/about/gnc-history.php','Scho
 require_once __DIR__.'/../components/page-analytics.php';$today=gncVisitorToday();
 $db->prepare('INSERT INTO page_visits_daily VALUES(1,?,3),(2,?,2),(3,?,999)')->execute([$today,$today,$today]);
 $db->prepare("INSERT INTO site_visitors VALUES('one',?),('one',?),('two',?)")->execute([$today,$today,$today]);
+$yesterday=(new DateTimeImmutable($today))->modify('-1 day')->format('Y-m-d');
+$db->prepare("INSERT INTO site_visitors VALUES('one',?),('past-only',?)")->execute([$yesterday,$yesterday]);
 $a=dashboardAnalytics($db,7);
 dashCheck($a['total_views']===20&&$a['today_views']===5,'Recorded views exclude private pages');
 dashCheck(count($a['top'])===1&&$a['most_visited']['visit_count']===20,'Historical aliases are combined');
-dashCheck($a['unique_visitors']===2,'Unique visitors are distinct from views');
+dashCheck($a['unique_visitors']===3,'All-time visitors count returning visitors once across dates');
+dashCheck($a['today_visitors']===2,'Today visitors exclude past-only visitors and duplicate daily identifiers');
 dashCheck(count($a['by_date'])===7&&array_sum($a['by_date'])===5,'Zero-filled seven-day trend');
+$db->exec('DELETE FROM site_visitors');
+$a=dashboardAnalytics($db,30);
+dashCheck($a['today_visitors']===0&&$a['unique_visitors']===0,'Empty visitor tracking returns zero totals');
+$db->exec('ALTER TABLE site_visitors DROP COLUMN visit_date');
+$a=dashboardAnalytics($db,14);
+dashCheck($a['today_visitors']===null&&$a['unique_visitors']===null,'Unavailable visitor tracking is not reported as zero');
 // Simulate unavailable columns without touching real tables.
 $db->exec('ALTER TABLE page_visits_daily DROP COLUMN views');
 try{dashboardAnalytics($db,7);throw new LogicException('Missing analytics must be reported.');}catch(PDOException $e){dashCheck(true,'Unavailable analytics are not zero');}

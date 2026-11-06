@@ -70,7 +70,19 @@ function rbacRequestBoundary(): void {
     if($route==='/admin/settings.php'&&rbacRole()==='The Mirror'&&($_SERVER['REQUEST_METHOD']??'GET')==='POST')rbacFail('Your role cannot change website settings.');
     if (!rbacIsSuper() && (str_contains($route,'/users') || str_contains($route,'/logs') || $route==='/admin/backfill-fb-categorizer.php')) rbacFail('Only Super Admin can access this feature.');
     require_once __DIR__.'/content-submissions.php';
-    if(!rbacIsSuper()&&($_SERVER['REQUEST_METHOD']??'GET')!=='POST'&&in_array($route,rbacContentRoutes(),true)&&isset($_GET['action'])&&!in_array($_GET['action'],['get','list','load','fetch_one','upload_environment','categories','get_content'],true))rbacFail('Content changes must be submitted by POST with a valid request token.',405);
+    // Events dispatches ajax_action. An unrelated action field must not bypass
+    // password confirmation, proposal routing or mutation checks.
+    if($route==='/admin/events.php'&&isset($_POST['ajax_action']))unset($_POST['action']);
+    require_once __DIR__.'/publish-confirmation.php';
+    require_once __DIR__.'/content-delete-password.php';
+    contentDeletePasswordBoundary($route);
+    if (rbacIsSuper() && empty($_SESSION['_rbac_worker']) && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && publishNeedsConfirmation($route, $_POST)) requirePublishConfirmation();
+    if(($_SERVER['REQUEST_METHOD']??'GET')!=='POST'&&in_array($route,rbacContentRoutes(),true)&&isset($_GET['action'])&&!in_array($_GET['action'],['get','list','load','fetch_one','upload_environment','categories','get_content'],true))rbacFail('Content changes must be submitted by POST with a valid request token.',405);
+    if (in_array($route,rbacContentRoutes(),true)||$route==='/admin/action/editor-draft-handler.php') {
+        require_once __DIR__.'/editor-presence.php';
+        try { editorPresenceWriteBoundary($route); }
+        catch(Throwable $e) { rbacFail($e instanceof PDOException?'Editor conflict protection is temporarily unavailable. Your pending work is kept.':$e->getMessage(),in_array($e->getCode(),[400,403,409,503],true)?$e->getCode():503); }
+    }
     if (rbacIsSuper() || ($_SERVER['REQUEST_METHOD']??'GET')!=='POST') return;
     if (rbacShouldQueue($route,$_POST)) rbacQueueCurrentRequest($route);
 }

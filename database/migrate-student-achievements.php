@@ -1,6 +1,7 @@
 <?php
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/normalized-content-lists.php';
 getDB()->exec("CREATE TABLE IF NOT EXISTS student_achievements (
     achievement_id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -23,7 +24,7 @@ if (!in_array('thumbnail_path',$columns,true)) {
     $db->exec('ALTER TABLE student_achievements ADD COLUMN thumbnail_path VARCHAR(500) NULL');
     $db->exec('UPDATE student_achievements SET thumbnail_path=image_path WHERE thumbnail_path IS NULL');
 }
-if (!in_array('achievers',$columns,true)) $db->exec('ALTER TABLE student_achievements ADD COLUMN achievers TEXT NULL');
+if (!in_array('achievers',$columns,true) && !contentListsEnabled($db)) $db->exec('ALTER TABLE student_achievements ADD COLUMN achievers TEXT NULL');
 $db->exec("CREATE TABLE IF NOT EXISTS student_achievement_photos (
     photo_id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     achievement_id INT UNSIGNED NOT NULL,

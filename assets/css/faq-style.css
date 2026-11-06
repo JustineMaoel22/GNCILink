@@ -23,5 +23,6 @@
 .faq-empty p{line-height:1.7;color:#637167;white-space:pre-wrap;overflow-wrap:anywhere}
 .faq-page [hidden]{display:none!important}
 @media(hover:hover){.faq-item summary:hover{background:#f2f7f0}}
+@media(max-width:768px){.faq-heading h1::after{margin-left:auto;margin-right:auto}}
 @media(max-width:575px){.faq-page{padding:40px 16px 56px}.faq-item summary{padding:18px 16px;gap:12px}.faq-answer{padding:4px 16px 20px}.faq-list{border-radius:12px}}
 @media(prefers-reduced-motion:reduce){.faq-item summary,.faq-item summary i{transition:none}}

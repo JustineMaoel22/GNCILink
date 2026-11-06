@@ -205,10 +205,52 @@ if ($requestedPage === '') {
     $requestedPage = $canManagePages ? 'home' : (string)($textPages[0]['slug'] ?? 'hub');
 }
 $activeSlug    = in_array($requestedPage, $validPanels, true) ? $requestedPage : 'hub';
+// Existing bookmarks now lead to the same queue as all other approvals.
+if($activeSlug==='review'&&rbacIsSuper()){
+    header('Location: /admin/submissions.php?status=pending',true,302);exit;
+}
 
 // "All content" and the review queue are lists. Every other page opens as the visual editor:
 // the real website page, edited in place.
 $editorMode = !in_array($activeSlug, ['hub', 'review'], true);
+
+// Shared page navigation for the editor picker and the content sidebar.
+$pickerPages = [];
+if ($canManagePages) $pickerPages[] = ['slug' => 'home', 'title' => 'Homepage', 'group' => 'Homepage', 'icon' => 'window-desktop'];
+foreach ($textPages as $p)   $pickerPages[] = ['slug' => $p['slug'], 'title' => $p['title'], 'group' => 'Pages', 'icon' => 'file-earmark-text'];
+foreach ($customPages as $p) $pickerPages[] = ['slug' => $p['slug'], 'title' => $p['title'], 'group' => 'Academics & people',
+    'icon' => $p['slug'] === 'administration' ? 'people' : ($p['slug'] === 'programs' ? 'mortarboard' : 'building')];
+if ($canManagePages) $pickerPages[] = ['slug' => 'basic-education', 'title' => $titleOf['basic-education'], 'group' => 'Academics & people', 'icon' => 'backpack'];
+if ($canManagePages) $pickerPages[] = ['slug'=>'student-organizations','title'=>'Student Organizations Management','group'=>'Student life','icon'=>'people'];
+if ($canManagePages) $pickerPages[] = ['slug'=>'student-achievements','title'=>'Student Achievements','group'=>'Student life','icon'=>'trophy'];
+if ($canManagePages) $pickerPages[] = ['slug'=>'athletics-sports','title'=>'Athletics and Sports','group'=>'Student life','icon'=>'dribbble'];
+if ($canManagePages) $pickerPages[] = ['slug'=>'community-activities','title'=>'Community Extension Activities','group'=>'Student life','icon'=>'heart'];
+if ($canManagePages) $pickerPages[] = ['slug'=>'faqs','title'=>'Frequently Asked Questions','group'=>'Student resources','icon'=>'question-circle'];
+if ($canManagePages && !in_array('online-payment-guide',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'online-payment-guide','title'=>'Online Payment Guide','group'=>'Admissions','icon'=>'credit-card'];
+if ($canManagePages && !in_array('scholarships',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'scholarships','title'=>'Scholarship Opportunities','group'=>'Admissions','icon'=>'mortarboard'];
+if ($canManagePages && !in_array('tuition-fees',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'tuition-fees','title'=>'Tuition and Fees','group'=>'Admissions','icon'=>'file-earmark-pdf'];
+
+// Follow the public navbar, retaining only pages already allowed above.
+$navbarPageGroups = [
+    'Homepage' => ['home'],
+    'About' => ['history', 'vision-mission', 'core-values', 'logo-meaning', 'administration'],
+    'Academics' => ['basic-education', 'basic-education-departments', 'college-departments', 'programs', 'graduate-school'],
+    'Admissions' => ['basic-education-admission-requirements', 'college-admission-requirements', 'enrollment-procedures', 'tuition-fees', 'scholarships', 'online-payment-guide'],
+    'Student Life' => ['student-organizations', 'community-activities', 'athletics-sports', 'faqs', 'student-achievements', 'alumni'],
+    'Contact Us' => ['contact-us'],
+];
+$navbarPageOrder = [];
+foreach ($navbarPageGroups as $group => $slugs) {
+    foreach ($slugs as $slug) $navbarPageOrder[$slug] = ['group' => $group, 'order' => count($navbarPageOrder)];
+}
+foreach ($pickerPages as &$pickerPage) {
+    $pickerPage['group'] = $navbarPageOrder[$pickerPage['slug']]['group'] ?? 'Other pages';
+}
+unset($pickerPage);
+usort($pickerPages, static function ($a, $b) use ($navbarPageOrder) {
+    return ($navbarPageOrder[$a['slug']]['order'] ?? PHP_INT_MAX) <=> ($navbarPageOrder[$b['slug']]['order'] ?? PHP_INT_MAX);
+});
+
 
 $VE = null;
 if ($editorMode) {
@@ -224,45 +266,6 @@ if ($editorMode) {
     if ($activeSlug === 'community-activities') $veKind = 'community';
     if ($activeSlug === 'faqs') $veKind = 'faqs';
     $withPreview = function (string $url): string { return $url . (strpos($url, '?') !== false ? '&' : '?') . 'ce_preview=1'; };
-
-    // The page list in the top bar
-    $pickerPages = [];
-    if ($canManagePages) $pickerPages[] = ['slug' => 'home', 'title' => 'Homepage', 'group' => 'Homepage', 'icon' => 'window-desktop'];
-    foreach ($textPages as $p)   $pickerPages[] = ['slug' => $p['slug'], 'title' => $p['title'], 'group' => 'Pages', 'icon' => 'file-earmark-text'];
-    foreach ($customPages as $p) $pickerPages[] = ['slug' => $p['slug'], 'title' => $p['title'], 'group' => 'Academics & people',
-        'icon' => $p['slug'] === 'administration' ? 'people' : ($p['slug'] === 'programs' ? 'mortarboard' : 'building')];
-    if ($canManagePages) $pickerPages[] = ['slug' => 'basic-education', 'title' => $titleOf['basic-education'], 'group' => 'Academics & people', 'icon' => 'backpack'];
-    if ($canManagePages) $pickerPages[] = ['slug'=>'student-organizations','title'=>'Student Organizations Management','group'=>'Student life','icon'=>'people'];
-    if ($canManagePages) $pickerPages[] = ['slug'=>'student-achievements','title'=>'Student Achievements','group'=>'Student life','icon'=>'trophy'];
-    if ($canManagePages) $pickerPages[] = ['slug'=>'athletics-sports','title'=>'Athletics and Sports','group'=>'Student life','icon'=>'dribbble'];
-    if ($canManagePages) $pickerPages[] = ['slug'=>'community-activities','title'=>'Community Extension Activities','group'=>'Student life','icon'=>'heart'];
-    if ($canManagePages) $pickerPages[] = ['slug'=>'faqs','title'=>'Frequently Asked Questions','group'=>'Student resources','icon'=>'question-circle'];
-    if ($canManagePages && !in_array('online-payment-guide',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'online-payment-guide','title'=>'Online Payment Guide','group'=>'Admissions','icon'=>'credit-card'];
-    if ($canManagePages && !in_array('scholarships',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'scholarships','title'=>'Scholarship Opportunities','group'=>'Admissions','icon'=>'mortarboard'];
-    if ($canManagePages && !in_array('tuition-fees',array_column($pickerPages,'slug'),true)) $pickerPages[] = ['slug'=>'tuition-fees','title'=>'Tuition and Fees','group'=>'Admissions','icon'=>'file-earmark-pdf'];
-    if ($postModules && $canManagePages) $pickerPages[] = ['slug' => 'updates', 'title' => 'News, announcements & events', 'group' => 'Posts', 'icon' => 'megaphone'];
-
-    // Follow the public navbar, retaining only pages already allowed above.
-    $navbarPageGroups = [
-        'Homepage' => ['home'],
-        'About' => ['history', 'vision-mission', 'core-values', 'logo-meaning', 'administration'],
-        'Academics' => ['basic-education', 'basic-education-departments', 'college-departments', 'programs', 'graduate-school'],
-        'Admissions' => ['basic-education-admission-requirements', 'college-admission-requirements', 'enrollment-procedures', 'tuition-fees', 'scholarships', 'online-payment-guide'],
-        'Student Life' => ['student-organizations', 'community-activities', 'athletics-sports', 'faqs', 'student-achievements', 'alumni'],
-        'News & Announcements' => ['updates'],
-        'Contact Us' => ['contact-us'],
-    ];
-    $navbarPageOrder = [];
-    foreach ($navbarPageGroups as $group => $slugs) {
-        foreach ($slugs as $slug) $navbarPageOrder[$slug] = ['group' => $group, 'order' => count($navbarPageOrder)];
-    }
-    foreach ($pickerPages as &$pickerPage) {
-        $pickerPage['group'] = $navbarPageOrder[$pickerPage['slug']]['group'] ?? 'Other pages';
-    }
-    unset($pickerPage);
-    usort($pickerPages, static function ($a, $b) use ($navbarPageOrder) {
-        return ($navbarPageOrder[$a['slug']]['order'] ?? PHP_INT_MAX) <=> ($navbarPageOrder[$b['slug']]['order'] ?? PHP_INT_MAX);
-    });
 
     $veTitle   = $activeSlug === 'home' ? 'Homepage' : ($titleOf[$activeSlug] ?? $activeSlug);
     $publicUrl = $publicUrls[$activeSlug] ?? '';
@@ -537,6 +540,9 @@ include __DIR__ . '/../components/header-admin.php';
 
 <link rel="stylesheet" href="/assets/css/content-editor-style.css?v=<?= (int)@filemtime(__DIR__ . '/../assets/css/content-editor-style.css') ?: 1 ?>">
 
+<link rel="stylesheet" href="/assets/css/contact-number.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/contact-number.css') ?>">
+<script src="/assets/js/contact-number.js?v=<?= (int)filemtime(__DIR__ . '/../assets/js/contact-number.js') ?>"></script>
+
 <div class="ce-toasts" id="ceToasts" aria-live="polite" aria-atomic="false"></div>
 
 <?php if ($editorMode): ?>
@@ -583,6 +589,14 @@ include __DIR__ . '/../components/header-admin.php';
         </div>
 
         <div class="ve-actions">
+            <div class="ve-presence" id="vePresence">
+                <button type="button" class="ve-tool" id="vePresenceButton" aria-expanded="false" aria-controls="vePresencePanel" title="Active users on this page"><i class="bi bi-people" aria-hidden="true"></i><span id="vePresenceCount">—</span><span class="ve-presence-label">Active</span></button>
+                <section class="ve-presence-panel" id="vePresencePanel" tabindex="-1" aria-label="Active viewers and editors" hidden>
+                    <strong>On this page</strong><ul id="vePresenceList"></ul><p id="vePresenceStatus">Connecting…</p>
+                </section>
+            </div>
+            <button type="button" class="ve-tool" id="veUndo" disabled title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" aria-keyshortcuts="Control+z Meta+z"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span>Undo</span></button>
+            <button type="button" class="ve-tool" id="veRedo" disabled title="Redo (Ctrl+Y / Ctrl/Cmd+Shift+Z)" aria-label="Redo" aria-keyshortcuts="Control+y Control+Shift+z Meta+Shift+z"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span>Redo</span></button>
             <?php if ($activeSlug === 'programs' && $canManagePages): ?>
             <button type="button" class="ve-tool" id="veAddProgramBtn" title="Create a college or Graduate School program"><i class="bi bi-plus-circle"></i><span>Add Program</span></button>
             <?php endif; ?>
@@ -604,6 +618,7 @@ include __DIR__ . '/../components/header-admin.php';
         </div>
     </header>
 
+    <div class="ve-presence-warning" id="vePresenceWarning" role="status" aria-live="polite" hidden><span id="vePresenceMessage"></span><button type="button" class="ve-presence-recovery" id="vePresenceRecovery" hidden>Save recovery draft</button></div>
     <main class="ve-canvas" id="veCanvas">
         <span class="ve-status ve-status-ok" id="veStatus" role="status" aria-live="polite" aria-atomic="true"></span>
         <div class="ve-stage" id="veStage" data-device="desktop">
@@ -662,6 +677,8 @@ include __DIR__ . '/../components/header-admin.php';
 <script src="/assets/js/editor-feedback.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/editor-feedback.js'),0,12) ?>"></script>
 <script src="/assets/js/department-card-order.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/department-card-order.js'),0,12) ?>"></script>
 <script src="/assets/js/editor-drafts.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/editor-drafts.js'),0,12) ?>"></script>
+<script src="/assets/js/editor-history.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/editor-history.js'),0,12) ?>"></script>
+<script src="/assets/js/editor-presence.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/editor-presence.js'),0,12) ?>"></script>
 <?php if ($activeSlug === 'alumni'): ?><script src="/assets/js/alumni-voices-editor.js?v=<?= filemtime(__DIR__ . '/../assets/js/alumni-voices-editor.js') ?>"></script><?php endif; ?>
 <script src="/assets/js/content-edit.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/content-edit.js'),0,12) ?>"></script>
 
@@ -683,50 +700,20 @@ include __DIR__ . '/../components/header-admin.php';
             <?php endif; ?>
         </div>
 
-        <?php if ($canManagePages): ?>
+        <?php
+        $sidebarPageGroups = [];
+        foreach ($pickerPages as $page) $sidebarPageGroups[$page['group']][] = $page;
+        foreach ($sidebarPageGroups as $group => $pages): ?>
         <div class="ce-nav-group">
-            <div class="ce-nav-label">Homepage</div>
-            <a class="ce-nav-link" href="?page=home" data-panel="home"><i class="bi bi-window-desktop"></i><span>Slideshow &amp; president</span></a>
-        </div>
-        <?php endif; ?>
-
-        <?php if ($textPages): ?>
-        <div class="ce-nav-group">
-            <div class="ce-nav-label">Pages</div>
-            <?php foreach ($textPages as $p): ?>
-            <a class="ce-nav-link" href="?page=<?= ce_e(rawurlencode($p['slug'])) ?>" data-panel="<?= ce_e($p['slug']) ?>">
-                <i class="bi bi-file-earmark-text"></i><span><?= ce_e($p['title']) ?></span>
-                <span class="ce-nav-dot" data-dot-for="<?= ce_e($p['slug']) ?>" hidden title="Unsaved changes"></span>
+            <div class="ce-nav-label"><?= ce_e($group) ?></div>
+            <?php foreach ($pages as $page): ?>
+            <a class="ce-nav-link" href="?page=<?= ce_e(rawurlencode($page['slug'])) ?>" data-panel="<?= ce_e($page['slug']) ?>">
+                <i class="bi bi-<?= ce_e($page['icon']) ?>"></i><span><?= ce_e($page['title']) ?></span>
+                <span class="ce-nav-dot" data-dot-for="<?= ce_e($page['slug']) ?>" hidden title="Unsaved changes"></span>
             </a>
             <?php endforeach; ?>
         </div>
-        <?php endif; ?>
-
-        <?php if ($customPages || $canManagePages): ?>
-        <div class="ce-nav-group">
-            <div class="ce-nav-label">Academics &amp; people</div>
-            <?php if ($canManagePages): ?>
-            <a class="ce-nav-link" href="?page=basic-education" data-panel="basic-education"><i class="bi bi-backpack"></i><span><?= ce_e($titleOf['basic-education']) ?></span></a>
-            <?php endif; ?>
-            <?php foreach ($customPages as $p):
-                $icon = $p['slug'] === 'administration' ? 'bi-people' : ($p['slug'] === 'programs' ? 'bi-mortarboard' : 'bi-building'); ?>
-            <a class="ce-nav-link" href="?page=<?= ce_e(rawurlencode($p['slug'])) ?>" data-panel="<?= ce_e($p['slug']) ?>">
-                <i class="bi <?= $icon ?>"></i><span><?= ce_e($p['title']) ?></span>
-            </a>
-            <?php endforeach; ?>
-        </div>
-        <?php endif; ?>
-
-        <?php if ($canManagePages): ?>
-        <div class="ce-nav-group">
-            <div class="ce-nav-label">Student life</div>
-            <a class="ce-nav-link" href="?page=student-organizations"><i class="bi bi-people"></i><span>Student Organizations Management</span></a>
-            <a class="ce-nav-link" href="?page=student-achievements"><i class="bi bi-trophy"></i><span>Student Achievements</span></a>
-            <a class="ce-nav-link" href="?page=athletics-sports"><i class="bi bi-dribbble"></i><span>Athletics and Sports</span></a>
-            <a class="ce-nav-link" href="?page=community-activities"><i class="bi bi-heart"></i><span>Community Extension Activities</span></a>
-        </div>
-        <?php endif; ?>
-
+        <?php endforeach; ?>
         <?php if ($otherModules): ?>
         <div class="ce-nav-group">
             <div class="ce-nav-label">Other content</div>

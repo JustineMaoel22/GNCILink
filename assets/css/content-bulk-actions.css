@@ -1,0 +1,6 @@
+.bulk-select-media { display: flex; align-items: center; gap: 10px; }
+.bulk-select-media > input,.bulk-select-media > .ann-thumb,.bulk-select-media > .news-thumb-button { flex-shrink: 0; }
+.announcement-management .ann-table:has([data-bulk-item]) th:first-child { width: 110px !important; }
+@media(max-width:1050px) {
+    .announcement-management .ann-table tr.ann-row:has([data-bulk-item]) { grid-template-columns: 84px minmax(0,1fr); }
+}

@@ -18,4 +18,38 @@
     update();
     setInterval(update, 30000);
     document.addEventListener('visibilitychange', update);
+
+    const totals = document.querySelector('[data-daily-totals]');
+    if (totals) {
+        const rows = [...totals.querySelectorAll('tbody tr')];
+        const pageSize = 7, pages = Math.ceil(rows.length / pageSize);
+        const pagination = totals.querySelector('[data-daily-pagination]');
+        const controls = totals.querySelector('[data-daily-controls]');
+        const status = totals.querySelector('[data-daily-status]');
+        if (pages > 1) {
+            let page = 1;
+            function render() {
+                const start = (page - 1) * pageSize;
+                rows.forEach((row, index) => { row.hidden = index < start || index >= start + pageSize; });
+                status.textContent = `Showing ${start + 1}–${Math.min(start + pageSize, rows.length)} of ${rows.length} days · Page ${page} of ${pages}`;
+                controls.replaceChildren();
+                function button(label, target, disabled, current) {
+                    const node = document.createElement('button');
+                    node.type = 'button'; node.textContent = label; node.disabled = disabled;
+                    node.setAttribute('aria-controls', 'dashboard-daily-table');
+                    if (current) node.setAttribute('aria-current', 'page');
+                    if (/^\d+$/.test(label)) node.setAttribute('aria-label', `Page ${label}`);
+                    node.addEventListener('click', () => {
+                        page = target; render();
+                        controls.querySelector('[aria-current="page"]').focus({preventScroll:true});
+                    });
+                    controls.appendChild(node);
+                }
+                button('Previous', page - 1, page === 1, false);
+                for (let number = 1; number <= pages; number++) button(String(number), number, false, number === page);
+                button('Next', page + 1, page === pages, false);
+            }
+            render(); pagination.hidden = false;
+        }
+    }
 })();

@@ -7,6 +7,8 @@ document.querySelectorAll('[data-hss-flip]').forEach(function (card) {
 
 // Reveal each card once; no scroll handlers or continuously running effects.
 (function () {
+    // Category links reload this page; show the new category immediately.
+    if (new URLSearchParams(location.search).has('section')) return;
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
     if (motion.matches || !('IntersectionObserver' in window)) return;
 

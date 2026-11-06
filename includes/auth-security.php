@@ -1,5 +1,6 @@
 <?php
 /** Authentication controls shared by every admin role. No credentials belong in logs. */
+require_once __DIR__.'/auth-email-templates.php';
 function authIp(): string {
     $ip=$_SERVER['REMOTE_ADDR']??'';
     return filter_var($ip,FILTER_VALIDATE_IP)?$ip:'unknown';
@@ -256,7 +257,13 @@ function authSendMail(string $email,string $name,string $subject,string $body,?i
     if(!authLocalDevelopment()&&function_exists('mail')){
         $safeFrom=str_replace(["\r","\n"],'',$fromAddr);
         $headers="From: $fromName <$safeFrom>\r\nReply-To: $safeFrom\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8";
-        if(@mail($email,$subject,$body,$headers)){
+        $message=$body;
+        if($htmlBody!==null&&$htmlBody!==''){
+            $boundary='gnci_alt_'.bin2hex(random_bytes(16));
+            $headers="From: $fromName <$safeFrom>\r\nReply-To: $safeFrom\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"$boundary\"";
+            $message=authEmailAlternativeBody($body,$htmlBody,$boundary);
+        }
+        if(@mail($email,$subject,$message,$headers)){
             error_log('Authentication email sent via local MTA fallback after SMTP error: '.implode(' | ',$errors));
             return true;
         }
@@ -267,27 +274,6 @@ function authSendMail(string $email,string $name,string $subject,string $body,?i
     authAudit($id,'AUTH_MAIL_FAILED','Email delivery failed: '.$summary);
     error_log('Authentication email delivery failed for user '.($id??'unknown').': '.$summary);
     return false;
-}
-function authBuildResetEmailHtml(string $firstName,string $url): string {
-    $safeName=htmlspecialchars($firstName!==''?$firstName:'Administrator',ENT_QUOTES,'UTF-8');
-    $safeUrl=htmlspecialchars($url,ENT_QUOTES,'UTF-8');
-    return '<!doctype html><html lang="en"><body style="margin:0;padding:24px;background:#f4f6f5;font-family:Arial,Helvetica,sans-serif;color:#1e2923;">'
-        .'<div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #dce4df;border-radius:10px;overflow:hidden;">'
-        .'<div style="background:#094024;color:#ffffff;padding:20px 24px;">'
-        .'<h2 style="margin:0;font-size:18px;font-weight:700;">GNC Admin Panel — Password Reset</h2>'
-        .'<p style="margin:4px 0 0;font-size:13px;opacity:0.9;">Guagua National Colleges, Inc.</p>'
-        .'</div>'
-        .'<div style="padding:24px;font-size:14px;line-height:1.6;">'
-        .'<p style="margin-top:0;">Hello <strong>'.$safeName.'</strong>,</p>'
-        .'<p>We received a request to reset the password for your GNC Admin Panel account. Click the button below within <strong>15 minutes</strong> to set a new password:</p>'
-        .'<p style="margin:24px 0;text-align:center;">'
-        .'<a href="'.$safeUrl.'" style="display:inline-block;background:#094024;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:6px;">Reset My Password</a>'
-        .'</p>'
-        .'<p style="font-size:12px;color:#526057;">If the button above does not open, copy and paste this single-use link into your browser:<br>'
-        .'<a href="'.$safeUrl.'" style="color:#094024;word-break:break-all;">'.$safeUrl.'</a></p>'
-        .'<hr style="border:0;border-top:1px solid #e5ebe7;margin:20px 0;">'
-        .'<p style="margin-bottom:0;font-size:12px;color:#66736b;">This link expires in 15 minutes and can only be used once. If you did not request a password reset, you can safely ignore this email—your password has not been changed.</p>'
-        .'</div></div></body></html>';
 }
 function authRequestReset(string $email): bool {
     $normalizedEmail=strtolower(trim($email));
@@ -342,7 +328,7 @@ function authResetPassword(string $token,string $password,string $confirmation):
         $db->prepare('DELETE FROM auth_password_resets WHERE user_id=?')->execute([$id]);$db->commit();
     }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
     authAudit((int)$id,'PASSWORD_RESET','Password reset completed; previous sessions and credentials revoked.');
-    authSendMail($u['email'],$u['first_name'],'GNCILink - Your password was changed',"Your GNCILink password was reset successfully. Existing sessions have been signed out.\n\nIf you did not make this change, contact your Super Admin immediately.",(int)$id);
+    authSendMail($u['email'],$u['first_name'],'GNCILink - Your password was changed',"Your GNCILink password was reset successfully. Existing sessions have been signed out.\n\nIf you did not make this change, contact your Super Admin immediately.",(int)$id,authBuildPasswordChangedEmailHtml((string)$u['first_name']));
 }
 // Separate transport function permits deterministic, isolated tests without external password queries.
 if(!function_exists('authPwnedRange')){

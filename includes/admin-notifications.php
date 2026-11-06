@@ -17,7 +17,7 @@ function adminNotifications(): array {
     if(hasPermission('approve_content')&&function_exists('pageReviewReady')&&pageReviewReady()){
         try{
             $count=(int)getDB()->query("SELECT COUNT(*) FROM page_sections WHERE review_status='pending'")->fetchColumn();
-            if($count>0)$items[]=['key'=>'page-review-'.$count,'title'=>'Website text awaiting review','detail'=>$count.' page sections need approval.','date'=>'','url'=>'/admin/content-edit.php?page=review'];
+            if($count>0)$items[]=['key'=>'page-review-'.$count,'title'=>'Website text awaiting review','detail'=>$count.' page sections need approval.','date'=>'','url'=>'/admin/submissions.php?status=pending&type=pages'];
         }catch(Throwable $exception){$unavailable=true;error_log('Admin page notifications unavailable.');}
     }
     return ['items'=>$items,'unavailable'=>$unavailable];

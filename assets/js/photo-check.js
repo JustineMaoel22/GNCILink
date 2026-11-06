@@ -29,6 +29,16 @@
                (PERSON_NAMES[el.name] === 1 || PERSON_IDS[el.id] === 1 || el.hasAttribute('data-photo-check'));
     }
 
+    function context(input) {
+        if (input.__pcContext) return input.__pcContext();
+        var selector = input.id === 'adm-person-photo' ? '#adm-person-name' :
+            input.id === 'adm-office-photo' ? '#adm-office-head' :
+            input.id === 'president-photo' ? '#president-name' : '.dean-name-input';
+        var scope = input.closest('[data-dept-id]') || document;
+        var field = scope.querySelector(selector);
+        return { name: field ? field.value : '', key: input.dataset.profileKey || '' };
+    }
+
     // ── popup ──
     var css = document.createElement('style');
     css.textContent =
@@ -41,8 +51,10 @@
         '.pc-spin{width:34px;height:34px;border:4px solid #ddd;border-top-color:#1f5e2c;border-radius:50%;margin:0 auto 12px;animation:pcs .8s linear infinite}' +
         '@keyframes pcs{to{transform:rotate(360deg)}}';
     document.head.appendChild(css);
+    css.textContent += '.pc-box{max-height:90vh;overflow:auto}.pc-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.pc-compare img{width:100%;height:150px;object-fit:contain;background:#f5f7f5;border-radius:8px}.pc-compare figcaption{overflow-wrap:anywhere;font-size:14px}.pc-compare figure{margin:0}.pc-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.pc-box textarea{width:100%;margin:8px 0}.pc-box .pc-secondary{background:#64716a}@media(prefers-reduced-motion:reduce){.pc-spin{animation:none}}';
 
     var overlay = null, lastFocus = null;
+    css.textContent += '.pc-compare{align-items:start}.pc-existing{display:grid;gap:16px;align-content:start}';
 
     function close() {
         if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
@@ -55,11 +67,12 @@
         lastFocus = document.activeElement;
         overlay = document.createElement('div');
         overlay.className = 'pc-back';
-        overlay.innerHTML = '<div class="pc-box" role="alertdialog" aria-modal="true">' + html +
+        overlay.innerHTML = '<div class="pc-box" role="alertdialog" aria-label="Personnel photo validation" aria-modal="true" tabindex="-1">' + html +
             (withButton ? '<button type="button" class="pc-btn">OK</button>' : '') + '</div>';
         document.body.appendChild(overlay);
         var b = overlay.querySelector('.pc-btn');
         if (b) { b.addEventListener('click', close); b.focus(); }
+        else overlay.querySelector('.pc-box').focus();
     }
 
     function notice(text) {
@@ -85,6 +98,70 @@
              '<h2>' + esc(title) + '</h2><p>' + esc(message || 'Please choose a real photo of the person.') + '</p>', true);
     }
 
+    document.addEventListener('keydown', function (event) {
+        if (!overlay) return;
+        if (event.key === 'Escape') { event.preventDefault(); return; }
+        if (event.key !== 'Tab') return;
+        var items = overlay.querySelectorAll('button,textarea');
+        if (!items.length) { event.preventDefault(); return; }
+        var first = items[0], last = items[items.length - 1];
+        if (!overlay.contains(document.activeElement) || (event.shiftKey && document.activeElement === first)) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }, true);
+
+    function compareWarning(res, file, person, accept, reject, review) {
+        open('<h2>Possible Duplicate Photo Detected</h2><p>' + esc(res.message) + '</p><p>Similarity is a screening result and does not prove identity.</p><div class="pc-results"></div><div class="pc-actions"></div>', false);
+        var results = overlay.querySelector('.pc-results');
+        if (res.coverage_notice) {
+            var coverage = document.createElement('p'); coverage.textContent = res.coverage_notice; results.appendChild(coverage);
+        }
+        var url = URL.createObjectURL(file);
+        var groups = new Map();
+        (res.matches || []).forEach(function (match) {
+            // Mirror the server's cross-section identity rule for presentation only.
+            var identity = String(match.name || '').trim().replace(/\s+/g, ' ').toLowerCase() || match.key;
+            var group = groups.get(identity);
+            if (!group) { group = { match:match, profiles:new Set() }; groups.set(identity, group); }
+            group.profiles.add(match.key);
+            if (match.similarity > group.match.similarity) group.match = match;
+        });
+        function portrait(image, name) {
+            var figure = document.createElement('figure'), img = document.createElement('img'), label = document.createElement('figcaption');
+            img.src = image; img.alt = name; label.textContent = name;
+            figure.appendChild(img); figure.appendChild(label);
+            return figure;
+        }
+        var row = document.createElement('div'); row.className = 'pc-compare';
+        var uploaded = document.createElement('div'); uploaded.className = 'pc-upload';
+        uploaded.appendChild(portrait(url, person.name));
+        var existing = document.createElement('div'); existing.className = 'pc-existing';
+        groups.forEach(function (group) {
+            var figure = portrait(group.match.image, group.match.name);
+            if (group.profiles.size > 1) {
+                var count = document.createElement('small');
+                count.textContent = 'Used in ' + group.profiles.size + ' profiles';
+                figure.appendChild(count);
+            }
+            existing.appendChild(figure);
+        });
+        row.appendChild(uploaded); row.appendChild(existing); results.appendChild(row);
+        function button(label, action) {
+            var b = document.createElement('button'); b.type = 'button'; b.className = 'pc-btn'; b.textContent = label;
+            b.onclick = function () { URL.revokeObjectURL(url); action(); };
+            overlay.querySelector('.pc-actions').appendChild(b);
+            return b;
+        }
+        button('Replace photo', reject).focus();
+        if (res.ok) button('Continue after checking', accept);
+        if (!res.ok && res.can_review) {
+            button('Confirm reviewed assignment', review);
+        }
+        if (!res.ok && !res.can_review) {
+            var help = document.createElement('p'); help.textContent = 'Saving is blocked. Replace the photo or ask a Super Admin to open and review this profile.';
+            results.appendChild(help);
+        }
+    }
+
     // ── interception ──
     document.addEventListener('change', function (ev) {
         var input = ev.target;
@@ -105,6 +182,16 @@
         var fd = new FormData();
         fd.append('csrf_token', csrf());
         fd.append('photo', input.files[0]);
+        var person = context(input);
+        fd.append('person_name', person.name);
+        fd.append('profile_key', person.key);
+
+        function accept() {
+            close();
+            input.__pcPassed = true;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        function reject() { input.value = ''; close(); }
 
         open('<div class="pc-spin"></div><p>Checking the photo&hellip;</p>', false);
 
@@ -115,6 +202,19 @@
             .then(function (res) {
                 if (timer) clearTimeout(timer);
                 if (input.files[0] !== selectedFile) { close(); return; }
+                if (res && res.success && res.reason === 'duplicate_face' && !res.reviewed) {
+                    compareWarning(res, selectedFile, person, accept, reject, function () {
+                        fd.set('review_duplicate', '1');
+                        open('<div class="pc-spin"></div><p>Recording review&hellip;</p>', false);
+                        fetch(HANDLER, { method:'POST',body:fd,credentials:'same-origin' })
+                            .then(function (r) { return r.json(); })
+                            .then(function (reviewed) {
+                                if (reviewed.success && reviewed.ok && reviewed.reviewed) accept();
+                                else { input.value = ''; showRejected(reviewed.reason, reviewed.error || reviewed.message); }
+                            }).catch(function () { input.value = ''; showRejected('unavailable', 'The review could not be saved. Please try again.'); });
+                    });
+                    return;
+                }
                 if (res && res.success && res.ok === false) {
                     console.info('[photo-check] rejected:', res.reason, res.detail);
                     input.value = '';
@@ -127,10 +227,8 @@
                     showRejected('unavailable', (res && (res.error || res.message)) || 'The photo could not be checked. Please try again.');
                     return;
                 }
-                if (!disabled) notice('Photo check passed. You can save your changes.');
-                close();
-                input.__pcPassed = true;
-                input.dispatchEvent(new Event('change', { bubbles: true }));
+                if (!disabled) notice(res.coverage_notice || 'Photo check passed. You can save your changes.');
+                accept();
             })
             .catch(function (err) {
                 if (timer) clearTimeout(timer);

@@ -34,3 +34,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # (see uploadHeroMedia() in admin-functions.php). Any .ini file dropped into
 # conf.d/ is auto-loaded by this base image.
 COPY uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+
+# Personnel face comparison runs locally; no face templates leave the container.
+COPY scripts/requirements-face-check.txt /opt/gnci-face-requirements.txt
+COPY scripts/install-face-models.py /opt/install-face-models.py
+RUN apt-get update && apt-get install -y --no-install-recommends python3-venv ca-certificates \
+    && python3 -m venv /opt/gnci-face \
+    && /opt/gnci-face/bin/pip install --no-cache-dir -r /opt/gnci-face-requirements.txt \
+    && /opt/gnci-face/bin/python /opt/install-face-models.py /opt/gnci-face/models \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+ENV FACE_CHECK_PYTHON=/opt/gnci-face/bin/python \
+    FACE_CHECK_MODELS=/opt/gnci-face/models

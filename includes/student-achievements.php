@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/image-framing.php';
 require_once __DIR__ . '/content-publish-policy.php';
+require_once __DIR__ . '/normalized-content-lists.php';
 function normalizeAchievementAcademicYear($value): ?string {
     if ($value === null || $value === '') return null;
     if (!is_string($value) || !preg_match('/^([1-9][0-9]{3})-([1-9][0-9]{3})$/D', $value, $matches)
@@ -33,7 +34,7 @@ function studentAchievementListing(PDO $db, array $query, bool $includeDrafts = 
     $statement = $db->prepare("SELECT n.* FROM student_achievements n
         WHERE $where ORDER BY n.created_at ASC,n.achievement_id ASC LIMIT 6 OFFSET " . (($page - 1) * 6));
     $statement->execute($params);
-    return ['items'=>$statement->fetchAll(PDO::FETCH_ASSOC),'years'=>$years,'year'=>$year,'categories'=>$categories,'category'=>$category,'page'=>$page,'pages'=>$pages,'total'=>$total];
+    return ['items'=>contentListsHydrate($db, 'achievement_achievers', $statement->fetchAll(PDO::FETCH_ASSOC)),'years'=>$years,'year'=>$year,'categories'=>$categories,'category'=>$category,'page'=>$page,'pages'=>$pages,'total'=>$total];
 }
 
 function studentAchievementPageUrl(int $page, ?string $year, ?string $category = null): string {
@@ -45,6 +46,7 @@ function studentAchievementById(PDO $db, int $id, bool $publishedOnly = true): ?
     $statement->execute([$id]);
     $record=$statement->fetch(PDO::FETCH_ASSOC);
     if (!$record) return null;
+    $record = contentListsHydrate($db, 'achievement_achievers', [$record])[0];
     $record['photos']=studentAchievementPhotos($db,$id);
     return $record;
 }
@@ -72,7 +74,7 @@ function saveStudentAchievement(PDO $db, int $id, array $data, ?string $imagePat
     $thumbnailPath=$thumbnailPath ?? ($existing['thumbnail_path'] ?? null);
     $fields = [];
     foreach (['title'=>255,'description'=>12000,'program_organization'=>255,'category_label'=>100,'achievers'=>12000] as $key=>$limit) {
-        $value = $data[$key] ?? '';
+        $value = $data[$key] ?? ($key === 'achievers' ? ($existing['achievers'] ?? '') : '');
         if (!is_string($value) || mb_strlen(trim($value)) > $limit) throw new InvalidArgumentException('Check the ' . str_replace('_', ' ', $key) . ' field.');
         $fields[$key] = trim($value);
     }
@@ -83,14 +85,25 @@ function saveStudentAchievement(PDO $db, int $id, array $data, ?string $imagePat
     if ($status === 'published' && (!$year || (!$thumbnailPath && !$imagePath)) && !contentPublishAllowsIncomplete()) throw new InvalidArgumentException('Choose an academic year and add a card cover photo before publishing.');
     $order = filter_var($data['sort_order'] ?? 0, FILTER_VALIDATE_INT);
     if ($order === false || $order < 0 || $order > 100000) throw new InvalidArgumentException('Display order must be between 0 and 100000.');
-    $values = [$fields['title'],$fields['description'],$fields['program_organization'],$fields['category_label'],$year,$imagePath,$status,empty($data['is_featured'])?0:1,$order,$fields['achievers'],$thumbnailPath];
-    if ($id) {
-        $values[] = $id;
-        $db->prepare('UPDATE student_achievements SET title=?,description=?,program_organization=?,category_label=?,academic_year=?,image_path=?,status=?,is_featured=?,sort_order=?,achievers=?,thumbnail_path=?,updated_at=NOW() WHERE achievement_id=?')->execute($values);
-        return $id;
-    }
-    $db->prepare('INSERT INTO student_achievements (title,description,program_organization,category_label,academic_year,image_path,status,is_featured,sort_order,achievers,thumbnail_path) VALUES (?,?,?,?,?,?,?,?,?,?,?)')->execute($values);
-    return (int)$db->lastInsertId();
+    $normalized = contentListsEnabled($db);
+    $featured = empty($data['is_featured']) ? 0 : 1;
+    return contentListTransaction($db, static function () use ($db, $id, $fields, $year, $imagePath, $status, $order, $thumbnailPath, $normalized, $featured): int {
+        $columns = ['title','description','program_organization','category_label','academic_year','image_path','status','is_featured','sort_order','thumbnail_path'];
+        $values = [$fields['title'],$fields['description'],$fields['program_organization'],$fields['category_label'],$year,$imagePath,$status,$featured,$order,$thumbnailPath];
+        if (!$normalized) { $columns[] = 'achievers'; $values[] = $fields['achievers']; }
+        if ($id) {
+            $assignments = implode(',', array_map(static fn($column) => "$column=?", $columns));
+            $values[] = $id;
+            $db->prepare("UPDATE student_achievements SET $assignments,updated_at=NOW() WHERE achievement_id=?")->execute($values);
+            $savedId = $id;
+        } else {
+            $placeholders = implode(',', array_fill(0, count($values), '?'));
+            $db->prepare('INSERT INTO student_achievements (' . implode(',', $columns) . ") VALUES ($placeholders)")->execute($values);
+            $savedId = (int)$db->lastInsertId();
+        }
+        if ($normalized) contentListReplace($db, 'achievement_achievers', $savedId, $fields['achievers']);
+        return $savedId;
+    });
 }
 
 function uploadStudentAchievementImage(array $file): string {

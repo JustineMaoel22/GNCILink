@@ -12,6 +12,7 @@ function activityLogTone(string $action): string {
     return 'neutral';
 }
 function activityLogModule(?string $module): string {
+    if($module==='website_pages')return 'Website pages';
     $labels = [''=>'General','authentication'=>'Login & security','announcements'=>'Announcements','news'=>'News','events'=>'Events','users'=>'Users','page_sections'=>'Content Editor','rbac_submissions'=>'Content approvals','calendar_import_series'=>'Calendar imports','fb_posts_cache'=>'Facebook posts','admin_sections'=>'Administration sections','admin_people'=>'Administration people','admin_offices'=>'Administration offices'];
     return $labels[$module??''] ?? ucfirst(str_replace('_',' ',(string)$module));
 }
@@ -25,6 +26,10 @@ function activityLogDescription(array $row): string {
     // credential boundaries. The original record remains unchanged in storage.
     $secrets = '/(?:password|passwd|pwd|token|secret|credential|api[ _-]?key|authorization|cookie|session[ _-]?id)\s*["\x27]?\s*[:=]|\bBearer\s+\S+|-----BEGIN [\w ]*PRIVATE KEY|https?:\/\/[^\s\/]+:[^\s\/]+@|[?&](?:code|key|access_token|token)=/i';
     if (preg_match($secrets,$description) || preg_match('/\b(?:temporary|initial|new|current|old) password\s+(?:is\s+)?\S+/i',$description)) return 'Description hidden because it may contain sensitive account information.';
+    if(($row['table_name']??'')==='website_pages'){
+        $publication=json_decode($description,true);
+        if(is_array($publication)&&is_string($publication['title']??null))return 'Published website page: '.$publication['title'];
+    }
     return $description !== '' ? $description : activityLogLabel($row['action']).' · '.activityLogModule($row['table_name']);
 }
 function activityLogFilters(array $input): array {

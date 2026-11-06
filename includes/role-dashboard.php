@@ -17,6 +17,10 @@ function roleDashboardData(?PDO $db=null): array {
             $q->execute(array_merge([$type],$params));$recent=array_merge($recent,$q->fetchAll(PDO::FETCH_ASSOC));
         }catch(PDOException $e){$errors['content']='Some content summaries could not be loaded.';error_log('Dashboard content unavailable: '.$type);}
     }
+    if(hasPermission('manage_page_content')||hasPermission('edit_page_content')){
+        try{require_once __DIR__.'/website-publications.php';$recent=array_merge($recent,dashboardPublishedPages($db));}
+        catch(PDOException $e){$errors['content']='Some content summaries could not be loaded.';error_log('Dashboard page publications unavailable.');}
+    }
     if(count($contentCounts)===count($types))$stats['published_content']=array_sum(array_column($contentCounts,'published'));
     try{
         $scope=$super?'':' WHERE user_id=?';$params=$super?[]:[$id];
@@ -25,7 +29,7 @@ function roleDashboardData(?PDO $db=null): array {
         $q=$db->prepare('SELECT submission_id,title,status,revision,created_at,updated_at FROM rbac_submissions'.$scope.' ORDER BY updated_at DESC,submission_id DESC LIMIT 6');$q->execute($params);$submissions=$q->fetchAll(PDO::FETCH_ASSOC);
     }catch(PDOException $e){$errors['submissions']='Submission status is temporarily unavailable.';error_log('Dashboard submissions unavailable.');}
     if($super){
-        try{$pagePending=(int)$db->query("SELECT COUNT(*) FROM page_sections WHERE review_status='pending'")->fetchColumn();}
+        try{$pagePending=(int)$db->query("SELECT COUNT(*) FROM page_sections WHERE review_status='pending'")->fetchColumn();if($stats['pending_approvals']!==null)$stats['pending_approvals']+=$pagePending;}
         catch(PDOException $e){if(!in_array($e->getCode(),['42S02','42S22'],true))$errors['page_review']='Page-text review status is unavailable.';}
     }
     if(hasPermission('manage_users')){
@@ -48,12 +52,17 @@ function dashboardAnalytics(PDO $db,int $days): array {
     // missing table is shown as unavailable rather than a fabricated zero.
     $db->query('SELECT page_url,page_title,visit_count,last_visited FROM page_visits LIMIT 0');
     $db->query('SELECT page_id,visit_date,views FROM page_visits_daily LIMIT 0');
-    $totals=gncPageTotals($db);$byDate=gncViewsByDate($db,$days);$visitors=null;
-    try{$visitors=(int)$db->query('SELECT COUNT(DISTINCT visitor_hash) FROM site_visitors')->fetchColumn();}catch(PDOException $e){}
-    return ['total_views'=>(int)array_sum(array_column($totals,'visit_count')),'unique_visitors'=>$visitors,'today_views'=>(int)($byDate[gncVisitorToday()]??0),'most_visited'=>$totals[0]??null,'top'=>array_slice($totals,0,5),'by_date'=>$byDate];
+    $totals=gncPageTotals($db);$byDate=gncViewsByDate($db,$days);$visitors=$todayVisitors=null;
+    try{
+        $q=$db->prepare('SELECT COUNT(DISTINCT visitor_hash) AS total,COUNT(DISTINCT CASE WHEN visit_date=? THEN visitor_hash END) AS today FROM site_visitors');
+        $q->execute([gncVisitorToday()]);$visitorCounts=$q->fetch(PDO::FETCH_ASSOC);
+        $visitors=(int)$visitorCounts['total'];$todayVisitors=(int)$visitorCounts['today'];
+    }catch(PDOException $e){}
+    return ['total_views'=>(int)array_sum(array_column($totals,'visit_count')),'unique_visitors'=>$visitors,'today_visitors'=>$todayVisitors,'today_views'=>(int)($byDate[gncVisitorToday()]??0),'most_visited'=>$totals[0]??null,'top'=>array_slice($totals,0,5),'by_date'=>$byDate];
 }
 
 function dashboardContentUrl(array $item): string {
+    if($item['type']==='page')return '/admin/content-edit.php?'.http_build_query(['page'=>$item['page'],'sub'=>$item['sub']??'']);
     if($item['type']==='event')return '/admin/events.php';
     $page=$item['type']==='news'?'news':'announcement';
     return '/admin/'.$page.'.php?'.http_build_query(['modal'=>'edit','id'=>(int)$item['id']]);

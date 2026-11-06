@@ -28,6 +28,12 @@ if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
 }
 
 // Super admins are the approvers, so they never send items for approval.
+if($postAction==='bulk_delete'){
+    require_once __DIR__.'/../../includes/content-bulk-delete.php';
+    try{$count=deleteSelectedContent('announcement',$_POST['ids']??null);$_SESSION['flash_success']=$count.' selected announcement(s) deleted.';}
+    catch(Throwable $e){$_SESSION['flash_errors']=[$e instanceof PDOException?'The selected announcements could not be deleted. Nothing was changed.':$e->getMessage()];}
+    header('Location: /admin/announcement.php');exit;
+}
 $isSuperAdmin = (($_SESSION['user_role'] ?? '') === 'Super Admin');
 
 // ============================================================

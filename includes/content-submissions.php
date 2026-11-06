@@ -12,10 +12,11 @@ function rbacSubmissionLabel(array $submission,array $payload): string {
     };
     if($type===null)return ($submission['route']??'')==='/admin/settings.php'?'Website settings changes':'Website content changes';
     $action=$payload['post']['action']??$payload['post']['ajax_action']??'';
+    if($action==='bulk_delete')return 'Delete '.count($payload['post']['ids']??[]).' selected '.$type.'s';
     $prefix=match($action){
         'create'=>'New',
         'update','edit'=>'Edited',
-        'delete'=>'Delete',
+        'delete','bulk_delete'=>'Delete',
         'archive'=>'Archive',
         'restore','unarchive'=>'Restore',
         default=>'Changes to',
@@ -40,7 +41,7 @@ function rbacContentRoutes(): array {
 }
 function rbacShouldQueue(string $route,array $post): bool {
     if (!in_array($route,rbacContentRoutes(),true)) return false;
-    $action=$post['action']??$post['ajax_action']??'';
+    $action=$route==='/admin/events.php'?($post['ajax_action']??$post['action']??''):($post['action']??$post['ajax_action']??'');
     // Calendar imports validate and store a canonical batch before explicitly
     // submitting it to this same approval queue. Uploads never enter the queue.
     if ($route==='/admin/events.php' && in_array($action,['import_preview','import_manage_preview','import_confirm','import_cancel'],true)) return false;
@@ -110,9 +111,15 @@ function rbacCollectUploads(array $files): array {
     return $out;
 }
 function rbacValidatePostOwnership(string $route,array $post): int {
-    $action=$post['action']??$post['ajax_action']??'';
+    $action=$route==='/admin/events.php'?($post['ajax_action']??$post['action']??''):($post['action']??$post['ajax_action']??'');
     $kind=$route==='/admin/action/create-announcement.php'?'announcement':($route==='/admin/action/create-news.php'?'news':($route==='/admin/events.php'?'event':''));
     if($kind==='')return 0;
+    if($action==='bulk_delete'){
+        if(rbacRole()==='The Mirror')throw new RuntimeException('The Mirror cannot delete content.');
+        require_once __DIR__.'/content-bulk-delete.php';
+        bulkContentRows(getDB(),$kind,bulkContentIds($post['ids']??null));
+        return 0;
+    }
     $id=(int)($post[$kind.'_id']??0);
     if(in_array($action,['create','update'],true)){
         $permission=$action==='create'?'create_'.$kind:'edit_'.$kind;
@@ -137,7 +144,9 @@ function rbacQueueCurrentRequest(string $route): void {
             $q=getDB()->prepare('SELECT token_id FROM csrf_tokens WHERE user_id=? AND token=? AND expires_at>NOW()');$q->execute([(int)$_SESSION['user_id'],$_POST['csrf_token']??'']);$valid=(bool)$q->fetchColumn();
         }
         if(!$valid)rbacFail('Invalid request token. Reload and try again.');
-        $post=$_POST;unset($post['csrf_token'],$post['facebook_confirmed'],$post['facebook_page_id'],$post['facebook_request_key'],$post['facebook_link']);
+        $post=$_POST;unset($post['csrf_token'],$post['current_password'],$post['facebook_confirmed'],$post['facebook_page_id'],$post['facebook_request_key'],$post['facebook_link']);
+        require_once __DIR__.'/contact-number.php';
+        $post=contactNumberProposal($route,$post);
         if($route==='/admin/action/create-announcement.php'&&(isset($post['category_ids_present'])||array_key_exists('category_ids',$post))){
             require_once __DIR__.'/announcement-categories.php';
             $post['category_ids']=normalizeAnnouncementCategoryIds(getDB(),$post['category_ids']??[]);
@@ -147,12 +156,18 @@ function rbacQueueCurrentRequest(string $route): void {
         // Approval never implicitly publishes to Facebook.
         if(isset($post['publish_destination']))$post['publish_destination']='website';
         $target=rbacValidatePostOwnership($route,$post);
+        if(($post['action']??$post['ajax_action']??'')==='bulk_delete')$post['ids']=bulkContentIds($post['ids']??null);
         $resubmit=(int)($post['_review_id']??0);unset($post['_review_id']);
         $uploads=rbacCollectUploads($_FILES);
         if($resubmit){$old=rbacGetSubmission($resubmit);if(!$old||(int)$old['user_id']!==(int)$_SESSION['user_id'])throw new RuntimeException('Submission not found.');$previous=rbacReadPayload($resubmit);$uploads=array_replace($previous['files']??[],$uploads);}
         $status=($post['status']??'')==='draft'?'draft':'pending';
         $title=(string)($post['title']??$post['page']??$post['section_key']??($post['action']??'Website content change'));
-        $id=rbacSaveSubmission('request',$route,$title,['post'=>$post,'files'=>$uploads],$target,$resubmit,$status);
+        $proposal=['post'=>$post,'files'=>$uploads];
+        if(!empty($_SERVER['HTTP_X_GNCI_EDITOR_PEER'])) {
+            require_once __DIR__.'/editor-presence.php';
+            $proposal['editor_version']=editorPresenceDraftVersion(getDB(),$_SERVER['HTTP_X_GNCI_EDITOR_PEER']);
+        }
+        $id=rbacSaveSubmission('request',$route,$title,$proposal,$target,$resubmit,$status);
         $message=$status==='draft'?'Draft saved. It is not live.':'Submitted for Super Admin approval. Published content is unchanged.';
         if(str_starts_with($route,'/admin/action/create-')||$route==='/admin/settings.php'){$_SESSION['flash_success']=$message;header('Location: /admin/submissions.php?id='.$id);exit;}
         header('Content-Type: application/json');http_response_code(202);echo json_encode(['success'=>true,'submitted'=>true,'submission_id'=>$id,'message'=>$message]);exit;
@@ -241,6 +256,7 @@ function rbacExecuteRequest(array $submission,array $payload): array {
     session_write_close();session_id($workerId);session_start(['use_cookies'=>0,'use_only_cookies'=>0]);$workerId=session_id();
     $_SESSION=['user_id'=>$reviewer,'user_role'=>'Super Admin','credential_version'=>$credentialVersion,'_initiated'=>true,'last_activity'=>time(),'csrf_token'=>$csrf,
         '_rbac_worker'=>['route'=>$submission['route'],'nonce'=>$nonce,'owner'=>(int)$submission['user_id'],'expires'=>time()+120,'used'=>false]];
+    if(isset($payload['editor_version']))$_SESSION['_rbac_worker']['editor_version']=$payload['editor_version'];
     session_write_close();
     try {
         $fields=rbacFlattenFields($post);
@@ -281,7 +297,7 @@ function rbacExecuteRequest(array $submission,array $payload): array {
         }
         // If the internal endpoint returned 404 without consuming the one-use worker token, the handler never ran (safe to retry).
         $notExecuted=($http===404&&empty($workerData['_rbac_worker']['used']));
-        return ['state'=>$ok?'approved':((in_array($http,[401,403],true)||$notExecuted)?'failed':'uncertain'),'created'=>$workerData['_rbac_created']??null,'message'=>$message];
+        return ['state'=>$ok?'approved':((in_array($http,[401,403,409],true)||$notExecuted)?'failed':'uncertain'),'created'=>$workerData['_rbac_created']??null,'message'=>$message];
     }finally{
         foreach($temporary as $path)if(is_file($path))unlink($path);
         if(session_status()===PHP_SESSION_ACTIVE)session_write_close();

@@ -64,12 +64,16 @@
                 button.title = !pinned && count >= data.limit ? 'Slideshow full. Unpin an item in Manage slideshow first.' : (pinned ? 'Remove from slideshow' : 'Pin to homepage slideshow');
             }
         });
+        if(window.GNCContentRowActions)window.GNCContentRowActions.refresh(root);
     }
     async function update(values, button) {
         if (busy) return false;
         busy = true;
         const content = [...button.childNodes];
-        button.textContent = 'Saving…'; button.disabled = true;
+        if(button.classList.contains('content-icon-action')){
+            const spinner=document.createElement('i');spinner.className='spinner-border spinner-border-sm';spinner.setAttribute('aria-hidden','true');button.replaceChildren(spinner);button.setAttribute('aria-label','Saving');
+        }else button.textContent = 'Saving…';
+        button.disabled = true;
         root.setAttribute('aria-busy', 'true');
         try {
             const response = await fetch('/admin/action/facebook-posts-handler.php', {

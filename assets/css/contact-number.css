@@ -1,0 +1,15 @@
+.contact-control{display:grid;gap:8px;min-width:0;font:inherit}
+.ve-pop-contact{overflow:auto;overscroll-behavior:contain}
+.contact-type{display:flex;flex-wrap:wrap;gap:4px;padding:4px;border:1px solid var(--color-border,#dce4dd);border-radius:10px;background:var(--color-surface-subtle,#f5f7f5)}
+.contact-type button{flex:1;min-width:100px;border:0;border-radius:7px;background:transparent;color:inherit;padding:7px 10px;font:inherit;font-size:13px;cursor:pointer}
+.contact-type button[aria-pressed=true]{background:var(--color-brand-primary,#1f5e2c);color:#fff;font-weight:600}
+.contact-main{display:flex;align-items:center;border:1px solid var(--color-border,#ced4da);border-radius:7px;overflow:hidden;background:var(--color-surface,#fff)}
+.contact-prefix{padding-left:10px;white-space:nowrap;color:var(--color-text-muted,#64716a)}
+.contact-main input.form-control{border:0;min-width:0;box-shadow:none!important;background:transparent;padding-left:2px}
+.contact-main:focus-within{outline:2px solid var(--color-brand-primary,#1f5e2c);outline-offset:2px}
+.contact-control input{width:100%;font:inherit;font-variant-numeric:tabular-nums}
+.contact-extension{display:grid;gap:4px;font-size:13px}
+.contact-control [hidden]{display:none!important}
+.contact-error{color:#a12622;font-size:12px;margin:0;overflow-wrap:anywhere}
+.contact-legacy{font-size:12px;color:var(--color-text-muted,#64716a);overflow-wrap:anywhere;margin:0}
+.contact-type button:focus-visible{outline:2px solid var(--color-brand-primary,#1f5e2c);outline-offset:1px}

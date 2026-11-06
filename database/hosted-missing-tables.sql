@@ -21,12 +21,8 @@ CREATE TABLE IF NOT EXISTS `community_activity_page` (
   PRIMARY KEY (`page_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS `community_extension_page` (
-  `page_id` tinyint UNSIGNED NOT NULL,
-  `content` mediumtext NOT NULL,
-  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`page_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- The abandoned community_extension_page table is intentionally not created.
+-- The current feature uses community_activity_page above.
 
 CREATE TABLE IF NOT EXISTS `enrollment_illustrations` (
   `image_key` varchar(40) NOT NULL,

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/../includes/content-publish-policy.php';
+require_once __DIR__.'/../includes/contact-number.php';
 /** Plain text and directory values edited through the existing section workflow. */
 function contactPageDefaults(): array {
     $contact = [
@@ -73,7 +74,7 @@ function contactPageDefaults(): array {
 function contactPagePlain(string $value): string {
     return trim(richTextLooksLikeHtml($value) ? html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8') : $value);
 }
-function contactPageValidate(string $key, string $value): string {
+function contactPageValidate(string $key, string $value, ?string $previous = null): string {
     $fields = contactPageDefaults();
     if (!isset($fields[$key])) throw new InvalidArgumentException('Unknown Contact Us field.');
     $value = contactPagePlain($value);
@@ -81,7 +82,8 @@ function contactPageValidate(string $key, string $value): string {
     if ($value === '' && contentPublishAllowsIncomplete()) return '';
     if ($key === 'contact_email' && (!filter_var($value, FILTER_VALIDATE_EMAIL) || preg_match('/[\r\n]/', $value))) throw new InvalidArgumentException('Enter a valid contact email address.');
     if ($key === 'contact_facebook' && !preg_match('~^https?://(?:www\.)?facebook\.com/[^\s]*$~iD', $value)) throw new InvalidArgumentException('Use a Facebook page URL starting with https://www.facebook.com/.');
-    if (($key === 'contact_phone' || str_ends_with($key, '_number')) && !preg_match('/\d/', $value)) throw new InvalidArgumentException('Enter a phone number containing digits.');
+    if ($key === 'contact_phone' || preg_match('/^direct_[0-9]+_number$/D', $key)) return contactNumberSave($value, $previous);
+    if (preg_match('/^local_[0-9]+_number$/D', $key)) return contactExtensionSave($value, $previous);
     return $value;
 }
 function contactPageContent(bool $preview): array {
@@ -92,5 +94,9 @@ function contactPageContent(bool $preview): array {
         $value = $preview && $section['draft_content'] !== null ? $section['draft_content'] : $section['content'];
         $fields[$key]['content'] = contactPagePlain((string)$value);
     }
+    foreach ($fields as $key => &$field) {
+        if ($key === 'contact_phone' || preg_match('/^direct_[0-9]+_number$/D', $key)) $field['content'] = contactNumberDisplay($field['content']);
+    }
+    unset($field);
     return $fields;
 }

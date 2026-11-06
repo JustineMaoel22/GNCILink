@@ -1,4 +1,7 @@
 .user-create-card { overflow: visible; }
+.user-list-person { display: flex; align-items: center; gap: 10px; min-width: 160px; }
+.user-list-avatar { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 36px; height: 36px; overflow: hidden; border-radius: 50%; background: #eaf3ed; color: var(--admin-primary); font-size: .75rem; font-weight: 600; }
+.user-list-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .user-create-heading { padding: 22px 24px 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid #e2e8e3; }
 .user-create-heading h2 { margin: 0; color: var(--gnc-green, #094024); font-size: 1.05rem; font-weight: 700; }
 .user-create-heading p { margin: 5px 0 0; color: #59665e; font-size: .85rem; }

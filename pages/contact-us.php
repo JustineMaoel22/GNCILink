@@ -219,7 +219,7 @@ $showOpen = ($success === '' && !$errors);
                             <span class="gnc-contact-icon"><i class="bi bi-telephone-fill"></i></span>
                             <div>
                                 <h3<?= $contactMark('phone_label') ?>><?= e($contactText('phone_label')) ?></h3>
-                                <a data-contact-channel="phone" href="tel:<?= e(preg_replace('/[^+\d]/', '', $contact['phone'])) ?>"><span<?= $contactMark('contact_phone') ?>><?= e($contactText('contact_phone')) ?></span></a>
+                                <a data-contact-channel="phone" href="<?= e(contactNumberTel($contact['phone'])) ?>"><span<?= $contactMark('contact_phone') ?>><?= e($contactText('contact_phone')) ?></span></a>
                             </div>
                         </div>
 
@@ -358,7 +358,7 @@ $showOpen = ($success === '' && !$errors);
         if (!channel) return;
         var link = document.querySelector('[data-contact-channel="' + channel + '"]');
         var value = field.textContent.trim();
-        if (link) link.setAttribute('href', channel === 'phone' ? 'tel:' + value.replace(/[^+\d]/g, '') : (channel === 'email' ? 'mailto:' + value : value));
+        if (link) link.setAttribute('href', channel === 'phone' ? 'tel:' + value.split(/\s+loc\.\s*/i)[0].replace(/[^+\d]/g, '') + (/\s+loc\.\s*([0-9]+)/i.test(value) ? ';ext=' + value.match(/\s+loc\.\s*([0-9]+)/i)[1] : '') : (channel === 'email' ? 'mailto:' + value : value));
     });
     <?php endif; ?>
     // Reveal directory blocks as they scroll into view.

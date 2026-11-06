@@ -1,0 +1,9 @@
+.git/
+.env
+.env.*
+**/secrets.php
+.aws/
+cache/
+uploads/
+node_modules/
+**/__pycache__/

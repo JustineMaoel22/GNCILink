@@ -175,18 +175,18 @@
                 }catch(error){available=false;options.notify(error.message,'error');}
                 finally{loading=false;options.refresh();}
             },
-            save:async function(){
+            save:async function(recovery){
                 var snapshot={version:1,state:Object.assign({},state(),{imagePositions:options.positions(),textPlacements:options.textPlacements?options.textPlacements():{},responsiveBackgrounds:options.backgrounds?options.backgrounds():{}}),preview:preview(options.document(),options.clean)};
                 var before=fingerprint();
                 var payload=await encode(snapshot);
                 if(payload.length>96*1024*1024)throw Error('This draft is too large. Save fewer media changes at a time.');
-                var result=await request('save',{snapshot:payload});revision=result.revision;checkpoint=before;
-                options.notify('Draft saved. Visitors still see the published page.');options.refresh();
+                var result=await request(recovery?'save_recovery':'save',{snapshot:payload});revision=result.revision;checkpoint=before;
+                options.notify(recovery?'Recovery draft saved. It keeps your previous content version and cannot overwrite newer live content.':'Draft saved. Visitors still see the published page.');options.refresh();
             },
             clear:async function(){if(revision)await request('delete');revision=0;checkpoint='';options.refresh();},
             submit:async function(){await this.save();return request('submit_review');},
             fingerprint:fingerprint
         };
     }
-    window.GNCEditorDrafts={create:create,encode:encode,decode:decode,trackUrl:trackUrl};
+    window.GNCEditorDrafts={create:create,encode:encode,decode:decode,trackUrl:trackUrl,media:function(url){return resources.has(url)?resources.get(url).deref():null;}};
 })();

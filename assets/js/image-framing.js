@@ -190,7 +190,7 @@
         doc.defaultView.addEventListener('pagehide',event=>{if(event.persisted)return;observer.disconnect();ro.disconnect();documents.delete(doc);scheduled.delete(doc);});
         doc.querySelectorAll('[data-bg],[data-ve-bg]').forEach(el=>ro.observe(el));
         doc.defaultView.addEventListener('resize',()=>{doc.querySelectorAll('img,[data-bg],[data-ve-bg]').forEach(el=>{if(framed.has(el))apply(el,framed.get(el));});});
-        if (config.admin && doc===document) installHover(doc);
+        if (config.admin && doc===document && visualEditor()) installHover(doc);
     }
     function element(tag,attrs={},text) {
         const el=document.createElement(tag);
@@ -295,6 +295,7 @@
         return cached;
     }
     async function edit(target) {
+        if(!visualEditor())return;
         target=findTarget(target);if(!target)return;
         const src=sourceOf(target),file=sources.get(src)||null;
         // Draft uploads are owned by the outer editor. Its File/settings must
@@ -441,5 +442,9 @@
         ready:Promise.resolve()
     };
     watch(document);
-    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>schedule(document));
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{
+        schedule(document);
+        // The Content Editor bridge is created after the shared header scripts.
+        if(config.admin&&visualEditor())installHover(document);
+    });
 })();

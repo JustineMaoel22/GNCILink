@@ -1,5 +1,7 @@
 # Authentication and password recovery
 
+Super Admin publishing requires the signed-in administrator's current password, including approval actions that publish content. Draft saves, approval submissions by other roles, and Settings do not require publication confirmation. The server checks a session-bound confirmation token before live content handlers run; the visual editor uses one confirmation for its multi-request Publish operation and revokes it when finished. Tokens expire after ten minutes and are invalidated by credential-version changes. Passwords are never stored in the token or browser storage. The existing authentication rate-limit table limits incorrect confirmations to five attempts per fifteen minutes. Deploy `includes/publish-confirmation.php`, `admin/action/publish-confirmation-handler.php`, and `assets/js/admin-publish-confirmation.js` together with the updated shared header, RBAC boundary, and Content Editor script. No new migration is needed when the existing authentication tables are installed.
+
 ## Deployment
 
 1. Back up the database. Import `sql/first-login-password-migration.sql` if not already applied, then import `sql/auth-security-migration.sql`. The new migration creates three tables and preserves accounts and content. Deploy the migration before the new authentication code: login fails closed while its required tables are missing.

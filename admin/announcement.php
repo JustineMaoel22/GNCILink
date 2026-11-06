@@ -222,6 +222,7 @@ include __DIR__ . '/../components/header-admin.php';
     <?php endif; ?>
 
 <?php endif; ?>
+    <?php if(!$facebookPostsPage): $bulkDeleteKind='announcement';$bulkDeleteTable='announcements-table';$bulkDeleteCsrf=$csrfToken;include __DIR__.'/../components/content-bulk-actions.php';endif; ?>
     <div class="table-responsive">
         <table class="table table-hover mb-0 ann-table" id="announcements-table">
             <thead>
@@ -258,11 +259,14 @@ include __DIR__ . '/../components/header-admin.php';
                 ?>
                 <tr class="ann-row">
                     <td class="ann-img-cell">
+                        <div class="bulk-select-media">
+                        <?php if (hasPermission('delete_announcement') || (hasPermission('delete_own_announcement') && $isOwner)): ?><input type="checkbox" class="form-check-input m-0" data-bulk-item value="<?= (int)$a['announcement_id'] ?>" aria-label="Select announcement <?= htmlspecialchars($a['title'],ENT_QUOTES) ?>"><?php endif; ?>
                         <?php if (!empty($a['image_path'])): ?>
                         <img src="<?= htmlspecialchars($a['image_path']) ?>" alt="" class="ann-thumb" loading="lazy">
                         <?php else: ?>
                         <div class="ann-thumb ann-thumb-empty"><i class="bi bi-image"></i></div>
                         <?php endif; ?>
+                        </div>
                     </td>
                     <td class="ann-title-cell">
                         <button type="button" class="ann-title ann-preview-open" data-preview-id="<?= (int)$a['announcement_id'] ?>"><?= htmlspecialchars($a['title']) ?></button>
@@ -592,7 +596,7 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
 <!-- ============================================================
      DELETE CONFIRMATION MODAL
 ============================================================ -->
-<div class="modal fade" id="deleteAnnouncementModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="deleteAnnouncementModal" data-delete-password-modal tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered" style="max-width:min(420px, calc(100% - 1rem))">
     <div class="modal-content">
       <form method="POST" action="/admin/action/create-announcement.php" id="delete-announcement-form">
@@ -604,6 +608,7 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
           <h5 class="fw-bold mb-2">Delete this announcement?</h5>
           <p class="mb-1"><strong id="delete-announcement-title"></strong></p>
           <p class="text-muted mb-3" style="font-size:.85rem">It will be removed from the website. This cannot be undone.</p>
+          <div class="text-start mb-3"><label class="form-label" for="delete-announcement-password">Your current password</label><input type="password" class="form-control" name="current_password" id="delete-announcement-password" autocomplete="current-password" maxlength="4096" required></div>
           <div class="d-flex gap-2 justify-content-center">
             <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
             <button type="submit" class="btn btn-danger px-4" id="delete-announcement-btn"><i class="bi bi-trash3 me-1"></i> Delete</button>
@@ -617,6 +622,9 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
 <!-- ============================================================
      EDIT FACEBOOK POST MODAL — posts to /admin/action/create-announcement.php
 ============================================================ -->
+<script src="/assets/js/content-delete-password.js?v=<?= filemtime(__DIR__.'/../assets/js/content-delete-password.js') ?>"></script>
+<link rel="stylesheet" href="/assets/css/content-row-actions.css?v=<?= filemtime(__DIR__.'/../assets/css/content-row-actions.css') ?>">
+<script src="/assets/js/content-row-actions.js?v=<?= filemtime(__DIR__.'/../assets/js/content-row-actions.js') ?>"></script>
 <div class="modal fade" id="fbEditModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">

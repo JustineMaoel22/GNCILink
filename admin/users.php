@@ -35,10 +35,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    $createValues=['first_name'=>'','last_name'=>'','email'=>'','role'=>'Content Editor'];
    logActivity((int)$_SESSION['user_id'],'CREATE_USER','users',$id,'Created an account with role '.$role.'; mandatory password change enabled.');$success='User account created. Copy the temporary password now; it will not be displayed again.';
   }elseif($action==='role'){
-   $id=(int)($_POST['user_id']??0);if($id===(int)$_SESSION['user_id']&&$role!=='Super Admin')throw new RuntimeException('You cannot remove your own Super Admin access.');
-   $db->beginTransaction();$db->query("SELECT user_id FROM users WHERE role='Super Admin' AND status='active' FOR UPDATE")->fetchAll();$q=$db->prepare('SELECT role FROM users WHERE user_id=? FOR UPDATE');$q->execute([$id]);$old=$q->fetchColumn();if($old===false)throw new RuntimeException('Account not found.');
-   if($old==='Super Admin'&&$role!=='Super Admin'&&(int)$db->query("SELECT COUNT(*) FROM users WHERE role='Super Admin' AND status='active'")->fetchColumn()<=1)throw new RuntimeException('Keep at least one active Super Admin.');
-   $db->prepare('UPDATE users SET role=?,remember_token=NULL,remember_token_expires_at=NULL WHERE user_id=?')->execute([$role,$id]);logActivity((int)$_SESSION['user_id'],'ASSIGN_ROLE','users',$id,'Changed role from '.$old.' to '.$role);$db->commit();$success='Role updated. Existing sessions use the new permissions on their next request.';
+   require_once __DIR__.'/../includes/user-roles.php';
+   if(!is_string($_POST['current_password']??null))throw new InvalidArgumentException('Enter your current Super Admin password to save this role change.');
+   $changed=changeAdminUserRole((int)($_POST['user_id']??0),$role,$_POST['current_password']);
+   $success=$changed?'Role updated. Existing sessions use the new permissions on their next request.':'No role changes to save.';
   }else throw new RuntimeException('Unknown action.');
   if($temporaryPassword===null){$_SESSION['users_notice']=$success;header('Location: /admin/users.php');exit;}
  }catch(Throwable $e){
@@ -51,6 +51,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
  }
 }
 $users=getDB()->query('SELECT user_id,first_name,last_name,email,role,status FROM users ORDER BY first_name,last_name')->fetchAll();$pageTitle='Users';require __DIR__.'/../components/header-admin.php';$e=fn($v)=>htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');
+$userPictures=profilePictureUrls(array_column($users,'user_id'));
 ?>
 <div class="page-header"><div><h1>Users</h1><p>Create accounts and assign their admin permissions.</p></div></div>
 <?php if($error):?><div class="alert alert-danger" role="alert"><?= $e($error) ?></div><?php endif;?><?php if($success):?><div class="alert alert-success" role="status"><?= $e($success) ?></div><?php endif;?>
@@ -66,7 +67,7 @@ $users=getDB()->query('SELECT user_id,first_name,last_name,email,role,status FRO
     <div class="user-create-body">
       <div id="create-user-feedback" class="alert alert-danger d-none" role="alert" tabindex="-1"></div>
       <div class="row g-3">
-        <?php foreach(['first_name'=>['First name','e.g. Juan'],'last_name'=>['Last name','e.g. Dela Cruz'],'email'=>['Email address','e.g. juan.delacruz@gmail.com']] as $key=>[$label,$ph]): ?>
+        <?php foreach(['first_name'=>['First name','e.g. Juan'],'last_name'=>['Last name','e.g. Dela Cruz'],'email'=>['Email address','you@example.com']] as $key=>[$label,$ph]): ?>
         <div class="col-12 col-sm-6">
           <label class="form-label" for="user-<?= $key ?>"><?= $label ?> <span class="text-danger" aria-hidden="true">*</span></label>
           <input class="form-control<?= isset($createErrors[$key])?' is-invalid':'' ?>" id="user-<?= $key ?>" name="<?= $key ?>" type="<?= $key==='email'?'email':'text' ?>" maxlength="<?= $key==='email'?255:100 ?>" value="<?= $e($createValues[$key]) ?>" placeholder="<?= $e($ph) ?>" required aria-describedby="user-<?= $key ?>-error<?= $key==='email'?' user-email-help':'' ?>"<?= isset($createErrors[$key])?' aria-invalid="true"':'' ?> spellcheck="false">
@@ -104,7 +105,7 @@ $users=getDB()->query('SELECT user_id,first_name,last_name,email,role,status FRO
 </details>
 <section class="data-card p-4" id="existing-users"><h2 class="data-card-title">Existing users</h2><div class="table-responsive"><table class="table"><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Role</th><th>Actions</th></tr></thead><tbody>
 <?php foreach($users as $user): ?>
-<tr><td><?= $e($user['first_name'].' '.$user['last_name']) ?></td><td><?= $e($user['email']) ?></td><td><?= $e($user['status']) ?></td><td><form method="post" class="d-flex gap-2" data-user-confirm="Apply this role change? Permissions take effect on the next request."><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="action" value="role"><input type="hidden" name="user_id" value="<?= (int)$user['user_id'] ?>"><select class="form-select" name="role" aria-label="Role for <?= $e($user['first_name']) ?>"><?php foreach($roles as $role):?><option<?= rbacRole($user['role'])===$role?' selected':'' ?>><?= $e($role) ?></option><?php endforeach;?></select><button class="btn btn-outline-secondary">Save</button></form></td>
+<tr><td><div class="user-list-person"><span class="user-list-avatar" aria-hidden="true"><?php if(isset($userPictures[(int)$user['user_id']])): ?><img src="<?= $e($userPictures[(int)$user['user_id']]) ?>" alt="" width="36" height="36" loading="lazy"><?php else: ?><?= $e(mb_strtoupper(mb_substr(trim($user['first_name']),0,1).mb_substr(trim($user['last_name']),0,1))?:'?') ?><?php endif; ?></span><span><?= $e($user['first_name'].' '.$user['last_name']) ?></span></div></td><td><?= $e($user['email']) ?></td><td><?= $e($user['status']) ?></td><td><form method="post" class="d-flex gap-2" data-saved-role="<?= $e(rbacRole($user['role'])) ?>" data-user-confirm="Apply this role change? Permissions take effect on the next request."><input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="action" value="role"><input type="hidden" name="user_id" value="<?= (int)$user['user_id'] ?>"><select class="form-select" name="role" aria-label="Role for <?= $e($user['first_name']) ?>"><?php foreach($roles as $role):?><option<?= rbacRole($user['role'])===$role?' selected':'' ?>><?= $e($role) ?></option><?php endforeach;?></select><button type="submit" class="btn btn-outline-secondary" disabled>Save</button></form></td>
 <td><?php if((int)$user['user_id']!==(int)$_SESSION['user_id']): ?><button type="button" class="btn btn-outline-danger btn-sm" data-delete-user="<?= (int)$user['user_id'] ?>" data-user-name="<?= $e($user['first_name'].' '.$user['last_name']) ?>">Delete</button><?php else: ?><span class="text-muted small">Your account</span><?php endif; ?></td></tr>
 <?php endforeach; ?></tbody></table></div></section>
 <dialog id="delete-user-dialog" class="gnc-dialog gnc-dialog-danger" aria-labelledby="delete-user-title" aria-describedby="delete-user-description"><div class="gnc-dialog-content">
@@ -114,7 +115,13 @@ $users=getDB()->query('SELECT user_id,first_name,last_name,email,role,status FRO
 <label class="form-label" for="delete-user-password">Your current Super Admin password</label><input type="password" class="form-control mb-3" name="current_password" id="delete-user-password" autocomplete="current-password" required>
 <div class="gnc-dialog-actions"><button type="button" class="gnc-dialog-cancel" id="cancel-delete-user">Cancel</button><button type="submit" class="gnc-dialog-accept">Delete user</button></div></form></div></dialog>
 <script src="/assets/js/user-deletion.js?v=<?= filemtime(__DIR__.'/../assets/js/user-deletion.js') ?>"></script>
-<script>document.addEventListener('submit',async event=>{const form=event.target;if(!form.matches('[data-user-confirm]:not(#create-user-form)'))return;event.preventDefault();if(await AdminDialogs.confirm(form.dataset.userConfirm,{title:'Confirm user change',confirmText:'Confirm'})){form.querySelector('button').disabled=true;HTMLFormElement.prototype.submit.call(form);}});</script>
+<dialog id="role-user-dialog" class="gnc-dialog" aria-labelledby="role-user-title" aria-describedby="role-user-description"><div class="gnc-dialog-content">
+<h2 id="role-user-title">Confirm role change</h2><p id="role-user-description">Change <strong id="role-user-name"></strong> to <strong id="role-user-value"></strong>? Enter your current Super Admin password to save the change.</p>
+<form method="post" action="/admin/users.php" id="role-user-form">
+<input type="hidden" name="csrf_token" value="<?= $e($csrfToken) ?>"><input type="hidden" name="action" value="role"><input type="hidden" name="user_id" id="role-user-id"><input type="hidden" name="role" id="role-user-selected">
+<label class="form-label" for="role-user-password">Your current Super Admin password</label><input type="password" class="form-control mb-3" name="current_password" id="role-user-password" autocomplete="current-password" maxlength="4096" required>
+<div class="gnc-dialog-actions"><button type="button" class="gnc-dialog-cancel" id="cancel-role-user">Cancel</button><button type="submit" class="gnc-dialog-accept">Save role</button></div></form></div></dialog>
+<script src="/assets/js/user-roles.js?v=<?= filemtime(__DIR__.'/../assets/js/user-roles.js') ?>"></script>
 <?php if($temporaryPassword!==null):?>
 <dialog id="temporary-password-dialog" class="gnc-dialog user-password-dialog" aria-labelledby="temporary-password-title" aria-describedby="temporary-password-description">
   <div class="user-password-heading"><span class="user-created-icon" aria-hidden="true">✓</span><div><h2 id="temporary-password-title">Account created</h2><p id="temporary-password-description">Save the temporary password and share it privately with the account owner.</p></div></div>

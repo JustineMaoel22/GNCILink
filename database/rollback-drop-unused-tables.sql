@@ -1,6 +1,7 @@
 -- ============================================================
--- ROLLBACK: Restore tables removed in gnc_admin (51).sql
--- Run this if the cleanup caused any issues.
+-- HISTORICAL SCHEMA-ONLY HELPER for gnc_admin (51).sql.
+-- For the current cleanup use migrate-unused-tables.php --rollback with the
+-- verified private archive. This old helper does NOT restore legacy content.
 -- ============================================================
 
 -- Re-create office_services (was empty; linked to the `offices` table)

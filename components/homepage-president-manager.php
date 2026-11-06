@@ -33,7 +33,7 @@ $president = homepagePresidentAdminPayload(getHomepagePresident());
                             <div class="d-flex gap-2 mt-3 flex-wrap">
                                 <button type="button" class="btn btn-outline-secondary btn-pick-president-photo"><i class="bi bi-upload"></i> Choose a photo</button>
                                 <button type="button" class="btn btn-outline-danger btn-remove-president-photo"><i class="bi bi-trash"></i> Remove photo</button>
-                                <input type="file" id="president-photo" name="president_photo" aria-label="President photo" class="president-photo-input" data-photo-check accept="image/jpeg,image/png,image/webp" hidden>
+                                <input type="file" id="president-photo" data-profile-key="president:1" name="president_photo" aria-label="President photo" class="president-photo-input" data-photo-check accept="image/jpeg,image/png,image/webp" hidden>
                             </div>
                             <div class="pm-help mt-2">A clear, front-facing photo works best.</div>
                         </div>
@@ -46,7 +46,7 @@ $president = homepagePresidentAdminPayload(getHomepagePresident());
                             <div class="row g-3">
                                 <div class="col-12">
                                     <label class="form-label" for="president-name">Full name</label>
-                                    <input type="text" id="president-name" name="president_name" class="form-control president-name-input" placeholder="e.g. Geraldine G. Lim, MBA">
+                                    <input type="text" id="president-name" title="Name changes apply to linked personnel profiles" name="president_name" class="form-control president-name-input" placeholder="e.g. Geraldine G. Lim, MBA">
                                 </div>
                                 <div class="col-sm-6">
                                     <label class="form-label" for="president-title">Position</label>

@@ -381,7 +381,7 @@ Modern facilities</pre>
                             <div class="row g-3">
                                 <div class="col-sm-8">
                                     <label class="dept-label">Full name</label>
-                                    <input type="text" class="form-control dean-name-input" placeholder="e.g. Annaliza V. Maris, LPT, MA">
+                                    <input type="text" class="form-control dean-name-input" title="Name changes apply to linked personnel profiles" placeholder="e.g. Annaliza V. Maris, LPT, MA">
                                 </div>
                                 <div class="col-sm-4">
                                     <label class="dept-label">Position</label>
@@ -406,7 +406,7 @@ Modern facilities</pre>
                                 </div>
                                 <div class="col-sm-6 col-lg-3">
                                     <label class="dept-label">Email address</label>
-                                    <input type="email" class="form-control dean-email-input" placeholder="e.g. info@gnc.edu.ph">
+                                    <input type="email" class="form-control dean-email-input" placeholder="you@example.com">
                                 </div>
                                 <div class="col-sm-6 col-lg-3">
                                     <label class="dept-label">Office location</label>
@@ -1125,6 +1125,7 @@ body.gnc-confirm-open { overflow: hidden; }
 
         /* ---------- Head of Office ---------- */
         var deanPending = { file: null, remove: false };
+        $('.dean-photo-input').dataset.profileKey = 'dean:' + current.dept_id;
         var deanPreviewUrl = null;
         var photoImg = $('.dean-photo-img'), photoPh = $('.dean-photo-placeholder');
         var photoName = $('.dean-photo-name'), photoHint = $('.dean-photo-hint');
@@ -1142,6 +1143,7 @@ body.gnc-confirm-open { overflow: hidden; }
         }
         function fillDean() {
             Object.keys(deanEls).forEach(function (k) { deanEls[k].value = current[k] || ''; });
+            if(window.GNCContact) window.GNCContact.refresh(deanEls.dean_phone);
         }
         function deanDirty() {
             var textDirty = Object.keys(deanEls).some(function (k) { return norm(deanEls[k].value) !== norm(current[k]); });
@@ -1187,6 +1189,7 @@ body.gnc-confirm-open { overflow: hidden; }
             deanPending = { file: null, remove: false }; fillDean(); hideAlert(deanAlert); renderDean();
         });
         deanSave.addEventListener('click', function () {
+            if(deanEls.dean_phone.__contact && !deanEls.dean_phone.__contact.validate()) return;
             var fd = new FormData();
             fd.append('action', 'save_department_dean');
             fd.append('csrf_token', csrf);

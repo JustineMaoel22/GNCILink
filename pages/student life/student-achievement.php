@@ -13,9 +13,11 @@ try {
     $achievements = getDB()->query("SELECT * FROM student_achievements
         WHERE " . ($achievementPreview ? '1=1' : "status='published'") . " AND is_featured=1
         ORDER BY created_at ASC,achievement_id ASC LIMIT 12")->fetchAll(PDO::FETCH_ASSOC);
+    $achievements = contentListsHydrate(getDB(), 'achievement_achievers', $achievements);
     $achievementListing = studentAchievementListing(getDB(), $_GET, $achievementPreview);
     if ($achievementPreview) {
         $achievementRecords = getDB()->query('SELECT * FROM student_achievements ORDER BY created_at ASC,achievement_id ASC')->fetchAll(PDO::FETCH_ASSOC);
+        $achievementRecords = contentListsHydrate(getDB(), 'achievement_achievers', $achievementRecords);
         foreach ($achievementRecords as &$record) $record['photos']=studentAchievementPhotos(getDB(),(int)$record['achievement_id']);
         unset($record);
     }

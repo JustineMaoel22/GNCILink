@@ -2,6 +2,12 @@
 
 Date: 2026-10-20, Asia/Manila. Status: **analysis completed; implementation and deployment pending**.
 
+Historical audit: later normalization and the reviewed local table cleanup are
+documented in [database-normalization.md](database-normalization.md),
+[personnel-normalization.md](personnel-normalization.md), and
+[unused-table-cleanup.md](unused-table-cleanup.md). The table-retention decisions
+below describe the earlier audit, not the current local schema.
+
 ## Scope and evidence
 
 Reviewed the current working tree, including uncommitted features, rather than only committed PHP. No existing application files were changed. No database DDL, inserts, updates, deletes, restores, or production deployment were performed. No new complete database backup has been created or restore-tested during this analysis. Backup verification is a prerequisite to the implementation phase.

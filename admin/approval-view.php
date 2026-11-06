@@ -9,6 +9,46 @@ function approvalTypes(): array {
 function approvalTypeSql(): string {
     return "CASE s.route WHEN '/admin/action/create-news.php' THEN 'news' WHEN '/admin/action/create-announcement.php' THEN 'announcements' WHEN '/admin/events.php' THEN 'events' WHEN '/admin/settings.php' THEN 'settings' ELSE 'pages' END";
 }
+/** Normalize existing stores for one queue; no records or IDs are migrated. */
+function approvalSectionEligibilitySql(): string {
+    // Discarding a rejected draft also resets review_status to 'none'; require
+    // an actual approval audit so discarded work is never labelled approved.
+    return "(ps.review_status IN ('pending','rejected') OR (ps.submitted_at IS NOT NULL AND ps.review_status='none' AND ps.reviewed_at IS NOT NULL AND ps.draft_content IS NULL AND (SELECT l.action FROM activity_logs l WHERE l.table_name='page_sections' AND l.record_id=ps.section_id AND l.created_at>=ps.submitted_at AND l.action IN ('APPROVE','REJECT','REQUEST_REVISION') ORDER BY l.log_id DESC LIMIT 1)='APPROVE'))";
+}
+function approvalQueueSource(PDO $db): string {
+    $base = "SELECT submission_id,user_id,CONVERT(kind USING utf8mb4) COLLATE utf8mb4_unicode_ci AS kind,CONVERT(route USING utf8mb4) COLLATE utf8mb4_unicode_ci AS route,target_id,CONVERT(title USING utf8mb4) COLLATE utf8mb4_unicode_ci AS title,CONVERT(status USING utf8mb4) COLLATE utf8mb4_unicode_ci AS status,revision,CONVERT(reason USING utf8mb4) COLLATE utf8mb4_unicode_ci AS reason,reviewed_by,reviewed_at,created_at,updated_at,'proposal' AS record_source FROM rbac_submissions";
+    try {
+        $db->query('SELECT ps.section_id,ps.title,ps.submitted_by,ps.submitted_at,ps.review_status,ps.reviewed_by,ps.reviewed_at,ps.review_note,ps.updated_at,ps.draft_content,p.title FROM page_sections ps JOIN pages p ON p.page_id=ps.page_id LIMIT 0');
+    } catch (PDOException $e) {
+        if (in_array($e->getCode(), ['42S02','42S22'], true)) return $base;
+        throw $e;
+    }
+    return $base." UNION ALL SELECT ps.section_id,ps.submitted_by,'section','/admin/action/page-review-handler.php',ps.section_id,CONCAT(CONVERT(p.title USING utf8mb4) COLLATE utf8mb4_unicode_ci,' — ',CONVERT(COALESCE(ps.title,ps.section_key) USING utf8mb4) COLLATE utf8mb4_unicode_ci),CASE ps.review_status WHEN 'pending' THEN 'pending' WHEN 'rejected' THEN 'needs_revision' ELSE 'approved' END,1,CONVERT(ps.review_note USING utf8mb4) COLLATE utf8mb4_unicode_ci,ps.reviewed_by,ps.reviewed_at,COALESCE(ps.submitted_at,ps.updated_at),ps.updated_at,'section' FROM page_sections ps JOIN pages p ON p.page_id=ps.page_id WHERE ".approvalSectionEligibilitySql();
+}
+
+function approvalSection(PDO $db, int $id, bool $super, int $userId, bool $lock = false): ?array {
+    $q=$db->prepare('SELECT ps.*,p.slug AS page_slug,p.title AS page_title,u.first_name,u.last_name FROM page_sections ps JOIN pages p ON p.page_id=ps.page_id LEFT JOIN users u ON u.user_id=ps.submitted_by WHERE ps.section_id=? AND '.approvalSectionEligibilitySql().($super?'':' AND ps.submitted_by=?').($lock?' FOR UPDATE':''));
+    $q->execute($super?[$id]:[$id,$userId]);
+    return $q->fetch(PDO::FETCH_ASSOC)?:null;
+}
+function approvalSectionVersion(array $row): string {
+    return hash('sha256',json_encode(array_intersect_key($row,array_flip(['section_id','content','draft_content','review_status','submitted_by','submitted_at','updated_at','reviewed_at'])),JSON_THROW_ON_ERROR));
+}
+function approvalSectionDecision(PDO $db,int $id,string $version,string $action,string $reason): void {
+    if(!rbacIsSuper()||!hasPermission('approve_content'))throw new RuntimeException('Only Super Admin can review these changes.');
+    if(!in_array($action,['approve','request_revision'],true))throw new InvalidArgumentException('Choose a valid page-text review action.');
+    if($action==='request_revision'&&(trim($reason)===''||mb_strlen($reason)>500))throw new InvalidArgumentException('Provide feedback of 1–500 characters.');
+    $db->beginTransaction();
+    try {
+        $row=approvalSection($db,$id,true,(int)$_SESSION['user_id'],true);
+        if(!$row||$row['review_status']!=='pending'||$row['draft_content']===null||!hash_equals(approvalSectionVersion($row),$version))throw new RuntimeException('These changes were updated or already reviewed. Reload before reviewing.');
+        if($action==='approve'&&!publishSection($row['page_slug'],$row['section_key']))throw new RuntimeException('Could not publish the section. Please try again.');
+        $q=$db->prepare('UPDATE page_sections SET review_status=?,reviewed_by=?,reviewed_at=NOW(),review_note=? WHERE section_id=?');
+        $q->execute([$action==='approve'?'none':'rejected',(int)$_SESSION['user_id'],$action==='approve'?null:trim($reason),$id]);
+        if(!logActivity((int)$_SESSION['user_id'],$action==='approve'?'APPROVE':'REQUEST_REVISION','page_sections',$id,($action==='approve'?'Approved and published ':'Requested changes on ').$row['page_slug'].'/'.$row['section_key']))throw new RuntimeException('Could not record the review. Please try again.');
+        $db->commit();
+    }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
+}
 function approvalFilters(array $input): array {
     $string=static fn($key)=>is_string($input[$key]??null)?trim($input[$key]):'';
     $f=['q'=>mb_substr($string('q'),0,200),'status'=>'','type'=>'','author'=>'','from'=>'','to'=>'','sort'=>'priority','page'=>1,'size'=>25];
@@ -29,8 +69,9 @@ function approvalFilters(array $input): array {
 }
 function approvalQueue(PDO $db,array &$filters,bool $super,int $userId): array {
     $scope=$super?'1=1':'s.user_id=?';$scopeParams=$super?[]:[$userId];
-    $from=' FROM rbac_submissions s LEFT JOIN users u ON u.user_id=s.user_id';
-    $q=$db->prepare('SELECT s.status,COUNT(*) AS total FROM rbac_submissions s WHERE '.$scope.' GROUP BY s.status');$q->execute($scopeParams);$counts=$q->fetchAll(PDO::FETCH_KEY_PAIR);
+    $source=approvalQueueSource($db);
+    $from=' FROM ('.$source.') s LEFT JOIN users u ON u.user_id=s.user_id';
+    $q=$db->prepare('SELECT s.status,COUNT(*) AS total FROM ('.$source.') s WHERE '.$scope.' GROUP BY s.status');$q->execute($scopeParams);$counts=$q->fetchAll(PDO::FETCH_KEY_PAIR);
     $q=$db->prepare("SELECT DISTINCT s.user_id,u.first_name,u.last_name $from WHERE $scope ORDER BY u.first_name,u.last_name,s.user_id");$q->execute($scopeParams);$authors=$q->fetchAll(PDO::FETCH_ASSOC);
     $where=[$scope];$params=$scopeParams;$type=approvalTypeSql();
     if($filters['q']!==''){
@@ -47,7 +88,7 @@ function approvalQueue(PDO $db,array &$filters,bool $super,int $userId): array {
     $where=' WHERE '.implode(' AND ',$where);
     $q=$db->prepare('SELECT COUNT(*)'.$from.$where);$q->execute($params);$total=(int)$q->fetchColumn();
     $pages=max(1,(int)ceil($total/$filters['size']));$filters['page']=min($filters['page'],$pages);
-    $order=['priority'=>"CASE WHEN s.status='pending' THEN 0 WHEN s.status IN ('uncertain','failed') THEN 1 ELSE 2 END,s.created_at ASC,s.submission_id ASC",'newest'=>'s.created_at DESC,s.submission_id DESC','oldest'=>'s.created_at ASC,s.submission_id ASC'][$filters['sort']];
+    $order=['priority'=>"CASE WHEN s.status='pending' THEN 0 WHEN s.status IN ('uncertain','failed') THEN 1 ELSE 2 END,s.created_at ASC,s.submission_id ASC,s.record_source ASC",'newest'=>'s.created_at DESC,s.submission_id DESC,s.record_source ASC','oldest'=>'s.created_at ASC,s.submission_id ASC,s.record_source ASC'][$filters['sort']];
     $q=$db->prepare("SELECT s.*,u.first_name,u.last_name,($type) AS content_type $from $where ORDER BY $order LIMIT ? OFFSET ?");
     foreach($params as $i=>$param)$q->bindValue($i+1,$param,PDO::PARAM_STR);
     $q->bindValue(count($params)+1,$filters['size'],PDO::PARAM_INT);$q->bindValue(count($params)+2,($filters['page']-1)*$filters['size'],PDO::PARAM_INT);$q->execute();$rows=$q->fetchAll(PDO::FETCH_ASSOC);

@@ -12,6 +12,10 @@ require_once __DIR__ . '/settings-functions.php';
 require_once __DIR__ . '/../includes/content-publish-policy.php';
 require_once __DIR__ . '/../includes/announcement-categories.php';
 require_once __DIR__ . '/photo-check.php';
+require_once __DIR__ . '/../includes/person-photo-check.php';
+require_once __DIR__ . '/../includes/contact-number.php';
+require_once __DIR__ . '/../includes/personnel.php';
+require_once __DIR__ . '/../includes/personnel-saves.php';
 require_once __DIR__ . '/../includes/image-framing.php';
 require_once __DIR__ . '/rich-text.php';
 require_once __DIR__ . '/basic-education-content.php';
@@ -41,7 +45,8 @@ function initSession() {
             $_SESSION['_initiated'] = true;
         }
         if(isset($_SESSION['last_activity'])&&time()-(int)$_SESSION['last_activity']>SESSION_TIMEOUT){authClearSession();header('Location: /admin/login.php?timeout=1');exit;}
-        $_SESSION['last_activity'] = time();
+        // Background presence polling must not keep an abandoned login alive.
+        if (rbacRequestRoute()!=='/admin/action/editor-presence-handler.php') $_SESSION['last_activity'] = time();
     }
     authEnforceTransport();
     if (isLoggedIn()) rbacRequestBoundary();
@@ -2253,7 +2258,7 @@ function saveSectionDraft(string $pageSlug, string $sectionKey, string $content)
     }
     if ($pageSlug === 'contact-us') {
         require_once __DIR__ . '/../components/contact-page-content.php';
-        $content = contactPageValidate($sectionKey, $content);
+        $content = contactPageValidate($sectionKey, $content, getSectionContent($pageSlug, $sectionKey));
     }
     try {
         $db = getDB();
@@ -2286,7 +2291,7 @@ function publishSection(string $pageSlug, string $sectionKey): bool {
     }
     if ($pageSlug === 'contact-us') {
         require_once __DIR__ . '/../components/contact-page-content.php';
-        contactPageValidate($sectionKey, (string)getSectionContent($pageSlug, $sectionKey, true));
+        contactPageValidate($sectionKey, (string)getSectionContent($pageSlug, $sectionKey, true), getSectionContent($pageSlug, $sectionKey));
     }
     try {
         $db = getDB();
@@ -2853,6 +2858,7 @@ function discardStoredDepartmentUpload(?array $stored): void {
  * always safer than breaking another page's image.
  */
 function deleteMediaIfUnreferenced(int $mediaId): bool {
+    if (personnelDeferMediaCleanup($mediaId)) return false;
     $references = [
         ['announcements',  'featured_image'],
         ['events',         'media_id'],
@@ -2948,6 +2954,7 @@ function departmentFileExists(?string $webPath): bool {
  *   dean_photo_name — the dean photo's original filename, or null
  */
 function hydrateDepartmentMedia(array $row): array {
+    $row = personnelHydrate('dean', [$row])[0];
     $row['logo_url']       = departmentFileExists($row['logo_path'] ?? null) ? $row['logo_path'] : null;
     $row['dean_photo_url'] = departmentFileExists($row['dean_photo_path'] ?? null) ? $row['dean_photo_path'] : null;
     if ($row['dean_photo_url'] === null) {
@@ -3260,7 +3267,7 @@ function saveDepartmentMedia(int $deptId, ?array $logoFile, bool $removeLogo): a
  * Returns the refreshed department row. Throws Exception with a
  * user-friendly message on validation/storage failure.
  */
-function saveDepartmentDean(
+function saveDepartmentDeanRecord(
     int $deptId,
     string $name,
     string $title,
@@ -3285,6 +3292,9 @@ function saveDepartmentDean(
             throw new Exception('Update this office through its location card in the Visual Editor.');
         }
     }
+
+    $phone = contactNumberSave($phone, $dept['dean_phone'] ?? null);
+    personPhotoEnforce($photoFile, $removePhoto, $dept['dean_photo_url'] ?? null, $name, 'dean:' . $deptId);
 
     $hasPhoto = !empty($photoFile) && ($photoFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
 
@@ -3433,6 +3443,7 @@ function departmentAdminPayload(array $dept): array {
         'logo_url'        => $dept['logo_url'] ?? null,
         'banner_url'      => departmentBanner($dept)['file_path'] ?? null,
         'logo_name'       => !empty($dept['logo_url']) ? ($dept['logo_name'] ?? null) : null,
+        'personnel_id'    => $dept['personnel_id'] ?? null,
         'dean_name'       => $dept['dean_name']   ?? null,
         'dean_title'      => $dept['dean_title']  ?? null,
         'dean_bio'        => $dept['dean_bio']    ?? null,
@@ -3698,6 +3709,8 @@ function setDepartmentArchived(int $deptId, bool $archive): array {
     }
 
     $db = getDB();
+    if (!$archive) personPhotoEnforce(null, false, $dept['dean_photo_url'] ?? null, (string)($dept['dean_name'] ?? ''), 'dean:' . $deptId);
+
     try {
         $stmt = $db->prepare($archive
             ? "UPDATE departments SET archived_at = NOW() WHERE dept_id = ?"
@@ -3749,6 +3762,7 @@ function getHomepagePresident(): array {
                 'heading' => null, 'greeting' => null, 'message' => null, 'media_id' => null,
                 'photo_path' => null, 'photo_name' => null];
     }
+    $row = personnelHydrate('president', [$row])[0];
     $row['photo_url'] = departmentFileExists($row['photo_path'] ?? null) ? $row['photo_path'] : null;
     if ($row['photo_url'] === null) {
         $row['photo_name'] = null;
@@ -3769,7 +3783,7 @@ function getHomepagePresident(): array {
  * Returns the refreshed row. Throws Exception with a user-friendly message
  * on validation/storage failure.
  */
-function saveHomepagePresident(
+function saveHomepagePresidentRecord(
     string $name,
     string $title,
     string $org,
@@ -3781,6 +3795,8 @@ function saveHomepagePresident(
     bool $removePhoto
 ): array {
     $current = getHomepagePresident();
+
+    personPhotoEnforce($photoFile, $removePhoto, $current['photo_url'] ?? null, $name, 'president:1');
 
     $hasPhoto = !empty($photoFile) && ($photoFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
 
@@ -4114,10 +4130,12 @@ function fetchAdministrationSections(bool $includeArchived = false): array {
             {$archivedFilter}
             ORDER BY p.display_order ASC, p.person_id ASC
         ")->fetchAll(PDO::FETCH_ASSOC);
+        $people = personnelHydrate('person', $people);
         foreach ($people as $p) {
             if (!isset($sections[$p['section_key']])) continue;
             $sections[$p['section_key']]['people'][] = [
                 'id'    => (int)$p['person_id'],
+                'personnel_id' => $p['personnel_id'] ?? null,
                 'name'  => (string)$p['name'],
                 'role'  => (string)$p['role'],
                 'image' => administrationPhotoUrl($p['photo']),
@@ -4134,12 +4152,15 @@ function fetchAdministrationSections(bool $includeArchived = false): array {
             {$officeFilter}
             ORDER BY o.display_order ASC, o.office_id ASC
         ")->fetchAll(PDO::FETCH_ASSOC);
+        $offices = personnelHydrate('office', $offices);
+        $offices = contentListsHydrate($db, 'office_services', $offices);
         foreach ($offices as $o) {
             if (!isset($sections[$o['section_key']])) continue;
             $services = preg_split('/\r\n|\r|\n/', (string)($o['services'] ?? ''));
             $services = array_values(array_filter(array_map('trim', $services), 'strlen'));
             $sections[$o['section_key']]['offices'][] = [
                 'id'       => (int)$o['office_id'],
+                'personnel_id' => $o['personnel_id'] ?? null,
                 'office'   => (string)$o['office_name'],
                 'name'     => (string)$o['head_name'],
                 'role'     => (string)$o['head_role'],
@@ -4147,7 +4168,7 @@ function fetchAdministrationSections(bool $includeArchived = false): array {
                 'archived'    => $canArchive && ($o['archived_at'] ?? null) !== null,
                 'archived_at' => $canArchive ? ($o['archived_at'] ?? null) : null,
                 'contact'  => [
-                    'phone'    => (string)($o['phone'] ?? ''),
+                    'phone'    => contactNumberDisplay($o['phone'] ?? ''),
                     'email'    => (string)($o['email'] ?? ''),
                     'location' => (string)($o['location'] ?? ''),
                     'hours'    => (string)($o['hours'] ?? ''),
@@ -4287,14 +4308,14 @@ function saveAdministrationSection(string $sectionKey, string $title, string $de
  * Add a person card, or edit one ($personId > 0).
  * New cards go to the end of their section.
  */
-function saveAdministrationPerson(
+function saveAdministrationPersonRecord(
     int $personId,
     string $sectionKey,
     string $name,
     string $role,
     ?array $photoFile,
     bool $removePhoto
-): void {
+): int {
     // Validate everything BEFORE storing the photo, so a bad form leaves nothing behind.
     $name = administrationCleanLine($name, 255, 'the name', true);
     $role = administrationCleanLine($role, 500, 'the position');
@@ -4321,6 +4342,14 @@ function saveAdministrationPerson(
             throw new Exception('Please choose a valid section.');
         }
     }
+
+    $photoPath = $current['image_path'] ?? null;
+    if (!empty($current['media_id'])) {
+        $q = $db->prepare('SELECT file_path FROM media_library WHERE media_id=?');
+        $q->execute([$current['media_id']]);
+        $photoPath = $q->fetchColumn() ?: $photoPath;
+    }
+    personPhotoEnforce($photoFile, $removePhoto, $photoPath, $name, 'person:' . $personId);
 
     $oldMediaId = ($current && $current['media_id'] !== null) ? (int)$current['media_id'] : null;
     [$mediaId, $imagePath, $stored] = administrationResolvePhoto(
@@ -4362,13 +4391,14 @@ function saveAdministrationPerson(
         (int)($_SESSION['user_id'] ?? 0), $current ? 'UPDATE' : 'CREATE', 'admin_people', $recordId,
         'Administration: ' . ($current ? 'updated ' : 'added ') . $name
     );
+    return $recordId;
 }
 
 /**
  * Add an office card (Heads of Student Services), or edit one ($officeId > 0).
  * New cards go to the end of their section.
  */
-function saveAdministrationOffice(
+function saveAdministrationOfficeRecord(
     int $officeId,
     string $sectionKey,
     string $officeName,
@@ -4381,7 +4411,7 @@ function saveAdministrationOffice(
     string $services,
     ?array $photoFile,
     bool $removePhoto
-): void {
+): int {
     // Validate everything BEFORE storing the photo, so a bad form leaves nothing behind.
     $officeName = administrationCleanLine($officeName, 255, 'the office name', true);
     $headName   = administrationCleanLine($headName, 255, 'the name of the head of office', true);
@@ -4401,7 +4431,7 @@ function saveAdministrationOffice(
 
     if ($officeId > 0) {
         try {
-            $stmt = $db->prepare("SELECT office_id, section_key, media_id, image_path FROM admin_offices WHERE office_id = ?");
+            $stmt = $db->prepare("SELECT office_id, section_key, media_id, image_path, phone FROM admin_offices WHERE office_id = ?");
             $stmt->execute([$officeId]);
             $current = $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -4419,6 +4449,15 @@ function saveAdministrationOffice(
         }
     }
 
+    $photoPath = $current['image_path'] ?? null;
+    if (!empty($current['media_id'])) {
+        $q = $db->prepare('SELECT file_path FROM media_library WHERE media_id=?');
+        $q->execute([$current['media_id']]);
+        $photoPath = $q->fetchColumn() ?: $photoPath;
+    }
+    $phone = contactNumberSave($phone, $current['phone'] ?? null);
+    personPhotoEnforce($photoFile, $removePhoto, $photoPath, $headName, 'office:' . $officeId);
+
     $oldMediaId = ($current && $current['media_id'] !== null) ? (int)$current['media_id'] : null;
     [$mediaId, $imagePath, $stored] = administrationResolvePhoto(
         $photoFile, $removePhoto, $oldMediaId, $current['image_path'] ?? null
@@ -4428,38 +4467,31 @@ function saveAdministrationOffice(
     $orNull = function (string $v): ?string { return $v === '' ? null : $v; };
 
     try {
-        if ($current) {
-            $stmt = $db->prepare("
-                UPDATE admin_offices
-                SET office_name = ?, head_name = ?, head_role = ?, media_id = ?, image_path = ?,
-                    phone = ?, email = ?, location = ?, hours = ?, services = ?
-                WHERE office_id = ?
-            ");
-            $stmt->execute([
-                $officeName, $headName, $headRole, $mediaId, $imagePath,
-                $orNull($phone), $orNull($email), $orNull($location), $orNull($hours), $orNull($services),
-                $officeId,
-            ]);
-            $recordId = $officeId;
-        } else {
-            $stmt = $db->prepare("SELECT COALESCE(MAX(display_order), 0) + 1 FROM admin_offices WHERE section_key = ?");
-            $stmt->execute([$sectionKey]);
-            $nextOrder = (int)$stmt->fetchColumn();
+        $normalized = contentListsEnabled($db);
+        $recordId = contentListTransaction($db, static function () use ($db, $current, $officeId, $sectionKey, $officeName, $headName, $headRole, $mediaId, $imagePath, $phone, $email, $location, $hours, $services, $orNull, $normalized): int {
+            $columns = ['office_name','head_name','head_role','media_id','image_path','phone','email','location','hours'];
+            $values = [$officeName,$headName,$headRole,$mediaId,$imagePath,$orNull($phone),$orNull($email),$orNull($location),$orNull($hours)];
+            if (!$normalized) { $columns[] = 'services'; $values[] = $orNull($services); }
+            if ($current) {
+                $assignments = implode(',', array_map(static fn($column) => "$column=?", $columns));
+                $values[] = $officeId;
+                $db->prepare("UPDATE admin_offices SET $assignments,updated_at=NOW() WHERE office_id=?")->execute($values);
+                $recordId = $officeId;
+            } else {
+                $stmt = $db->prepare("SELECT COALESCE(MAX(display_order), 0) + 1 FROM admin_offices WHERE section_key = ?");
+                $stmt->execute([$sectionKey]);
+                $nextOrder = (int)$stmt->fetchColumn();
 
-            $stmt = $db->prepare("
-                INSERT INTO admin_offices
-                    (section_key, office_name, head_name, head_role, media_id, image_path,
-                     phone, email, location, hours, services, display_order)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([
-                $sectionKey, $officeName, $headName, $headRole, $mediaId, $imagePath,
-                $orNull($phone), $orNull($email), $orNull($location), $orNull($hours), $orNull($services),
-                $nextOrder,
-            ]);
-            $recordId = (int)$db->lastInsertId();
-        }
-    } catch (PDOException $e) {
+                $columns[] = 'section_key'; $values[] = $sectionKey;
+                $columns[] = 'display_order'; $values[] = $nextOrder;
+                $placeholders = implode(',', array_fill(0, count($values), '?'));
+                $db->prepare('INSERT INTO admin_offices (' . implode(',', $columns) . ") VALUES ($placeholders)")->execute($values);
+                $recordId = (int)$db->lastInsertId();
+            }
+            if ($normalized) contentListReplace($db, 'office_services', $recordId, $services);
+            return $recordId;
+        });
+    } catch (Throwable $e) {
         discardStoredDepartmentUpload($stored);
         error_log('Save administration office error: ' . $e->getMessage());
         throw new Exception('Could not save this office. Please try again.');
@@ -4473,6 +4505,7 @@ function saveAdministrationOffice(
         (int)($_SESSION['user_id'] ?? 0), $current ? 'UPDATE' : 'CREATE', 'admin_offices', $recordId,
         'Administration: ' . ($current ? 'updated ' : 'added ') . $officeName
     );
+    return $recordId;
 }
 
 /**
@@ -4575,6 +4608,13 @@ function setAdministrationArchived(string $kind, int $id, bool $archive): void {
     $isArchived = $row['archived_at'] !== null;
     if ($isArchived === $archive) {
         return; // already in the requested state
+    }
+
+    if (!$archive) {
+        $q = $db->prepare("SELECT p.*, COALESCE(m.file_path,p.image_path) AS checked_photo FROM `{$table}` p LEFT JOIN media_library m ON m.media_id=p.media_id WHERE p.`{$idCol}`=?");
+        $q->execute([$id]);
+        $profile = $q->fetch(PDO::FETCH_ASSOC);
+        personPhotoEnforce(null, false, $profile['checked_photo'] ?? null, (string)($profile[$kind === 'office' ? 'head_name' : 'name'] ?? ''), $kind . ':' . $id);
     }
 
     try {

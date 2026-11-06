@@ -17,6 +17,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/knowledge.php';
 require_once __DIR__ . '/tuition.php';
 require_once __DIR__ . '/../../includes/website-developers.php';
+require_once __DIR__ . '/../../includes/normalized-content-lists.php';
 
 final class GncbotRetriever
 {
@@ -695,9 +696,10 @@ final class GncbotRetriever
         }
         try {
             $rows = $this->db->query(
-                "SELECT office_name, head_name, head_role, phone, email, location, hours, services
+                "SELECT *
                    FROM admin_offices ORDER BY display_order"
             )->fetchAll(PDO::FETCH_ASSOC);
+            $rows = contentListsHydrate($this->db, 'office_services', $rows);
             $legacy = $this->db->query("SELECT office_name, email, contact_no AS phone, location, office_hours AS hours, description AS services FROM offices")->fetchAll(PDO::FETCH_ASSOC);
             foreach ($legacy as $l) { $rows[] = $l + ['head_name' => '', 'head_role' => '']; }
         } catch (Throwable $e) { $this->dbFail($e); return; }

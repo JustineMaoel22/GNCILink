@@ -33,6 +33,12 @@ $revision = filter_var($_POST['revision'] ?? 0, FILTER_VALIDATE_INT, ['options' 
 if ($revision === false) edReply(['error' => 'Invalid draft revision.'], 400);
 try {
     $db = getDB();
+    if($action==='record_publication'){
+        if(!rbacIsSuper())edReply(['error'=>'Only Super Admin can record a publication.'],403);
+        require_once __DIR__.'/../../includes/website-publications.php';
+        recordWebsitePublication($db,['page'=>$page,'route'=>$route,'sub'=>$_POST['sub']??'','title'=>$_POST['title']??null]);
+        edReply(['success'=>true]);
+    }
     $reviewId=(int)($_POST['review_submission']??0);
     if($action==='complete_review'){
         if(!rbacIsSuper())edReply(['error'=>'Only Super Admin can approve changes.'],403);
@@ -47,6 +53,10 @@ try {
         if(!$review||$review['kind']!=='snapshot'||(!rbacIsSuper()&&(int)$review['user_id']!==$userId))edReply(['error'=>'Submission not found.'],403);
         $payload=rbacReadPayload($reviewId);
         if(($payload['page']??'')!==$page||($payload['route']??'')!==$route)edReply(['error'=>'Open the page route stored with this submission.'],409);
+        if(!empty($_SERVER['HTTP_X_GNCI_EDITOR_PEER'])) {
+            require_once __DIR__.'/../../includes/editor-presence.php';
+            editorPresenceRestoreDraft($db,$_SERVER['HTTP_X_GNCI_EDITOR_PEER'],$payload['snapshot']);
+        }
         edReply(['success'=>true,'draft'=>['revision'=>0,'snapshot'=>$payload['snapshot']]]);
     }
     if($action==='submit_review'){
@@ -57,10 +67,25 @@ try {
         $id=rbacSaveSubmission('snapshot','/admin/content-edit.php','Page changes: '.$page,['page'=>$page,'route'=>$route,'snapshot'=>$draft['snapshot']],0,$resubmit);
         edReply(['success'=>true,'submission_id'=>$id,'message'=>'Submitted for Super Admin approval. Visitors still see the published page.']);
     }
-    if ($action === 'load') edReply(['success' => true, 'draft' => editorDraftLoad($db, $userId, $key)]);
-    if ($action === 'save') {
+    if ($action === 'load') {
+        $loaded=editorDraftLoad($db,$userId,$key);
+        if($loaded && !empty($_SERVER['HTTP_X_GNCI_EDITOR_PEER'])) {
+            require_once __DIR__.'/../../includes/editor-presence.php';
+            editorPresenceRestoreDraft($db,$_SERVER['HTTP_X_GNCI_EDITOR_PEER'],$loaded['snapshot']);
+        }
+        edReply(['success'=>true,'draft'=>$loaded]);
+    }
+    if ($action === 'save' || $action === 'save_recovery') {
+        if($action==='save_recovery'&&empty($_SERVER['HTTP_X_GNCI_EDITOR_PEER']))edReply(['error'=>'Open the Content Editor to save a recovery draft.'],403);
         $payload = $_POST['snapshot'] ?? null;
         if (!is_string($payload)) edReply(['error' => 'The draft was not received. Check the hosting request-size limit.'], 400);
+        if(!empty($_SERVER['HTTP_X_GNCI_EDITOR_PEER'])) {
+            require_once __DIR__.'/../../includes/editor-presence.php';
+            $decoded=json_decode($payload,true,64,JSON_THROW_ON_ERROR);
+            $decoded['content_version']=editorPresenceDraftVersion($db,$_SERVER['HTTP_X_GNCI_EDITOR_PEER']);
+            $payload=json_encode($decoded,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE);
+            unset($decoded);
+        }
         $next = editorDraftSave($db, $userId, $key, $revision, $payload);
         edReply(['success' => true, 'revision' => $next]);
     }
@@ -70,8 +95,10 @@ try {
     }
     edReply(['error' => 'Unknown draft action.'], 400);
 } catch (JsonException | InvalidArgumentException | LengthException $e) {
+    if($action==='record_publication')edReply(['error'=>'Invalid page publication summary.'],400);
     edReply(['error' => 'The draft is invalid or too large. Save fewer media changes at a time.'], 400);
 } catch (PDOException $e) {
+    if($action==='record_publication'){error_log('Page publication history unavailable.');edReply(['error'=>'The page publication summary could not be recorded.'],503);}
     error_log('Editor draft storage error: ' . $e->getCode());
     edReply(['error' => 'Draft storage is unavailable. Ask your developer to run database/migrate-content-editor-drafts.php.'], 503);
 } catch (Throwable $e) {

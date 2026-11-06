@@ -21,6 +21,7 @@ try {
         if ($id) {
             $statement=$db->prepare('SELECT * FROM student_achievements WHERE achievement_id=? FOR UPDATE'); $statement->execute([$id]); $old=$statement->fetch(PDO::FETCH_ASSOC);
             if (!$old) throw new InvalidArgumentException('An achievement was removed. Reload the editor.');
+            $old=contentListsHydrate($db,'achievement_achievers',[$old])[0];
             if (isset($change['updated_at']) && $change['updated_at']!==$old['updated_at']) throw new InvalidArgumentException('This achievement changed in another session. Reload before saving.');
         }
         if (!empty($change['remove'])) {

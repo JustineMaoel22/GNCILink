@@ -313,7 +313,6 @@ $cdText = function (?string $v) use ($cePreview): string {
             </div>
         </section>
 
-        <?php if (!$isBasicEducation): ?>
         <?php $departmentStatements = array_filter(['vision', 'mission'], static fn($key) => $cePreview || trim(strip_tags($pageContent[$key . '_text']['value'])) !== ''); ?>
         <?php if ($departmentStatements): ?>
         <section class="dept-programs" aria-label="Department vision and mission">
@@ -331,7 +330,6 @@ $cdText = function (?string $v) use ($cePreview): string {
                 </div>
             </div>
         </section>
-        <?php endif; ?>
         <?php endif; ?>
 
         <!-- ═══ 2 · Programs Offered (from `programs` where dept_id = this dept) ═══ -->
