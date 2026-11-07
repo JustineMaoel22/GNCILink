@@ -11,6 +11,7 @@
 
 (function (window, document) {
     'use strict';
+    let nextOptionGroupId = 0;
 
     class GncMultiSelect {
         constructor(wrapperEl, config) {
@@ -27,6 +28,7 @@
             this.selected = new Set();
             this.searchTerm = '';
             this.isOpen = false;
+            this.optionIdPrefix = 'gnc-ms-option-' + (++nextOptionGroupId);
 
             if (!wrapperEl) {
                 return;
@@ -94,20 +96,20 @@
 
             // "All" option at top
             html += `
-                <label class="gnc-ms-option gnc-ms-all-option" data-value="${this.escapeHtml(this.config.allValue)}">
-                    <input type="checkbox" class="form-check-input gnc-ms-check-all" value="${this.escapeHtml(this.config.allValue)}">
+                <label class="gnc-ms-option gnc-ms-all-option" for="${this.optionIdPrefix}-all" data-value="${this.escapeHtml(this.config.allValue)}"${this.config.hideAllOption ? ' style="display:none"' : ''}>
+                    <input type="checkbox" id="${this.optionIdPrefix}-all" class="form-check-input gnc-ms-check-all" value="${this.escapeHtml(this.config.allValue)}">
                     <span class="gnc-ms-option-text"><strong>${this.escapeHtml(this.config.allLabel)}</strong></span>
                 </label>
-                <div class="gnc-ms-divider"></div>
+                <div class="gnc-ms-divider"${this.config.hideAllOption ? ' style="display:none"' : ''}></div>
             `;
 
-            (this.config.items || []).forEach(item => {
+            (this.config.items || []).forEach((item, index) => {
                 const val = String(item.value);
                 const badge = item.badge ? `<span class="gnc-ms-option-badge">${this.escapeHtml(item.badge)}</span>` : '';
                 const searchStr = (item.search || (item.badge ? item.badge + ' ' : '') + item.label).toLowerCase();
                 html += `
-                    <label class="gnc-ms-option gnc-ms-item-option" data-value="${this.escapeHtml(val)}" data-search="${this.escapeHtml(searchStr)}">
-                        <input type="checkbox" class="form-check-input gnc-ms-checkbox" name="${this.escapeHtml(this.config.name)}" value="${this.escapeHtml(val)}">
+                    <label class="gnc-ms-option gnc-ms-item-option" for="${this.optionIdPrefix}-${index}" data-value="${this.escapeHtml(val)}" data-search="${this.escapeHtml(searchStr)}">
+                        <input type="checkbox" id="${this.optionIdPrefix}-${index}" class="form-check-input gnc-ms-checkbox" name="${this.escapeHtml(this.config.name)}" value="${this.escapeHtml(val)}">
                         ${badge}
                         <span class="gnc-ms-option-text">${this.escapeHtml(item.label)}</span>
                     </label>
@@ -117,10 +119,37 @@
             this.listEl.innerHTML = html;
             this.allCheckbox = this.listEl.querySelector('.gnc-ms-check-all');
             this.itemCheckboxes = this.listEl.querySelectorAll('.gnc-ms-checkbox');
+            this.syncCheckboxesState();
         }
 
         bindEvents() {
             if (!this.triggerEl) return;
+
+            // Keep focus inside the dropdown throughout a mouse press on a row.
+            // Otherwise the admin focusout handler can close it before click fires.
+            this.listEl.addEventListener('pointerdown', (event) => {
+                if (event.pointerType !== 'mouse' || event.button !== 0 || event.target.closest('input')) return;
+                const option = event.target.closest('.gnc-ms-option');
+                const checkbox = option && option.querySelector('input[type="checkbox"]');
+                if (!checkbox || checkbox.disabled) return;
+                event.preventDefault();
+                checkbox.focus({ preventScroll: true });
+            });
+
+            // Handle the row explicitly rather than relying on label activation.
+            // Checkbox clicks retain their native behavior and must not toggle twice.
+            this.listEl.addEventListener('click', (event) => {
+                if (event.target.closest('input')) return;
+                const option = event.target.closest('.gnc-ms-option');
+                if (!option || !this.listEl.contains(option)) return;
+                const checkbox = option.querySelector('input[type="checkbox"]');
+                if (!checkbox || checkbox.disabled) return;
+                event.preventDefault();
+                checkbox.focus({ preventScroll: true });
+                checkbox.checked = !checkbox.checked;
+                checkbox.dispatchEvent(new Event('input', { bubbles: true }));
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            });
 
             // Toggle dropdown
             this.triggerEl.addEventListener('click', (e) => {
@@ -138,9 +167,10 @@
                 }
             });
 
-            // "All" checkbox click
-            if (this.allCheckbox) {
-                this.allCheckbox.addEventListener('change', () => {
+            // Delegate so replacing program options keeps the All control working.
+            if (this.listEl) {
+                this.listEl.addEventListener('change', (e) => {
+                    if (!e.target.matches('.gnc-ms-check-all')) return;
                     if (this.allCheckbox.checked) {
                         this.deselectAll();
                     } else if (this.selected.size === 0) {
@@ -278,7 +308,7 @@
 
             const allOpt = this.listEl.querySelector('.gnc-ms-all-option');
             if (allOpt) {
-                allOpt.style.display = this.searchTerm ? 'none' : 'flex';
+                allOpt.style.display = this.searchTerm || this.config.hideAllOption ? 'none' : 'flex';
             }
 
             if (this.noResultsEl) {
@@ -314,6 +344,7 @@
             if (!this.allCheckbox || !this.itemCheckboxes) return;
             const hasSelections = this.selected.size > 0;
             this.allCheckbox.checked = !hasSelections;
+            this.allCheckbox.closest('.gnc-ms-option').classList.toggle('is-checked', !hasSelections);
 
             this.itemCheckboxes.forEach(cb => {
                 const isChecked = this.selected.has(cb.value);
@@ -358,16 +389,46 @@
             this.tagsAreaEl.innerHTML = html;
         }
 
+        bindDepartments(departmentSelect) {
+            const allItems = this.config.items.slice();
+            this.config.restrictToItems = true;
+            const previousOnChange = departmentSelect.config.onChange;
+            let previousDepartments = departmentSelect.getSelected();
+            const refresh = (selectNewDepartments = false) => {
+                const ids = departmentSelect.getSelected();
+                this.config.hideAllOption = ids.length > 0;
+                this.config.items = allItems.filter(item => !ids.length || ids.includes(String(item.departmentId)));
+                const values = new Set(this.getSelected());
+                if (selectNewDepartments) {
+                    if (!ids.length) values.clear();
+                    const added = ids.filter(id => !previousDepartments.includes(id));
+                    this.config.items.forEach(item => {
+                        if (added.includes(String(item.departmentId))) values.add(String(item.value));
+                    });
+                }
+                this.renderOptions();
+                this.setSelected([...values], false);
+                this.filterOptions(this.searchInput.value);
+                previousDepartments = ids;
+            };
+            departmentSelect.config.onChange = (values) => {
+                refresh(true);
+                if (typeof previousOnChange === 'function') previousOnChange(values);
+            };
+            refresh();
+        }
+
         setSelected(values, triggerChange = true) {
             this.selected.clear();
+            const allowed = this.config.restrictToItems ? new Set(this.config.items.map(item => String(item.value))) : null;
             if (Array.isArray(values)) {
                 values.forEach(v => {
                     const str = String(v);
-                    if (str !== '' && str !== this.config.allValue) {
+                    if (str !== '' && str !== this.config.allValue && (!allowed || allowed.has(str))) {
                         this.selected.add(str);
                     }
                 });
-            } else if (values && values !== this.config.allValue) {
+            } else if (values && values !== this.config.allValue && (!allowed || allowed.has(String(values)))) {
                 this.selected.add(String(values));
             }
 

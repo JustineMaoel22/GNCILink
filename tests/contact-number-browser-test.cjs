@@ -42,6 +42,19 @@ async function until(fn, message) {
     assert.equal(await evaluate('document.getElementById("number").value'),'+63-912-345-6789');
     await enter('9123456789999');
     assert.equal(await evaluate('document.getElementById("number").value'),'+63-912-345-6789');
+    assert.match(await evaluate('document.querySelector("#number + .contact-control [role=status]").textContent'),/maximum of 10 digits/);
+    async function attemptDigit(sourceId, extension = false) {
+        await evaluate(`(()=>{const field=document.getElementById(${JSON.stringify(sourceId)}).__contact.${extension ? 'extension' : 'input'};field.focus();field.setSelectionRange(field.value.length,field.value.length);})()`);
+        await send('Input.dispatchKeyEvent',{type:'keyDown',key:'9',code:'Digit9',text:'9',windowsVirtualKeyCode:57});
+        await send('Input.dispatchKeyEvent',{type:'keyUp',key:'9',code:'Digit9',windowsVirtualKeyCode:57});
+    }
+    await attemptDigit('number');
+    assert.match(await evaluate('document.querySelector("#number + .contact-control [role=status]").textContent'),/maximum of 10 digits/);
+    assert.equal(await evaluate('document.getElementById("number").__contact.input.checkValidity()'),true,'Rejected extra digit must not invalidate a complete number');
+    await evaluate(`(()=>{const field=document.getElementById('number').__contact.input;field.setSelectionRange(0,1);})()`);
+    await send('Input.insertText',{text:'8'});
+    assert.equal(await evaluate('document.getElementById("number").value'),'+63-812-345-6789','Replacing a digit remains allowed at the limit');
+    assert.equal(await evaluate('document.querySelector("#number + .contact-control [role=status]").hidden'),true,'Accepted edits clear the reminder');
     await enter('abc912!345@6789');
     assert.equal(await evaluate('document.getElementById("number").value'),'+63-912-345-6789');
     await enter('9123');
@@ -51,6 +64,8 @@ async function until(fn, message) {
     await enter('9123456789');
     await evaluate(`document.querySelectorAll('#number + .contact-control .contact-type button')[1].click();`);
     await enter('9004473');
+    await attemptDigit('number');
+    assert.match(await evaluate('document.querySelector("#number + .contact-control [role=status]").textContent'),/maximum of 7 digits/);
     await evaluate(`(()=>{const ext=document.getElementById('number').__contact.extension;ext.value='abc00123';ext.dispatchEvent(new Event('input',{bubbles:true}));})()`);
     assert.equal(await evaluate('document.getElementById("number").value'),'045-900-4473 loc. 00123');
     await evaluate(`document.querySelectorAll('#number + .contact-control .contact-type button')[0].click();`);
@@ -64,6 +79,19 @@ async function until(fn, message) {
     assert.equal(await evaluate('document.getElementById("number").value'),'+63-912-345-6789','Pasted local mobile auto-converts and selects type');
     await evaluate(`(()=>{const f=document.getElementById('local').__contact.input;f.value='12abc345678';f.setSelectionRange(10,10);f.dispatchEvent(new Event('input',{bubbles:true}));})()`);
     assert.equal(await evaluate('document.getElementById("local").value'),'123456');
+    assert.match(await evaluate('document.querySelector("#local + .contact-control [role=status]").textContent'),/maximum of 6 digits/);
+    await attemptDigit('local');
+    assert.equal(await evaluate('document.getElementById("local").value'),'123456');
+    await evaluate(`document.querySelectorAll('#number + .contact-control .contact-type button')[1].click();`);
+    await enter('9004473');
+    await evaluate(`(()=>{const field=document.getElementById('number').__contact.extension;field.value='123456';field.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    await attemptDigit('number',true);
+    assert.match(await evaluate('document.querySelector("#number + .contact-control [role=status]").textContent'),/Extension allows a maximum of 6 digits/);
+    await evaluate(`(()=>{const field=document.getElementById('number').__contact.extension,dt=new DataTransfer();field.setSelectionRange(0,6);dt.setData('text/plain','123456789');field.dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true}));})()`);
+    assert.equal(await evaluate('document.getElementById("number").__contact.extension.value'),'123456');
+    assert.match(await evaluate('document.querySelector("#number + .contact-control [role=status]").textContent'),/maximum of 6 digits/);
+    await evaluate(`(()=>{const field=document.getElementById('number').__contact.input;field.focus();field.setSelectionRange(field.value.length,field.value.length);window.limitBlocked=!field.dispatchEvent(new InputEvent('beforeinput',{inputType:'insertText',data:'9',bubbles:true,cancelable:true}));})()`);
+    assert.equal(await evaluate('window.limitBlocked'),true,'Mobile beforeinput blocks excess digits with feedback');
     await evaluate(`document.getElementById('number').value='legacy / multiple numbers';GNCContact.refresh(document.getElementById('number'));`);
     assert.equal(await evaluate('document.getElementById("number").value'),'legacy / multiple numbers');
     assert.equal(await evaluate('document.getElementById("number").__contact.validate()'),true);

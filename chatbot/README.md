@@ -6,7 +6,8 @@ Floating chat widget + PHP endpoint that answers from the live GNCILink database
 1. Upload the `chatbot/` folder to the project root (next to `config/`, `index.php`).
 2. Add to the existing `.env` (the one `config/config.php` already loads):
    ```
-   GEMINI_API_KEY=your_key_from_aistudio.google.com
+   CHATBOT_API_KEY=your_chatbot_key_from_aistudio.google.com
+   PHOTO_CHECK_API_KEY=your_separate_image_validation_key
    # optional:
    # GEMINI_MODEL=gemini-3.6-flash   (default; run tests/list_models.php to see what YOUR key can use)
    # GEMINI_TIMEOUT=20

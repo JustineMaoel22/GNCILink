@@ -348,7 +348,7 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
                             <i class="bi bi-pencil"></i><span>Edit</span>
                         </button>
                         <!-- Raw content stashed in a hidden template (not JSON) -->
-                        <template id="ann-content-<?= $a['announcement_id'] ?>"><?= $a['content'] ?></template>
+                        <template id="ann-content-<?= $a['announcement_id'] ?>"><?= sectionToEditorHtml($a['content']) ?></template>
                         <?php endif; ?>
                         <?php if (hasPermission('delete_announcement') || (hasPermission('delete_own_announcement') && $isOwner)): ?>
                         <button type="button" class="btn btn-sm btn-outline-danger btn-delete-announcement" title="Delete this announcement"
@@ -917,6 +917,9 @@ const progSelectItems = <?= json_encode(array_values(array_map(function($code, $
     return ['value' => (string)$code, 'label' => $label, 'badge' => $code];
 }, array_keys(array_diff_key($announcementProgramChoices, ['ALL' => ''])), array_diff_key($announcementProgramChoices, ['ALL' => '']))), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
+const programDepartments = <?= json_encode(getProgramDepartmentMap(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+progSelectItems.forEach(item => { item.departmentId = String(programDepartments[item.value] ?? ''); });
+
 const annDeptSelect = new GncMultiSelect(document.getElementById('modal-dept-multiselect'), {
     name: 'dept_ids[]',
     allLabel: 'Everyone (All departments)',
@@ -949,6 +952,7 @@ function updateAudienceHelp() {
 }
 annDeptSelect.config.onChange = updateAudienceHelp;
 annProgSelect.config.onChange = updateAudienceHelp;
+annProgSelect.bindDepartments(annDeptSelect);
 const modalStatus       = document.getElementById('modal-status');
 const modalActionInput  = document.getElementById('modal-action');
 const modalIdInput      = document.getElementById('modal-announcement-id');
@@ -1186,7 +1190,7 @@ function openEditModal(btn) {
 
     const contentTpl = document.getElementById(btn.dataset.contentId);
     if (contentTpl) {
-        modalQuill.root.innerHTML = contentTpl.innerHTML;
+        modalQuill.loadHtml(contentTpl.innerHTML);
     }
 
     if (btn.dataset.image) {
@@ -1371,7 +1375,7 @@ window.GncAnnouncementForm.init({quill: modalQuill});
 openCreateModal();
 <?php if (!empty($flashErrors)): ?>
 modalTitleInput.value = <?= json_encode($flashOld['title'] ?? '') ?>;
-modalQuill.root.innerHTML = <?= json_encode($flashOld['content'] ?? '') ?>;
+modalQuill.loadHtml(<?= json_encode($flashOld['content'] ?? '') ?>);
 if (modalCategory) modalCategory.setSelected(<?= json_encode($flashOld['category_ids'] ?? (!empty($flashOld['category_id']) ? [$flashOld['category_id']] : [])) ?>);
 if (annDeptSelect) annDeptSelect.setSelected(<?= json_encode($modalAudience['dept_ids'] ?? []) ?>);
 if (annProgSelect) annProgSelect.setSelected(<?= json_encode($modalAudience['programs'] ?? []) ?>);
@@ -1385,7 +1389,7 @@ modalIdInput.value = <?= json_encode($modalEditing['announcement_id'] ?? ($_GET[
 modalLabel.textContent = 'Edit Announcement';
 modalSaveLabel.textContent = 'Save Changes';
 modalTitleInput.value = <?= json_encode($modalEditing['title'] ?? '') ?>;
-modalQuill.root.innerHTML = <?= json_encode($modalEditing['content'] ?? '') ?>;
+modalQuill.loadHtml(<?= json_encode($modalEditing['content'] ?? '') ?>);
 if (modalCategory) modalCategory.setSelected(<?= json_encode($modalEditing['category_ids'] ?? (!empty($modalEditing['category_id']) ? [$modalEditing['category_id']] : [])) ?>);
 if (annDeptSelect) annDeptSelect.setSelected(<?= json_encode($modalAudience['dept_ids'] ?? []) ?>);
 if (annProgSelect) annProgSelect.setSelected(<?= json_encode($modalAudience['programs'] ?? []) ?>);

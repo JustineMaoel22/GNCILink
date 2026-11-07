@@ -1,0 +1,13 @@
+.ql-toolbar.ql-snow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+.ql-toolbar.ql-snow .ql-formats { margin-right: 10px; }
+.ql-toolbar.ql-snow button.ql-active,
+.ql-toolbar.ql-snow .ql-picker-label.ql-active { background: #edf5ef; border-radius: 4px; }
+.ql-toolbar.ql-snow :is(button, .ql-picker-label):focus-visible { outline: 2px solid #1f5e2c; outline-offset: 2px; }
+.ql-snow .ql-tooltip { z-index: 2; max-width: 100%; white-space: normal; }
+.ql-snow .ql-tooltip input[type=text] { max-width: 100%; }
+#ann-preview-message.cms-rich { white-space: normal; }
+@media (pointer: coarse) {
+    .ql-toolbar.ql-snow button { width: 44px; height: 44px; }
+    .ql-toolbar.ql-snow .ql-picker-label { min-height: 44px; display: flex; align-items: center; }
+    .ql-toolbar.ql-snow .ql-picker-item { min-height: 44px; display: flex; align-items: center; }
+}

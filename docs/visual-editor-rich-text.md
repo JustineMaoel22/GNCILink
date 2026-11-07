@@ -12,6 +12,19 @@ introductions, program descriptions and item bodies, and organization pages
 including leadership callouts. Existing section editors, news, and announcement
 editors retain their rich-text tools. Changes use the existing Publish workflow.
 
+News and Announcements share `assets/js/admin-rich-text.js` and retain the Quill
+toolbar. Saved HTML is loaded through Quill's clipboard/document API; form data
+is synchronized with the editor. Heading 1, strikethrough, and alignment survive
+the shared HTML sanitizer, reopening and safe previews. Public articles style
+Quill alignment classes without loading editor UI styles. No migration is needed.
+
+Validation: `php tests/admin-rich-text-test.php` checks safe formatting and legacy
+plain text; `php tests/admin-rich-text-storage-test.php` checks create/edit/publish
+using connection-local temporary tables. `node tests/admin-rich-text-browser-test.cjs`
+checks every toolbar control and previews in the actual News and Announcement
+modals at desktop, tablet and mobile widths, without saving content. The browser
+test requires the local Docker site and Chrome.
+
 Select words in any editable text field, then choose **Font size** or **Font color**.
 Sizes include 12, 14, 16, 18, 20, 24, 32, 36 and 48px, plus custom values from
 8–200px. Colors include presets, a color picker and custom HEX values. **Default

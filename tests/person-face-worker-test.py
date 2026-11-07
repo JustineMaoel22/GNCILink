@@ -14,6 +14,15 @@ import numpy as np
 spec = importlib.util.spec_from_file_location('face_worker', Path(__file__).parents[1] / 'scripts/person-face-check.py')
 worker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(worker)
+assert worker.cosine_score(1.0000000810496772) == 1.0
+assert worker.cosine_score(-1.0000000810496772) == -1.0
+assert worker.cosine_score(.55) == .55
+for invalid in [1.001, -1.001, float('nan'), float('inf')]:
+    try:
+        worker.cosine_score(invalid)
+        raise AssertionError('Invalid similarity accepted')
+    except ValueError:
+        pass
 with tempfile.TemporaryDirectory() as directory:
     root = Path(directory)
     image = cv2.imdecode(np.fromfile(args.portrait, dtype=np.uint8), cv2.IMREAD_COLOR)
@@ -28,11 +37,14 @@ with tempfile.TemporaryDirectory() as directory:
     cv2.imwrite(str(root / 'blank.jpg'), np.full((320, 320, 3), 255, dtype=np.uint8))
     profiles = [{'profile_key': key, 'path': str(root / filename)} for key, filename in [
         ('resized', 'different-name.jpg'), ('crop', 'cropped.jpg'), ('blank', 'blank.jpg')]]
+    profiles.append({'profile_key': 'identical', 'path': str(args.portrait)})
     result = worker.compare({'image': str(args.portrait), 'profiles': profiles}, args.models)
     assert result['complete'] and result['faces'] == 1, result
     assert result['scores']['resized'] >= .55, result
     assert result['scores']['crop'] >= .55, result
     assert result['scores']['blank'] == -1, result
+    assert .99 <= result['scores']['identical'] <= 1, result
+    assert all(-1 <= score <= 1 for score in result['scores'].values()), result
     blank = worker.compare({'image': str(root/'blank.jpg'), 'profiles': profiles}, args.models)
     assert blank['faces'] == 0 and blank['scores'] == {}, blank
     group = np.concatenate([image, image], axis=1)

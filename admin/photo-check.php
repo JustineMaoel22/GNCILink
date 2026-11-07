@@ -12,8 +12,9 @@ require_once __DIR__ . '/settings-functions.php';
  *   - storeDepartmentUpload() in admin-functions.php -> server-side backstop,
  *     so the check can't be skipped by bypassing the browser.
  *
- * Setup: none needed if config.php already defines GEMINI_API_KEY (it reads it from
- * .env, as the chatbot does). The model defaults to gemini-3.5-flash-lite; override PHOTO_CHECK_MODEL in .env.
+ * Setup: set PHOTO_CHECK_API_KEY in .env or config/secrets.php for a dedicated
+ * image-validation key. Existing GEMINI_API_KEY remains a compatibility fallback.
+ * The model defaults to gemini-3.5-flash-lite; override PHOTO_CHECK_MODEL in .env.
  * Optional (config.php):
  *     define('PHOTO_CHECK_MODEL', 'gemini-3.5-flash-lite');  // use a different model just for this check
  *     define('PHOTO_CHECK_BLOCK_AI', true);              // false = AI photos are not blocked
@@ -25,7 +26,9 @@ require_once __DIR__ . '/settings-functions.php';
  * is fairly confident about are blocked.
  */
 
-// Reuses the GEMINI_API_KEY / GEMINI_MODEL / GEMINI_TIMEOUT already defined in config.php (from .env).
+if (!defined('PHOTO_CHECK_API_KEY')) define('PHOTO_CHECK_API_KEY', function_exists('env')
+    ? env('PHOTO_CHECK_API_KEY', defined('GEMINI_API_KEY') ? GEMINI_API_KEY : '')
+    : (getenv('PHOTO_CHECK_API_KEY') ?: (defined('GEMINI_API_KEY') ? GEMINI_API_KEY : '')));
 if (!defined('PHOTO_CHECK_MODEL')) define('PHOTO_CHECK_MODEL', function_exists('env') ? env('PHOTO_CHECK_MODEL', 'gemini-3.5-flash-lite') : 'gemini-3.5-flash-lite');
 if (!defined('PHOTO_CHECK_BLOCK_AI')) define('PHOTO_CHECK_BLOCK_AI', true);
 // Backup models tried (in order) when the main model is overloaded (HTTP 503/429/500) or times out.
@@ -49,7 +52,7 @@ const PHOTO_CHECK_MSG_NOT_PERSON = 'This image is not a person. Please upload a 
 const PHOTO_CHECK_MSG_AI         = 'This image appears to be AI-generated. Please upload a camera photo of the person.';
 
 function photoCheckConfigured(): bool {
-    return defined('GEMINI_API_KEY') && !empty(GEMINI_API_KEY);
+    return trim((string)PHOTO_CHECK_API_KEY) !== '';
 }
 
 /**
@@ -143,7 +146,7 @@ function photoCheckImage(string $path): array {
                 'detail' => 'AI label found in the file metadata: ' . $marker];
     }
 
-    if (!photoCheckConfigured()) return $skip('GEMINI_API_KEY is empty or not defined');
+    if (!photoCheckConfigured()) return $skip('Image-validation API key is not configured');
     if (!function_exists('curl_init')) return $skip('The PHP cURL extension is not installed');
     if (!empty($_SESSION['photo_check_down_until']) && time() < $_SESSION['photo_check_down_until']) {
         return $skip('skipped: the Gemini call failed a moment ago, retrying in ' . ($_SESSION['photo_check_down_until'] - time()) . 's (' . ($_SESSION['photo_check_down_why'] ?? '') . ')');
@@ -217,7 +220,7 @@ TXT;
                 CURLOPT_TIMEOUT        => min($remaining, max(5, defined('GEMINI_TIMEOUT') ? (int)GEMINI_TIMEOUT : 20)),
                 CURLOPT_HTTPHEADER     => [
                     'content-type: application/json',
-                    'x-goog-api-key: ' . GEMINI_API_KEY,
+                    'x-goog-api-key: ' . trim((string)PHOTO_CHECK_API_KEY),
                 ],
             ]);
             $body   = curl_exec($ch);

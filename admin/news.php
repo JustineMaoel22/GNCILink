@@ -804,7 +804,7 @@ function openEditModal(btn) {
 
     const contentTpl = document.getElementById(btn.dataset.contentId);
     if (contentTpl) {
-        modalQuill.root.innerHTML = contentTpl.innerHTML;
+        modalQuill.loadHtml(contentTpl.innerHTML);
     }
 
     if (btn.dataset.image) {
@@ -907,7 +907,7 @@ window.GncAnnouncementForm.init({quill: modalQuill, kind: 'news'});
 openCreateModal();
 <?php if (!empty($flashErrors)): ?>
 modalTitleInput.value = <?= $newsJson($flashOld['title'] ?? '') ?>;
-modalQuill.root.innerHTML = <?= $newsJson(sectionToEditorHtml($flashOld['content'] ?? '')) ?>;
+modalQuill.loadHtml(<?= $newsJson(sectionToEditorHtml($flashOld['content'] ?? '')) ?>);
 modalAuthorInput.value = <?= $newsJson($flashOld['author'] ?? '') ?>;
 selectNewsCategory(<?= $newsJson($flashOld['category'] ?? 'Others') ?>);
 if (modalStatus) modalStatus.value = <?= $newsJson($flashOld['status'] ?? 'draft') ?>;
@@ -920,7 +920,7 @@ modalIdInput.value = <?= $newsJson($modalEditing['news_id'] ?? ($_GET['id'] ?? '
 modalLabel.textContent = 'Edit Article';
 modalSaveLabel.textContent = 'Save Changes';
 modalTitleInput.value = <?= $newsJson($modalEditing['title'] ?? '') ?>;
-modalQuill.root.innerHTML = <?= $newsJson(sectionToEditorHtml($modalEditing['content'] ?? '')) ?>;
+modalQuill.loadHtml(<?= $newsJson(sectionToEditorHtml($modalEditing['content'] ?? '')) ?>);
 modalAuthorInput.value = <?= $newsJson($modalEditing['author'] ?? '') ?>;
 selectNewsCategory(<?= $newsJson($modalEditing['category'] ?? 'Others') ?>, true);
 if (modalStatus) modalStatus.value = <?= $newsJson($modalEditing['status'] ?? 'draft') ?>;

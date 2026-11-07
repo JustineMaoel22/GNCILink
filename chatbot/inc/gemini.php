@@ -14,9 +14,11 @@ declare(strict_types=1);
  */
 function gncbot_gemini_generate(string $systemInstruction, array $contents): array
 {
-    $key = function_exists('env') ? env('GEMINI_API_KEY') : (getenv('GEMINI_API_KEY') ?: ($_ENV['GEMINI_API_KEY'] ?? null));
+    $key = defined('CHATBOT_API_KEY') ? CHATBOT_API_KEY : (function_exists('env')
+        ? env('CHATBOT_API_KEY', env('GEMINI_API_KEY', ''))
+        : (getenv('CHATBOT_API_KEY') ?: ($_ENV['CHATBOT_API_KEY'] ?? (getenv('GEMINI_API_KEY') ?: ($_ENV['GEMINI_API_KEY'] ?? null)))));
     if (!is_string($key) || trim($key) === '') {
-        error_log('[gncbot] GEMINI_API_KEY is not set');
+        error_log('[gncbot] Chatbot API key is not configured');
         return ['ok' => false, 'error' => 'not_configured'];
     }
     $key   = trim($key);

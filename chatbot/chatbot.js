@@ -31,6 +31,42 @@
 
   var endpoint = root.getAttribute('data-endpoint') || '/chatbot/chatbot.php';
   var state = { messages: [], busy: false, open: false, ctrl: null, typingNode: null };
+  var mascot = el.launcher.querySelector('.gncbot-mascot');
+  if (mascot && mascot.dataset.activeSrc) {
+    var activeMascotPreload = new Image();
+    activeMascotPreload.src = mascot.dataset.activeSrc;
+  }
+  var gazeMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  var gazePointer = matchMedia('(any-pointer: fine)');
+  var gazeFrame = 0, gazeX = 0, gazeY = 0;
+  function resetMascotGaze() {
+    if (gazeFrame) { cancelAnimationFrame(gazeFrame); gazeFrame = 0; }
+    root.classList.remove('gncbot-tracking');
+    root.style.removeProperty('--gb-look-x');
+    root.style.removeProperty('--gb-look-y');
+    root.style.removeProperty('--gb-look-tilt');
+  }
+  function renderMascotGaze() {
+    gazeFrame = 0;
+    if (state.open || document.hidden || gazeMotion.matches || !gazePointer.matches) { resetMascotGaze(); return; }
+    var bounds = el.launcher.getBoundingClientRect();
+    var x = Math.max(-1, Math.min(1, (gazeX - bounds.left - bounds.width / 2) / Math.max(1, innerWidth * .4)));
+    var y = Math.max(-1, Math.min(1, (gazeY - bounds.top - bounds.height / 2) / Math.max(1, innerHeight * .4)));
+    root.style.setProperty('--gb-look-x', (x * 2).toFixed(2) + 'px');
+    root.style.setProperty('--gb-look-y', (y * 1.5).toFixed(2) + 'px');
+    root.style.setProperty('--gb-look-tilt', (x * 3).toFixed(2) + 'deg');
+    root.classList.add('gncbot-tracking');
+  }
+  document.addEventListener('pointermove', function (event) {
+    if (event.pointerType !== 'mouse' || state.open || gazeMotion.matches || !gazePointer.matches) { return; }
+    gazeX = event.clientX; gazeY = event.clientY;
+    if (!gazeFrame) { gazeFrame = requestAnimationFrame(renderMascotGaze); }
+  }, { passive: true });
+  document.documentElement.addEventListener('pointerleave', resetMascotGaze);
+  window.addEventListener('blur', resetMascotGaze);
+  document.addEventListener('visibilitychange', resetMascotGaze);
+  gazeMotion.addEventListener('change', resetMascotGaze);
+  gazePointer.addEventListener('change', resetMascotGaze);
   var consentKey = 'gncbot.ai-consent.v1', agreed = false;
   try { agreed = sessionStorage.getItem(consentKey) === 'yes'; } catch (e) { /* keep consent in memory if storage is unavailable */ }
   var consent = root.querySelector('.gncbot-consent'), agreeButton = root.querySelector('.gncbot-agree');
@@ -274,8 +310,10 @@
   }
 
   function setOpen(open) {
+    resetMascotGaze();
     clearTimeout(closeTimer);
     state.open = open;
+    if (mascot) { mascot.src = open ? mascot.dataset.activeSrc : mascot.dataset.idleSrc; }
     el.launcher.setAttribute('aria-expanded', open ? 'true' : 'false');
     el.launcher.setAttribute('aria-label', open ? 'Close chat with Cian' : 'Open chat with Cian');
     if (open) {

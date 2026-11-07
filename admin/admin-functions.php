@@ -233,6 +233,27 @@ function getProgramCategories(): array {
     return $cache;
 }
 
+/** Department membership comes from the same records managed by the Content Editor. */
+function getProgramDepartmentMap(): array {
+    static $map = null;
+    if ($map === null) {
+        $map = array_column(getDB()->query('SELECT program_code, dept_id FROM programs')->fetchAll(PDO::FETCH_ASSOC), 'dept_id', 'program_code');
+    }
+    return $map;
+}
+
+/** Reject programs outside the selected departments, including direct POST requests. */
+function validateMultiAudienceProgramDepartments(array $audience): void {
+    if (empty($audience['dept_ids']) || empty($audience['programs'])) return;
+    $departments = array_map('intval', $audience['dept_ids']);
+    $programDepartments = getProgramDepartmentMap();
+    foreach ($audience['programs'] as $code) {
+        if (!isset($programDepartments[$code]) || !in_array((int)$programDepartments[$code], $departments, true)) {
+            throw new InvalidArgumentException('Choose programs in the selected departments, or leave Programs on all programs.');
+        }
+    }
+}
+
 /** Announcement choices exclude Basic Education tracks; use their department instead. */
 function getAnnouncementProgramCategories(): array {
     static $cache = null;
@@ -420,6 +441,8 @@ function createAnnouncement(array $data): ?int {
         $status = rbacIsSuper()
                 ? $data['status'] ?? 'draft' 
                 : 'pending';
+
+        $publishedAt = $status === 'published' ? gmdate('Y-m-d H:i:s') : null;
         
         $program = normalizeProgramCategory($data['program'] ?? null);
         $deptId  = normalizeAnnouncementDept($data['dept_id'] ?? null);
@@ -430,8 +453,8 @@ function createAnnouncement(array $data): ?int {
 
         $stmt = $db->prepare("
             INSERT INTO announcements 
-            (user_id, title, slug, content, category_id, program, dept_id, featured_image, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            (user_id, title, slug, content, category_id, program, dept_id, featured_image, status, published_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())
         ");
         
         $result = $stmt->execute([
@@ -443,7 +466,8 @@ function createAnnouncement(array $data): ?int {
             $program,
             $deptId,
             $data['featured_image'] ?? null,  // Use featured_image instead of media_id
-            $status
+            $status,
+            $publishedAt
         ]);
         
         if (!$result) {
@@ -497,6 +521,11 @@ function updateAnnouncement(int $id, array $data): bool {
         
         $slug = uniqueContentSlug('announcements', 'announcement_id', $data['title'], $id);
         $status = isset($data['status']) ? $data['status'] : $announcement['status'];
+        // Record the first explicit publication; later edits keep that timestamp.
+        $publishedAt = $announcement['published_at'] ?? null;
+        if ($status === 'published' && empty($publishedAt)) {
+            $publishedAt = gmdate('Y-m-d H:i:s');
+        }
 
         // Handle featured_image - only update if new media was provided or removal was requested
         $featuredImage = $announcement['featured_image'];
@@ -516,7 +545,7 @@ function updateAnnouncement(int $id, array $data): bool {
         if ($ownsTransaction) $db->beginTransaction();
         $stmt = $db->prepare("
             UPDATE announcements
-            SET title = ?, slug = ?, content = ?, category_id = ?, program = ?, dept_id = ?, featured_image = ?, status = ?, updated_at = NOW()
+            SET title = ?, slug = ?, content = ?, category_id = ?, program = ?, dept_id = ?, featured_image = ?, status = ?, published_at = ?, updated_at = UTC_TIMESTAMP()
             WHERE announcement_id = ?
         ");
         
@@ -529,6 +558,7 @@ function updateAnnouncement(int $id, array $data): bool {
             $deptId,
             $featuredImage,
             $status,
+            $publishedAt,
             $id
         ]);
         
@@ -1087,13 +1117,13 @@ function createNews(array $data): ?int {
                 ? $data['status'] ?? 'draft'
                 : 'pending';
 
-        $publishedAt = $status === 'published' ? date('Y-m-d H:i:s') : null;
+        $publishedAt = $status === 'published' ? gmdate('Y-m-d H:i:s') : null;
         $category = normalizeNewsCategory($data['category'] ?? null);
 
         $stmt = $db->prepare("
             INSERT INTO news
             (user_id, category, title, slug, content, author, featured_image, status, published_at, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())
         ");
 
         $result = $stmt->execute([
@@ -1167,12 +1197,12 @@ function updateNews(int $id, array $data): bool {
         // leave it alone on subsequent edits so the original publish date sticks.
         $publishedAt = $news['published_at'];
         if ($status === 'published' && empty($publishedAt)) {
-            $publishedAt = date('Y-m-d H:i:s');
+            $publishedAt = gmdate('Y-m-d H:i:s');
         }
 
         $stmt = $db->prepare("
             UPDATE news
-            SET title = ?, slug = ?, content = ?, author = ?, category = ?, featured_image = ?, status = ?, published_at = ?, updated_at = NOW()
+            SET title = ?, slug = ?, content = ?, author = ?, category = ?, featured_image = ?, status = ?, published_at = ?, updated_at = UTC_TIMESTAMP()
             WHERE news_id = ?
         ");
 

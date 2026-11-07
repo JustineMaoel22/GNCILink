@@ -551,7 +551,7 @@ function na_url(array $overrides = []): string {
     <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
-    <?php $activeSection = 'news-and-announcement'; ?>
+    <?php $activeSection = 'news-and-announcement'; $pageEntranceTitle = 'News and Announcement'; ?>
     <?php include_once __DIR__ . '/../components/navbar.php'; ?>
 
     <section class="newsannouncement-intro">

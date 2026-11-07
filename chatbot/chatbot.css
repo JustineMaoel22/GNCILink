@@ -21,15 +21,19 @@
 }
 .gncbot-launcher:hover { transform: translateY(-3px); }
 .gncbot-mascot { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(9, 64, 36, .22)); }
+.gncbot-mascot { transform: translate(var(--gb-look-x, 0px), var(--gb-look-y, 0px)) rotate(var(--gb-look-tilt, 0deg)); transition: transform .12s ease-out; transform-origin: 50% 75%; }
+@media (prefers-reduced-motion: reduce) {
+  .gncbot-mascot { transform: none; transition: none; }
+}
 .gncbot-launcher:focus-visible, .gncbot-iconbtn:focus-visible, .gncbot-send:focus-visible, .gncbot-chip:focus-visible,
 .gncbot-input:focus-visible, .gncbot-retry:focus-visible { outline: 3px solid var(--gb-gold); outline-offset: 2px; }
 .gncbot-launcher-label { position: absolute; right: calc(100% + 8px); padding: 8px 12px; border-radius: 10px; color: #fff; background: var(--gb-dark); font-weight: 600; font-size: 14px; white-space: nowrap; opacity: 0; pointer-events: none; }
 .gncbot-launcher:hover .gncbot-launcher-label, .gncbot-launcher:focus-visible .gncbot-launcher-label { opacity: 1; }
 .gncbot-ico-close { display: none; }
-.gncbot.is-open .gncbot-ico-chat { display: none; }
-.gncbot.is-open .gncbot-ico-close { display: block; }
+.gncbot.is-open .gncbot-ico-chat { display: block; }
+.gncbot.is-open .gncbot-ico-close { display: block; position: absolute; right: -2px; bottom: -2px; width: 20px; height: 20px; padding: 3px; border-radius: 50%; background: var(--gb-dark); }
 .gncbot.is-open .gncbot-launcher-label { display: none; }
-.gncbot.is-open .gncbot-launcher { width: 58px; height: 58px; border-radius: 50%; background: var(--gb-dark); box-shadow: 0 6px 20px rgba(9, 64, 36, .25); }
+.gncbot.is-open .gncbot-launcher { border-radius: 50%; background: transparent; box-shadow: none; }
 
 /* ---- panel ---- */
 .gncbot-panel {

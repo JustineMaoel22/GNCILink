@@ -1114,5 +1114,6 @@ include __DIR__ . '/../components/header-admin.php';
 </script>
 <?php endif; /* editor / list */ ?>
 
+<link rel="stylesheet" href="../assets/css/photo-check.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/photo-check.css') ?>">
 <script src="../assets/js/photo-check.js?v=<?= (int)filemtime(__DIR__ . '/../assets/js/photo-check.js') ?>"></script>
 <?php include __DIR__ . '/../components/footer-admin.php'; ?>

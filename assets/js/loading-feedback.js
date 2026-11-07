@@ -84,8 +84,8 @@
         const originalFetch = window.fetch;
         window.fetch = function (input, options) {
             const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url, location.href);
-            // Visitor analytics run in the background without user interaction.
-            if (url.pathname === '/api/track-visit.php') return originalFetch.apply(this, arguments);
+            // Analytics and editor presence run in the background without user interaction.
+            if (url.pathname === '/api/track-visit.php' || url.pathname === '/admin/action/editor-presence-handler.php') return originalFetch.apply(this, arguments);
             const method = String(options?.method || input?.method || 'GET').toUpperCase();
             const finish = begin(method === 'GET' || method === 'HEAD' ? 'Loading...' : 'Processing request...');
             try {

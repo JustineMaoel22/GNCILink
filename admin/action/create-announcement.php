@@ -257,6 +257,7 @@ if ($postAction === 'create' || $postAction === 'update') {
                 $_POST['dept_ids'] ?? ($_POST['dept_id'] ?? null),
                 $_POST['programs'] ?? ($_POST['program'] ?? null)
             );
+            validateMultiAudienceProgramDepartments($audience);
             $program = $audience['primary_program'];
             $deptId  = $audience['primary_dept_id'];
 

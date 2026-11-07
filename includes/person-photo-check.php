@@ -66,6 +66,7 @@ function personPhotoWorker(string $path, array $profiles): array {
             usleep(10000);
         } while (true);
         $out .= stream_get_contents($pipes[1]);
+        if ($out === '') throw new RuntimeException('Face worker exited without output (exit ' . (int)($status['exitcode'] ?? -1) . ', signal ' . (int)($status['termsig'] ?? 0) . ')');
         $result = json_decode($out, true, 32, JSON_THROW_ON_ERROR);
         if (!is_array($result) || ($result['complete'] ?? false) !== true) throw new RuntimeException('Incomplete comparison');
         return $result;
@@ -133,7 +134,14 @@ function personPhotoCheck(string $path, string $name, string $key = '', ?callabl
         }
         return $result;
     } catch (Throwable $e) {
-        error_log('Personnel face comparison unavailable');
+        // Log only known internal categories, never raw paths, SQL or user data.
+        $reason = $e->getMessage();
+        $safeReasons = ['Face runtime not configured', 'Face runtime unavailable', 'Face runtime limit', 'Incomplete comparison', 'Invalid comparison'];
+        if (!in_array($reason, $safeReasons, true)
+            && !preg_match('/\AFace worker exited without output \(exit -?\d+, signal \d+\)\z/', $reason)) {
+            $reason = $e instanceof JsonException ? 'Invalid worker JSON' : 'Comparison preparation failed';
+        }
+        error_log('Personnel face comparison unavailable: ' . $reason);
         return personPhotoUnavailable();
     }
 }

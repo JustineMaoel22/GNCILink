@@ -29,6 +29,8 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <link href="/assets/css/content-rich-text.css?v=<?= filemtime(__DIR__ . '/../assets/css/content-rich-text.css') ?>" rel="stylesheet">
+    <link href="/assets/css/admin-rich-text.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin-rich-text.css') ?>" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/header-admin-style.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/header-admin-style.css') ?>">
     <script src="/assets/js/admin-appearance.js?v=<?= (int)filemtime(__DIR__ . '/../assets/js/admin-appearance.js') ?>" data-user="<?= (int)$_SESSION['user_id'] ?>"></script>
     <link rel="stylesheet" href="/assets/css/admin-dialogs.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/admin-dialogs.css') ?>">

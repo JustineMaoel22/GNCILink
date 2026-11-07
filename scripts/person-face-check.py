@@ -1,8 +1,17 @@
 """One-shot, local YuNet/SFace comparison. Embeddings exist only in process memory."""
 import argparse
 import json
+import math
 from pathlib import Path
 import sys
+
+
+def cosine_score(value):
+    """SFace float32 dot products can overshoot +/-1 by a few ulps."""
+    score = float(value)
+    if not math.isfinite(score) or score < -1.000001 or score > 1.000001:
+        raise ValueError('Invalid cosine score')
+    return max(-1.0, min(1.0, score))
 
 
 def compare(payload, models):
@@ -41,7 +50,7 @@ def compare(payload, models):
             # A non-face legacy image cannot match a face; still count it as checked.
             scores[profile['profile_key']] = -1.0
             continue
-        scores[profile['profile_key']] = max(float(recognizer.match(candidate[0], face, cv2.FaceRecognizerSF_FR_COSINE)) for face in faces)
+        scores[profile['profile_key']] = max(cosine_score(recognizer.match(candidate[0], face, cv2.FaceRecognizerSF_FR_COSINE)) for face in faces)
     return {'complete': True, 'faces': 1, 'scores': scores}
 
 

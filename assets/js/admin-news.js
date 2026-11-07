@@ -23,16 +23,7 @@
         // Saved HTML is sanitized by renderSectionContent() on the server.
         // The draft uses a conservative DOM allowlist before rendering.
         previewMessage.replaceChildren();
-        const template = document.createElement('template'); template.innerHTML = item.html;
-        const allowed = new Set(['P','BR','STRONG','B','EM','I','U','S','UL','OL','LI','H1','H2','H3','H4','BLOCKQUOTE','A','SPAN','DIV','SUB','SUP']);
-        for (const node of [...template.content.querySelectorAll('*')].reverse()) {
-            if (['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','SVG','MATH'].includes(node.tagName)) { node.remove(); continue; }
-            if (!allowed.has(node.tagName)) { node.replaceWith(...node.childNodes); continue; }
-            const href = node.tagName === 'A' ? node.getAttribute('href') : null;
-            for (const attr of [...node.attributes]) node.removeAttribute(attr.name);
-            if (href) { try { const url = new URL(href, location.origin); if (['http:','https:','mailto:','tel:'].includes(url.protocol)) { node.href = url.href; node.target = '_blank'; node.rel = 'noopener noreferrer'; } } catch {} }
-        }
-        previewMessage.append(template.content);
+        previewMessage.innerHTML = GncRichText.previewHtml(item.html);
         edit.hidden = draft || !item.canEdit;
         if (draft) document.getElementById('newsModal').append(dialog);
         dialog.showModal();

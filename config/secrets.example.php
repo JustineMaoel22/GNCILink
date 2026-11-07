@@ -3,6 +3,10 @@
 // secrets.php is ignored by Git. Do not upload these placeholder values as credentials.
 // Entries here override .env; omit entries that should continue using .env.
 return [
+    // Uncomment and fill these to use independent Google Gemini credentials.
+    // 'CHATBOT_API_KEY' => 'YOUR_CHATBOT_API_KEY',
+    // 'PHOTO_CHECK_API_KEY' => 'YOUR_IMAGE_VALIDATION_API_KEY',
+    // GEMINI_API_KEY remains the legacy fallback for either omitted key.
     'DB_HOST' => 'YOUR_HOSTED_DATABASE_HOST',
     'DB_NAME' => 'YOUR_HOSTED_DATABASE_NAME',
     'DB_USER' => 'YOUR_HOSTED_DATABASE_USER',

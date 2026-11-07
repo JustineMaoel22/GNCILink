@@ -6,6 +6,7 @@
     const dialog = document.getElementById('ann-preview-dialog');
     const records = new Map(JSON.parse(source.textContent).map(item => [String(item.id), item]));
     let trigger;
+    const previewHome = dialog.parentNode;
     page.querySelectorAll('[data-preview-id]').forEach(button => {
         button.addEventListener('click', () => {
             const item = records.get(button.dataset.previewId);
@@ -13,7 +14,7 @@
             trigger = button;
             document.getElementById('ann-preview-title').textContent = item.title;
             document.getElementById('ann-preview-meta').textContent = `${item.author || 'Former account'} · ${item.created} · Website: ${item.status}`;
-            document.getElementById('ann-preview-message').textContent = item.text;
+            document.getElementById('ann-preview-message').innerHTML = GncRichText.previewHtml(item.html);
             const images = document.getElementById('ann-preview-images');
             images.replaceChildren();
             item.images.forEach(path => {
@@ -28,7 +29,7 @@
     });
     dialog.querySelector('[data-ann-preview-close]').addEventListener('click', () => dialog.close());
     dialog.addEventListener('keydown', event => {if (event.key === 'Escape') {event.preventDefault(); dialog.close();}});
-    dialog.addEventListener('close', () => trigger?.focus());
+    dialog.addEventListener('close', () => { previewHome.append(dialog); trigger?.focus(); });
     dialog.addEventListener('click', event => {
         if (event.target !== dialog) return;
         const r = dialog.getBoundingClientRect();
@@ -63,8 +64,9 @@
         trigger = event.currentTarget;
         document.getElementById('ann-preview-title').textContent = document.getElementById('modal-title').value.trim() || 'Untitled announcement';
         document.getElementById('ann-preview-meta').textContent = 'Unsaved content preview';
-        document.getElementById('ann-preview-message').textContent = document.querySelector('#modal-content-editor .ql-editor')?.innerText || 'No message entered yet.';
+        document.getElementById('ann-preview-message').innerHTML = GncRichText.previewHtml(document.querySelector('#modal-content-editor .ql-editor')?.innerHTML || '<p>No message entered yet.</p>');
         document.getElementById('ann-preview-images').replaceChildren();
+        document.getElementById('announcementModal').append(dialog);
         dialog.showModal();dialog.querySelector('[data-ann-preview-close]').focus();
     });
     filters.addEventListener('submit', () => {

@@ -1,12 +1,12 @@
 <?php
 /** Shared safe rich-text storage and rendering, independent of database helpers. */
 function richTextLooksLikeHtml(string $s): bool {
-    return (bool)preg_match('#<(p|br|h[2-4]|strong|em|u|ul|ol|li|a|blockquote)[\s>/]#i', $s);
+    return (bool)preg_match('#<(p|br|h[1-4]|strong|em|u|s|strike|ul|ol|li|a|blockquote)[\s>/]#i', $s);
 }
 
 /**
  * Clean HTML from the rich-text editor down to a safe allow-list:
- * paragraphs, headings (h2-h4), bold, italic, underline, lists, links,
+ * paragraphs, headings (h1-h4), bold, italic, underline, strikethrough, lists, links,
  * block quotes and text alignment. Everything else (scripts, styles,
  * event handlers, unknown tags, odd link types) is removed. Always run
  * this on the SERVER; never trust what the browser sends.
@@ -27,7 +27,7 @@ function richTextSanitize(string $html): string {
 
     $dropWithContent = ['script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'head', 'title', 'meta', 'link',
                         'noscript', 'template', 'form', 'input', 'textarea', 'select', 'button', 'audio', 'video', 'img'];
-    $aligned = ['p', 'h2', 'h3', 'h4', 'blockquote', 'li'];
+    $aligned = ['p', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'li'];
 
     $align = function (DOMElement $el): string {
         $a = '';
@@ -35,6 +35,8 @@ function richTextSanitize(string $html): string {
             $a = strtolower($m[1]);
         } elseif (in_array(strtolower((string)$el->getAttribute('align')), ['left', 'center', 'right', 'justify'], true)) {
             $a = strtolower($el->getAttribute('align'));
+        } elseif (preg_match('/(?:^|\s)ql-align-(center|right|justify)(?:\s|$)/', $el->getAttribute('class'), $m)) {
+            $a = $m[1];
         }
         return ($a !== '' && $a !== 'left') ? ' style="text-align:' . $a . '"' : '';
     };
@@ -55,6 +57,7 @@ function richTextSanitize(string $html): string {
 
             if ($tag === 'b') $tag = 'strong';
             if ($tag === 'i') $tag = 'em';
+            if ($tag === 'strike') $tag = 's';
             if ($tag === 'div') $tag = 'p';        // browsers add <div> for new lines
 
             if ($tag === 'a') {
@@ -66,7 +69,7 @@ function richTextSanitize(string $html): string {
                       . ($ext ? ' target="_blank" rel="noopener noreferrer"' : '') . '>' . $inner . '</a>';
                 continue;
             }
-            if (in_array($tag, ['p', 'h2', 'h3', 'h4', 'blockquote', 'ul', 'ol', 'li', 'strong', 'em', 'u'], true)) {
+            if (in_array($tag, ['p', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'ul', 'ol', 'li', 'strong', 'em', 'u', 's'], true)) {
                 $attr = in_array($tag, $aligned, true) ? $align($c) : '';
                 $class = trim($c->getAttribute('class'));
                 if (($tag === 'p' && $class === 'dept-offers-label') || ($tag === 'ul' && $class === 'dept-offers-list')) $attr .= ' class="' . $class . '"';

@@ -337,6 +337,9 @@ html:not(.gh-js) .timeline-subtitle::after { width: 100%; }
 .prose li { margin-bottom: .35rem; }
 .prose li[data-list="bullet"] { list-style: disc; } .prose li[data-list="ordered"] { list-style: decimal; }
 .prose .ql-ui { display: none; }
+.prose .ql-align-center { text-align: center; }
+.prose .ql-align-right { text-align: right; }
+.prose .ql-align-justify { text-align: justify; }
 .prose blockquote { margin: 1.5rem 0; padding: .6rem 1.2rem; border-left: 4px solid var(--gold); background: rgba(233,185,60,.12); font-style: italic; border-radius: 0 8px 8px 0; }
 .prose img { display: block; margin: 1.5rem auto; border-radius: 10px; cursor: zoom-in; }
 .prose a { text-decoration-thickness: 1px; text-underline-offset: 3px; }

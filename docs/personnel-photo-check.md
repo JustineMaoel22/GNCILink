@@ -2,6 +2,12 @@
 
 Personnel portraits now have two independent checks: local face comparison and the existing optional AI-generated-image checker. Face comparison runs even when the optional AI checker is disabled. It uses OpenCV YuNet landmarks and SFace features, rather than filenames or whole-image hashes. It never sends images to an external face service. The pre-existing optional AI checker still uses its configured Gemini service.
 
+Use `PHOTO_CHECK_API_KEY` for Gemini image validation and `CHATBOT_API_KEY` for
+the chatbot, in the private `.env` or `config/secrets.php`. Each dedicated key
+overrides `GEMINI_API_KEY`; omitted/empty dedicated settings retain that legacy
+fallback for compatibility. The two features never fall back to each other's
+dedicated key. Local face comparison does not use either API key.
+
 ## Setup
 
 For the repository's Docker development environment, the web image installs Python, OpenCV and checksum-verified model files in `/opt/gnci-face`, and sets both configuration variables automatically. Apply image changes with `docker compose up -d --build --no-deps web`. This recreates only the web container; the database service and its data remain in place. Verify with `docker compose exec -T --user www-data web php tests/person-photo-runtime-test.php`. The first build downloads Python packages and the two model binaries plus their licenses; later builds reuse the image layers.
@@ -31,6 +37,12 @@ Use absolute paths. For Windows, set these to the environment's `Scripts/python.
 
 The feature fails closed if the runtime/models are missing, a present photo cannot be decoded, inference is incomplete, or processing exceeds 45 seconds. Missing legacy files that public pages already render as having no photograph are omitted with an explicit coverage notice. Replace them to restore full coverage; they cannot be compared until the images exist. Configure and smoke-test the runtime before deploying the PHP changes. There is no silent fallback to file hashes or AI guesses. The installed development runtime/models under `cache/face-*` are ignored by Git and are test artifacts, not production configuration.
 
+SFace scores within 0.000001 of the cosine bounds are clamped to [-1, 1]
+to handle floating-point rounding on identical portraits. Non-finite or materially
+out-of-range scores still fail closed. Private server logs distinguish worker
+exit, timeout, malformed output and invalid-score failures without exposing paths,
+photos or credentials to the browser.
+
 ## Editing and review
 
 Enter a full name, then choose a single-face JPG, PNG or WebP portrait. Administration people (including faculty entered as personnel cards), office heads, department heads and the homepage president share the same comparison inventory. Both conventional settings and visual-editor saves pass through server enforcement. Retained images are checked on profile saves, so changing a name cannot bypass the check. Restoring archived personnel/department records also checks their portraits. Existing published records are not automatically modified or retrospectively blocked by this change.
@@ -38,6 +50,14 @@ Enter a full name, then choose a single-face JPG, PNG or WebP portrait. Administ
 Possible matches show the uploaded portrait and matching profile images with both names. Cosine similarity >= 0.363 warns and requires acknowledgement in the upload UI. Scores >= 0.55 block saving; a Super Admin can review the comparison and confirm the assignment, or replace the photo. Content Editors must ask a Super Admin to open that profile and review it in their own session. Saving a draft does not publish blocked personnel changes.
 
 The comparison dialog shows the upload once and groups matches by the same normalized full-name rule used for cross-section identity reuse. Each matching person appears once, with a profile count when used in multiple sections. The highest-scoring image represents each group; server-side checks and review binding still cover every matching record.
+
+The comparison uses labeled photo cards side by side on desktop and stacked on
+mobile, with a separate notice for missing comparison coverage. Replace Photo
+is the primary action; available continue/review actions retain their existing
+permission rules. The body scrolls independently of the actions. Escape or Close
+clears the pending upload and returns focus without changing the other edits.
+Presentation styles live in `assets/css/photo-check.css`; detection thresholds,
+server enforcement and review authorization are unchanged.
 
 Reviews are recorded in the existing activity log. A review lasts 15 minutes in that Super Admin's session and is bound to the image's content hash, target record, entered name and current comparison inventory. Changing any of these requires a fresh review; losing the Super Admin role also invalidates it. A review does not bypass image-type, upload, single-face or existing AI-image validation. To review a retained photo after renaming a record, reselect that image so the comparison dialog can open. Personnel writes hold a MySQL advisory lock through the request to serialize comparisons and saves.
 

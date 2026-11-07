@@ -119,6 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 $_POST['dept_ids'] ?? ($_POST['dept_id'] ?? null),
                 $_POST['programs'] ?? ($_POST['program'] ?? null)
             );
+            validateMultiAudienceProgramDepartments($multiAudience);
             $program    = $multiAudience['primary_program'];
             $department = $multiAudience['primary_dept_id'];
             $audience   = ['dept_id' => $department, 'program' => $program, 'audience_group' => (!empty($_POST['audience_group']) ? $_POST['audience_group'] : 'all')];
@@ -1141,6 +1142,9 @@ document.addEventListener('DOMContentLoaded', function () {
         return ['value' => (string)$code, 'label' => $label, 'badge' => (string)$code];
     }, array_keys(array_diff_key($programCategories, ['ALL' => ''])), array_diff_key($programCategories, ['ALL' => '']))), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
+    const programDepartments = <?= json_encode(getProgramDepartmentMap(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    progSelectItems.forEach(item => { item.departmentId = String(programDepartments[item.value] ?? ''); });
+
     const evtDeptSelectEl = document.getElementById('event-dept-multiselect');
     const evtProgSelectEl = document.getElementById('event-program-multiselect');
 
@@ -1184,6 +1188,8 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
     }
+
+    if (evtProgSelect && evtDeptSelect) evtProgSelect.bindDepartments(evtDeptSelect);
 
     function resetForm() {
         form.reset();

@@ -25,7 +25,7 @@
             if ((raw.trim()[0] === '+' || digits.length > 10) && digits.startsWith('63')) digits = digits.slice(2);
             if (digits.startsWith('09')) digits = digits.slice(1);
         } else if (digits.length > 7 && digits.startsWith('045')) digits = digits.slice(3);
-        return digits.slice(0,type === 'landline' ? 7 : 10);
+        return digits;
     }
     function bind(source, options) {
         if (source.__contact) return source.__contact;
@@ -40,12 +40,24 @@
         var label = doc.createElement('label'); label.className = 'contact-extension'; label.textContent = 'Local Number / Extension';
         var extension = doc.createElement('input'); extension.type='text'; extension.inputMode='numeric'; extension.className='form-control'; extension.maxLength=6; extension.placeholder='e.g. 123'; label.appendChild(extension);
         var error = doc.createElement('p'); error.className='contact-error'; error.id='contact-error-'+(++serial); error.setAttribute('aria-live','polite');
-        input.setAttribute('aria-describedby',error.id); extension.setAttribute('aria-describedby',error.id);
+        var limitNotice = doc.createElement('p'); limitNotice.className='contact-error'; limitNotice.id=error.id+'-limit'; limitNotice.setAttribute('role','status'); limitNotice.setAttribute('aria-live','polite'); limitNotice.hidden=true;
+        input.setAttribute('aria-describedby',error.id+' '+limitNotice.id); extension.setAttribute('aria-describedby',error.id+' '+limitNotice.id);
         var legacy = doc.createElement('p'); legacy.className='contact-legacy';
         main.appendChild(prefix); main.appendChild(input);
-        wrapper.appendChild(types); wrapper.appendChild(main); wrapper.appendChild(label); wrapper.appendChild(legacy); wrapper.appendChild(error);
+        wrapper.appendChild(types); wrapper.appendChild(main); wrapper.appendChild(label); wrapper.appendChild(legacy); wrapper.appendChild(error); wrapper.appendChild(limitNotice);
         source.type = 'hidden'; source.after(wrapper);
         var type='mobile', buffers={}, original='', last='', untouched=true, buttons={};
+        function digitLimit(field) { return field===extension || extensionOnly ? 6 : type==='landline' ? 7 : 10; }
+        function clearLimitNotice() { limitNotice.textContent=''; limitNotice.hidden=true; }
+        function showLimitNotice(field) {
+            var limit=digitLimit(field), name=field===extension?'Extension':extensionOnly?'Local number':type==='landline'?'Landline number after 045':'Mobile number after +63';
+            limitNotice.textContent=name+' allows a maximum of '+limit+' digits. Remove or replace a digit before adding another.';
+            limitNotice.hidden=false;
+        }
+        function exceedsLimit(field, text) {
+            var selected=field.value.slice(field.selectionStart,field.selectionEnd).replace(/[^0-9]/g,'').length;
+            return field.value.replace(/[^0-9]/g,'').length-selected+String(text||'').replace(/[^0-9]/g,'').length>digitLimit(field);
+        }
         function render() {
             types.hidden=extensionOnly; label.hidden=extensionOnly || type !== 'landline'; prefix.hidden=extensionOnly;
             prefix.textContent=type === 'landline' ? '045-' : '+63-';
@@ -68,6 +80,7 @@
             return !message;
         }
         function emit() {
+            clearLimitNotice();
             untouched=false; legacy.hidden=true;
             var state=buffers[type], value=extensionOnly ? state.digits : state.digits ? (type==='landline'?'045-':'+63-')+format(state.digits,type) : '';
             if (!extensionOnly && type==='landline' && state.extension) value+=' loc. '+state.extension;
@@ -80,11 +93,12 @@
         });
         function update(raw, position) {
             var before=raw.slice(0,position).replace(/[^0-9]/g,'').length;
-            var rawDigits=raw.replace(/[^0-9]/g,''), digits=extensionOnly ? rawDigits.slice(0,6) : national(raw,type);
-            var removed=Math.max(0,rawDigits.length-(extensionOnly ? rawDigits.length : national(raw,type).length));
+            var rawDigits=raw.replace(/[^0-9]/g,''), normalized=extensionOnly ? rawDigits : national(raw,type), digits=normalized.slice(0,digitLimit(input));
+            var removed=Math.max(0,rawDigits.length-normalized.length);
             // Prefix removal affects the caret; discarded excess digits at the end do not.
             if (!extensionOnly && ((type==='mobile' && rawDigits.startsWith('09')) || (type==='landline' && rawDigits.startsWith('045')) || (raw.trim()[0]==='+' && rawDigits.startsWith('63')))) before=Math.max(0,before-removed);
             buffers[type].digits=digits; render(); emit();
+            if(normalized.length>digitLimit(input))showLimitNotice(input);
             var target=Math.min(before,digits.length), caret=0, seen=0;
             while(caret<input.value.length && seen<target) { if(/[0-9]/.test(input.value[caret]))seen++;caret++; }
             input.setSelectionRange(caret,caret);
@@ -103,8 +117,33 @@
             if(backward && input.value[position-1]==='-') {event.preventDefault();update(input.value.slice(0,position-2)+input.value.slice(position),position-2);}
             else if(forward && input.value[position]==='-') {event.preventDefault();update(input.value.slice(0,position)+input.value.slice(position+2),position);}
         });
-        extension.addEventListener('input',function () {extension.value=extension.value.replace(/[^0-9]/g,'').slice(0,6);buffers[type].extension=extension.value;emit();});
+        [input,extension].forEach(function (field) {
+            field.addEventListener('keydown',function (event) {
+                if(!event.ctrlKey && !event.metaKey && !event.altKey && /^[0-9]$/.test(event.key) && exceedsLimit(field,event.key)) {
+                    event.preventDefault();showLimitNotice(field);
+                }
+            });
+            field.addEventListener('beforeinput',function (event) {
+                if(event.inputType.startsWith('insert') && event.data && exceedsLimit(field,event.data)) {
+                    event.preventDefault();showLimitNotice(field);
+                }
+            });
+        });
+        extension.addEventListener('input',function () {
+            var digits=extension.value.replace(/[^0-9]/g,'');
+            extension.value=digits.slice(0,6);buffers[type].extension=extension.value;emit();
+            if(digits.length>6)showLimitNotice(extension);
+        });
+        extension.addEventListener('paste',function (event) {
+            event.preventDefault();
+            var pasted=event.clipboardData.getData('text').replace(/[^0-9]/g,''), start=extension.selectionStart, end=extension.selectionEnd;
+            var digits=extension.value.slice(0,start)+pasted+extension.value.slice(end);
+            extension.value=digits.slice(0,6);buffers[type].extension=extension.value;emit();
+            var caret=Math.min(start+pasted.length,extension.value.length);extension.setSelectionRange(caret,caret);
+            if(digits.length>6)showLimitNotice(extension);
+        });
         function refresh() {
+            clearLimitNotice();
             original=source.value; last=source.value; untouched=true; buffers={mobile:{digits:'',extension:''},landline:{digits:'',extension:''}};
             var parsed=extensionOnly ? (/^[0-9]{0,6}$/.test(original)?{type:'mobile',digits:original,extension:''}:null) : parse(original);
             type=parsed ? parsed.type : 'landline'; if(parsed)buffers[type]={digits:parsed.digits,extension:parsed.extension};

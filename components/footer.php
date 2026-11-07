@@ -192,6 +192,7 @@ if (!function_exists('gncResolvePopularUrl')) {
     </div>
 </footer>
 <?php include_once __DIR__ . '/privacy-controls.php'; ?>
+<?php include_once __DIR__ . '/visitor-feedback.php'; ?>
 
 <?php include_once __DIR__ . '/../chatbot/widget.php'; ?>
 

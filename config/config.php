@@ -130,6 +130,9 @@ require_once __DIR__ . '/../includes/image-upload.php';
 define('ALLOWED_IMAGE_TYPES', ['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 
 define('GEMINI_API_KEY', env('GEMINI_API_KEY', ''));
+// Dedicated keys override the legacy shared key independently.
+define('CHATBOT_API_KEY', env('CHATBOT_API_KEY', GEMINI_API_KEY));
+if (!defined('PHOTO_CHECK_API_KEY')) define('PHOTO_CHECK_API_KEY', env('PHOTO_CHECK_API_KEY', GEMINI_API_KEY));
 define('GEMINI_MODEL', $_ENV['GEMINI_MODEL'] ?? 'gemini-3.6-flash');
 define('GEMINI_FALLBACK_MODELS', $_ENV['GEMINI_FALLBACK_MODELS'] ?? 'gemini-2.5-flash,gemini-2.5-flash-lite');
 define('GEMINI_TIMEOUT', (int) env('GEMINI_TIMEOUT', 20));

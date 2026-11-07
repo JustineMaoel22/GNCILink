@@ -22,21 +22,31 @@
         return;
     }
     const openingTitle = overlay.dataset.openingTitle;
-    overlay.querySelector('span').textContent = openingTitle || document.title;
-    root.classList.add('gnc-shared-entrance');
-    function updateTitle() {
-        if (openingTitle) return;
+    // Cover the page while its heading is still being parsed. Never show a
+    // provisional document title and then replace it during the animation.
+    root.classList.add('gnc-entrance-pending');
+    function startEntrance() {
+        if (!overlay.isConnected) return;
+        if (motion.matches) { remove(); return; }
         const heading = document.querySelector('main h1, section h1, .hero-slideshow h1');
-        if (heading && heading.textContent.trim()) overlay.querySelector('span').textContent = heading.textContent.trim();
+        overlay.querySelector('span').textContent = openingTitle
+            || (heading && heading.textContent.trim()) || document.title;
+        root.classList.add('gnc-shared-entrance');
+        root.classList.remove('gnc-entrance-pending');
+        setTimeout(remove, 2000);
     }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', updateTitle, { once: true });
-    else updateTitle();
-    const remove = () => overlay.remove();
+    function remove() {
+        root.classList.remove('gnc-entrance-pending');
+        overlay.remove();
+        motion.removeEventListener('change', remove);
+    }
     overlay.addEventListener('animationend', event => {
         if (event.target === overlay) remove();
     });
     motion.addEventListener('change', remove, { once: true });
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startEntrance, { once: true });
+    else startEntrance();
     // Also clean up if animation events are suppressed or the tab is backgrounded.
-    setTimeout(() => { remove(); motion.removeEventListener('change', remove); }, 2000);
+    setTimeout(remove, 5000);
     window.addEventListener('pageshow', event => { if (event.persisted) remove(); });
 })();

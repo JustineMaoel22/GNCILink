@@ -40,29 +40,17 @@
     }
 
     // ── popup ──
-    var css = document.createElement('style');
-    css.textContent =
-        '.pc-back{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20000;display:flex;align-items:center;justify-content:center;padding:16px}' +
-        '.pc-box{background:#fff;color:#222;border-radius:12px;max-width:420px;width:100%;padding:24px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.35);font-family:inherit}' +
-        '.pc-icon{font-size:42px;line-height:1;margin-bottom:8px}' +
-        '.pc-box h2{font-size:20px;margin:0 0 8px}' +
-        '.pc-box p{margin:0 0 18px;color:#555;font-size:15px}' +
-        '.pc-btn{border:0;border-radius:8px;padding:9px 22px;font-size:15px;font-weight:600;background:#1f5e2c;color:#fff;cursor:pointer}' +
-        '.pc-spin{width:34px;height:34px;border:4px solid #ddd;border-top-color:#1f5e2c;border-radius:50%;margin:0 auto 12px;animation:pcs .8s linear infinite}' +
-        '@keyframes pcs{to{transform:rotate(360deg)}}';
-    document.head.appendChild(css);
-    css.textContent += '.pc-box{max-height:90vh;overflow:auto}.pc-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.pc-compare img{width:100%;height:150px;object-fit:contain;background:#f5f7f5;border-radius:8px}.pc-compare figcaption{overflow-wrap:anywhere;font-size:14px}.pc-compare figure{margin:0}.pc-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.pc-box textarea{width:100%;margin:8px 0}.pc-box .pc-secondary{background:#64716a}@media(prefers-reduced-motion:reduce){.pc-spin{animation:none}}';
-
-    var overlay = null, lastFocus = null;
-    css.textContent += '.pc-compare{align-items:start}.pc-existing{display:grid;gap:16px;align-content:start}';
+    var overlay = null, lastFocus = null, dismissComparison = null, activeNotice = null;
 
     function close() {
         if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
         overlay = null;
+        dismissComparison = null;
         if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) {} }
     }
 
     function open(html, withButton) {
+        if (activeNotice) { activeNotice.remove(); activeNotice = null; }
         close();
         lastFocus = document.activeElement;
         overlay = document.createElement('div');
@@ -76,12 +64,14 @@
     }
 
     function notice(text) {
+        if (activeNotice) activeNotice.remove();
         var n = document.createElement('div');
         n.setAttribute('role', 'status');
         n.style.cssText = 'position:fixed;right:16px;bottom:16px;max-width:380px;z-index:20001;background:#fff3cd;color:#664d03;' +
             'border:1px solid #ffecb5;border-radius:10px;padding:10px 14px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.2)';
         n.textContent = text;
         document.body.appendChild(n);
+        activeNotice = n;
         setTimeout(function () { if (n.parentNode) n.parentNode.removeChild(n); }, 12000);
     }
 
@@ -100,9 +90,9 @@
 
     document.addEventListener('keydown', function (event) {
         if (!overlay) return;
-        if (event.key === 'Escape') { event.preventDefault(); return; }
+        if (event.key === 'Escape') { event.preventDefault(); if (dismissComparison) dismissComparison(); return; }
         if (event.key !== 'Tab') return;
-        var items = overlay.querySelectorAll('button,textarea');
+        var items = overlay.querySelectorAll('button:not(:disabled),textarea:not(:disabled)');
         if (!items.length) { event.preventDefault(); return; }
         var first = items[0], last = items[items.length - 1];
         if (!overlay.contains(document.activeElement) || (event.shiftKey && document.activeElement === first)) { event.preventDefault(); last.focus(); }
@@ -110,12 +100,35 @@
     }, true);
 
     function compareWarning(res, file, person, accept, reject, review) {
-        open('<h2>Possible Duplicate Photo Detected</h2><p>' + esc(res.message) + '</p><p>Similarity is a screening result and does not prove identity.</p><div class="pc-results"></div><div class="pc-actions"></div>', false);
-        var results = overlay.querySelector('.pc-results');
+        open('<header class="pc-header"><span class="pc-warning-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.8 2.1 18a2 2 0 0 0 1.7 3h16.4a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></svg></span>' +
+            '<div><span class="pc-eyebrow">Photo verification</span><h2 id="pc-comparison-title">Possible Duplicate Photo Detected</h2>' +
+            '<p id="pc-comparison-description">This photo looks similar to an existing profile photo. Compare the photos before continuing.</p></div></header>' +
+            '<div class="pc-body"><div class="pc-results"></div>' +
+            '<aside class="pc-guidance"><strong>A similarity match is not proof of identity.</strong><p>Check the person\u2019s name and photo to make sure this assignment is correct.</p></aside>' +
+            '<div class="pc-coverage" hidden></div></div>' +
+            '<footer class="pc-footer"><p class="pc-action-help"></p><div class="pc-actions"></div></footer>', false);
+        var box = overlay.querySelector('.pc-box');
+        box.classList.add('pc-comparison');
+        box.removeAttribute('aria-label');
+        box.setAttribute('aria-labelledby', 'pc-comparison-title');
+        box.setAttribute('aria-describedby', 'pc-comparison-description');
+        var results = box.querySelector('.pc-results');
         if (res.coverage_notice) {
-            var coverage = document.createElement('p'); coverage.textContent = res.coverage_notice; results.appendChild(coverage);
+            var coverage = box.querySelector('.pc-coverage');
+            var heading = document.createElement('strong'), message = document.createElement('p');
+            heading.textContent = 'Some photos could not be compared';
+            message.textContent = res.coverage_notice;
+            coverage.append(heading, message); coverage.hidden = false;
         }
         var url = URL.createObjectURL(file);
+        var dismiss = document.createElement('button');
+        dismiss.type = 'button'; dismiss.className = 'pc-close';
+        dismiss.setAttribute('aria-label', 'Close photo comparison');
+        dismiss.textContent = '\u00d7';
+        dismissComparison = function () { URL.revokeObjectURL(url); reject(); };
+        dismiss.onclick = dismissComparison;
+        box.prepend(dismiss);
         var groups = new Map();
         (res.matches || []).forEach(function (match) {
             // Mirror the server's cross-section identity rule for presentation only.
@@ -125,44 +138,70 @@
             group.profiles.add(match.key);
             if (match.similarity > group.match.similarity) group.match = match;
         });
-        function portrait(image, name) {
-            var figure = document.createElement('figure'), img = document.createElement('img'), label = document.createElement('figcaption');
-            img.src = image; img.alt = name; label.textContent = name;
-            figure.appendChild(img); figure.appendChild(label);
+        function profileLabel(key) {
+            return {person:'Administration', office:'Office head', dean:'Department head', president:'Homepage president'}[String(key || '').split(':')[0]] || 'Personnel profile';
+        }
+        function portrait(image, name, heading, detail, isExisting) {
+            var figure = document.createElement('figure'), img = document.createElement('img'), caption = document.createElement('figcaption');
+            figure.className = 'pc-photo-card' + (isExisting ? ' pc-photo-match' : '');
+            var title = document.createElement('h3'); title.textContent = heading;
+            var frame = document.createElement('div'); frame.className = 'pc-photo-frame';
+            img.src = image; img.alt = heading + ': ' + name;
+            img.addEventListener('error', function () {
+                img.hidden = true;
+                var unavailable = document.createElement('span'); unavailable.className = 'pc-photo-unavailable';
+                unavailable.textContent = 'Photo unavailable'; frame.appendChild(unavailable);
+            }, { once:true });
+            frame.appendChild(img);
+            var fullName = document.createElement('strong'); fullName.textContent = name || 'Name not available';
+            var info = document.createElement('span'); info.className = 'pc-profile-info'; info.textContent = detail;
+            caption.append(fullName, info);
+            figure.append(title, frame, caption);
             return figure;
         }
         var row = document.createElement('div'); row.className = 'pc-compare';
         var uploaded = document.createElement('div'); uploaded.className = 'pc-upload';
-        uploaded.appendChild(portrait(url, person.name));
+        uploaded.appendChild(portrait(url, person.name, 'Uploaded Photo', profileLabel(person.key) + ' \u00b7 New upload', false));
         var existing = document.createElement('div'); existing.className = 'pc-existing';
         groups.forEach(function (group) {
-            var figure = portrait(group.match.image, group.match.name);
+            var locations = [...new Set([...group.profiles].map(profileLabel))].join(' \u00b7 ');
+            var figure = portrait(group.match.image, group.match.name, 'Existing Profile Photo', locations, true);
             if (group.profiles.size > 1) {
-                var count = document.createElement('small');
+                var count = document.createElement('small'); count.className = 'pc-profile-count';
                 count.textContent = 'Used in ' + group.profiles.size + ' profiles';
-                figure.appendChild(count);
+                figure.querySelector('figcaption').appendChild(count);
             }
             existing.appendChild(figure);
         });
-        row.appendChild(uploaded); row.appendChild(existing); results.appendChild(row);
-        function button(label, action) {
-            var b = document.createElement('button'); b.type = 'button'; b.className = 'pc-btn'; b.textContent = label;
-            b.onclick = function () { URL.revokeObjectURL(url); action(); };
-            overlay.querySelector('.pc-actions').appendChild(b);
+        row.append(uploaded, existing); results.appendChild(row);
+        function button(label, action, secondary) {
+            var b = document.createElement('button'); b.type = 'button'; b.className = 'pc-btn' + (secondary ? ' pc-secondary' : ' pc-primary'); b.textContent = label;
+            b.onclick = function () {
+                box.querySelectorAll('button').forEach(function (control) { control.disabled = true; });
+                dismissComparison = null;
+                URL.revokeObjectURL(url); action();
+            };
+            box.querySelector('.pc-actions').appendChild(b);
             return b;
         }
-        button('Replace photo', reject).focus();
-        if (res.ok) button('Continue after checking', accept);
+        var help = box.querySelector('.pc-action-help');
+        help.textContent = 'Replace the photo to choose a different image. Your other edits will be kept.';
+        button('Replace Photo', reject, false).focus();
+        if (res.ok) {
+            button('Continue After Checking', accept, true);
+            help.textContent = 'Replace the photo, or continue after verifying the person and assignment. This does not publish your changes.';
+        }
         if (!res.ok && res.can_review) {
-            button('Confirm reviewed assignment', review);
+            button('Confirm Reviewed Assignment', review, true);
+            help.textContent = 'Confirm only after checking the person and assignment. Your review is recorded; changes are not published yet.';
         }
         if (!res.ok && !res.can_review) {
-            var help = document.createElement('p'); help.textContent = 'Saving is blocked. Replace the photo or ask a Super Admin to open and review this profile.';
-            results.appendChild(help);
+            var permissions = document.createElement('aside'); permissions.className = 'pc-permission';
+            permissions.textContent = 'To keep this photo, ask a Super Admin to review this profile. You can replace it now.';
+            box.querySelector('.pc-body').appendChild(permissions);
         }
     }
 
-    // ── interception ──
     document.addEventListener('change', function (ev) {
         var input = ev.target;
         if (!isPersonInput(input)) return;

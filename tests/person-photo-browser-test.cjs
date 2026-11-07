@@ -35,6 +35,7 @@ async function until(fn, message) {
         document.getElementById('adm-person-photo').addEventListener('change',()=>accepted++);
         window.fetch=async (url,options)=>{requests.push(Object.fromEntries(options.body));return {json:async()=>window.reply};};`);
     await evaluate(fs.readFileSync(path.join(__dirname,'../assets/js/photo-check.js'),'utf8'));
+    await evaluate(`document.head.appendChild(Object.assign(document.createElement('style'),{textContent:${JSON.stringify(fs.readFileSync(path.join(__dirname,'../assets/css/photo-check.css'),'utf8'))}}));`);
     const pick = async reply => {
         await evaluate(`(()=>{window.reply=${JSON.stringify(reply)};const transfer=new DataTransfer();transfer.items.add(new File([Uint8Array.from(atob(window.portrait),c=>c.charCodeAt(0))],'portrait.jpg',{type:'image/jpeg'}));const input=document.getElementById('adm-person-photo');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
         await delay(100);
@@ -57,12 +58,22 @@ async function until(fn, message) {
     await pick({...blocked,matches:[...repeated,{...match,key:'person:9',name:'Another Person'}]});
     assert.equal(await evaluate('document.querySelectorAll(".pc-upload img").length'),1);
     assert.equal(await evaluate('document.querySelectorAll(".pc-existing img").length'),2);
-    await evaluate('document.querySelector(".pc-actions button").click()');
+    assert.equal(await evaluate('document.querySelector(".pc-close").getAttribute("aria-label")'),'Close photo comparison');
+    await evaluate('document.querySelector(".pc-close").click()');
+    assert.equal(await evaluate('document.querySelector(".pc-back")'),null);
+    assert.equal(await evaluate('document.getElementById("adm-person-photo").files.length'),0);
+    assert.equal(await evaluate('accepted'),0);
     await pick({...blocked,ok:true,can_review:false});
     assert.equal(await evaluate('accepted'),0);
     await evaluate('document.querySelectorAll(".pc-actions button")[1].click()');
     assert.equal(await evaluate('accepted'),1);
     await pick({...blocked,can_review:true,matches:repeated});
+    assert.equal(await evaluate('document.activeElement.textContent'),'Replace Photo','Recommended action receives focus');
+    assert.equal(await evaluate('document.querySelector(".pc-box").getAttribute("aria-labelledby")'),'pc-comparison-title');
+    await evaluate('document.querySelectorAll(".pc-actions button")[1].focus()');
+    await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+    await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+    assert.equal(await evaluate('document.activeElement.classList.contains("pc-close")'),true,'Tab stays inside the comparison');
     assert.equal(await evaluate('document.querySelector(".pc-box textarea")'),null);
     await evaluate(`window.reply={success:true,checked:true,ok:true,reviewed:true,reason:'duplicate_face'};
         document.querySelectorAll('.pc-actions button')[1].click();`);
@@ -75,14 +86,36 @@ async function until(fn, message) {
     await evaluate('document.querySelector(".pc-btn").click()');
     await pick({success:true,checked:true,ok:true,reason:'clear'});
     assert.equal(await evaluate('accepted'),3);
+    await evaluate('document.getElementById("adm-person-name").focus()');
+    await pick({...blocked,coverage_notice:'3 existing profile photos are missing and could not be compared.'});
+    assert.equal(await evaluate('document.querySelector(".pc-coverage").hidden'),false);
+    assert.equal(await evaluate('document.querySelector(".pc-coverage p").textContent'),'3 existing profile photos are missing and could not be compared.');
+    await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+    await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+    assert.equal(await evaluate('document.querySelector(".pc-back")'),null,'Escape safely cancels the selected upload');
+    assert.equal(await evaluate('document.activeElement.id'),'adm-person-name','Focus returns to the editor');
+    assert.equal(await evaluate('accepted'),3,'Dismissal never accepts an unchecked photo');
     // Capture the actual comparison layout at phone and desktop widths.
-    await pick({...blocked,can_review:true});
+    await pick({...blocked,can_review:true,matches:repeated.map(item=>({...item,name:'Existing Person'})),coverage_notice:'3 existing profile photos are missing and could not be compared.'});
     fs.mkdirSync(path.join(__dirname,'../cache/person-photo-tests'),{recursive:true});
-    for (const width of [390,1440]) {
+    for (const width of [390,768,1440]) {
         await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<500});
         assert.equal(await evaluate('document.querySelector(".pc-box").getBoundingClientRect().width <= innerWidth'),true);
+        assert.equal(await evaluate('document.querySelector(".pc-box").getBoundingClientRect().height <= innerHeight'),true);
+        assert.equal(await evaluate('document.querySelector(".pc-body").scrollWidth <= document.querySelector(".pc-body").clientWidth'),true,'Comparison has no horizontal overflow');
+        const positions=await evaluate('(()=>{const upload=document.querySelector(".pc-upload").getBoundingClientRect(),existing=document.querySelector(".pc-existing").getBoundingClientRect();return {uploadX:upload.x,existingX:existing.x,uploadY:upload.y,existingY:existing.y};})()');
+        if(width<600) assert.ok(positions.existingY>positions.uploadY,'Mobile photos stack vertically');
+        else assert.ok(positions.existingX>positions.uploadX,'Desktop/tablet photos compare side by side');
         const screenshot=await send('Page.captureScreenshot',{format:'png'});
         fs.writeFileSync(path.join(__dirname,`../cache/person-photo-tests/comparison-${width}.png`),Buffer.from(screenshot.data,'base64'));
     }
+    await send('Emulation.setDeviceMetricsOverride',{width:390,height:600,deviceScaleFactor:1,mobile:true});
+    await evaluate('document.querySelector(".pc-body").scrollTop=10000');
+    assert.equal(await evaluate('document.querySelector(".pc-body").scrollTop>0'),true,'Long comparison scrolls within the modal');
+    assert.equal(await evaluate('document.querySelector(".pc-actions .pc-primary").getBoundingClientRect().bottom<=innerHeight'),true,'Primary action stays accessible');
+    await evaluate('document.querySelector(".pc-actions .pc-primary").click()');
+    await pick({...blocked,matches:[{...match,name:'Unavailable profile',image:'data:image/png;base64,invalid'}]});
+    await until(()=>evaluate('Boolean(document.querySelector(".pc-photo-unavailable"))'),'Missing image fallback not displayed');
+    assert.equal(await evaluate('accepted'),3,'A missing comparison image never auto-accepts the upload');
     console.log('Personnel photo browser: comparison, escaping, blocking, acknowledgement, review, outage and responsive checks passed.');
 })().catch(error => { console.error(error); process.exitCode=1; }).finally(() => { if(socket) socket.close(); browser.kill(); });

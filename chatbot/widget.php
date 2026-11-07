@@ -26,14 +26,15 @@ $gncbotProg = (is_string($gncbotProg) && preg_match('/^[A-Za-z\-]{2,10}$/', $gnc
 $gncbotDept = $chatbotDept ?? '';
 $gncbotDept = (is_string($gncbotDept) && preg_match('/^[A-Za-z0-9\-]{1,50}$/', $gncbotDept)) ? $gncbotDept : '';
 $gncbotVer  = static function (string $f): string { $p = __DIR__ . '/' . $f; return is_file($p) ? (string)filemtime($p) : '1'; };
-$gncbotMascot = rtrim(dirname($gncbotBase), '/') . '/assets/images/chatbot.png';
+$gncbotMascot = rtrim(dirname($gncbotBase), '/') . '/assets/images/chatbot.png?v=' . $gncbotVer('../assets/images/chatbot.png');
+$gncbotExcited = rtrim(dirname($gncbotBase), '/') . '/assets/images/chatbot-excited.png?v=' . $gncbotVer('../assets/images/chatbot-excited.png');
 ?>
 <style>#gncbot:not(.gncbot-ready){display:none}</style><?php /* stays hidden unless chatbot.css really loaded (see chatbot.js) */ ?>
 <link rel="stylesheet" href="<?= $gncbotBase ?>/chatbot.css?v=<?= $gncbotVer('chatbot.css') ?>">
 <div id="gncbot" class="gncbot" data-endpoint="<?= $gncbotBase ?>/chatbot.php"
      data-program="<?= htmlspecialchars($gncbotProg, ENT_QUOTES) ?>" data-dept="<?= htmlspecialchars($gncbotDept, ENT_QUOTES) ?>">
     <button type="button" class="gncbot-launcher" aria-label="Open chat with Cian" aria-expanded="false" aria-controls="gncbot-panel">
-        <img class="gncbot-ico-chat gncbot-mascot" src="<?= htmlspecialchars($gncbotMascot, ENT_QUOTES, 'UTF-8') ?>" width="112" height="112" alt="" aria-hidden="true" draggable="false">
+        <img class="gncbot-ico-chat gncbot-mascot" src="<?= htmlspecialchars($gncbotMascot, ENT_QUOTES, 'UTF-8') ?>" data-idle-src="<?= htmlspecialchars($gncbotMascot, ENT_QUOTES, 'UTF-8') ?>" data-active-src="<?= htmlspecialchars($gncbotExcited, ENT_QUOTES, 'UTF-8') ?>" width="112" height="112" alt="" aria-hidden="true" draggable="false">
         <svg class="gncbot-ico-close" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></svg>
         <span class="gncbot-launcher-label">Ask Cian</span>
     </button>
@@ -41,7 +42,7 @@ $gncbotMascot = rtrim(dirname($gncbotBase), '/') . '/assets/images/chatbot.png';
     <section id="gncbot-panel" class="gncbot-panel" role="dialog" aria-label="Cian, GNCILink AI Assistant" hidden>
         <header class="gncbot-header">
             <span class="gncbot-avatar" aria-hidden="true">
-                <img src="<?= htmlspecialchars($gncbotMascot, ENT_QUOTES, 'UTF-8') ?>" width="38" height="38" alt="" draggable="false">
+                <img src="<?= htmlspecialchars($gncbotExcited, ENT_QUOTES, 'UTF-8') ?>" width="38" height="38" alt="" draggable="false">
             </span>
             <div class="gncbot-titles">
                 <h2 class="gncbot-title">Cian</h2>

@@ -9,7 +9,7 @@ The shared implementation is `includes/contact-number.php`, `assets/js/contact-n
 - Optional landline extension: 1–6 digits, stored/displayed as `045-900-4473 loc. 123`. Leading zeroes are preserved. The extension is hidden for mobile numbers, and switching types retains both in-progress values until the editor is closed.
 - Local directory entries are extension-only numeric controls. They do not require a main number in every row.
 
-The controls filter unsupported characters, cap digits, format while typing, accept full-number pastes, and handle deletion across separators. Partial numbers show an inline message. Optional empty personnel phone fields remain allowed; Contact Us fields keep their existing completeness policy. Nonempty malformed numbers are rejected even when an administrator allows incomplete page content.
+The controls filter unsupported characters, cap digits, format while typing, accept full-number pastes, and handle deletion across separators. Trying to type or paste beyond the limit shows an accessible inline reminder (10 mobile digits, 7 landline subscriber digits, or 6 extension digits). Replacing selected digits is allowed; an accepted edit clears the reminder. Rejected extra digits do not invalidate an already complete number. Partial numbers show an inline message. Optional empty personnel phone fields remain allowed; Contact Us fields keep their existing completeness policy. Nonempty malformed numbers are rejected even when an administrator allows incomplete page content.
 
 ## Storage and compatibility
 

@@ -241,6 +241,9 @@
 
 .gnc-ms-option {
     display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
     align-items: center;
     gap: 10px;
     padding: 7px 12px;
@@ -257,7 +260,13 @@
 }
 
 .gnc-ms-option.is-checked {
-    background-color: rgba(234, 186, 59, 0.1);
+    background-color: rgba(234, 186, 59, 0.16);
+    box-shadow: inset 3px 0 #1F5E2C;
+}
+
+.gnc-ms-option:focus-within {
+    outline: 2px solid #1F5E2C;
+    outline-offset: -2px;
 }
 
 .gnc-ms-option input[type="checkbox"] {
