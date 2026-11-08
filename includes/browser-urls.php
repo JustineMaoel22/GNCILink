@@ -19,7 +19,11 @@ function gncBrowserUrl(string $url): string {
         $clean = ($m[1] === 'program' ? '/programs/' : '/departments/') . $m[2];
     } else {
         foreach (gncBrowserRoutes() as $alias => $file) {
-            if ($path === $file || $path === substr($file, 0, -4)) { $clean = $alias; break; }
+            $admin = str_starts_with($file, '/admin/');
+            if ($path === $file || $path === substr($file, 0, -4)
+                || ($admin && (rtrim($path,'/') === $alias || rtrim($path,'/') === '/admin'.$alias))) {
+                $clean = $admin ? '/admin'.$alias : $alias; break;
+            }
         }
     }
     if ($clean === null) return $url;
@@ -31,6 +35,10 @@ function gncBrowserLegacyUrl(string $url): string {
     if ($parts === false || isset($parts['scheme']) || isset($parts['host'])) return $url;
     $path = $parts['path'] ?? '';
     $legacy = gncBrowserRoutes()[rtrim($path, '/')] ?? null;
+    if ($legacy === null && str_starts_with($path,'/admin/')) {
+        $candidate = gncBrowserRoutes()[substr(rtrim($path,'/'),6)] ?? null;
+        if ($candidate !== null && str_starts_with($candidate,'/admin/')) $legacy = $candidate;
+    }
     if (preg_match('~^/(programs|departments)/([a-z0-9-]+)/?$~D', $path, $m)) {
         $legacy = '/pages/academics/college/' . ($m[1] === 'programs' ? 'program/' : 'college-department/') . $m[2];
     }
@@ -43,6 +51,8 @@ function gncBrowserHtml(string $html, string $legacyPath): string {
     foreach (headers_list() as $header) {
         if (stripos($header, 'Content-Type:') === 0 && stripos($header, 'text/html') === false) return $html;
     }
+    require_once __DIR__ . '/pwa.php';
+    $html = gncPwaHtml($html, $legacyPath);
     // Preserve relative assets and form actions at their original filesystem depth.
     $base = rtrim(str_replace('\\', '/', dirname($legacyPath)), '/') . '/';
     $hasBase = stripos($html, '<base ') !== false;

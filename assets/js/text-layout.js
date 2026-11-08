@@ -22,6 +22,16 @@
     const ALIGNS=['left','center','right','justify'];
     let forcedDevice=null;
     const mode = () => forcedDevice || (innerWidth < 768 ? 'mobile' : innerWidth <= 1024 ? 'tablet' : 'desktop');
+    const canvasScale = () => window.GNCResponsiveCanvas?.scale() || 1;
+    const rect = el => window.GNCResponsiveCanvas ? window.GNCResponsiveCanvas.rect(el) : el.getBoundingClientRect();
+    function headingScale(el) {
+        if (window.GNCResponsiveCanvas) return 1;
+        // Saved boxes use the available content width. Exclude the scrollbar
+        // here too, otherwise a nearly full line wraps earlier on iPad Pro.
+        const width = document.documentElement.clientWidth;
+        return mode() === 'desktop' && innerWidth >= 1025 && width < 1920
+            && el.closest('[data-gnc-responsive-heading]') ? width / 1920 : 1;
+    }
     function loadFont(key) {
         if (!Object.prototype.hasOwnProperty.call(fonts,key) || loadedFonts.has(key)) return;
         loadedFonts.add(key);
@@ -35,7 +45,8 @@
     function applyFont(el,box) {
         if(isMedia(el))return;
         if(Number.isFinite(box.fontSize)){
-            const size=clamp(box.fontSize,8,200)+'px';
+            const fontSize = Math.max(8, clamp(box.fontSize,8,200) * headingScale(el));
+            const size=fontSize+'px';
             el.style.setProperty('--gnc-text-size',size);
             el.style.setProperty('font-size',size,'important');
         }
@@ -47,7 +58,7 @@
         }
         if(/^#[0-9a-f]{6}$/i.test(box.color||'')){el.style.setProperty('--gnc-text-color',box.color);el.style.setProperty('color',box.color,'important');}
         if(Number.isFinite(box.lineHeight)){const v=String(clamp(box.lineHeight,.8,4));el.style.setProperty('--gnc-text-lh',v);el.style.setProperty('line-height',v,'important');}
-        if(Number.isFinite(box.letterSpacing)){const v=clamp(box.letterSpacing,-5,20)+'px';el.style.setProperty('--gnc-text-ls',v);el.style.setProperty('letter-spacing',v,'important');}
+        if(Number.isFinite(box.letterSpacing)){const v=clamp(box.letterSpacing,-5,20)*headingScale(el)+'px';el.style.setProperty('--gnc-text-ls',v);el.style.setProperty('letter-spacing',v,'important');}
         if(ALIGNS.includes(box.textAlign)){el.style.setProperty('--gnc-text-align',box.textAlign);el.style.setProperty('text-align',box.textAlign,'important');}
     }
     const clamp = (n,min,max) => Math.max(min,Math.min(max,n));
@@ -81,7 +92,7 @@
                 applyFont(el,box);
                 return;
             }
-            const boundary=section(el), r=el.getBoundingClientRect(), b=boundary.getBoundingClientRect();
+            const boundary=section(el), r=rect(el), b=rect(boundary);
             if(!r.width || !b.width || !b.height)return;
             const style=el.getAttribute('style'), cs=getComputedStyle(el), wrap=document.createElement('span');
             // Reserve the original footprint, so moving/resizing never pushes adjacent content.
@@ -90,15 +101,16 @@
             if(isMedia(el))wrap.style.flexShrink='0';
             el.before(wrap);wrap.appendChild(el);
             placed.set(el,{style,wrap});
-            const origin=wrap.getBoundingClientRect(), w=Math.min(b.width,Math.max(24,b.width*box.w/100));
-            const naturalHeight=isMedia(el)?box.h:Math.max(r.height,box.h);
+            const origin=rect(wrap), w=Math.min(b.width,Math.max(24,b.width*box.w/100));
+            const boxHeight=box.h*headingScale(el);
+            const naturalHeight=isMedia(el)?boxHeight:Math.max(r.height,boxHeight);
             const left=clamp(box.centerX?b.left+(b.width-w)/2:origin.left+box.x*b.width/100,b.left,Math.max(b.left,b.right-w));
             const top=clamp(origin.top+box.y*b.height/100,b.top,Math.max(b.top,b.bottom-naturalHeight));
-            Object.assign(el.style,{position:'absolute',display:'block',boxSizing:'border-box',margin:'0',left:(left-origin.left)+'px',top:(top-origin.top)+'px',width:w+'px',maxWidth:'none',height:'auto',minHeight:box.h+'px',overflow:'visible',overflowWrap:'anywhere',animation:'none',transition:'none'});
+            Object.assign(el.style,{position:'absolute',display:'block',boxSizing:'border-box',margin:'0',left:(left-origin.left)+'px',top:(top-origin.top)+'px',width:w+'px',maxWidth:'none',height:'auto',minHeight:boxHeight+'px',overflow:'visible',overflowWrap:'anywhere',animation:'none',transition:'none'});
             if(isMedia(el))Object.assign(el.style,{height:box.h+'px',minHeight:'0',maxHeight:'none',objectFit:'contain'});
             else applyFont(el,box);
             // Wrapping text may be taller than its old box; never clip its contents.
-            const actual=el.getBoundingClientRect();
+            const actual=rect(el);
             if(actual.bottom>b.bottom && actual.height<=b.height)el.style.top=(b.bottom-actual.height-origin.top)+'px';
         });
         if(controller)controller.refresh();
@@ -136,8 +148,8 @@
             overlay.hidden=!enabled||!selected?.isConnected||state.busy||state.preview;
             grid.hidden=overlay.hidden||!snapping;
             if(overlay.hidden)return;
-            const r=selected.getBoundingClientRect();Object.assign(overlay.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px'});
-            const b=section(placed.get(selected)?.wrap||selected).getBoundingClientRect();Object.assign(grid.style,{left:b.left+'px',top:b.top+'px',width:b.width+'px',height:b.height+'px'});
+            const r=rect(selected);Object.assign(overlay.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px'});
+            const b=rect(section(placed.get(selected)?.wrap||selected));Object.assign(grid.style,{left:b.left+'px',top:b.top+'px',width:b.width+'px',height:b.height+'px'});
             overlay.querySelector('.text-layout-move').textContent='↕ Drag '+(isMedia(selected)?'logo':'text')+' · '+mode()+(snapping?' · 8px grid':'');
             overlay.querySelectorAll('button').forEach(button=>button.setAttribute('aria-label',button.dataset.direction==='move'?'Drag selected '+(isMedia(selected)?'logo':'text'):'Resize '+(isMedia(selected)?'logo':'text')+' '+button.dataset.direction));
         }
@@ -178,35 +190,35 @@
         }
         function snapToCenter(){
             if(!selected||!controller.eligible(selected)||options.state().busy||options.state().preview)return;
-            const r=selected.getBoundingClientRect(),b=section(placed.get(selected)?.wrap||selected).getBoundingClientRect();
+            const r=rect(selected),b=rect(section(placed.get(selected)?.wrap||selected));
             if(!b.width||!r.width)return;
-            const slot=placed.get(selected)?.wrap?.getBoundingClientRect()||r;
+            const slot=(placed.get(selected)?.wrap ? rect(placed.get(selected).wrap) : r);
             const current=settings[identify(selected)]?.[mode()]||{};
             const width=Math.min(r.width,b.width),left=b.left+(b.width-width)/2;
-            commit(Object.assign({y:0,w:clamp(width/b.width*100,1,100),h:r.height},current,{x:clamp((left-slot.left)/b.width*100,-100,100),centerX:true}));
+            commit(Object.assign({y:0,w:clamp(width/b.width*100,1,100),h:r.height/headingScale(selected)},current,{x:clamp((left-slot.left)/b.width*100,-100,100),centerX:true}));
         }
         function changeFontSize(delta){
             if(!selected||isMedia(selected)||options.state().busy||options.state().preview)return;
             const id=identify(selected);if(!id)return;
             const current=settings[id]?.[mode()];
             if(delta===null){if(!current||!('fontSize' in current))return;const box=Object.assign({},current);delete box.fontSize;commit(box,false);return;}
-            const r=selected.getBoundingClientRect(),b=section(placed.get(selected)?.wrap||selected).getBoundingClientRect();
-            const box=Object.assign({x:0,y:0,w:clamp(r.width/b.width*100,1,100),h:r.height},current||{});
-            box.fontSize=clamp(Math.round((parseFloat(getComputedStyle(selected).fontSize)+delta)*100)/100,8,200);
+            const r=rect(selected),b=rect(section(placed.get(selected)?.wrap||selected));
+            const box=Object.assign({x:0,y:0,w:clamp(r.width/b.width*100,1,100),h:r.height/headingScale(selected)},current||{});
+            box.fontSize=clamp(Math.round((parseFloat(getComputedStyle(selected).fontSize)+delta)/headingScale(selected)*100)/100,8,200);
             commit(box);
         }
         function begin(event,dir){
             if(!enabled||!selected||options.state().busy||options.state().preview||event.button!==0)return;
             event.preventDefault();event.stopImmediatePropagation();selected.blur();
-            const boundary=section(placed.get(selected)?.wrap||selected), b=boundary.getBoundingClientRect(),r=selected.getBoundingClientRect();
-            const slot=placed.get(selected)?.wrap?.getBoundingClientRect()||r;
-            drag={dir,x:event.clientX,y:event.clientY,r,b,slot,id:event.pointerId,original:settings[identify(selected)]?.[mode()]||null};
+            const boundary=section(placed.get(selected)?.wrap||selected), b=rect(boundary),r=rect(selected);
+            const slot=(placed.get(selected)?.wrap ? rect(placed.get(selected).wrap) : r);
+            drag={dir,x:event.clientX/canvasScale(),y:event.clientY/canvasScale(),r,b,slot,id:event.pointerId,original:settings[identify(selected)]?.[mode()]||null};
             document.addEventListener('pointermove',move,true);document.addEventListener('pointerup',end,true);document.addEventListener('pointercancel',cancel,true);
             overlay.querySelector('[data-direction="'+dir+'"]').setPointerCapture?.(event.pointerId);
         }
         function move(event){
             if(!drag)return;event.preventDefault();event.stopImmediatePropagation();
-            const d=drag,dx=event.clientX-d.x,dy=event.clientY-d.y;let left=d.r.left,top=d.r.top,w=d.r.width,h=d.r.height;
+            const d=drag,dx=event.clientX/canvasScale()-d.x,dy=event.clientY/canvasScale()-d.y;let left=d.r.left,top=d.r.top,w=d.r.width,h=d.r.height;
             if(d.dir==='move'){left+=dx;top+=dy;}else{
                 if(d.dir.includes('e'))w+=dx;if(d.dir.includes('s'))h+=dy;
                 if(d.dir.includes('w')){left+=dx;w-=dx;}if(d.dir.includes('n')){top+=dy;h-=dy;}
@@ -233,7 +245,7 @@
                 if(d.dir.includes('n'))top=d.r.bottom-h;
             }
             left=clamp(left,d.b.left,Math.max(d.b.left,d.b.right-w));top=clamp(top,d.b.top,Math.max(d.b.top,d.b.bottom-h));
-            commit({x:clamp((left-d.slot.left)/d.b.width*100,-100,100),y:clamp((top-d.slot.top)/d.b.height*100,-100,100),w:clamp(w/d.b.width*100,1,100),h});
+            commit({x:clamp((left-d.slot.left)/d.b.width*100,-100,100),y:clamp((top-d.slot.top)/d.b.height*100,-100,100),w:clamp(w/d.b.width*100,1,100),h:h/headingScale(selected)});
         }
         function finish(){document.removeEventListener('pointermove',move,true);document.removeEventListener('pointerup',end,true);document.removeEventListener('pointercancel',cancel,true);drag=null;suppress=true;setTimeout(()=>{suppress=false;},0);}
         function end(e){if(!drag)return;e.preventDefault();e.stopImmediatePropagation();finish();}
@@ -244,8 +256,8 @@
         overlay.addEventListener('keydown',e=>{
             if(e.key==='Escape'){cancel();enabled=false;refresh();return;}
             if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)||!selected)return;
-            e.preventDefault();const b=section(placed.get(selected)?.wrap||selected).getBoundingClientRect(),r=selected.getBoundingClientRect(),slot=placed.get(selected)?.wrap?.getBoundingClientRect()||r;
-            const step=snapping?(e.shiftKey?gridSize*5:gridSize):(e.shiftKey?10:1);commit({x:clamp((r.left-slot.left+(e.key==='ArrowRight'?step:e.key==='ArrowLeft'?-step:0))/b.width*100,-100,100),y:clamp((r.top-slot.top+(e.key==='ArrowDown'?step:e.key==='ArrowUp'?-step:0))/b.height*100,-100,100),w:clamp(r.width/b.width*100,1,100),h:r.height});
+            e.preventDefault();const b=rect(section(placed.get(selected)?.wrap||selected)),r=rect(selected),slot=(placed.get(selected)?.wrap ? rect(placed.get(selected).wrap) : r);
+            const step=snapping?(e.shiftKey?gridSize*5:gridSize):(e.shiftKey?10:1);commit({x:clamp((r.left-slot.left+(e.key==='ArrowRight'?step:e.key==='ArrowLeft'?-step:0))/b.width*100,-100,100),y:clamp((r.top-slot.top+(e.key==='ArrowDown'?step:e.key==='ArrowUp'?-step:0))/b.height*100,-100,100),w:clamp(r.width/b.width*100,1,100),h:r.height/headingScale(selected)});
         });
         addEventListener('scroll',refresh,{passive:true});addEventListener('resize',refresh);
         controller={refresh,eligible:el=>!!el&&!!identify(el)&&!el.closest('[data-gnc-layout-ignore]')&&!el.querySelector('[data-gnc-text]'),
@@ -261,7 +273,7 @@
         return controller;
     }
     function acceptChanges(changes){Object.entries(changes||{}).forEach(([id,devices])=>Object.entries(devices).forEach(([device,entry])=>{published[id]=published[id]||{};if(entry.value===null)delete published[id][device];else published[id][device]=entry.value;}));setChanges({});}
-    function setDevice(d){forcedDevice=d||null;apply();if(controller)controller.refresh();}
+    function setDevice(d){forcedDevice=d||null;if(window.GNCResponsiveCanvas)window.GNCResponsiveCanvas.setDevice(d);apply();if(controller)controller.refresh();}
     window.GNCTextLayout={create,apply,setDevice,setChanges,acceptChanges,targets,device:mode,snapshot:()=>JSON.parse(JSON.stringify(settings)),baseline:()=>JSON.parse(JSON.stringify(published))};
     addEventListener('resize',schedule);addEventListener('load',schedule);
     if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply);else apply();

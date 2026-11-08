@@ -34,17 +34,20 @@
             if (!event.persisted && previewUrl) URL.revokeObjectURL(previewUrl);
         });
     }
+    const settingInput = form => form.querySelector('[data-settings-input],[role="switch"]');
+    const settingValue = input => input.type === 'checkbox' ? (input.checked ? '1' : '0') : input.value.trim();
     const changed = form => {
-        const input = form.querySelector('[role="switch"]');
-        return form.dataset.savedValue !== '' && (input.checked ? '1' : '0') !== form.dataset.savedValue;
+        const input = settingInput(form);
+        return form.dataset.savedValue !== '' && settingValue(input) !== form.dataset.savedValue;
     };
     const update = form => {
-        const input = form.querySelector('[role="switch"]');
+        const input = settingInput(form);
         const dirty = changed(form);
         const busy = form.dataset.saving === '1';
         const known = form.dataset.savedValue !== '';
         const status = form.querySelector('[data-settings-status]');
-        form.querySelector('[data-settings-value]').textContent = known ? (input.checked ? 'Enabled' : 'Disabled') : 'Unavailable';
+        const label = form.querySelector('[data-settings-value]');
+        if (label) label.textContent = known ? (input.checked ? 'Enabled' : 'Disabled') : 'Unavailable';
         const button = form.querySelector('button[type="submit"]');
         if (button) button.disabled = !known || busy || (!dirty && form.dataset.initialError !== '1');
         status.textContent = busy ? 'Saving changes…' : dirty ? 'Unsaved changes' : form.dataset.autoSave === '1' ? 'Changes save automatically.' : 'No unsaved changes';
@@ -53,11 +56,11 @@
         if (notice) notice.hidden = input.checked;
     };
     forms.forEach(form => {
-        const input = form.querySelector('[role="switch"]');
+        const input = settingInput(form);
         const button = form.querySelector('button[type="submit"]');
         const feedback = form.querySelector('[data-settings-feedback]');
         update(form);
-        input.addEventListener('change', () => {
+        input.addEventListener(input.type === 'checkbox' ? 'change' : 'input', () => {
             feedback.hidden = true;
             delete form.dataset.initialError;
             update(form);
@@ -90,8 +93,16 @@
                 if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Your session may have expired. Sign in again, or reload to check the saved setting.');
                 const result = await response.json();
                 if (!response.ok || !result.success) throw new Error(result.error || 'Could not save this setting. Please try again.');
-                if (!['0', '1'].includes(result.value)) throw new Error('The saved value could not be confirmed. Reload to check this setting.');
-                input.checked = result.value === '1';
+                if (input.type === 'checkbox') {
+                    if (!['0', '1'].includes(result.value)) throw new Error('The saved value could not be confirmed. Reload to check this setting.');
+                    input.checked = result.value === '1';
+                } else if (input.type === 'number') {
+                    if (typeof result.value !== 'string' || !/^[0-9]+$/.test(result.value) || Number(result.value) < Number(input.min) || Number(result.value) > Number(input.max)) throw new Error('The saved delay could not be confirmed. Reload to check this setting.');
+                    input.value = result.value;
+                } else {
+                    if (typeof result.value !== 'string' || !/^https?:\/\/\S+$/i.test(result.value)) throw new Error('The saved URL could not be confirmed. Reload to check this setting.');
+                    input.value = result.value;
+                }
                 form.dataset.savedValue = result.value;
                 delete form.dataset.initialError;
                 feedback.textContent = result.message || 'Changes saved.';

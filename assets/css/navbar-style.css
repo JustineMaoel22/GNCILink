@@ -27,13 +27,13 @@ nav:is(.template-breadcrumb, .nursing-breadcrumb, .pharmacy-breadcrumb, .finan-b
 }
 
 /* =============================================================
-   MOBILE / IPAD MINI BREADCRUMB NAVIGATION (<= 768px)
+   MOBILE BREADCRUMB NAVIGATION (< 768px)
    - Single line, no text wrapping across all pages
    - Horizontally scrollable when too long (reuses Programs implementation)
    - Center-aligned horizontally when content fits within the screen
    - Adapts to different mobile screen sizes without page-level overflow
    ============================================================= */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     nav:is([aria-label="breadcrumb" i], [aria-label="Breadcrumb" i], [class*="-breadcrumb"]) {
         display: flex !important;
         flex-wrap: nowrap !important;
@@ -59,11 +59,11 @@ nav:is(.template-breadcrumb, .nursing-breadcrumb, .pharmacy-breadcrumb, .finan-b
 }
 
 /* =============================================================
-   MOBILE / IPAD MINI HERO HEADER CENTERING (<= 768px)
+   MOBILE HERO HEADER CENTERING (< 768px)
    Center-align page headers (title, subtitles, intro copy)
    across all pages in mobile view.
    ============================================================= */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     :is(
         [class*="-hero"],
         [class*="-hero-inner"],

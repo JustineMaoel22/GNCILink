@@ -16,9 +16,23 @@ function gncRecCatalog(PDO $db): array {
             'tags'=>array_values(array_filter($tags)), 'date'=>$date ? strtotime($date) * 1000 : 0,
             'aliases'=>array_values(array_unique(array_merge([$url], $aliases))), 'popular'=>0];
     };
-    $programs = $db->query("SELECT p.*, m.file_path AS image FROM programs p LEFT JOIN departments d ON d.dept_id=p.dept_id
-        LEFT JOIN media_library m ON m.media_id=COALESCE(p.hero_media_id,p.image_media_id)
+    $programs = $db->query("SELECT p.*, COALESCE(hm.file_path,m.file_path) AS image FROM programs p LEFT JOIN departments d ON d.dept_id=p.dept_id
+        LEFT JOIN media_library hm ON hm.media_id=p.hero_media_id
+        LEFT JOIN media_library m ON m.media_id=p.image_media_id
         WHERE p.is_published=1 AND (d.dept_id IS NULL OR (d.archived_at IS NULL AND d.department_type<>'basic-education')) ORDER BY p.program_id DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC);
+    // The visual editor stores replacement banners as ordered hero slides, not hero_media_id.
+    // Videos cannot be used in an <img>; select the first usable picture instead.
+    $programBanners=[];
+    foreach ($db->query("SELECT i.program_id,i.image_path,m.file_path AS upload_path FROM program_items i
+        JOIN programs p ON p.program_id=i.program_id
+        LEFT JOIN media_library m ON m.media_id=i.image_media_id
+        WHERE i.item_type='hero_slide' AND p.is_published=1
+        ORDER BY i.program_id,i.display_order,i.item_id")->fetchAll(PDO::FETCH_ASSOC) as $slide) {
+        $path=$slide['upload_path'] ?: $slide['image_path'];
+        if (!isset($programBanners[$slide['program_id']]) && $path && gncRecImage($path)!=='/assets/images/logos/gnc-logo-v1.svg') {
+            $programBanners[$slide['program_id']]=$path;
+        }
+    }
     $programDepartments = [];
     foreach ($programs as $p) {
         if (!$p['slug']) continue;
@@ -31,7 +45,7 @@ function gncRecCatalog(PDO $db): array {
             if (is_file(__DIR__ . '/..' . $legacy)) $aliases[] = $legacy;
         }
         $add('program:'.$p['program_id'], '/pages/academics/college/program/'.rawurlencode($p['slug']),
-            $p['program_name'] ?: $p['program_code'], 'Programs', $p['description'], $p['image'],
+            $p['program_name'] ?: $p['program_code'], 'Programs', $p['description'], $programBanners[$p['program_id']] ?? $p['image'],
             ['academics','program:'.$code, $p['dept_id'] ? 'dept:'.$p['dept_id'] : ''], null, $aliases);
     }
     foreach ($db->query("SELECT d.*,m.file_path AS image FROM departments d LEFT JOIN media_library m ON m.media_id=d.media_id WHERE d.archived_at IS NULL ORDER BY d.dept_id DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC) as $d) {

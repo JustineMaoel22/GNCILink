@@ -378,13 +378,11 @@ if ($editorMode) {
         }, array_values($postModules)), 'open' => $openUrl];
     }
     // Programs are edited on the canvas; their media controls live in the slide strip and page options.
-    $hasDrawer = in_array($veKind, ['home', 'admin', 'entity'], true) && !in_array($activeSlug, ['college-departments', 'programs', 'graduate-school'], true);
+    $hasDrawer = in_array($veKind, ['admin', 'entity'], true) && !in_array($activeSlug, ['college-departments', 'programs', 'graduate-school'], true);
     $hasPanel  = $hasDrawer || $veEmbed !== null;
-    $drawerFile = $veKind === 'home' ? 'homepage-president-manager.php'
-        : ($veKind === 'admin' ? 'administration-manager.php' : 'department-media-manager.php');
+    $drawerFile = $veKind === 'admin' ? 'administration-manager.php' : 'department-media-manager.php';
     if ($activeSlug === 'basic-education') $drawerFile = 'basic-edu-media-manager.php';
-    $drawerTitle = $veKind === 'home' ? 'Message from the President (full form)'
-        : ($veKind === 'admin' ? 'More settings: archived people, tabs and offices' : ($activeSlug === 'programs' ? 'Program details' : 'Department details'));
+    $drawerTitle = $veKind === 'admin' ? 'More settings: archived people, tabs and offices' : ($activeSlug === 'programs' ? 'Program details' : 'Department details');
     if ($veKind === 'organizations') $drawerTitle = 'Student Organizations Management';
 
     if (!empty($_GET['review_submission'])) {
@@ -550,7 +548,8 @@ include __DIR__ . '/../components/header-admin.php';
 <div class="ve-app" id="veApp" data-device="desktop">
 
     <header class="ve-top">
-        <a class="ve-back" href="?page=hub" data-ve-nav title="Back to the list of all content"><i class="bi bi-grid-1x2"></i><span>All content</span></a>
+        <div class="ve-navigation">
+        <a class="ve-back" href="?page=hub" data-ve-nav title="Back to the list of all content" aria-label="All content"><i class="bi bi-grid-1x2"></i><span>All content</span></a>
 
         <details class="ve-menu" id="vePageMenu">
             <summary title="Choose which page to edit">
@@ -580,7 +579,7 @@ include __DIR__ . '/../components/header-admin.php';
         </select>
         <?php endif; ?>
 
-        <button type="button" class="ve-tool" id="veOutlineBtn" hidden title="Jump to a section of this page"><i class="bi bi-list-nested"></i><span>Sections</span></button>
+        <button type="button" class="ve-tool" id="veOutlineBtn" hidden title="Jump to a section of this page" aria-label="Sections"><i class="bi bi-list-nested"></i><span>Sections</span></button>
 
         <div class="ve-devices" role="group" aria-label="Preview size">
             <button type="button" class="active" data-device="desktop" aria-pressed="true" title="Computer"><i class="bi bi-display"></i></button>
@@ -588,9 +587,10 @@ include __DIR__ . '/../components/header-admin.php';
             <button type="button" data-device="mobile" aria-pressed="false" title="Phone"><i class="bi bi-phone"></i></button>
         </div>
 
+        </div>
         <div class="ve-actions">
             <div class="ve-presence" id="vePresence">
-                <button type="button" class="ve-tool" id="vePresenceButton" aria-expanded="false" aria-controls="vePresencePanel" title="Active users on this page"><i class="bi bi-people" aria-hidden="true"></i><span id="vePresenceCount">—</span><span class="ve-presence-label">Active</span></button>
+                <button type="button" class="ve-tool" id="vePresenceButton" aria-expanded="false" aria-controls="vePresencePanel" title="Active users on this page" aria-label="Active users on this page"><i class="bi bi-people" aria-hidden="true"></i><span id="vePresenceCount">—</span><span class="ve-presence-label">Active</span></button>
                 <section class="ve-presence-panel" id="vePresencePanel" tabindex="-1" aria-label="Active viewers and editors" hidden>
                     <strong>On this page</strong><ul id="vePresenceList"></ul><p id="vePresenceStatus">Connecting…</p>
                 </section>
@@ -598,19 +598,19 @@ include __DIR__ . '/../components/header-admin.php';
             <button type="button" class="ve-tool" id="veUndo" disabled title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" aria-keyshortcuts="Control+z Meta+z"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span>Undo</span></button>
             <button type="button" class="ve-tool" id="veRedo" disabled title="Redo (Ctrl+Y / Ctrl/Cmd+Shift+Z)" aria-label="Redo" aria-keyshortcuts="Control+y Control+Shift+z Meta+Shift+z"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span>Redo</span></button>
             <?php if ($activeSlug === 'programs' && $canManagePages): ?>
-            <button type="button" class="ve-tool" id="veAddProgramBtn" title="Create a college or Graduate School program"><i class="bi bi-plus-circle"></i><span>Add Program</span></button>
+            <button type="button" class="ve-tool" id="veAddProgramBtn" title="Create a college or Graduate School program" aria-label="Add program"><i class="bi bi-plus-circle"></i><span>Add Program</span></button>
             <?php endif; ?>
             <?php if ($VE['page']['publicUrl'] !== ''): ?>
-            <a class="ve-tool" href="<?= ce_e($VE['page']['publicUrl']) ?>" target="_blank" rel="noopener" title="Open the live page in a new tab"><i class="bi bi-box-arrow-up-right"></i><span>View live</span></a>
+            <a class="ve-tool" href="<?= ce_e($VE['page']['publicUrl']) ?>" target="_blank" rel="noopener" title="Open the live page in a new tab" aria-label="View live"><i class="bi bi-box-arrow-up-right"></i><span>View live</span></a>
             <?php endif; ?>
             <?php if ($hasDrawer): ?>
-            <button type="button" class="ve-tool" id="veSettingsBtn" title="<?= ce_e($drawerTitle) ?>"><i class="bi bi-sliders"></i><span>More settings</span></button>
+            <button type="button" class="ve-tool" id="veSettingsBtn" title="<?= ce_e($drawerTitle) ?>" aria-label="More settings"><i class="bi bi-sliders"></i><span>More settings</span></button>
             <?php endif; ?>
-            <button type="button" class="ve-tool" id="vePageOpts" hidden title="Visibility, colour and other options for this page"><i class="bi bi-gear"></i><span>Page options</span></button>
+            <button type="button" class="ve-tool" id="vePageOpts" hidden title="Visibility, colour and other options for this page" aria-label="Page options"><i class="bi bi-gear"></i><span>Page options</span></button>
             <?php if ($veEmbed): ?>
-            <button type="button" class="ve-tool" id="vePostsBtn" title="Open the list of news, announcements and events here"><i class="bi bi-megaphone"></i><span>Posts</span></button>
+            <button type="button" class="ve-tool" id="vePostsBtn" title="Open the list of news, announcements and events here" aria-label="Posts"><i class="bi bi-megaphone"></i><span>Posts</span></button>
             <?php endif; ?>
-            <button type="button" class="ve-tool ve-tool-danger" id="veCancel" hidden title="Throw away the changes that are not saved yet"><i class="bi bi-x-circle"></i><span>Cancel</span></button>
+            <button type="button" class="ve-tool ve-tool-danger" id="veCancel" hidden title="Throw away the changes that are not saved yet" aria-label="Cancel changes"><i class="bi bi-x-circle"></i><span>Cancel</span></button>
             <button type="button" class="btn btn-outline-secondary ve-btn" id="veDiscardDraft" title="Discard your private draft and restore the published page" hidden><span>Discard draft</span></button>
             <button type="button" class="btn btn-outline-secondary ve-btn" id="veSaveDraft" title="Save pending preview changes privately (Ctrl/Cmd+S)" hidden><i class="bi bi-save" aria-hidden="true"></i><span>Save draft</span></button>
             <button type="button" class="btn btn-outline-secondary ve-btn" id="veSecondary" hidden></button>

@@ -5,7 +5,9 @@
     const KEY='gnc_recommendations_v1', DAY=86400000;
     const $=id=>document.getElementById(id);
     const privacy=$('gncRecPrivacy'), settings=$('gncRecSettings');
-    const dueAt=Date.now()+Math.max(0,60000-performance.now());
+    const configuredDelay=Number(section.dataset.delaySeconds);
+    const delaySeconds=Number.isInteger(configuredDelay)&&configuredDelay>=5&&configuredDelay<=3600?configuredDelay:60;
+    const dueAt=Date.now()+Math.max(0,delaySeconds*1000-performance.now());
     let hasOpened=false,openTimer=null,closeTimer=null,previousFocus=null,pageScroll=null;
     let state={consent:null,history:{},shown:{}}, items=[], current=null, selected=[], observed=false, lastTick=Date.now(), counted=false;
     const restricted=false; // Privacy signals only default choices to off; explicit consent is checked via GNCPrivacy.

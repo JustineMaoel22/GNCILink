@@ -6,6 +6,7 @@
 
 // Ensure user is logged in before rendering
 requireLogin();
+if (!headers_sent()) header('Cache-Control: no-store, private');
 $currentUser = getCurrentUser();
 require_once __DIR__.'/../includes/profile-picture.php';
 require_once __DIR__.'/../includes/admin-notifications.php';
@@ -23,6 +24,7 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <?php require_once __DIR__.'/../includes/pwa.php'; echo gncPwaHead(true); ?>
     <?php require_once __DIR__ . '/loading-feedback.php'; ?>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= isset($pageTitle) ? htmlspecialchars($pageTitle) . ' — ' : '' ?>GNC Admin Panel</title>

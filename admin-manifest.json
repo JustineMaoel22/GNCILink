@@ -1,0 +1,18 @@
+{
+  "id": "/admin/",
+  "name": "GNCILink Admin",
+  "short_name": "GNCILink Admin",
+  "description": "Secure access to the GNCILink administrative panel. An internet connection and authorized account are required.",
+  "lang": "en",
+  "start_url": "/admin/login",
+  "scope": "/admin/",
+  "display": "standalone",
+  "background_color": "#f9f6f1",
+  "theme_color": "#094024",
+  "icons": [
+    {"src": "/assets/images/pwa/admin-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/images/pwa/admin-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/images/pwa/admin-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "categories": ["productivity", "education"]
+}

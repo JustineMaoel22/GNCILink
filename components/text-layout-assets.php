@@ -6,5 +6,8 @@ catch (InvalidArgumentException $gncTextLayoutError) { /* Preserve the including
 ?>
 <script>window.GNC_TEXT_LAYOUT=<?= json_encode($gncTextLayout,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;</script>
 <script>window.GNC_TEXT_FONTS=<?= json_encode(textLayoutFonts(),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;</script>
+<?php if (!empty($_GET['ce_preview'])): ?>
+<script src="/assets/js/responsive-canvas.js?v=<?= filemtime(__DIR__.'/../assets/js/responsive-canvas.js') ?>"></script>
+<?php endif; ?>
 <script src="/assets/js/text-layout.js?v=<?= filemtime(__DIR__.'/../assets/js/text-layout.js') ?>"></script>
 <script src="/assets/js/inline-text-style.js?v=<?= filemtime(__DIR__.'/../assets/js/inline-text-style.js') ?>"></script>

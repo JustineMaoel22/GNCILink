@@ -127,7 +127,8 @@ if (!function_exists('gncResolvePopularUrl')) {
                         <li><a href="http://library.gncipampanga.com/" target="_blank" rel="noopener noreferrer">GNCI Library <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
                         <li><a href="/index.php#events">Calendar <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
                         <li><a href="/coming-soon.php" target="_blank" rel="noopener noreferrer">Student Portal <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
-                        <li><a href="https://osa.gncipampanga.com/" target="_blank" rel="noopener noreferrer">OSA Student Grievance <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+                        <li><a href="https://osa.gncipampanga.com/" target="_blank" rel="noopener noreferrer">Office of Student Affairs Portal <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+                        <li><a href="https://docs.google.com/forms/d/e/1FAIpQLSc0ZkdNZ12ITe7ZgPCnUyHGkt7d1GvJhKrtFKP-3pdn9Grnwg/viewform" target="_blank" rel="noopener noreferrer">OSA Student Grievance <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
                         <li><a href="/pages/faq.php">Frequently Asked Questions <i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
                     </ul>
 

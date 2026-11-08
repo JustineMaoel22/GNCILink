@@ -1,0 +1,33 @@
+/* PWA controls are isolated from existing site styles. */
+.gnc-pwa-notice,.gnc-pwa-dialog,.gnc-offline-card{font:400 15px/1.6 Inter,system-ui,sans-serif;color:#173d2b;box-sizing:border-box}
+.gnc-pwa-notice[hidden],.gnc-pwa-dialog[hidden]{display:none}
+.gnc-pwa-notice{position:fixed;left:max(16px,env(safe-area-inset-left));bottom:max(20px,env(safe-area-inset-bottom));z-index:1055;width:min(380px,calc(100vw - 32px));padding:20px 44px 20px 20px;border:1px solid #dce5df;border-top:4px solid #eaba3b;border-radius:16px;background:#fff;box-shadow:0 12px 40px #082b2426}
+.gnc-pwa-notice strong{display:block;font-size:17px;color:#094024}.gnc-pwa-notice p{margin:6px 0 14px}
+.gnc-pwa-install-notice{bottom:calc(max(20px,env(safe-area-inset-bottom)) + 64px);width:min(320px,calc(100vw - 32px));padding:16px 44px 16px 16px;border-top-width:3px;font-size:13px;box-shadow:0 6px 22px #082b241a}
+.gnc-pwa-install-notice strong{font-size:15px}.gnc-pwa-install-notice p{margin:6px 0 12px}
+.gnc-pwa-install-chat{left:auto;right:max(20px,env(safe-area-inset-right));bottom:calc(max(20px,env(safe-area-inset-bottom)) + 124px);border:1px solid #dce5df;border-radius:18px 18px 6px 18px;box-shadow:0 8px 28px #082b2421}
+.gnc-pwa-install-chat::after{content:'';position:absolute;right:48px;bottom:-8px;width:14px;height:14px;background:#fff;border-right:1px solid #dce5df;border-bottom:1px solid #dce5df;transform:rotate(45deg)}
+.gnc-pwa-tip-from{display:block;margin-bottom:6px;color:#52705e;font-size:11px;font-weight:600;letter-spacing:.02em}
+@media(max-width:576px){.gnc-pwa-install-chat{right:max(14px,env(safe-area-inset-right));bottom:calc(max(14px,env(safe-area-inset-bottom)) + 96px)}.gnc-pwa-install-chat::after{right:34px}}
+.gnc-pwa-notice button,.gnc-pwa-dialog button,.gnc-offline-card button,.gnc-offline-card a,.gnc-pwa-install-link{font:600 14px/1.4 Inter,system-ui,sans-serif;cursor:pointer;touch-action:manipulation}
+.gnc-pwa-notice .gnc-pwa-dismiss{position:absolute;right:8px;top:8px;width:32px;height:32px;padding:0;border:0;background:transparent;color:#53675c;font-size:24px}
+.gnc-pwa-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.gnc-pwa-actions button,.gnc-offline-card a{min-height:44px;padding:10px 16px;border:1px solid #094024;border-radius:8px;background:#094024;color:#fff;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.gnc-pwa-actions button.gnc-pwa-secondary,.gnc-offline-card a{background:#fff;color:#094024}
+.gnc-pwa-notice button:focus-visible,.gnc-pwa-dialog button:focus-visible,.gnc-offline-card a:focus-visible,.gnc-pwa-install-link:focus-visible{outline:3px solid #eaba3b;outline-offset:3px}
+.gnc-pwa-dialog{width:min(460px,calc(100vw - 32px));max-height:calc(100dvh - 48px);padding:28px;border:1px solid #dce5df;border-radius:18px;background:#fff;overflow:auto}
+.gnc-pwa-dialog::backdrop{background:#082b2480}.gnc-pwa-dialog h2{font:700 26px/1.25 Georgia,serif;color:#094024;margin:0 0 12px}.gnc-pwa-dialog ol{padding-left:24px}.gnc-pwa-dialog li{margin-bottom:10px}
+.gnc-pwa-install-link{border:0;background:transparent;color:inherit;text-decoration:underline;text-underline-offset:3px;padding:6px 0;min-height:44px}
+.gnc-pwa-install-footer{display:inline-flex;align-items:center;gap:10px;margin-top:20px;padding:12px 20px;border:1px solid var(--gf-gold,#eaba3b);border-radius:12px;background:var(--gf-gold,#eaba3b);color:var(--gf-green,#094024);text-decoration:none}
+.gnc-pwa-install-footer:hover{background:#f5ce60;color:#094024}
+.gnc-pwa-install-footer[hidden]{display:none}
+.gnc-pwa-install-floating{position:fixed;right:max(20px,env(safe-area-inset-right));bottom:calc(max(20px,env(safe-area-inset-bottom)) + var(--gnc-pwa-dock-height,0px));z-index:1046;display:inline-flex;align-items:center;gap:10px;min-height:48px;max-width:calc(100vw - 40px);padding:12px 20px;border:1px solid #eaba3b;border-radius:12px;background:#094024;color:#fff;text-decoration:none;box-shadow:0 6px 22px #082b2433}
+.gnc-pwa-install-floating:hover{background:#125836;color:#fff}
+.gnc-pwa-install-floating[hidden]{display:none}
+.gnc-pwa-offline-strip{position:relative;z-index:1040;padding:8px max(16px,env(safe-area-inset-left));background:#fff4d4;color:#563e0a;text-align:center;font:500 13px/1.5 Inter,system-ui,sans-serif}
+.gnc-pwa-offline-strip button{font:inherit;margin-left:8px;background:transparent;border:0;color:inherit;text-decoration:underline;cursor:pointer;min-height:32px}
+.gnc-offline-page{box-sizing:border-box;margin:0;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:24px;background:radial-gradient(ellipse at top right,#165c3d,#094024 65%);padding:max(24px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left))}
+.gnc-offline-page .gnc-pwa-offline-strip{box-sizing:border-box;width:min(590px,100%);border-radius:8px}
+.gnc-offline-card{width:min(590px,100%);padding:clamp(24px,6vw,48px);background:#f9f6f1;border-radius:24px;border-top:5px solid #eaba3b;box-shadow:0 24px 70px #001b2159}.gnc-offline-card img{border-radius:50%}
+.gnc-pwa-eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#526a5a;margin-top:20px}.gnc-offline-card h1{font:700 clamp(32px,6vw,44px)/1.15 Georgia,serif;margin:12px 0 20px;color:#094024}.gnc-offline-card p{max-width:50ch}.gnc-offline-note{font-size:12px;color:#5f7066;border-top:1px solid #dce5df;padding-top:20px;margin-top:24px}
+@media(display-mode:standalone){body{padding-bottom:env(safe-area-inset-bottom)}}

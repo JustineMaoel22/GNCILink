@@ -1169,7 +1169,8 @@ a.gnc-programs-count:hover {
     }
 }
 
-@media (max-width: 768px) {
+/* Share the centered hero layout with tablet-sized visitor and editor views. */
+@media (max-width: 1024px) {
     /* Hero Content */
     .hero-title-line,
     .hero-title-gold,
@@ -1192,7 +1193,9 @@ a.gnc-programs-count:hover {
         width: 100%;
         justify-content: center;
     }
+}
 
+@media (max-width: 768px) {
     /* Arrows: hidden on mobile (dots + swipe/auto-advance remain) */
     .slide-arrow {
         display: none;

@@ -1489,8 +1489,50 @@
   .dept-programs-grid > * { flex-basis: 100%; }
 }
 
-/* ---------- Mobile view (768px and below): center-align all department text ---------- */
-@media (max-width: 768px) {
+/* Match the 1920px desktop header proportions on smaller monitors/iPad Pro.
+   Saved title positions stay active; typography and the original text origin
+   scale together so the public header keeps the editor's composition. */
+@media (min-width: 1025px) and (max-width: 1919px) {
+  .dept-intro-program .dept-hero-inner { max-width: 68.75%; padding: 1.5625vw .78125vw 3.645833vw; }
+  .dept-intro-program .dept-hero-content { width: 58%; margin-top: 3.958333vw; gap: 1.875vw; }
+  .dept-intro-program .dept-hero-title { font-size: 2.5vw; }
+  .dept-intro-program .dept-hero-prefix { margin-bottom: .416667vw; }
+  .dept-intro-program .dept-breadcrumb { max-width: 100%; margin-bottom: .729167vw; }
+  .dept-intro-program .dept-hero-logo { flex-basis: 9.375vw; width: 9.375vw; height: 9.375vw; }
+}
+
+/* Center department headers throughout the tablet range, including the editor preview. */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .dept-intro-program .dept-hero-inner,
+  .dept-intro-program .dept-hero-copy,
+  .dept-intro-program .dept-hero-title,
+  .dept-intro-program .dept-hero-blurb {
+    text-align: center;
+  }
+
+  .dept-intro-program .dept-hero-content {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-intro-program .dept-hero-copy { width: 100%; }
+
+  .dept-intro-program .dept-breadcrumb {
+    justify-content: safe center;
+    text-align: center;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Phone content stays centered below 768px. */
+@media (max-width: 767px) {
   .dept-hero-inner {
     text-align: center;
     padding-left: 18px;

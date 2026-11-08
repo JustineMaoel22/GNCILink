@@ -3,7 +3,7 @@ require_once __DIR__.'/../admin/settings-functions.php';
 if (!isset($_GET['ce_preview']) && http_response_code() !== 404 && !defined('GNC_RECOMMENDATIONS_RENDERED') && pageSuggestionsEnabled()):
 define('GNC_RECOMMENDATIONS_RENDERED', true); ?>
 <link rel="stylesheet" href="/assets/css/recommendations.css?v=<?= filemtime(__DIR__.'/../assets/css/recommendations.css') ?>">
-<dialog class="gnc-rec" id="gncRecommendations" aria-labelledby="gncRecTitle" aria-describedby="gncRecSummary" hidden>
+<dialog class="gnc-rec" id="gncRecommendations" data-delay-seconds="<?= pageSuggestionDelay() ?>" aria-labelledby="gncRecTitle" aria-describedby="gncRecSummary" hidden>
     <div class="gnc-rec-inner">
         <button type="button" class="gnc-rec-close" id="gncRecClose" aria-label="Close page suggestions" autofocus><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
         <div class="gnc-rec-heading"><div><span class="gnc-rec-eyebrow">Discover GNC</span><h2 id="gncRecTitle">You May Also Like</h2></div></div>

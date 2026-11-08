@@ -5,7 +5,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') { http_response_code(405); echo '{"items":[]}'; exit; }
 // One shared snapshot for all visitors, bounded to 60 seconds. No session or profile data.
-$cache = sys_get_temp_dir().'/gnc-rec-'.hash('sha256', __DIR__.DB_NAME).'.json';
+$cache = sys_get_temp_dir().'/gnc-rec-v2-'.hash('sha256', __DIR__.DB_NAME).'.json';
 $lock = fopen($cache.'.lock', 'c');
 try {
     if (!$lock || !flock($lock, LOCK_EX)) throw new RuntimeException('Catalog lock unavailable');

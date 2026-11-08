@@ -214,7 +214,7 @@ $cdText = function (?string $v) use ($cePreview): string {
         .dept-fb-copy { min-width:0; overflow-wrap:anywhere; }
         .dept-fb-copy strong { display:block; font:700 17px/1.4 'Noto Serif',Georgia,serif; }
         .dept-fb-copy span { display:block; margin-top:8px; font:600 14px/1.5 Inter,Arial,sans-serif; text-decoration:underline; }
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .dept-fb-link { flex-direction: column; justify-content: center; text-align: center; padding: 20px 18px; gap: 12px; }
             .dept-fb-copy { text-align: center; }
         }
@@ -251,7 +251,7 @@ $cdText = function (?string $v) use ($cePreview): string {
                     <?= basicEducationMedia($logoUrl, $pageTitle . ' logo', 'dept-hero-logo' . ($pageContent['header_logo_hidden']['value'] === '1' ? ' dept-header-hidden' : ''), ' data-dept-header-logo data-gnc-text="' . substr(hash('sha256', 'department-header-logo:' . $dept['dept_id']), 0, 24) . '" data-gnc-layout-media' . ceManageMark('data-ve-img="dept-logo"')) ?>
                     <?php endif; ?>
                     <div class="dept-hero-copy<?= $isCollegeHeader && $pageContent['header_text_hidden']['value'] === '1' ? ' dept-header-hidden' : '' ?>"<?= $isCollegeHeader ? ' data-dept-header-text' : '' ?>>
-                    <h1 class="dept-hero-title"<?= $isCollegeHeader ? ceTextLayoutMark('data-ve-field="dept-name"') . ' data-gnc-layout-group' : ($dept ? ($isBasicEducation ? departmentPageField($dept, 'hero_title') : ceField('dept-name', ['max' => 255, 'label' => 'Department name'])) : '') ?>><?= $heroTitleHtml ?></h1>
+                    <h1 class="dept-hero-title"<?= $isCollegeHeader ? ceTextLayoutMark('data-ve-field="dept-name"') . ' data-gnc-layout-group data-gnc-responsive-heading' : ($dept ? ($isBasicEducation ? departmentPageField($dept, 'hero_title') : ceField('dept-name', ['max' => 255, 'label' => 'Department name'])) : '') ?>><?= $heroTitleHtml ?></h1>
                     <?php if (($cePreview && $dept) || ((!$isCollegeHeader || strcasecmp(trim($heroBlurb), trim($heroTitle)) !== 0) && $heroBlurb !== '')): ?>
                     <p class="dept-hero-blurb<?= $isCollegeHeader && $pageContent['header_blurb_hidden']['value'] === '1' ? ' dept-header-hidden' : '' ?>"<?= $isCollegeHeader ? ' data-dept-header-blurb' : '' ?><?= $dept ? ceField('dept-hero', ['max' => 255, 'label' => 'Line under the title', 'ph' => 'Add a line under the title', 'allow_empty' => $isGraduateSchool]) : '' ?>><?= cd_h($heroBlurb) ?></p>
                     <?php endif; ?>

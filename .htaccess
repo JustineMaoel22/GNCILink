@@ -7,6 +7,29 @@
 # Disable directory listing and MultiViews
 Options -Indexes -MultiViews
 
+# /admin/dashboard is an application route despite the older directory shim.
+<IfModule mod_dir.c>
+    <If "%{REQUEST_URI} == '/admin/dashboard'">
+        DirectorySlash Off
+    </If>
+</IfModule>
+
+# Stable root worker URL; PHP supplies the deployment version without build tooling.
+<IfModule mod_mime.c>
+    AddType application/manifest+json .webmanifest
+</IfModule>
+<Files "manifest.json">
+    ForceType application/manifest+json
+</Files>
+<Files "admin-manifest.json">
+    ForceType application/manifest+json
+</Files>
+<IfModule mod_headers.c>
+    <FilesMatch "^((admin-)?manifest\.json|offline\.html)$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+</IfModule>
+
 # Protect server configuration
 <Files ".user.ini">
     Require all denied
@@ -15,6 +38,32 @@ Options -Indexes -MultiViews
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /
+    RewriteRule ^service-worker\.js$ service-worker.php [END]
+    RewriteRule ^admin/service-worker\.js$ admin/service-worker.php [END]
+
+    # Administrative aliases stay inside the Admin PWA's /admin/ scope.
+    # Execute original files directly (dashboard also has an old directory shim).
+    RewriteRule ^admin/account-password/?$ admin/account-password.php [END]
+    RewriteRule ^admin/activity-logs/?$ admin/logs.php [END]
+    RewriteRule ^admin/admin-help/?$ admin/help.php [END]
+    RewriteRule ^admin/change-password/?$ admin/change-password.php [END]
+    RewriteRule ^admin/content-editor/?$ admin/content-edit.php [END]
+    RewriteRule ^admin/dashboard/?$ admin/admin-dash.php [END]
+    RewriteRule ^admin/enrollment-steps/?$ admin/enrollment-steps.php [END]
+    RewriteRule ^admin/facebook-integration/?$ admin/facebook-integration.php [END]
+    RewriteRule ^admin/forgot-password/?$ admin/forgot-password.php [END]
+    RewriteRule ^admin/login/?$ admin/login.php [END]
+    RewriteRule ^admin/logout/?$ admin/auth/logout.php [END]
+    RewriteRule ^admin/manage-announcements/?$ admin/announcement.php [END]
+    RewriteRule ^admin/manage-events/?$ admin/events.php [END]
+    RewriteRule ^admin/manage-facebook-posts/?$ admin/facebook-posts.php [END]
+    RewriteRule ^admin/manage-news/?$ admin/news.php [END]
+    RewriteRule ^admin/manage-student-achievements/?$ admin/student-achievements.php [END]
+    RewriteRule ^admin/manage-users/?$ admin/users.php [END]
+    RewriteRule ^admin/reset-password/?$ admin/reset-password.php [END]
+    RewriteRule ^admin/settings/?$ admin/settings.php [END]
+    RewriteRule ^admin/submissions/?$ admin/submissions.php [END]
+    RewriteRule ^admin/verify-login/?$ admin/auth/verify-otp.php [END]
 
     # ==========================================
     # 1. MAIN DOMAIN SECURITY

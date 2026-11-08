@@ -582,6 +582,7 @@
         if (editorFeedback) { editorFeedback.dispose(); editorFeedback=null; }
         if(textLayout){textLayout.dispose();textLayout=null;}
         S.doc = doc; S.win = S.frame.contentWindow; S.loadCount++;
+        if (S.win.GNCResponsiveCanvas) S.win.GNCResponsiveCanvas.setDevice(S.device);
         if (S.statusControlObserver) S.statusControlObserver.disconnect();
         S.statusControlObserver = new MutationObserver(function (records) {
             if (records.some(function (record) {
@@ -1199,7 +1200,7 @@
             discardDraft.hidden = !drafts.hasDraft(); discardDraft.disabled = S.busy;
         } else { if (saveDraft) saveDraft.hidden = true; if (discardDraft) discardDraft.hidden = true; }
         if (!S.busy) { var st = S.adapter.status(); setStatus(drafts && drafts.hasDraft() && drafts.saved() ? 'Draft saved · not live yet' : st.text, st.tone); }
-        var o = $('#veOutlineBtn'); if (o) o.hidden = !S.adapter.outline;
+        var o = $('#veOutlineBtn'); if (o) { o.hidden = false; o.disabled = !S.doc || !loader.hidden; }
         if (btnCancel) btnCancel.hidden = !unsavedPageChanges() || S.preview;
         if (btnPageOpts) btnPageOpts.hidden = !(S.adapter.hasPageOptions && S.adapter.hasPageOptions()) || S.preview;
         if (editorFeedback) editorFeedback.refresh();
@@ -1267,6 +1268,7 @@
         if (!d) return;
         S.device = d;
         S.stage.setAttribute('data-device', S.device);
+        if (S.win && S.win.GNCResponsiveCanvas) S.win.GNCResponsiveCanvas.setDevice(S.device);
         if (S.win && S.win.GNCTextLayout && S.win.GNCTextLayout.setDevice) {
             S.win.GNCTextLayout.setDevice(S.device);
         }
@@ -6242,8 +6244,60 @@
     S.url = C.page.url;
     if (kind === 'organizations') window.OrganizationEditor = { hasChanges: unsavedPageChanges, refreshOrder: function(){return S.adapter.refreshOrder();} };
 
+    function pageOutline() {
+        if (!S.doc) return [];
+        var excluded = 'nav,footer,dialog,[role="dialog"],.modal,[data-text-layout-control],#gncbot';
+        var candidates = $$('section,article,.hero-slideshow,[data-ve-section],main header,main details', S.doc).filter(function (el) {
+            return !el.closest(excluded) && el.getClientRects().length
+                && (el.querySelector('h1,h2,h3,h4,h5,h6,[data-ve-field],[data-ve-section]') || el.matches('[data-ve-section]'));
+        });
+        var blocks = candidates.filter(function (el) {
+            return !candidates.some(function (parent) { return parent !== el && parent.contains(el); });
+        });
+        if (!blocks.length) blocks = [S.doc.querySelector('main') || S.doc.body];
+        return blocks.map(function (el, index) {
+            var labelled = el.getAttribute('aria-labelledby');
+            var heading = labelled && S.doc.getElementById(labelled.split(/\s+/)[0]) || el.querySelector('h1,h2,h3,h4,h5,h6,summary');
+            var title = el.getAttribute('data-ve-label') || el.getAttribute('aria-label')
+                || heading && heading.innerText || (blocks.length === 1 ? C.page.title : 'Section ' + (index + 1));
+            return {el:el, title:String(title).replace(/\s+/g, ' ').trim()};
+        });
+    }
+    function outlineStatus(el) {
+        if (drafts && drafts.supported() && drafts.hasDraft() && drafts.saved()) return {tone:'warn', text:'Page draft'};
+        if (el.matches('[data-ve-feedback="unsaved"]') || el.querySelector('[data-ve-feedback="unsaved"]')) return {tone:'warn', text:'Unsaved'};
+        if (el.closest('[data-ve-status="draft"]') || el.matches('[data-ve-feedback="draft"]')) return {tone:'warn', text:'Draft · not live'};
+        if (el.querySelector('[data-ve-status="draft"],[data-ve-feedback="draft"]')) return {tone:'warn', text:'Contains drafts'};
+        // Some changes (ordering or page settings) have no individual DOM target.
+        if (unsavedPageChanges() && !S.doc.querySelector('[data-ve-feedback="unsaved"]')) return {tone:'warn', text:'Page has changes'};
+        return {tone:'ok', text:'Live'};
+    }
+    function openPageOutline(x, y) {
+        if (editorFeedback) editorFeedback.refresh();
+        var rows = pageOutline().map(function (item) {
+            var status = outlineStatus(item.el);
+            return h('button', {type:'button', class:'ve-outline-row', on:{click:function () {
+                closePop();
+                var el = item.el;
+                el.scrollIntoView({block:'start', behavior:S.win.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+                el.classList.add('ve-flash');
+                window.setTimeout(function () { el.classList.remove('ve-flash'); }, 1400);
+                // Move keyboard focus without changing content or selecting an edit.
+                if (!el.hasAttribute('tabindex')) {
+                    el.setAttribute('tabindex','-1');
+                    el.addEventListener('blur',function () { el.removeAttribute('tabindex'); },{once:true});
+                }
+                el.focus({preventScroll:true});
+            }}}, [h('span',{class:'ve-dot ve-dot-' + status.tone,'aria-hidden':'true'}), h('strong',{text:item.title}), h('small',{text:status.text})]);
+        });
+        openPop(h('div',{class:'ve-outline'},[h('div',{class:'ve-pop-label',text:'Sections on this page'})].concat(rows)), x, y);
+    }
     var ob = $('#veOutlineBtn');
-    if (ob) ob.addEventListener('click', function () { var r = ob.getBoundingClientRect(); if (S.adapter.openOutline) S.adapter.openOutline(r.left, r.bottom + 8); });
+    if (ob) ob.addEventListener('click', function () {
+        var r = ob.getBoundingClientRect();
+        if (S.adapter.openOutline) S.adapter.openOutline(r.left, r.bottom + 8);
+        else openPageOutline(r.left, r.bottom + 8);
+    });
     var sb = $('#veSettingsBtn'); if (sb) sb.addEventListener('click', openDrawer);
     if (btnPageOpts) btnPageOpts.addEventListener('click', function () {
         var r = btnPageOpts.getBoundingClientRect();

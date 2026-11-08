@@ -8,6 +8,29 @@ Desktop (above 1024px), tablet (768–1024px), and mobile (below 768px) have ind
 
 Save Draft stores private placement changes alongside text and media. Publish uses the authenticated, CSRF-protected `admin/action/text-layout-handler.php`; only accounts with `manage_page_content` can publish placement. Failed saves retain pending changes. Unconfigured text keeps its original layout. Existing CMS handlers still save content, media, and other page settings. Newly created content obtains its persistent display identity when it renders through its normal template.
 
+The Content Editor preview uses `assets/js/responsive-canvas.js` only inside
+its own `veFrame` iframe. Visitor pages keep their existing responsive layout,
+font sizes and breakpoints. A standalone preview URL also remains unscaled.
+
+Desktop, tablet and mobile previews retain separate designs at reference widths
+of 1920px, 820px and 390px. Resizing the editor window scales the selected preview
+without reflowing its contents. Crossing a monitor-width breakpoint does not
+switch the selected editor device. The editor controls remain at their normal
+size outside the scaled preview.
+
+Text dragging, resizing and font controls use design pixels so reopening an edit
+does not apply scaling twice. Existing content and saved placement metadata are
+not rewritten. Browsers without CSS zoom retain the previous editor behavior.
+Physical Safari/iPad and Android checks are still recommended before deployment.
+This fixed preview represents its reference width; the visitor website continues
+to adapt normally at other viewport widths.
+
+Department banner headings retain their desktop composition above 1024px,
+including the 1032px iPad Pro viewport. Saved heading font sizes and heights
+scale from the 1920px editor reference using the available content width,
+excluding the scrollbar, so a full desktop title line does not wrap early.
+The prefix and subject remain editable; saved content and placement are unchanged.
+
 Public templates expose opaque `data-gnc-text` identifiers, not editor fields or draft text. Existing `ceMark`, `ceManageMark`, and `ceField` helpers generate these identifiers, and entity scopes keep repeated text distinct. Program cards use their stored item IDs. Text with nested marked text is controlled through its individual child fields.
 
 ## Installation

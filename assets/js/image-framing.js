@@ -344,14 +344,15 @@
             top=Math.max(top,rect.top+6);
             if(bottom-top<34){hide();return;}
             hoverTarget=target;hoverButton.hidden=false;
-            const width=hoverButton.offsetWidth,height=hoverButton.offsetHeight;
+            const zoom=doc.defaultView.GNCResponsiveCanvas?.scale()||1;
+            const width=hoverButton.offsetWidth*zoom,height=hoverButton.offsetHeight*zoom;
             if(bottom-top<height){hide();return;}
             let left=rect.right-width-6;
             if(target.hasAttribute('data-ve-sports-background-area')){
                 if(target.classList.contains('ve-selected')){hide();return;}
                 top=bottom-height;left=rect.left+(rect.width-width)/2;
             }
-            const topValue=top+'px',leftValue=Math.max(6,Math.min(doc.documentElement.clientWidth-width-6,left))+'px';
+            const topValue=(top/zoom)+'px',leftValue=(Math.max(6,Math.min(doc.documentElement.clientWidth-width-6,left))/zoom)+'px';
             if(hoverButton.style.top!==topValue)hoverButton.style.top=topValue;
             if(hoverButton.style.left!==leftValue)hoverButton.style.left=leftValue;
             // Follow reveal/hover transforms even when the pointer is stationary.

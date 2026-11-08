@@ -1,6 +1,9 @@
 <?php
 require_once __DIR__ . '/../includes/privacy.php';
 require_once __DIR__ . '/../includes/breadcrumbs.php';
+require_once __DIR__ . '/../admin/settings-functions.php';
+try { $gncStudentEmailUrl=studentEmailUrl(); }
+catch (Throwable $exception) { $gncStudentEmailUrl=GNC_STUDENT_EMAIL_DEFAULT_URL; error_log('Student email link setting unavailable.'); }
 /**
  * Shared navbar partial.
  *
@@ -248,7 +251,8 @@ $studentLifeGroups = [
     ]],
     ['heading' => 'Student Resources', 'items' => [
         ['label' => 'Student Portal', 'href' => '/coming-soon.php', 'target' => '_blank'],
-        ['label' => 'OSA Student Grievance', 'href' => 'https://osa.gncipampanga.com/', 'target' => '_blank'],
+        ['label' => 'Office of Student Affairs Portal', 'href' => 'https://osa.gncipampanga.com/', 'target' => '_blank'],
+        ['label' => 'OSA Student Grievance', 'href' => 'https://docs.google.com/forms/d/e/1FAIpQLSc0ZkdNZ12ITe7ZgPCnUyHGkt7d1GvJhKrtFKP-3pdn9Grnwg/viewform', 'target' => '_blank'],
         ['label' => 'GNCI Library', 'href' => 'http://library.gncipampanga.com/', 'target' => '_blank'],
         ['label' => 'Frequently Asked Questions', 'href' => '/pages/faq.php'],
     ]],
@@ -425,7 +429,7 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
                 </li>
 
                 <li class="nav-item ms-2">
-                    <a class="btn-portal" href="https://login.microsoftonline.com/" target="_blank" rel="noopener noreferrer">
+                    <a class="btn-portal" href="<?= htmlspecialchars($gncStudentEmailUrl,ENT_QUOTES,'UTF-8') ?>" target="_blank" rel="noopener noreferrer">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill" viewBox="0 0 16 16">
                             <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
                         </svg>
@@ -514,7 +518,7 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
         </ul>
 
         <div class="gnc-mobile-portal d-grid gap-2">
-            <a class="btn-portal w-100 justify-content-center" href="https://login.microsoftonline.com/" target="_blank" rel="noopener noreferrer">
+            <a class="btn-portal w-100 justify-content-center" href="<?= htmlspecialchars($gncStudentEmailUrl,ENT_QUOTES,'UTF-8') ?>" target="_blank" rel="noopener noreferrer">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill" viewBox="0 0 16 16">
                     <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
                 </svg>
