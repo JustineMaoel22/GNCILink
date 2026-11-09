@@ -485,6 +485,9 @@
         '.gnc-backtop,#gncBackTop,.gnc-scroll-progress,#gnc-intro,.chatbot,[id*="chatbot"],#gncbot{display:none!important}',
         '.ve-hover{outline:2px dashed rgba(211,166,58,.95)!important;outline-offset:4px!important}',
         '.ve-selected{outline:2px solid #1f7a3d!important;outline-offset:4px!important}',
+        // Reserved heading slots can overlap moved sibling text; only the text should receive clicks.
+        '.dept-hero-title [data-text-layout-slot]{pointer-events:none}',
+        '.dept-hero-title [data-text-layout-slot]>[data-gnc-text]{pointer-events:auto}',
         '.ve-drag-handle{position:absolute;top:8px;right:8px;z-index:8;display:flex;align-items:center;gap:5px;padding:7px 10px;border:1px solid #b9cec0;border-radius:8px;background:#fff;color:#245b36;font:600 12px system-ui;cursor:grab;touch-action:none;box-shadow:0 2px 8px #0002}',
         '.ve-drag-handle:focus-visible{outline:3px solid #d3a63a;outline-offset:3px}',
         '.ve-drag-source{opacity:.3!important;outline:3px solid #1f7a3d!important;outline-offset:4px!important}',
