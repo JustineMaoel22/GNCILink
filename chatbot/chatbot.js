@@ -31,6 +31,44 @@
 
   var endpoint = root.getAttribute('data-endpoint') || '/chatbot/chatbot.php';
   var state = { messages: [], busy: false, open: false, ctrl: null, typingNode: null };
+  var allowanceNode = root.querySelector('.gncbot-allowance'), allowanceTimer = null, allowanceRequest = 0;
+  var allowanceBusy=false, allowanceFailures=0, allowanceNext=0;
+  function showAllowance(data) {
+    if (!allowanceNode) { return; }
+    var a = data && data.allowance;
+    if (!a || !Number.isInteger(a.limit) || !Number.isInteger(a.remaining) || !Number.isInteger(a.retry_after)) {
+      allowanceNode.textContent = 'Message allowance is temporarily unavailable.';
+      clearTimeout(allowanceTimer);
+      allowanceFailures++;
+      allowanceNext=Math.max(allowanceNext,Date.now()+Math.min(300000,30000*Math.pow(2,allowanceFailures-1)));
+      if (state.open && allowanceFailures<5) { allowanceTimer = setTimeout(refreshAllowance, allowanceNext-Date.now()); }
+      return;
+    }
+    var text = a.remaining + ' of ' + a.limit + ' messages available';
+    allowanceFailures=0;allowanceNext=Date.now()+30000;
+    if (a.retry_after > 0) {
+      text += ' ' + (a.remaining === 0 ? 'Try again' : 'More available') + ' in ' + Math.ceil(a.retry_after / 60) + ' min.';
+    }
+    allowanceNode.textContent = text;
+    allowanceNode.title = 'Greetings and thanks do not use this allowance. Shared networks share the same limit. Site-wide availability may vary.';
+    clearTimeout(allowanceTimer);
+    if (state.open) { allowanceTimer = setTimeout(refreshAllowance, Math.min(a.retry_after || 30, 30) * 1000); }
+  }
+  function refreshAllowance() {
+    if (!state.open || state.busy || document.hidden || allowanceBusy) { return; }
+    if(Date.now()<allowanceNext){clearTimeout(allowanceTimer);allowanceTimer=setTimeout(refreshAllowance,allowanceNext-Date.now());return;}
+    allowanceBusy=true;
+    var request = ++allowanceRequest;
+    fetch(endpoint, {
+      method: 'POST', credentials: 'same-origin', signal: AbortSignal.timeout(10000),
+      headers: { 'Content-Type': 'application/json', 'X-GNCI-Chat': '1' },
+      body: JSON.stringify({ action: 'status' })
+    }).then(function (res) { if(!res.ok){allowanceNext=Date.now()+(Number(res.headers.get('Retry-After'))||60)*1000;throw Error('Allowance unavailable');}return res.json(); }).then(function (data) {
+      if (request === allowanceRequest) { showAllowance(data); }
+    }).catch(function () {
+      if (request === allowanceRequest) { showAllowance(null); }
+    }).finally(function(){allowanceBusy=false;});
+  }
   var mascot = el.launcher.querySelector('.gncbot-mascot');
   if (mascot && mascot.dataset.activeSrc) {
     var activeMascotPreload = new Image();
@@ -65,6 +103,7 @@
   document.documentElement.addEventListener('pointerleave', resetMascotGaze);
   window.addEventListener('blur', resetMascotGaze);
   document.addEventListener('visibilitychange', resetMascotGaze);
+  document.addEventListener('visibilitychange', function(){if(!document.hidden&&state.open&&allowanceFailures<5)refreshAllowance();});
   gazeMotion.addEventListener('change', resetMascotGaze);
   gazePointer.addEventListener('change', resetMascotGaze);
   var consentKey = 'gncbot.ai-consent.v1', agreed = false;
@@ -241,6 +280,7 @@
     var history = state.messages.slice(-MAX_HISTORY).map(function (m) { return { role: m.role, text: m.text.slice(0, 600) }; });
     if (!isRetry) { addBubble('user', text); el.chips.innerHTML = ''; }
     el.input.value = ''; autosize(); setBusy(true); showTyping(true);
+    ++allowanceRequest; clearTimeout(allowanceTimer);
 
     if (state.ctrl) { state.ctrl.abort(); }
     var ctrl = new AbortController(); state.ctrl = ctrl;
@@ -253,6 +293,7 @@
     }).then(function (res) {
       return res.text().then(function (t) { var d = null; try { d = JSON.parse(t); } catch (e) { /* non-JSON (e.g. PHP die) */ } return d; });
     }).then(function (d) {
+      showAllowance(d);
       showTyping(false);
       if (d && d.ok && typeof d.reply === 'string') {
         state.messages.push({ role: 'user', text: text }, { role: 'model', text: d.reply, links: d.links || [] }); save();
@@ -269,6 +310,7 @@
     }).then(function () {
       clearTimeout(timer); if (state.ctrl === ctrl) { state.ctrl = null; }
       if (state.ctrl === null || state.ctrl === ctrl) { setBusy(false); }
+      // The message response already contains the allowance; no duplicate status request.
       if (state.open && matchMedia('(hover: hover)').matches) { el.input.focus(); }
     });
   }
@@ -277,6 +319,7 @@
     if (state.ctrl) { state.ctrl.abort(); state.ctrl = null; }
     showTyping(false); setBusy(false);
     state.messages = []; save(); redraw(); el.input.value = ''; autosize();
+    refreshAllowance();
   }
 
   /* ------------------------------------------------------------ open / close */
@@ -313,6 +356,8 @@
     resetMascotGaze();
     clearTimeout(closeTimer);
     state.open = open;
+    clearTimeout(allowanceTimer);
+    if (open) { refreshAllowance(); }
     if (mascot) { mascot.src = open ? mascot.dataset.activeSrc : mascot.dataset.idleSrc; }
     el.launcher.setAttribute('aria-expanded', open ? 'true' : 'false');
     el.launcher.setAttribute('aria-label', open ? 'Close chat with Cian' : 'Open chat with Cian');

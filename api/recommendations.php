@@ -8,7 +8,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') { http_response_code(405); ech
 $cache = sys_get_temp_dir().'/gnc-rec-v2-'.hash('sha256', __DIR__.DB_NAME).'.json';
 $lock = fopen($cache.'.lock', 'c');
 try {
-    if (!$lock || !flock($lock, LOCK_EX)) throw new RuntimeException('Catalog lock unavailable');
+    if (!$lock || !flock($lock, LOCK_EX|LOCK_NB)) {
+        // Do not tie up PHP workers behind a slow catalog rebuild.
+        if (is_file($cache) && time()-filemtime($cache)<300 && ($stale=@file_get_contents($cache))!==false && is_array(json_decode($stale,true))) {
+            header('Cache-Control: public, max-age=10');echo $stale;exit;
+        }
+        throw new RuntimeException('Catalog lock unavailable');
+    }
     if (is_file($cache) && time()-filemtime($cache)<60) {
         $json=file_get_contents($cache);
     } else {
@@ -18,6 +24,6 @@ try {
     header('Cache-Control: public, max-age=30');
     echo $json;
 } catch (Throwable $e) {
-    error_log('Recommendation catalog: '.$e->getMessage());
-    http_response_code(503); header('Cache-Control: no-store'); echo '{"items":[]}';
+    error_log('Recommendation catalog unavailable.');
+    http_response_code(503); header('Cache-Control: no-store'); header('Retry-After: 30'); echo '{"items":[]}';
 } finally { if ($lock) { flock($lock, LOCK_UN); fclose($lock); } }

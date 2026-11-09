@@ -22,6 +22,7 @@ const GNCBOT_FRIENDLY_ERR = "Sorry, I'm having trouble responding right now. Ple
 
 function gncbot_out(int $http, array $body)
 {
+    if (function_exists('gncbot_allowance')) { $body['allowance'] = gncbot_allowance(); }
     http_response_code($http);
     echo json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
@@ -34,7 +35,7 @@ function gncbot_fail(int $http, string $msg, string $code)
 // Never let PHP warnings/exceptions leak into the response.
 ini_set('display_errors', '0');
 set_exception_handler(function (Throwable $e) {
-    error_log('[gncbot] uncaught: ' . get_class($e) . ' ' . $e->getMessage());
+    error_log('[gncbot] uncaught: ' . get_class($e));
     if (!headers_sent()) { http_response_code(500); }
     echo json_encode(['ok' => false, 'error' => 'server', 'message' => GNCBOT_FRIENDLY_ERR]);
     exit;
@@ -60,6 +61,10 @@ $raw = file_get_contents('php://input', false, null, 0, 20000);
 if ($raw === false || $raw === '' || strlen($raw) >= 20000) { gncbot_fail(400, 'Bad request.', 'bad_request'); }
 $in = json_decode($raw, true);
 if (!is_array($in)) { gncbot_fail(400, 'Bad request.', 'bad_request'); }
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/inc/ratelimit.php';
+// Local status only: no message, database lookup or AI request is needed.
+if (($in['action'] ?? '') === 'status') { gncbot_out(200, ['ok' => true]); }
 if (($in['ai_notice_accepted']??null)!==true) { gncbot_fail(422,'Please review the Google Gemini notice and choose whether to send your message.','privacy_choice'); }
 
 // ---------------------------------------------------------------- sanitise input
@@ -124,6 +129,7 @@ require_once __DIR__ . '/inc/prompt.php';
 require_once __DIR__ . '/inc/gemini.php';
 
 if (!gncbot_throttle_ok()) {
+    header('Retry-After: '.max(60,(int)(gncbot_allowance()['retry_after']??600)));
     gncbot_fail(429, "You're sending messages very quickly. Please wait a moment and try again.", 'throttled');
 }
 
@@ -132,7 +138,7 @@ try {
     $retriever = new GncbotRetriever(getDB(), $pageCtx);
     $result    = $retriever->retrieve($message, $history);
 } catch (Throwable $e) {
-    error_log('[gncbot] retrieval failed: ' . $e->getMessage());
+    error_log('[gncbot] retrieval failed: ' . get_class($e));
     gncbot_fail(503, GNCBOT_FRIENDLY_ERR, 'database');
 }
 // Clearly unrelated question: answer locally (no Gemini call, no cost, nothing to hallucinate).

@@ -55,8 +55,7 @@
     window.addEventListener('gnc:privacychange',()=>{visit();render();});
     window.addEventListener('gnc:recommendation-profile-change',render);
     window.addEventListener('storage',event=>{if(event.key===key)render();});
-    fetch('/api/recommendations.php',{credentials:'omit',signal:AbortSignal.timeout(10000)})
-        .then(response=>{if(!response.ok)throw Error('Suggestions unavailable');return response.json();})
+    engine.catalog()
         .then(data=>{
             items=Array.isArray(data.items)?data.items:[];const path=engine.canonical(location.href);
             current=items.find(item=>(item.aliases||[item.url]).some(alias=>engine.canonical(alias)===path));

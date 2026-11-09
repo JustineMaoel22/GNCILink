@@ -60,6 +60,8 @@ function facebookGraphRequest(string $method, string $path, array $params, ?stri
     $secret = (string)env('FB_PUBLISH_APP_SECRET', '');
     if ($secret !== '' && !str_contains($auth, '|')) $params['appsecret_proof'] = hash_hmac('sha256', $auth, $secret);
     if (!function_exists('curl_init')) throw new FacebookPublishingError('PHP cURL is required for Facebook publishing.');
+    require_once __DIR__.'/request-protection.php';
+    if (!gncIntegrationReserve('facebook-publishing',600,3000)) throw new FacebookPublishingError('Facebook usage limit reached. Please try again later.');
     $url = 'https://graph.facebook.com/' . $version . '/' . $path;
     if ($method === 'GET') $url .= '?' . http_build_query($params);
     $curl = curl_init($url);

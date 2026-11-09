@@ -49,6 +49,7 @@ function initSession() {
         if (rbacRequestRoute()!=='/admin/action/editor-presence-handler.php') $_SESSION['last_activity'] = time();
     }
     authEnforceTransport();
+    gncRequestBoundary(true);
     if (isLoggedIn()) rbacRequestBoundary();
 }
 

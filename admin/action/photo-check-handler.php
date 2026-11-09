@@ -19,9 +19,10 @@ function photoCheckFail(string $message, int $status): void {
     exit;
 }
 
-// Self-test: open  /admin/action/photo-check-handler.php?test=1  in the browser while logged in.
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['test'])) {
+// Diagnostic: authenticated POST with test=1 and a valid CSRF token.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['test'])) {
     if (!isLoggedIn() || !hasPermission('manage_page_content')) photoCheckFail('Log in as an administrator first.', 403);
+    if (!verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) photoCheckFail('Refresh the page and try again.', 403);
     unset($_SESSION['photo_check_down_until'], $_SESSION['photo_check_down_why']);
     $report = [
         'curl_loaded'   => function_exists('curl_init'),

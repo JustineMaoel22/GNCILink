@@ -110,8 +110,7 @@
     window.addEventListener('storage',e=>{if(e.key===KEY){load();render(false);}});
     load();
     state.consent=!!window.GNCPrivacy?.allows('personalization');
-    fetch('/api/recommendations.php',{credentials:'omit',signal:AbortSignal.timeout(10000)})
-        .then(r=>{if(!r.ok)throw Error('Catalog unavailable');return r.json();})
+    engine.catalog()
         .then(data=>{
             items=Array.isArray(data.items) ? data.items : [];
             const path=engine.canonical(location.href);

@@ -23,7 +23,11 @@
             const active = directory.querySelector(url.searchParams.has('p') ? '.student-org-pagination [aria-current="page"], .student-org-filters [aria-current]' : '.student-org-filters [aria-current], .student-org-filters a');
             if (active && push) active.focus({preventScroll: true});
         } catch (error) {
-            if (error.name !== 'AbortError' && controller === pending) location.assign(url.href);
+            if (error.name !== 'AbortError' && controller === pending) {
+                let status=directory.querySelector('[data-request-status]');
+                if(!status){status=document.createElement('p');status.dataset.requestStatus='1';status.setAttribute('role','status');directory.append(status);}
+                status.textContent='Organizations could not be loaded. Please wait a moment and try again.';
+            }
         } finally {
             if (controller === pending) { directory.removeAttribute('aria-busy'); pending = null; }
         }

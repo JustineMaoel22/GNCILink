@@ -51,6 +51,8 @@ function loadSecretsArray(string $path): void {
 
 loadEnv(__DIR__ . '/../.env');
 loadSecretsArray(__DIR__ . '/secrets.php');
+require_once __DIR__ . '/../includes/request-protection.php';
+gncRequestBoundary();
 // Deployment URL routing needs the environment/secrets overrides loaded first.
 gncBrowserRoutingStart();
 

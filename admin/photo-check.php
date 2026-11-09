@@ -207,6 +207,10 @@ TXT;
         for ($attempt = 1; $attempt <= 2; $attempt++) {
             $remaining = 45 - (time() - $started);
             if ($remaining <= 0) break 2;
+            require_once __DIR__.'/../includes/request-protection.php';
+            if (!gncIntegrationReserve('photo-gemini',300,1500)) {
+                return ['checked'=>false,'ok'=>false,'reason'=>'unavailable','message'=>'The photo-check usage limit has been reached. Please try again later.'];
+            }
             $ch = curl_init('https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent');
             // Windows PHP may have no bundled CA file; use the OS trust store.
             if (PHP_OS_FAMILY === 'Windows' && defined('CURLSSLOPT_NATIVE_CA')) {
@@ -231,7 +235,7 @@ TXT;
             if ($body !== false && $status === 200) break 2;                     // got an answer
             $tried[] = $model . ' → HTTP ' . $status . ($err !== '' ? ' (' . $err . ')' : '');
             // 429 = this model's per-minute quota is used up: retrying it only wastes time, go to the next model now.
-            if ($status === 429) break;
+            if ($status === 429) break 2;
             $retryable = in_array($status, [0, 500, 502, 503, 504], true);
             if (!$retryable) break;                                              // 400/403/404: try the next model
             if ($attempt === 1) usleep(800000);                                  // brief pause, then retry once
@@ -239,8 +243,8 @@ TXT;
     }
 
     if ($body === false || $status !== 200) {
-        $why = implode('; ', $tried) . ' | ' . ($err !== '' ? $err : substr((string)$body, 0, 200));
-        error_log('Photo check unavailable: ' . $why);
+        $why = 'HTTP '.$status.' after '.count($tried).' attempts';
+        error_log('Photo check unavailable: HTTP ' . $status);
         $_SESSION['photo_check_down_until'] = time() + 20;
         $_SESSION['photo_check_down_why']   = substr($why, 0, 160);
         $res = $skip('Gemini request failed on all models: ' . $why);

@@ -61,7 +61,16 @@
         }
         return chosen;
     }
-    const api={canonical,features,similarity,rank};
+    // Both recommendation widgets share one in-flight request and a 30-second snapshot.
+    let catalogRequest, catalogUntil=0;
+    function catalog() {
+        if (catalogRequest && Date.now()<catalogUntil) return catalogRequest;
+        catalogUntil=Date.now()+30000;
+        catalogRequest=fetch('/api/recommendations.php',{credentials:'omit',signal:AbortSignal.timeout(10000)})
+            .then(response=>{if(!response.ok)throw Error('Suggestions temporarily unavailable');return response.json();});
+        return catalogRequest;
+    }
+    const api={canonical,features,similarity,rank,catalog};
     if (typeof module !== 'undefined' && module.exports) module.exports=api;
     else root.GNCRecommendations=api;
 })(typeof window === 'undefined' ? globalThis : window);

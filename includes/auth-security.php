@@ -8,10 +8,10 @@ function authIp(): string {
 }
 function authIsHttps(): bool {
     if((!empty($_SERVER['HTTPS'])&&strtolower((string)$_SERVER['HTTPS'])!=='off')||(int)($_SERVER['SERVER_PORT']??0)===443||strtolower((string)($_SERVER['REQUEST_SCHEME']??''))==='https')return true;
-    if(strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO']??''))==='https'||strtolower((string)($_SERVER['HTTP_X_FORWARDED_SSL']??''))==='on')return true;
-    if(!empty($_SERVER['HTTP_CF_VISITOR'])&&str_contains((string)$_SERVER['HTTP_CF_VISITOR'],'"scheme":"https"'))return true;
     $trusted=array_filter(array_map('trim',explode(',',(string)env('AUTH_TRUSTED_PROXIES',''))));
-    return in_array(authIp(),$trusted,true)&&($_SERVER['HTTP_X_FORWARDED_PROTO']??'')==='https';
+    // Direct cPanel HTTPS uses server variables above. Only explicitly trusted
+    // proxy peers may supply a single, overwritten X-Forwarded-Proto value.
+    return in_array(authIp(),$trusted,true)&&strtolower(trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO']??'')))==='https';
 }
 function authNormalizeUrl(string $url): string {
     $url=trim($url);
@@ -26,9 +26,9 @@ function authNormalizeUrl(string $url): string {
 function authLocalDevelopment(): bool {
     $local=['localhost','127.0.0.1','::1','[::1]'];
     $configuredHost=strtolower((string)parse_url(authNormalizeUrl((string)APP_URL),PHP_URL_HOST));
-    $configured=in_array($configuredHost,$local,true);
+    $configured=in_array($configuredHost,array_merge($local,['admin.localhost']),true);
     $reqHost=strtolower((string)parse_url('http://'.($_SERVER['HTTP_HOST']??$_SERVER['SERVER_NAME']??''),PHP_URL_HOST));
-    if(in_array($reqHost,$local,true)||$reqHost==='admin.localhost')return true;
+    if($configured&&(in_array($reqHost,$local,true)||$reqHost==='admin.localhost'))return true;
     return $configured&&PHP_SAPI==='cli';
 }
 function authPublicOrigin(): string {
@@ -39,15 +39,7 @@ function authPublicOrigin(): string {
     $explicit=trim((string)env('AUTH_PUBLIC_URL',''));
     $candidate=$explicit!==''?$explicit:(string)APP_URL;
     $parts=parse_url(authNormalizeUrl($candidate));
-    // If AUTH_PUBLIC_URL was not set and APP_URL still points to localhost while running on a live domain, use the live host over HTTPS.
-    $reqHostRaw=trim((string)($_SERVER['HTTP_HOST']??$_SERVER['SERVER_NAME']??''));
-    $reqParts=$reqHostRaw!==''?parse_url('http://'.$reqHostRaw):false;
-    $reqHost=strtolower((string)($reqParts['host']??''));
-    if($explicit===''&&$reqHost!==''&&!in_array($reqHost,$local,true)&&preg_match('/^[a-z0-9.-]+$/i',$reqHost)&&in_array(strtolower((string)($parts['host']??'')),$local,true)){
-        $scheme=authIsHttps()||!in_array($reqHost,$local,true)?'https':'http';
-        $port=isset($reqParts['port'])&&(int)$reqParts['port']!==80&&(int)$reqParts['port']!==443?':'.(int)$reqParts['port']:'';
-        return $scheme.'://'.$reqHost.$port;
-    }
+    // Password reset destinations come from configuration, never an arbitrary Host.
     if(!$parts||empty($parts['host'])||isset($parts['user'])||isset($parts['pass'])||!in_array($parts['scheme']??'',['https','http'],true))throw new RuntimeException('Authentication URL is not configured.');
     $host=strtolower((string)$parts['host']);
     $scheme=strtolower((string)$parts['scheme']);
@@ -337,6 +329,9 @@ function authResetPassword(string $token,string $password,string $confirmation):
 // Separate transport function permits deterministic, isolated tests without external password queries.
 if(!function_exists('authPwnedRange')){
 function authPwnedRange(string $prefix): string {
+    if (!preg_match('/^[A-F0-9]{5}$/D',$prefix)) throw new InvalidArgumentException('Invalid password safety request.');
+    require_once __DIR__.'/request-protection.php';
+    if (!gncIntegrationReserve('password-safety',300,1500)) throw new RuntimeException('Password safety checks are temporarily busy. Please try again later.');
     if(!function_exists('curl_init'))throw new RuntimeException('Password safety check is temporarily unavailable. Try again later.');
     $curl=curl_init('https://api.pwnedpasswords.com/range/'.$prefix);
     curl_setopt_array($curl,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>3,CURLOPT_TIMEOUT=>8,CURLOPT_HTTPHEADER=>['Add-Padding: true','User-Agent: GNCILink-Password-Security'],CURLOPT_FOLLOWLOCATION=>false]);

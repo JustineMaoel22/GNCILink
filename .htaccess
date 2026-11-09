@@ -32,6 +32,13 @@ ErrorDocument 500 /errors/500.html
     ForceType application/manifest+json
 </Files>
 <IfModule mod_headers.c>
+    Header onsuccess unset X-Content-Type-Options
+    Header onsuccess unset X-Frame-Options
+    Header onsuccess unset Content-Security-Policy
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Content-Security-Policy "frame-ancestors 'self'; object-src 'none'; base-uri 'self'"
     <FilesMatch "^((admin-)?manifest\.json|offline\.html)$">
         Header set Cache-Control "no-cache, must-revalidate"
     </FilesMatch>
@@ -45,6 +52,10 @@ ErrorDocument 500 /errors/500.html
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /
+    # Apply before routing, on every hostname (including staging and direct IPs).
+    RewriteRule (^|/)(app|config|storage|vendor|cache|tests|database|scripts|docs|sql|\.git|\.agents|\.codex|\.aws)(/|$) - [F,END,NC]
+    RewriteRule (^|/)(\.env[^/]*|\.ht[^/]*|\.user\.ini|secrets(\.php)?|config(\.php)?|composer\.(json|lock)|package(-lock)?\.json|Dockerfile[^/]*|docker-compose[^/]*|[^/]+\.(sql|bak|log|ini|md))$ - [F,END,NC]
+    RewriteRule ^uploads/.*\.(php[0-9]*|phtml|pht|phar|cgi|pl|py|sh|shtml|html?|js)([./]|$) - [F,END,NC]
     RewriteRule ^service-worker\.js$ service-worker.php [END]
     RewriteRule ^admin/service-worker\.js$ admin/service-worker.php [END]
 
@@ -80,13 +91,6 @@ ErrorDocument 500 /errors/500.html
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost)(?::[0-9]+)?$ [NC]
     RewriteRule ^(cba|clinic|library|osa)\.gncipampanga\.com(/|$) - [F,END,NC]
 
-    # Block private directories
-    RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost)(?::[0-9]+)?$ [NC]
-    RewriteRule (^|/)(app|config|storage|vendor|\.git)(/|$) - [F,END,NC]
-
-    # Block sensitive files
-    RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost)(?::[0-9]+)?$ [NC]
-    RewriteRule (^|/)(\.env[^/]*|secrets(\.php)?|config(\.php)?|composer\.(json|lock)|package(-lock)?\.json|README\.md|[^/]+\.(sql|bak|log))$ - [F,END,NC]
 
 
     # ==========================================

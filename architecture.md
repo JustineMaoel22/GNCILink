@@ -86,6 +86,8 @@ Personnel portraits additionally use `includes/person-photo-check.php` and the l
 - Make media crop/reposition behavior predictable and preserve uploaded image aspect ratios.
 
 ## APIs and chatbot
+- Direct-cPanel deployment hardening and the read-only `scripts/check-deployment.php` preflight are documented in `docs/cpanel-deployment.md`. Root rules deny private artifacts on every hostname; `uploads/.htaccess` enforces static media handling. Authentication trusts forwarded HTTPS only from explicitly configured proxy peers.
+- Shared endpoint/IP/user budgets run through `includes/request-protection.php` at configuration/session bootstrap. Provider-attempt quotas also apply at outbound call sites. See `docs/api-request-protection.md` for endpoint inventory, limits, single-host storage and proxy setup, failure behavior and verification.
 - Keep secret API keys server-side.
 - Validate provider outputs before rendering them as HTML.
 - Apply rate limits and sensible timeouts to external requests.

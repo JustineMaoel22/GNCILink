@@ -21,6 +21,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 // Enforce the choice server-side too; bypassing the footer must not set an ID
 // or record visits before an opt-in. Preference cookies are not authorization.
 if (!gncPrivacyAllows('analytics')) { echo json_encode(['ok'=>false,'tracking'=>false]); exit; }
+if (($_SERVER['HTTP_SEC_FETCH_SITE']??'')==='cross-site') {http_response_code(403);echo '{"ok":false}';exit;}
+foreach (['path'=>2048,'title'=>300] as $key=>$limit) {
+    if (isset($_POST[$key]) && (!is_string($_POST[$key]) || strlen($_POST[$key])>$limit)) {http_response_code(400);echo '{"ok":false}';exit;}
+}
 try {
     $db = getDB();
     $pageTracked = false;

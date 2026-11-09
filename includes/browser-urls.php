@@ -54,6 +54,10 @@ function gncBrowserHtml(string $html, string $legacyPath): string {
     }
     require_once __DIR__ . '/pwa.php';
     $html = gncPwaHtml($html, $legacyPath);
+    if (strpos($html, '/assets/js/request-guard.js') === false) {
+        $guard='<script src="/assets/js/request-guard.js?v='.(int)filemtime(__DIR__.'/../assets/js/request-guard.js').'"></script>';
+        $html=preg_replace('~(<head\b[^>]*>)~i','$1'.$guard,$html,1);
+    }
     // Preserve relative assets and form actions at their original filesystem depth.
     $base = rtrim(str_replace('\\', '/', dirname($legacyPath)), '/') . '/';
     $hasBase = stripos($html, '<base ') !== false;

@@ -100,6 +100,12 @@ function getFacebookPosts(): array {
     if ($isFresh) {
         return fetchCachedFbPostsFromDb($db);
     }
+    // One refresh attempt per two minutes, including failures and empty feeds.
+    // Other visitors immediately receive the existing cache instead of queueing.
+    try { $refresh=gncRequestConsume('facebook-feed-refresh',1,120); }
+    catch (Throwable $e) { return fetchCachedFbPostsFromDb($db); }
+    if (!$refresh['allowed'] || !gncIntegrationReserve('facebook-feed',30,720)) return fetchCachedFbPostsFromDb($db);
+    $refreshDeadline=microtime(true)+20;
 
     // ---------------------------------------------------------------
     // Rate limiting: a hard cap on how many real Facebook calls we make
@@ -128,27 +134,28 @@ function getFacebookPosts(): array {
 
     $url = "https://graph.facebook.com/v19.0/{$pageId}/posts"
          . "?fields=id,message,created_time,permalink_url,full_picture,picture,"
-         . "attachments{media{image{src}},subattachments{media{image{src}}}}&limit=6"
-         . "&access_token={$accessToken}";
+         . "attachments{media{image{src}},subattachments{media{image{src}}}}&limit=6";
 
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer '.$accessToken]);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     $raw = curl_exec($ch);
     $curlErr = curl_error($ch);
     curl_close($ch);
 
     if ($raw === false) {
-        error_log("Facebook fetch failed: $curlErr");
+        error_log('Facebook feed request failed.');
         return fetchCachedFbPostsFromDb($db); // serve whatever's already cached, even if stale
     }
 
     $response = json_decode($raw, true);
 
     if (isset($response['error'])) {
-        error_log("Facebook API error: " . $response['error']['message']);
+        error_log('Facebook feed provider rejected the request.');
         return fetchCachedFbPostsFromDb($db);
     }
 
@@ -189,8 +196,9 @@ function getFacebookPosts(): array {
                 $imageMediaId = (int) $existing['image_media_id'];
             } else {
                 $candidates = gncPickFbImageUrls($post);
-                foreach ($candidates as $candidateUrl) {
-                    $imageMediaId = downloadAndStoreFbImageAsMedia($db, $post['id'], $candidateUrl);
+                foreach (array_slice($candidates,0,2) as $candidateUrl) {
+                    if (microtime(true)>=$refreshDeadline) break;
+                    $imageMediaId = downloadAndStoreFbImageAsMedia($db, $post['id'], $candidateUrl, $refreshDeadline);
                     if ($imageMediaId) break;
                 }
                 if (!$imageMediaId) {
@@ -280,24 +288,36 @@ function gncFbImageIsUsable(?string $publicPath): bool {
  * exactly like every other uploaded file in this project. Returns the
  * new media_id, or null if the download/insert failed.
  */
-function downloadAndStoreFbImageAsMedia(PDO $db, string $postId, string $remoteUrl): ?int {
+function downloadAndStoreFbImageAsMedia(PDO $db, string $postId, string $remoteUrl, ?float $deadline = null): ?int {
+    $parts=parse_url($remoteUrl);
+    $host=strtolower((string)($parts['host']??''));
+    if (($parts['scheme']??'')!=='https' || isset($parts['user']) || isset($parts['pass']) || (isset($parts['port']) && $parts['port']!==443)
+        || !preg_match('/(?:^|\.)(?:fbcdn\.net|fbsbx\.com)$/D',$host)) return null;
+    if (!gncIntegrationReserve('facebook-images',180,4320)) return null;
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $remoteUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);          // CDN links can redirect
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false); // Never follow a provider URL to an unvalidated host.
     curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_TIMEOUT, max(1,min(8,(int)floor(($deadline??microtime(true)+8)-microtime(true)))));
+    curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+    $download='';
+    curl_setopt($ch,CURLOPT_WRITEFUNCTION,static function($handle,string $chunk) use (&$download): int {
+        if(strlen($download)+strlen($chunk)>5*1024*1024)return 0;
+        $download.=$chunk;return strlen($chunk);
+    });
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (compatible; GNCWebsite/1.0)');
     curl_setopt($ch, CURLOPT_ENCODING, '');                   // accept gzip etc.
-    $imageData = curl_exec($ch);
+    $downloaded = curl_exec($ch);
+    $imageData = $downloaded===false?false:$download;
     $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlErr   = curl_error($ch);
     curl_close($ch);
 
     if ($imageData === false || $httpCode < 200 || $httpCode >= 300 || $imageData === '') {
-        error_log("Failed to download FB image for post $postId (HTTP $httpCode) $curlErr");
+        error_log('Facebook image download failed: HTTP '.(int)$httpCode);
         return null;
     }
 

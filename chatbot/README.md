@@ -39,6 +39,12 @@ Edit `inc/knowledge.php` -> `gncbot_page_urls()`. Entries set to `null` (vision-
 are never recommended until you fill in their real routes.
 
 ## Test
+The widget shows the remaining per-IP rolling 10-minute allowance from the server,
+refreshing while the panel is open and after requests. Greetings and thanks remain
+exempt; a new conversation does not reset the allowance. Shared networks share
+the same limit, and the site-wide daily cap can still make the assistant busy.
+`php chatbot/tests/allowance_test.php` checks allowance reporting and expiry without AI calls.
+
 `php chatbot/tests/cli_test.php` shows the exact GNCILink data sent to Gemini for the 10 test questions (free).
 `php chatbot/tests/cli_test.php --live "Your question"` also calls Gemini.
 

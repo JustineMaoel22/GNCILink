@@ -68,6 +68,7 @@ $gncbotExcited = rtrim(dirname($gncbotBase), '/') . '/assets/images/chatbot-exci
         <div class="gncbot-suggestions" aria-label="Suggested questions"></div>
         </div>
 
+        <p class="gncbot-allowance" role="status" aria-live="polite">Checking message allowance...</p>
         <form class="gncbot-form" autocomplete="off" hidden>
             <label for="gncbot-input" class="gncbot-sr">Type your question</label>
             <textarea id="gncbot-input" class="gncbot-input" rows="1" maxlength="500" placeholder="Ask about GNC programs, events, offices..." enterkeyhint="send"></textarea>

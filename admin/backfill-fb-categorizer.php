@@ -19,6 +19,13 @@ if (($_SESSION['user_role'] ?? '') !== 'Super Admin') {
     exit('Super Admin only.');
 }
 
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<form method="post"><input type="hidden" name="csrf_token" value="'.htmlspecialchars(generateCSRFToken(),ENT_QUOTES,'UTF-8').'"><button>Recategorize unlocked Facebook posts</button></form>';
+    exit;
+}
+if (!verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) rbacFail('Refresh the page and try again.',403);
+
 $db  = getDB();
 $map = gncLoadCategoryMap($db);
 

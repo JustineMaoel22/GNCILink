@@ -106,10 +106,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // given URL and swaps it into the current page in place — no navigation,
     // no reload, no scroll jump. Used by both the month-nav arrows and the
     // program filter dropdown below.
+    let calendarRequest;
     async function refreshEventsSection(url) {
-        const response = await fetch(url);
+        calendarRequest?.abort();
+        const request=new AbortController();calendarRequest=request;
+        const response = await fetch(url,{signal:request.signal});
         if (!response.ok) throw new Error('Calendar request failed: '+response.status);
         const html = await response.text();
+        if(request!==calendarRequest || request.signal.aborted)return;
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
@@ -143,8 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await refreshEventsSection(targetUrl.href);
         } catch (error) {
+            if(error.name==='AbortError')return;
             console.error('Failed to load calendar:', error);
-            window.location.href = targetUrl.href;
+            calendarError();
         }
     });
 
@@ -155,8 +160,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetUrl=new URL(link.href),currentParams=new URLSearchParams(location.search);
         ['evt_month','evt_year'].forEach(key=>{if(currentParams.has(key))targetUrl.searchParams.set(key,currentParams.get(key));});
         try {await refreshEventsSection(targetUrl.href);}
-        catch(error){console.error('Failed to filter events:',error);window.location.href=link.href;}
+        catch(error){if(error.name!=='AbortError')calendarError();}
     });
+
+    function calendarError(){
+        const target=document.querySelector('.gnc-cal-card');if(!target)return;
+        let status=target.querySelector('[data-request-status]');
+        if(!status){status=document.createElement('p');status.dataset.requestStatus='1';status.setAttribute('role','status');target.append(status);}
+        status.textContent='Calendar details could not be loaded. Please wait a moment and try again.';
+    }
 
     // Program filter dropdown — stays exactly where the user is, no reload.
     const programSelect = document.getElementById('evtProgramFilter');

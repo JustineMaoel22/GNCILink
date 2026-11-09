@@ -5,6 +5,7 @@
         var endpoint='/admin/action/editor-presence-handler.php', token='', route='', generation=0;
         var pending=Promise.resolve(), connecting=Promise.resolve(), timer=0, lastInteraction=Date.now(), lastEdit=0;
         var disposed=false, offline=false, stale=false, users=[], stopped=false, sending=false, failureMessage='';
+        var polling=false, failures=0, nextPoll=0;
         var button=document.getElementById('vePresenceButton'), panel=document.getElementById('vePresencePanel');
         var list=document.getElementById('vePresenceList'), warning=document.getElementById('vePresenceWarning');
         var message=document.getElementById('vePresenceMessage'), recovery=document.getElementById('vePresenceRecovery');
@@ -44,28 +45,30 @@
             var data=await response.json().catch(function(){return {};});
             if (!response.ok||!data.success) {
                 var error=Error(data.error||'Your session ended or active users are unavailable.');
-                error.status=response.status;throw error;
+                error.status=response.status;error.retryAfter=Number(response.headers.get('Retry-After'))||0;throw error;
             }
             return data;
         }
-        function accept(data){users=data.users||users;stale=!!data.stale;offline=false;failureMessage='';paint();}
+        function accept(data){users=data.users||users;stale=!!data.stale;offline=false;failureMessage='';failures=0;nextPoll=0;stopped=false;paint();}
         function beacon(action,peer){if(!peer)return;var body=new URLSearchParams({action:action,csrf_token:options.csrf,token:peer});navigator.sendBeacon(endpoint,body);}
-        function schedule(){clearTimeout(timer);if(!disposed&&!stopped)timer=setTimeout(poll,5000);}
+        function schedule(){clearTimeout(timer);if(!disposed&&!stopped)timer=setTimeout(poll,Math.max(5000,nextPoll-Date.now()));}
         async function poll(){
-            if(disposed||stopped)return;
+            if(disposed||stopped||polling)return;
+            if(Date.now()<nextPoll){schedule();return;}
             if(Date.now()-lastInteraction>300000&&!options.busy()){
                 // Stop advertising an abandoned tab without forgetting its concurrency baseline.
                 schedule();return;
             }
             if(!token||sending){schedule();return;}
             var current=generation;
-            try{var data=await call('ping',{activity:activity()});if(current===generation)accept(data);}
-            catch(error){if(current===generation){offline=true;failureMessage=error.message;if([0,302,401,403].indexOf(error.status)>=0)stopped=true;paint();}}
-            finally{schedule();}
+            polling=true;
+            try{var data=await call('ping',{activity:activity()});if(current===generation){failures=0;nextPoll=0;accept(data);}}
+            catch(error){if(current===generation){offline=true;failureMessage=error.message;failures++;nextPoll=Date.now()+Math.max(5000*Math.pow(2,Math.min(failures,6)),error.retryAfter*1000||0);if([0,302,401,403].indexOf(error.status)>=0||failures>=5)stopped=true;paint();}}
+            finally{polling=false;schedule();}
         }
         function open(url){
             var next=String(url||'/');
-            var current=++generation,old=token;route=next;token='';users=[];stale=false;offline=false;stopped=false;
+            var current=++generation,old=token;route=next;token='';users=[];stale=false;offline=false;stopped=false;failures=0;nextPoll=0;
             clearTimeout(timer);beacon('leave',old);status.textContent='Connecting…';
             connecting=(async function(){
                 try{
@@ -80,7 +83,7 @@
         async function check(){
             await connecting;
             if(!token||offline){
-                if(token){try{accept(await call('check',{activity:activity()}));}catch(error){offline=true;paint();throw error;}}
+                if(token){try{accept(await call('check',{activity:activity()}));return;}catch(error){offline=true;paint();throw error;}}
                 else throw Error('Reconnect to the editor before saving. Your pending work is kept here.');
             }
             try{accept(await call('check',{activity:activity()}));}

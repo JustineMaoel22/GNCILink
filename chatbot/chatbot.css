@@ -91,6 +91,7 @@
 .gncbot-chip:hover { color: #fff; background: var(--gb-green); }
 
 /* ---- composer ---- */
+.gncbot-allowance { flex-shrink: 0; margin: 0; padding: 6px 12px; font-size: 12px; color: var(--gb-dark); background: var(--gb-bg); border-top: 1px solid var(--gb-line); }
 .gncbot-form { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px 6px; background: #fff; border-top: 1px solid var(--gb-line); }
 .gncbot-input { flex: 1; min-height: 40px; max-height: 110px; resize: none; padding: 9px 12px; font: inherit; color: var(--gb-ink); background: #fff; border: 1px solid #c9d3cb; border-radius: 10px; }
 .gncbot-input:focus { border-color: var(--gb-green); }

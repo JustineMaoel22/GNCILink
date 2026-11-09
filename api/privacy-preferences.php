@@ -1,6 +1,7 @@
 <?php
 // Clear only the optional HttpOnly visitor identifier, never login cookies.
 require_once __DIR__.'/../includes/privacy.php';
+require_once __DIR__.'/../config/config.php';
 header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');
 if (($_SERVER['REQUEST_METHOD']??'')!=='POST' || ($_SERVER['HTTP_X_GNC_PRIVACY']??'')!=='1'
     || ($_SERVER['HTTP_SEC_FETCH_SITE']??'')==='cross-site') { http_response_code(403);echo '{"ok":false}';exit; }

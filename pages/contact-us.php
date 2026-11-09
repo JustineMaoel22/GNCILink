@@ -40,6 +40,7 @@ function e($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
  * Otherwise falls back to PHP's mail(), which only works on a server with mail set up.
  */
 function gncSendContactMail(string $to, string $name, string $replyEmail, string $subject, string $body, string $headers): bool {
+    if (!gncIntegrationReserve('contact-mail',200,1000)) return false;
     $autoload = __DIR__ . '/../vendor/autoload.php';
     if (is_file($autoload)) { require_once $autoload; }
 
@@ -54,6 +55,8 @@ function gncSendContactMail(string $to, string $name, string $replyEmail, string
         try {
             $m = new PHPMailer\PHPMailer\PHPMailer(true);
             $m->isSMTP();
+            $m->Timeout = 15;
+            $m->Timelimit = 20;
             $m->Host       = $env('MAIL_HOST', 'smtp.gmail.com');
             $m->SMTPAuth   = true;
             $m->Username   = $user;
@@ -71,7 +74,7 @@ function gncSendContactMail(string $to, string $name, string $replyEmail, string
             $m->send();
             return true;
         } catch (Throwable $ex) {
-            error_log('Contact form SMTP error: ' . $ex->getMessage());
+            error_log('Contact form SMTP delivery failed.');
             return false;
         }
     }
@@ -100,12 +103,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' && isset($_SESSION['contact_flash'])) 
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $old['name']    = trim($_POST['name'] ?? '');
-    $old['email']   = trim($_POST['email'] ?? '');
-    $old['subject'] = trim($_POST['subject'] ?? '');
-    $old['message'] = trim($_POST['message'] ?? '');
+    foreach (array_keys($old) as $field) $old[$field]=is_string($_POST[$field]??null)?trim($_POST[$field]):'';
 
-    if (!hash_equals($_SESSION['csrf'], $_POST['csrf'] ?? '')) {
+    if (!is_string($_POST['csrf']??null) || !hash_equals($_SESSION['csrf'], $_POST['csrf'])) {
         $errors[] = 'Your session expired. Please try again.';
     } elseif (!empty($_POST['gnc_hp_7f3a'])) {
         // Honeypot filled in: pretend success, send nothing.

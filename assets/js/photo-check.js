@@ -245,7 +245,7 @@
                     compareWarning(res, selectedFile, person, accept, reject, function () {
                         fd.set('review_duplicate', '1');
                         open('<div class="pc-spin"></div><p>Recording review&hellip;</p>', false);
-                        fetch(HANDLER, { method:'POST',body:fd,credentials:'same-origin' })
+                        fetch(HANDLER, { method:'POST',body:fd,credentials:'same-origin',signal:AbortSignal.timeout(60000) })
                             .then(function (r) { return r.json(); })
                             .then(function (reviewed) {
                                 if (reviewed.success && reviewed.ok && reviewed.reviewed) accept();

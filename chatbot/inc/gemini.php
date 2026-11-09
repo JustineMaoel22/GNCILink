@@ -57,14 +57,19 @@ function gncbot_gemini_generate(string $systemInstruction, array $contents): arr
 
     $url = $base . '/models/' . $model . ':generateContent';
 
+    require_once __DIR__.'/../../includes/request-protection.php';
+    $deadline=microtime(true)+28;
     for ($attempt = 0; $attempt < 3; $attempt++) {
+        $remaining=(int)floor($deadline-microtime(true));
+        if ($remaining<1) return ['ok'=>false,'error'=>'timeout'];
+        if (!gncIntegrationReserve('chatbot-gemini',1000, max(1,(int)(function_exists('env')?env('GNCBOT_DAILY_LIMIT',3000):3000))*2)) return ['ok'=>false,'error'=>'rate_limited'];
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => $payload,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_TIMEOUT        => max(5, $timeout),
+            CURLOPT_TIMEOUT        => min($remaining,max(5, $timeout)),
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'x-goog-api-key: ' . $key],

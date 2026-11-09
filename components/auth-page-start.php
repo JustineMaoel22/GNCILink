@@ -2,6 +2,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+    <script src="/assets/js/request-guard.js?v=<?= (int) filemtime(__DIR__.'/../assets/js/request-guard.js') ?>"></script>
     <meta charset="utf-8">
     <?php require_once __DIR__.'/../includes/pwa.php'; echo gncPwaHead(true); ?>
     <meta name="viewport" content="width=device-width, initial-scale=1">
