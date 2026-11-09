@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/admin-origin.php';
 /** Short browser addresses with the original routes retained for CMS/RBAC code. */
 function gncBrowserRoutes(): array {
     static $routes;
@@ -73,6 +74,7 @@ function gncBrowserHtml(string $html, string $legacyPath): string {
                 $resolved = '/' . implode('/', $segments);
             }
             $clean = gncBrowserUrl($resolved);
+            if (gncAdminRequestOrigin()!==null && gncPwaPublicUrl($clean)) $clean='https://gncipampanga.com'.$clean;
             if ($clean === $resolved) return $href[0];
             return 'href=' . $href[1] . htmlspecialchars($clean, ENT_QUOTES, 'UTF-8') . $href[1];
         }, $tag);
@@ -85,8 +87,10 @@ function gncBrowserRoutingStart(): void {
     $started = true;
     if (PHP_SAPI === 'cli') return;
     $host = $_SERVER['HTTP_HOST'] ?? '';
-    if (!preg_match('~^(?:(?:www\.)?gncipampanga\.com|localhost|127\.0\.0\.1)(?::[0-9]+)?$~iD', $host)) return;
+    if (gncAdminRequestOrigin()===null && !preg_match('~^(?:(?:www\.)?gncipampanga\.com|localhost|127\.0\.0\.1)(?::[0-9]+)?$~iD', $host)) return;
     $request = $_SERVER['REQUEST_URI'] ?? '/';
+    $adminTarget=gncAdminOriginRedirect($request,$_SERVER['REQUEST_METHOD']??'GET');
+    if ($adminTarget!==null) {header('Cache-Control: no-store');header('Referrer-Policy: no-referrer');header('Location: '.$adminTarget,true,302);exit;}
     $clean = gncBrowserUrl($request);
     if ($clean !== $request && in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true)) {
         header('Location: ' . $clean, true, 302);

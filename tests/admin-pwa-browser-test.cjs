@@ -35,7 +35,7 @@ async function until(fn, message) {
 
     await send('Page.enable');await send('Network.enable');
     await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
-    const base='http://localhost:8080';
+    const base=process.argv.includes('--subdomain')?'http://admin.localhost:8080':'http://localhost:8080';
     const visit=async route=>{await send('Page.navigate',{url:base+route});await until(()=>evaluate("document.readyState==='complete'"),'Page unavailable: '+route);};
     await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
     await visit('/admin/dashboard');
@@ -124,8 +124,18 @@ async function until(fn, message) {
     await visit('/admin/login');
     assert.equal(await evaluate('location.pathname'),'/admin/dashboard');
     await visit('/');
+    if(process.argv.includes('--subdomain')){
+        assert.equal(await evaluate('location.pathname'),'/admin/dashboard','Admin subdomain root launches the signed-in admin app');
+        assert.equal(await evaluate("document.querySelector('link[rel=manifest]').getAttribute('href')"),'/admin-manifest.json');
+        assert.equal(await evaluate("fetch('/service-worker.js').then(r=>r.status)"),404,'Visitor root worker cannot be installed on admin origin');
+        assert.equal(await evaluate("navigator.serviceWorker.getRegistrations().then(regs=>regs.some(r=>r.scope===location.origin+'/'))"),false,'Admin origin has no visitor root worker');
+        const visitorCookies=await send('Network.getCookies',{urls:['http://localhost:8080/']});
+        assert.ok(!visitorCookies.cookies.some(c=>c.name===auth.name),'Admin session cookie stays off visitor origin');
+        await send('Page.navigate',{url:'http://localhost:8080/'});
+        await until(()=>evaluate("document.readyState==='complete'&&location.hostname==='localhost'"),'Separate visitor origin unavailable');
+    }
     assert.equal(await evaluate("document.querySelector('link[rel=manifest]').getAttribute('href')"),'/manifest.json','Public app identity remains separate');
-    await until(()=>evaluate("navigator.serviceWorker.getRegistrations().then(regs=>regs.some(r=>r.scope===location.origin+'/'&&r.active)&&regs.some(r=>r.scope===location.origin+'/admin/'&&r.active))"),'Visitor and admin workers coexist in the same browser profile');
+    await until(()=>evaluate(process.argv.includes('--subdomain')?"navigator.serviceWorker.getRegistrations().then(regs=>regs.some(r=>r.scope===location.origin+'/'&&r.active)&&!regs.some(r=>r.scope===location.origin+'/admin/'))":"navigator.serviceWorker.getRegistrations().then(regs=>regs.some(r=>r.scope===location.origin+'/'&&r.active)&&regs.some(r=>r.scope===location.origin+'/admin/'&&r.active))"),'Visitor and admin worker scopes match deployment origins');
     const apps=await evaluate("Promise.all(['/manifest.json','/admin-manifest.json'].map(url=>fetch(url).then(r=>r.json())))");
     assert.notEqual(apps[0].id,apps[1].id);assert.notEqual(apps[0].start_url,apps[1].start_url);assert.notEqual(apps[0].icons[0].src,apps[1].icons[0].src);
     mirrorAuth=JSON.parse(session(['The Mirror']));await send('Network.setCookie',{...mirrorAuth,url:base,httpOnly:true});

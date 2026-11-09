@@ -1,5 +1,34 @@
 <?php
 /** Additional announcement topic tags; category_id remains the primary legacy tag. */
+/** Available announcement choices; retain database IDs and legacy event naming. */
+function getAnnouncementCategoryLabels(): array {
+    return [
+        'Holiday' => 'Holiday',
+        'Job Opportunities' => 'Job Opportunities',
+        'Reminder' => 'Reminder',
+        'Scholarship' => 'Scholarship',
+        'School Activities' => 'School Activities',
+        'School Event' => 'School Events',
+        'School Events' => 'School Events',
+        'Suspension' => 'Suspension',
+    ];
+}
+
+function getAnnouncementCategories(PDO $db): array {
+    $labels = getAnnouncementCategoryLabels();
+    $query = $db->prepare('SELECT category_id,category_name,category_color FROM categories WHERE category_name IN (' . implode(',', array_fill(0, count($labels), '?')) . ') ORDER BY category_name,category_id');
+    $query->execute(array_keys($labels));
+    $choices = [];
+    foreach ($query->fetchAll(PDO::FETCH_ASSOC) as $category) {
+        $label = $labels[$category['category_name']];
+        $category['category_name'] = $label;
+        // Prefer the legacy event ID if both spellings exist.
+        if (!isset($choices[$label])) $choices[$label] = $category;
+    }
+    ksort($choices, SORT_NATURAL | SORT_FLAG_CASE);
+    return array_values($choices);
+}
+
 function announcementCategoriesReady(PDO $db): bool {
     static $ready = [];
     $key = spl_object_id($db);

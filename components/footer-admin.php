@@ -4,6 +4,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
 <script src="/assets/js/admin-rich-text.js?v=<?= filemtime(__DIR__ . '/../assets/js/admin-rich-text.js') ?>"></script>
+<script src="/assets/js/admin-auto-filters.js?v=<?= filemtime(__DIR__ . '/../assets/js/admin-auto-filters.js') ?>"></script>
 
 <script>
 /**

@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/../includes/browser-urls.php';
-gncBrowserRoutingStart();
 function loadEnv(string $path): void {
     if (!file_exists($path)) {
         return; // fine in prod if real env vars are set another way
@@ -52,6 +51,8 @@ function loadSecretsArray(string $path): void {
 
 loadEnv(__DIR__ . '/../.env');
 loadSecretsArray(__DIR__ . '/secrets.php');
+// Deployment URL routing needs the environment/secrets overrides loaded first.
+gncBrowserRoutingStart();
 
 /**
  * Small helper: fetch an env var, with an optional default and the

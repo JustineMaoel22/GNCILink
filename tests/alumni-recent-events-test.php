@@ -4,6 +4,7 @@ require_once __DIR__ . '/../admin/admin-functions.php';
 require_once __DIR__ . '/../components/alumni-page-content.php';
 require_once __DIR__ . '/../includes/campus-event-posts.php';
 $db = getDB();
+if (!isset(getNewsCategories()['Alumni']) || normalizeNewsCategory('Alumni') !== 'Alumni') throw new RuntimeException('Alumni must be an allowed News category.');
 $db->beginTransaction();
 try {
     $category = $db->prepare('SELECT category_id FROM categories WHERE category_name=? LIMIT 1');
@@ -28,7 +29,12 @@ try {
     foreach ([['news', 'news_id', 'news'], ['announcements', 'announcement_id', 'announcement'], ['fb_posts_cache', 'fb_post_id', 'facebook']] as [$table, $column, $type]) {
         $id = $db->query("SELECT $column FROM $table" . ($type !== 'facebook' ? " WHERE status='published'" : '') . ' LIMIT 1')->fetchColumn();
         if ($id) {
-            $db->prepare("UPDATE $table SET category_id=? WHERE $column=?")->execute([$categoryId, $id]);
+            if ($type === 'news') {
+                // News editor saves the string category, without the legacy category_id.
+                $db->prepare("UPDATE news SET category='Alumni', category_id=NULL WHERE news_id=?")->execute([$id]);
+            } else {
+                $db->prepare("UPDATE $table SET category_id=? WHERE $column=?")->execute([$categoryId, $id]);
+            }
             $taggedPosts[] = $type . ':' . $id;
         }
     }

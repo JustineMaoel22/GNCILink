@@ -5,12 +5,10 @@
         if (!form.checkValidity()) return;
         document.getElementById('logs-loading').hidden = false;
         document.querySelector('.logs-page').setAttribute('aria-busy', 'true');
-        form.querySelector('[type="submit"]').textContent = 'Loading…';
     });
     window.addEventListener('pageshow', () => {
         document.getElementById('logs-loading').hidden = true;
         document.querySelector('.logs-page').removeAttribute('aria-busy');
-        form.querySelector('[type="submit"]').textContent = 'Apply filters';
     });
     const dialog = document.getElementById('activity-dialog');
     if (typeof dialog.showModal !== 'function') return;

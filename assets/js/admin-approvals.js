@@ -83,10 +83,8 @@
     const filters = document.getElementById('approval-filters');
     filters.addEventListener('submit', () => {
         filters.setAttribute('aria-busy', 'true');
-        filters.querySelector('[type="submit"]').textContent = 'Loading…';
     });
     window.addEventListener('pageshow', () => {
         filters.removeAttribute('aria-busy');
-        filters.querySelector('[type="submit"]').textContent = 'Apply filters';
     });
 })();

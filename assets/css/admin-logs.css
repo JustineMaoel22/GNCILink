@@ -7,7 +7,7 @@
 .logs-filters { padding: 24px; margin-bottom: 24px; }
 .logs-filters label { display: block; font-size: .8rem; font-weight: 600; min-width: 0; }
 .logs-filters .form-control, .logs-filters .form-select { margin-top: 7px; font-size: .85rem; min-height: 42px; }
-.logs-search-row { display: grid; grid-template-columns: minmax(200px, 2fr) minmax(150px, 1fr) auto auto; gap: 16px; align-items: end; }
+.logs-search-row { display: grid; grid-template-columns: minmax(200px, 2fr) minmax(150px, 1fr); gap: 16px; align-items: end; }
 .logs-search-row .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; font-size: .85rem; }
 .logs-more { margin-top: 20px; }
 .logs-more summary { cursor: pointer; color: var(--admin-primary); font-size: .85rem; font-weight: 600; padding: 6px 0; }

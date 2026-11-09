@@ -103,21 +103,17 @@ if ($selectedDepartment !== null) {
 // Categories for the sidebar (Emergency, Holiday, Reminder, School Event…)
 // ---------------------------------------------------------------
 try {
-    $sidebarCategories = $db ? $db->query("
-        SELECT category_id, category_name, category_color
-        FROM categories
-        ORDER BY category_name ASC
-    ")->fetchAll() : [];
+    $sidebarCategories = $db ? getAnnouncementCategories($db) : [];
 } catch (Exception $e) {
     $sidebarCategories = [];
 }
 $selectedCategory = null;
 $selectedCategoryName = '';
 $newsCategoryLabels = getNewsCategories();
-$newsSidebarCategories = array_diff_key($newsCategoryLabels, array_flip(['Updates', 'Job Opportunities', 'Scholarship']));
+$newsSidebarCategories = $newsCategoryLabels;
 $categoryColors = [
     'Holiday'=>'#C99114', 'Job Opportunities'=>'#2878A5', 'Reminder'=>'#D46B28',
-    'Scholarship'=>'#8851AD', 'School Event'=>'#26713A', 'Suspension'=>'#BC3030',
+    'Scholarship'=>'#8851AD', 'School Events'=>'#26713A', 'Suspension'=>'#BC3030',
     'School News'=>'#236C91', 'Academic'=>'#6452A3', 'Achievements'=>'#B88616',
     'Student Life'=>'#B34880', 'Community Extension'=>'#28856F',
     'Athletics and Sports'=>'#D0652B', 'Others'=>'#657681',

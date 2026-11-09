@@ -37,7 +37,7 @@ function initSession() {
         ini_set('session.use_strict_mode','1');ini_set('session.use_only_cookies','1');ini_set('session.use_trans_sid','0');
         // PHP must retain the login for at least the application's inactivity window.
         ini_set('session.gc_maxlifetime', (string)max(SESSION_TIMEOUT, (int)ini_get('session.gc_maxlifetime')));
-        session_set_cookie_params(['lifetime'=>0,'path'=>'/','httponly'=>true,'secure'=>$secure,'samesite'=>'Lax']);
+        session_set_cookie_params(['lifetime'=>0,'path'=>'/','domain'=>'','httponly'=>true,'secure'=>$secure,'samesite'=>'Lax']);
         session_start();
         // Regenerate session ID for security
         if (!isset($_SESSION['_initiated'])) {
@@ -883,27 +883,45 @@ function unpinAnnouncement(int $id): bool {
  */
 function getNewsCategories(): array {
     return [
-        'School News'   => 'School News',
-        'Academic'      => 'Academic',
         'Achievements'  => 'Achievements',
-        'Student Life'  => 'Student Organization',
-        'Community Extension' => 'Community Extension Activity',
+        'Alumni'        => 'Alumni',
         'Athletics and Sports' => 'Athletics and Sports',
-        'Job Opportunities' => 'Job Opportunities',
-        'Scholarship'    => 'Scholarship',
-        'Updates'       => 'Updates',
-        'Others'        => 'Others',
+        'Campus Events' => 'Campus Events',
+        'Community Extension' => 'Community Extension Activity',
+        'Student Life'  => 'Student Organization',
     ];
 }
 
 /**
- * Validate/normalize a submitted News category. Falls back to 'Others'
- * for anything missing or not on the approved list, so a tampered or
- * stale form value can never write an arbitrary string into the column.
+ * Validate a submitted News category against the available choices.
  */
 function normalizeNewsCategory(?string $category): string {
     $valid = getNewsCategories();
-    return isset($valid[$category]) ? $category : 'Others';
+    if (!isset($valid[$category])) throw new InvalidArgumentException('Choose a valid news category.');
+    return $category;
+}
+
+/** Facebook posts use shared database IDs for all announcement and news topics. */
+function facebookPostCategoryLabel(?string $name): ?string {
+    return getAnnouncementCategoryLabels()[$name ?? ''] ?? getNewsCategories()[$name ?? ''] ?? $name;
+}
+
+function getFacebookPostCategories(PDO $db): array {
+    $labels = getAnnouncementCategoryLabels();
+    foreach (getNewsCategories() as $code => $label) {
+        $labels[$code] = $label;
+        $labels[$label] = $label;
+    }
+    $rows = $db->query('SELECT category_id,category_name FROM categories ORDER BY category_name,category_id')->fetchAll(PDO::FETCH_ASSOC);
+    $choices = [];
+    foreach ($rows as $row) {
+        if (!isset($labels[$row['category_name']])) continue;
+        $label = $labels[$row['category_name']];
+        $row['category_name'] = $label;
+        if (!isset($choices[$label])) $choices[$label] = $row;
+    }
+    ksort($choices, SORT_NATURAL | SORT_FLAG_CASE);
+    return array_values($choices);
 }
 
 /**
@@ -1189,7 +1207,7 @@ function updateNews(int $id, array $data): bool {
             ? ($data['author'] !== '' ? $data['author'] : null)
             : $news['author'];
 
-        $category = array_key_exists('category', $data)
+        $category = array_key_exists('category', $data) && $data['category'] !== ($news['category'] ?? null)
             ? normalizeNewsCategory($data['category'])
             : ($news['category'] ?? 'Others');
 

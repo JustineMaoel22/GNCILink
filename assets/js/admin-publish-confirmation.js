@@ -75,6 +75,7 @@
     document.addEventListener('formdata', event => { authorizedForms.delete(event.target); });
     document.addEventListener('submit', async event => {
         const form = event.target;
+        if (form.method.toLowerCase() !== 'post') return;
         if (form.closest('.gnc-dialog') || replay.has(form) || authorizedForms.has(form)) return;
         const status = form.querySelector('[name="status"]')?.value;
         const action = event.submitter?.name === 'action' ? event.submitter.value : form.querySelector('[name="action"]')?.value;

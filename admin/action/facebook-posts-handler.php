@@ -42,6 +42,7 @@ try {
     if($source==='facebook'){
         $q=$db->prepare('SELECT f.is_pinned,f.category_id,f.category_locked,c.category_name FROM fb_posts_cache f LEFT JOIN categories c ON c.category_id=f.category_id WHERE f.fb_post_id=?');$q->execute([$id]);$post=$q->fetch(PDO::FETCH_ASSOC);
     }
+    if ($post) $post['category_name'] = facebookPostCategoryLabel($post['category_name']);
     $pinned=announcementPinnedItems($db);$db->commit();
     echo json_encode(['success'=>true,'message'=>$message,'post'=>$post,'pinned'=>$pinned],JSON_INVALID_UTF8_SUBSTITUTE);
 }catch(InvalidArgumentException $e){

@@ -51,7 +51,7 @@ function approvalSectionDecision(PDO $db,int $id,string $version,string $action,
 }
 function approvalFilters(array $input): array {
     $string=static fn($key)=>is_string($input[$key]??null)?trim($input[$key]):'';
-    $f=['q'=>mb_substr($string('q'),0,200),'status'=>'','type'=>'','author'=>'','from'=>'','to'=>'','sort'=>'priority','page'=>1,'size'=>25];
+    $f=['q'=>mb_substr($string('q'),0,200),'status'=>'','type'=>'','author'=>'','from'=>'','to'=>'','sort'=>'newest','page'=>1,'size'=>25];
     if(isset(approvalStatuses()[$string('status')]))$f['status']=$string('status');
     if(isset(approvalTypes()[$string('type')]))$f['type']=$string('type');
     if(preg_match('/^[1-9]\d{0,9}$/',$string('author')))$f['author']=$string('author');

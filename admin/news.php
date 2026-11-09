@@ -47,7 +47,7 @@ $statusFilter=$listFilters['status'];$categoryFilter=$listFilters['category'];$s
 try{$result=newsListResults(getDB(),$listFilters,rbacRole(),(int)$_SESSION['user_id']);$newsList=$result['rows'];$listTotal=$result['total'];$listPages=$result['pages'];$listGalleries=$result['galleries'];}
 catch(Throwable $e){$listError='News articles could not be loaded. Please try again.';error_log('News management list unavailable.');}
 $newsCategories = getNewsCategories();
-$newsCreateCategories = array_diff_key($newsCategories, array_flip(['Updates', 'Job Opportunities', 'Scholarship']));
+$newsCreateCategories = $newsCategories;
 $pinnedCount    = countPinnedItems();
 
 // Which modal (if any) should auto-open on load
@@ -369,6 +369,7 @@ include __DIR__ . '/../components/header-admin.php';
             <div class="col-12 col-sm-6">
               <label class="form-label" for="modal-category">News category</label>
               <select name="category" id="modal-category" class="form-select">
+                <option value="">Choose a category</option>
                 <?php foreach ($newsCreateCategories as $code => $label): ?>
                 <option value="<?= htmlspecialchars($code) ?>"><?= htmlspecialchars($label) ?></option>
                 <?php endforeach; ?>
@@ -695,7 +696,7 @@ function selectNewsCategory(code = 'Others', preserveExisting = false) {
         modalCategory.add(option);
     }
     modalCategory.value = code;
-    if (!modalCategory.value) modalCategory.value = 'Others';
+    if (!modalCategory.value) modalCategory.value = '';
 }
 
 function resetModalForm() {

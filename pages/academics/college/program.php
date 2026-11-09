@@ -232,7 +232,7 @@ if ($program !== null) {
     $showAbout   = $sealUrl !== null || trim($c['about_text']) !== '' || $showVision || $showMission;
     $showCore    = $program['core_enabled'] && (!empty($items['core_value']) || $cePreview);
 
-    // Every program shares the enrollment destination, including older saved CTAs.
+    // Every program shares the college admission requirements destination, including older saved CTAs.
     $ctaLink = $defaults['cta_link'];
 
     $pageTitle = $fullName;

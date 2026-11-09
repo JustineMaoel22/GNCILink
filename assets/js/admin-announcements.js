@@ -71,6 +71,5 @@
     });
     filters.addEventListener('submit', () => {
         filters.setAttribute('aria-busy', 'true');
-        filters.querySelector('[type="submit"]').textContent = 'Loading…';
     });
 })();

@@ -18,12 +18,12 @@ try {
     ] as [$name, $color, $description]) {
         $insert->execute([$name, $color, $description, $name]);
         $check->execute([$name]);
-        if ((int)$check->fetchColumn() < 1 || normalizeNewsCategory($name) !== $name) {
-            throw new RuntimeException('Category unavailable for news or announcements: ' . $name);
+        if ((int)$check->fetchColumn() < 1) {
+            throw new RuntimeException('Announcement category unavailable: ' . $name);
         }
     }
     $db->commit();
-    echo "Verified: Job Opportunities and Scholarship are available for news and announcements.\n";
+    echo "Verified: Job Opportunities and Scholarship are available for announcements.\n";
 } catch (Throwable $error) {
     $db->rollBack();
     throw $error;

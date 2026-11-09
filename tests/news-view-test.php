@@ -15,13 +15,13 @@ $db->exec('CREATE TEMPORARY TABLE fb_posts_cache(is_pinned INT)');
 $db->exec('CREATE TEMPORARY TABLE activity_logs(log_id INT AUTO_INCREMENT PRIMARY KEY,user_id INT,action VARCHAR(255),table_name VARCHAR(100),record_id INT NULL,description TEXT,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)');
 $db->exec("INSERT INTO users VALUES(1,'School','Editor');INSERT INTO media_library VALUES(1,'uploads/news/example.jpg')");
 $insert=$db->prepare('INSERT INTO news(news_id,user_id,title,slug,content,category,status,created_at,updated_at,published_at,featured_image,is_pinned) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)');
-for($i=1;$i<=135;$i++)$insert->execute([$i,$i%2?1:2,'Article '.$i,'article-'.$i,'Example story','Academic',$i%2?'published':'draft','2026-10-01 10:00:00',$i===1?'2026-11-05 12:00:00':null,null,1,0]);
-$insert->execute([136,1,'Special 100%_complete!','special-136','Unique search content','Others','published','2026-11-04 15:59:59',null,'2026-11-04 15:59:59',1,1]);
+for($i=1;$i<=135;$i++)$insert->execute([$i,$i%2?1:2,'Article '.$i,'article-'.$i,'Example story','Achievements',$i%2?'published':'draft','2026-10-01 10:00:00',$i===1?'2026-11-05 12:00:00':null,null,1,0]);
+$insert->execute([136,1,'Special 100%_complete!','special-136','Unique search content','Alumni','published','2026-11-04 15:59:59',null,'2026-11-04 15:59:59',1,1]);
 $db->exec('INSERT INTO news_images VALUES(1,136,1,1)');
 $mode=$argv[1]??'list';
 if($mode!=='list'){
     session_start();$_SESSION=['user_id'=>1,'user_role'=>'Super Admin','csrf_token'=>str_repeat('a',64),'_initiated'=>true,'last_activity'=>time()];
-    $_SERVER['REQUEST_METHOD']='POST';$_POST=['csrf_token'=>$_SESSION['csrf_token'],'news_id'=>'136','action'=>$mode,'title'=>'Changed article','content'=>'<p>Changed story</p>','author'=>'School editor','category'=>'Academic','status'=>'draft','return_query'=>'search=Changed&sort=updated&page=2'];
+    $_SERVER['REQUEST_METHOD']='POST';$_POST=['csrf_token'=>$_SESSION['csrf_token'],'news_id'=>'136','action'=>$mode,'title'=>'Changed article','content'=>'<p>Changed story</p>','author'=>'School editor','category'=>'Achievements','status'=>'draft','return_query'=>'search=Changed&sort=updated&page=2'];
     if($mode==='csrf'){$_POST['action']='delete';$_POST['csrf_token']='invalid';}
     if($mode==='invalid-id'){$_POST['action']='delete';$_POST['news_id']=['136'];}
     if($mode==='invalid-fields'){$_POST['action']='update';$_POST['title']=['Bad headline'];$_POST['status']='invalid';}
@@ -50,7 +50,7 @@ $run=function(array $input=[],string $role='Super Admin',int $id=1)use($db){$f=n
 [$r]=$run(['search'=>'100%_complete!']);newsCheck($r['total']===1,'Literal wildcard search');
 [$r]=$run(['search'=>'Unique search']);newsCheck($r['total']===1,'Content search');
 [$r]=$run(['search'=>"' OR 1=1 --"]);newsCheck($r['total']===0,'Parameterized search');
-[$r]=$run(['category'=>'Others','status'=>'published','pinned'=>'1','from'=>'2026-11-04','to'=>'2026-11-04','date_field'=>'published']);newsCheck($r['total']===1,'Combined local date filters');
+[$r]=$run(['category'=>'Alumni','status'=>'published','pinned'=>'1','from'=>'2026-11-04','to'=>'2026-11-04','date_field'=>'published']);newsCheck($r['total']===1,'Combined local date filters');
 [$r]=$run(['from'=>'2026-11-05']);newsCheck($r['total']===0,'Philippine midnight boundary');
 [$r]=$run([],'The Mirror',2);newsCheck($r['total']===67,'Mirror sees only own articles');
 [$r]=$run([],'Content Editor',2);newsCheck($r['total']===136,'Editor sees all records');

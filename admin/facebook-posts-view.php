@@ -27,6 +27,8 @@ function facebookPostList(PDO $db,array &$filters): array {
     $q=$db->prepare('SELECT f.fb_post_id,f.message,f.permalink_url,f.created_time,f.is_pinned,f.category_id,f.category_locked,c.category_name,m.file_path AS image_path'.$sql.' ORDER BY f.created_time DESC,f.fb_post_id DESC LIMIT ? OFFSET ?');
     foreach($params as $i=>$v)$q->bindValue($i+1,$v,PDO::PARAM_STR);
     $q->bindValue(count($params)+1,$filters['size'],PDO::PARAM_INT);$q->bindValue(count($params)+2,$ids!==null?0:$offset,PDO::PARAM_INT);$q->execute();$rows=$q->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$row) $row['category_name'] = facebookPostCategoryLabel($row['category_name']);
+    unset($row);
     return compact('rows','total','pages');
 }
 function facebookPostImage(?string $path): string {

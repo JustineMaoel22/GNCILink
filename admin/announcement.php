@@ -57,7 +57,9 @@ if ($facebookPostsPage) {
 }
 
 try {
-    $categories = getDB()->query("SELECT category_id, category_name FROM categories ORDER BY category_name")->fetchAll();
+    $categories = $facebookPostsPage
+        ? getFacebookPostCategories(getDB())
+        : getAnnouncementCategories(getDB());
 } catch (Exception $e) {
     $categories = [];
 }

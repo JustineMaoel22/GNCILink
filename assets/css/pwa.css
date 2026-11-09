@@ -14,6 +14,8 @@
 .gnc-pwa-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .gnc-pwa-actions button,.gnc-offline-card a{min-height:44px;padding:10px 16px;border:1px solid #094024;border-radius:8px;background:#094024;color:#fff;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 .gnc-pwa-actions button.gnc-pwa-secondary,.gnc-offline-card a{background:#fff;color:#094024}
+.gnc-offline-card .gnc-pwa-actions{display:inline-grid;grid-template-columns:repeat(2,minmax(0,1fr));max-width:100%;align-items:stretch}
+.gnc-offline-card .gnc-pwa-actions>button,.gnc-offline-card .gnc-pwa-actions>a{box-sizing:border-box}
 .gnc-pwa-notice button:focus-visible,.gnc-pwa-dialog button:focus-visible,.gnc-offline-card a:focus-visible,.gnc-pwa-install-link:focus-visible{outline:3px solid #eaba3b;outline-offset:3px}
 .gnc-pwa-dialog{width:min(460px,calc(100vw - 32px));max-height:calc(100dvh - 48px);padding:28px;border:1px solid #dce5df;border-radius:18px;background:#fff;overflow:auto}
 .gnc-pwa-dialog::backdrop{background:#082b2480}.gnc-pwa-dialog h2{font:700 26px/1.25 Georgia,serif;color:#094024;margin:0 0 12px}.gnc-pwa-dialog ol{padding-left:24px}.gnc-pwa-dialog li{margin-bottom:10px}

@@ -15,9 +15,9 @@ function campusEventPosts(PDO $db, array $query, string $category = 'School Even
             n.title, n.slug, COALESCE(n.published_at, n.created_at) AS post_date,
             m.file_path AS image_path, NULL AS permalink_url
         FROM news n
-        JOIN categories c ON c.category_id = n.category_id
+        LEFT JOIN categories c ON c.category_id = n.category_id
         LEFT JOIN media_library m ON m.media_id = n.featured_image
-        WHERE n.status = 'published' AND c.category_name = ?
+        WHERE n.status = 'published' AND (n.category = ? OR c.category_name = ?)
         UNION ALL
         SELECT f.fb_post_id AS post_id, 'facebook' AS post_type,
             f.message AS title, NULL AS slug, f.created_time AS post_date,
@@ -26,7 +26,8 @@ function campusEventPosts(PDO $db, array $query, string $category = 'School Even
         JOIN categories c ON c.category_id = f.category_id
         LEFT JOIN media_library m ON m.media_id = f.image_media_id
         WHERE c.category_name = ?";
-    $params = [$category, $category, $category];
+    $newsCategory = $category === 'School Event' ? 'Campus Events' : $category;
+    $params = [$category, $newsCategory, $category, $category];
     if ($includeEvents) {
         $feedSql .= " UNION ALL
             SELECT e.event_id AS post_id, 'event' AS post_type,

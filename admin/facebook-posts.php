@@ -9,7 +9,7 @@ $canManage=hasPermission('publish_announcement');
 try {
     $db=getDB();
     if(rbacRole()!=='The Mirror'){require_once __DIR__.'/../config/fb-categorizer.php';gncAutoCategorizeFbPosts($db);}
-    $categories=$db->query('SELECT category_id,category_name FROM categories ORDER BY category_name')->fetchAll(PDO::FETCH_ASSOC);
+    $categories=getFacebookPostCategories($db);
     $list=facebookPostList($db,$filters);$rows=$list['rows'];$total=$list['total'];$pages=$list['pages'];
     $lastRetrieved=$db->query('SELECT MAX(fetched_at) FROM fb_posts_cache')->fetchColumn();
     $pinned=announcementPinnedItems($db);
@@ -35,11 +35,11 @@ $pageTitle='Facebook Posts';include __DIR__.'/../components/header-admin.php';
 <?php foreach($pinned as $item): ?><li data-source="<?= $h($item['source']) ?>" data-item-id="<?= $h($item['item_id']) ?>"><div><small><?= $h(ucfirst($item['source'])) ?></small><strong><?= $h($item['title']?:'Post without a caption') ?></strong></div><?php if($canManage): ?><button type="button" class="btn btn-outline-secondary" data-unpin-source="<?= $h($item['source']) ?>" data-unpin-id="<?= $h($item['item_id']) ?>"><i class="bi bi-pin-angle" aria-hidden="true"></i> Unpin</button><?php endif; ?></li><?php endforeach; ?>
 </ul><p id="fb-no-pins" <?= $pinnedCount?'hidden':'' ?>>No items are pinned.</p></details></section>
 <?php if(!$canManage): ?><p class="fb-permission-note"><i class="bi bi-info-circle" aria-hidden="true"></i> You can browse and preview posts. Category and slideshow changes require Super Admin access.</p><?php endif; ?>
-<form method="get" class="fb-panel fb-filters" aria-label="Find Facebook posts"><div class="fb-filter-main">
+<form method="get" class="fb-panel fb-filters" aria-label="Find Facebook posts" data-auto-filters><div class="fb-filter-main">
 <label>Search captions<input type="search" class="form-control" name="search" placeholder="Search Facebook posts…" value="<?= $h($filters['search']) ?>" maxlength="200"></label>
 <label>Category<select class="form-select" name="category"><option value="">All categories</option><option value="none" <?= $filters['category']==='none'?'selected':'' ?>>Uncategorized</option><?php foreach($categories as $cat): ?><option value="<?= (int)$cat['category_id'] ?>" <?= $filters['category']===(string)$cat['category_id']?'selected':'' ?>><?= $h($cat['category_name']) ?></option><?php endforeach; ?></select></label>
 <label>Slideshow<select class="form-select" name="pinned"><option value="">All posts</option><option value="1" <?= $filters['pinned']==='1'?'selected':'' ?>>Pinned posts</option><option value="0" <?= $filters['pinned']==='0'?'selected':'' ?>>Unpinned posts</option></select></label>
-<button class="btn btn-gnc-primary" type="submit"><i class="bi bi-search" aria-hidden="true"></i> Apply filters</button></div>
+<noscript><button class="btn btn-gnc" type="submit">Apply filters</button></noscript></div>
 <div class="fb-filter-secondary"><details <?= $filters['from']||$filters['to']?'open':'' ?>><summary>Publication dates<?= $filters['from']||$filters['to']?' · active':'' ?></summary><div class="fb-dates"><label>From<input class="form-control" type="date" name="from" value="<?= $h($filters['from']) ?>"></label><label>Through<input class="form-control" type="date" name="to" value="<?= $h($filters['to']) ?>"></label></div></details><label class="fb-size">Posts per page<select class="form-select" name="size"><?php foreach([10,25,50,100] as $size): ?><option <?= $filters['size']===$size?'selected':'' ?>><?= $size ?></option><?php endforeach; ?></select></label></div>
 <?php if($activeCount): ?><div class="fb-active-filters"><strong><?= $activeCount ?> active filter<?= $activeCount===1?'':'s' ?></strong><?php foreach(['search'=>'Search','category'=>'Category','pinned'=>'Slideshow','from'=>'From','to'=>'Through'] as $key=>$label): if($filters[$key]==='')continue;$value=$filters[$key];if($key==='category')$value=$value==='none'?'Uncategorized':(array_column($categories,'category_name','category_id')[$value]??$value);if($key==='pinned')$value=$value==='1'?'Pinned':'Unpinned'; ?><span><?= $h($label.': '.$value) ?></span><?php endforeach; ?><a href="/admin/facebook-posts.php">Clear filters</a></div><?php endif; ?></form>
 <div class="fb-section-heading fb-results"><h2>Retrieved posts <span>(<?= $total ?>)</span></h2><p>Newest published first</p></div>

@@ -1,6 +1,7 @@
 <?php
 /** Authentication controls shared by every admin role. No credentials belong in logs. */
 require_once __DIR__.'/auth-email-templates.php';
+require_once __DIR__.'/admin-origin.php';
 function authIp(): string {
     $ip=$_SERVER['REMOTE_ADDR']??'';
     return filter_var($ip,FILTER_VALIDATE_IP)?$ip:'unknown';
@@ -27,10 +28,13 @@ function authLocalDevelopment(): bool {
     $configuredHost=strtolower((string)parse_url(authNormalizeUrl((string)APP_URL),PHP_URL_HOST));
     $configured=in_array($configuredHost,$local,true);
     $reqHost=strtolower((string)parse_url('http://'.($_SERVER['HTTP_HOST']??$_SERVER['SERVER_NAME']??''),PHP_URL_HOST));
-    if(in_array($reqHost,$local,true))return true;
+    if(in_array($reqHost,$local,true)||$reqHost==='admin.localhost')return true;
     return $configured&&PHP_SAPI==='cli';
 }
 function authPublicOrigin(): string {
+    // Reset links and transport redirects belong to the configured admin app, not the enclosing visitor app.
+    $adminOrigin=gncAdminPwaOrigin() ?? gncAdminRequestOrigin();
+    if ($adminOrigin!==null) return $adminOrigin;
     $local=['localhost','127.0.0.1','::1','[::1]'];
     $explicit=trim((string)env('AUTH_PUBLIC_URL',''));
     $candidate=$explicit!==''?$explicit:(string)APP_URL;

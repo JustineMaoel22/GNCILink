@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/admin-origin.php';
 /** PWA metadata; offline document storage remains public-only. */
 function gncPwaPublicPaths(): array {
     $paths = ['/', '/news', '/news-article', '/announcement', '/announcement-article'];
@@ -20,7 +21,7 @@ function gncPwaVersion(): string {
     if ($version !== null) return $version;
     $root = dirname(__DIR__);
     $hash = hash_init('sha256');
-    foreach (['version.txt','manifest.json','admin-manifest.json','offline.html','service-worker.php','assets/js/pwa-worker.js','assets/js/pwa.js','assets/css/pwa.css','includes/pwa.php','includes/browser-routes.php','assets/images/pwa/icon-192.png','assets/images/pwa/icon-512.png','assets/images/pwa/maskable-512.png','assets/images/pwa/apple-touch-icon.png'] as $file) {
+    foreach (['version.txt','manifest.json','admin-manifest.json','offline.html','service-worker.php','assets/js/pwa-worker.js','assets/js/pwa.js','assets/css/pwa.css','includes/pwa.php','includes/admin-origin.php','includes/browser-routes.php','assets/images/pwa/icon-192.png','assets/images/pwa/icon-512.png','assets/images/pwa/maskable-512.png','assets/images/pwa/apple-touch-icon.png'] as $file) {
         hash_update_file($hash, $root . '/' . $file);
     }
     foreach (glob($root.'/assets/images/pwa/admin-*.png') as $file) hash_update_file($hash,$file);
@@ -33,6 +34,7 @@ function gncPwaVersion(): string {
 }
 
 function gncPwaHtml(string $html, string $legacyPath): string {
+    if (gncAdminRequestOrigin()!==null) return $html; // Public editor frames must never register the visitor PWA on the admin origin.
     $publicUrl = gncBrowserUrl($legacyPath);
     if (!gncPwaPublicUrl($publicUrl) || isset($_GET['ce_preview'])
         || !in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET','HEAD'], true)

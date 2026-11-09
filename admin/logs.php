@@ -30,13 +30,13 @@ require __DIR__.'/../components/header-admin.php';
 <a href="<?= $e($url(['source'=>$source,'page'=>1,'action'=>'','module'=>''])) ?>"<?= $filters['source']===$source?' aria-current="page"':'' ?>><?= $e($label) ?></a>
 <?php endforeach; ?>
 </nav>
-<form class="data-card logs-filters" method="get" action="/admin/logs.php" id="logs-filters">
+<form class="data-card logs-filters" method="get" action="/admin/logs.php" id="logs-filters" data-auto-filters>
 <input type="hidden" name="source" value="<?= $e($filters['source']) ?>">
 <div class="logs-search-row">
 <label class="logs-search" for="log-search">Search activity<input class="form-control" type="search" name="q" id="log-search" value="<?= $e($filters['q']) ?>" maxlength="200" placeholder="Search name, email, action or description"></label>
 <label for="log-action">Action<select class="form-select" name="action" id="log-action"><option value="">All actions</option><?php foreach($actions as $action): ?><option value="<?= $e($action) ?>"<?= $filters['action']===$action?' selected':'' ?>><?= $e(activityLogLabel($action)) ?></option><?php endforeach; ?></select></label>
-<button class="btn btn-gnc logs-apply" type="submit">Apply filters</button>
-<a class="btn btn-outline-secondary" href="<?= $e('/admin/logs.php?source='.$filters['source']) ?>">Clear filters</a>
+<noscript><button class="btn btn-gnc" type="submit">Apply filters</button></noscript>
+
 </div>
 <details class="logs-more"<?= array_filter(array_intersect_key($filters,array_flip(['user','module','from','to'])),fn($v)=>$v!=='')?' open':'' ?>>
 <summary>More filters <span class="logs-muted">User, module and date range</span></summary>

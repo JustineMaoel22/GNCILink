@@ -4,6 +4,10 @@ PWA support is added to the existing PHP site. No database migration, Node build
 new production dependency, or login change is required. Deploy to the site's root
 on HTTPS. `localhost:8080` is also a secure development context.
 
+For **independent Android installation**, the admin app needs its own HTTPS origin.
+The original same-origin `/admin/` deployment remains available until the optional
+subdomain setting below is enabled.
+
 ## Files and integration
 
 - `manifest.json`: stable app identity `/`, standalone launch, school colors,
@@ -150,7 +154,62 @@ is required. HTTPS must work without certificate errors. Keep the root worker
 URL/scope stable across releases. The admin worker has a separate stable URL
 `/admin/service-worker.js` and scope `/admin/`.
 
-### Migrating the earlier admin install
+### Independent Android installation: admin subdomain
+
+The intended addresses are `https://gncipampanga.com/` for visitors and
+`https://admin.gncipampanga.com/admin/login` for administrators. A path such as
+`gncipampanga.com/admin/login` is not a subdomain.
+
+1. In cPanel Domains, create `admin.gncipampanga.com` and set its **document root
+   to the same project root as the visitor domain**, usually `public_html`.
+   Do not point it at `public_html/admin`; shared assets, config, uploads, APIs
+   and editor previews depend on the complete project tree. No second database
+   or copy of the application is needed.
+2. Ensure the DNS record points to the hosting server. Enable AutoSSL and confirm
+   that `https://admin.gncipampanga.com/admin/login` loads with a valid certificate.
+   Its root address redirects to `/admin/login`. Test before enabling migration.
+3. In the host's existing `config/secrets.php` return array, add only:
+   `'ADMIN_PWA_ORIGIN' => 'https://admin.gncipampanga.com',`
+   Alternatively set `ADMIN_PWA_ORIGIN=https://admin.gncipampanga.com` in the
+   hosting environment. Do not replace existing credentials with the example file.
+4. Existing visitor-host admin bookmarks now redirect with GET/HEAD to the admin
+   subdomain. POST requests, uploads, APIs and approval replay are not redirected.
+   Password-reset emails use the admin origin. Sessions use host-only cookies;
+   sign in again on the new origin rather than sharing cookies across subdomains.
+5. Open the **admin address directly in Chrome**, install **GNCILink Admin**, and
+   verify its ADMIN-badged icon and standalone navigation. Install the visitor
+   app from the visitor address. The manifests retain relative IDs and scopes;
+   their different origins give the applications separate identities/storage.
+
+`includes/admin-origin.php` accepts only the canonical HTTPS admin origin (and
+the reserved `http://admin.localhost:8080` development hostname). A missing or
+invalid setting leaves the old visitor-host login in place. Never derive a
+redirect or password-reset origin from an unvalidated Host header. Preview frames
+stay on the admin origin so the editor can read and edit them. Public “View live”
+links point back to the visitor origin, and visitor PWA metadata/root workers are
+not served on the admin origin. Private files remain denied by Apache on both hosts.
+
+Local checks: `php tests/admin-origin-test.php`,
+`php tests/browser-routes-test.php`, and
+`node tests/admin-pwa-browser-test.cjs --subdomain` (Docker running).
+These use `admin.localhost` without changing DNS, cPanel, production credentials
+or the deployment setting. They do not simulate Android OS installation.
+
+To roll back migration, remove only `ADMIN_PWA_ORIGIN`; the original login keeps
+working. The subdomain can remain available while existing installed admin apps
+are retired manually. Do not clear visitor storage or delete the shared project.
+
+### Migrating the earlier same-origin admin install
+
+**Android limitation:** the current visitor scope `/` encloses the admin scope
+`/admin/`. Distinct manifest IDs do not remove that overlap. Chrome can suppress
+the admin installation event when the enclosing visitor app is already installed.
+Desktop/emulated checks do not prove independent Android WebAPK installation.
+Google recommends separate origins (for example, an HTTPS admin subdomain) for
+independent PWAs: [multiple PWAs on one domain](https://web.dev/articles/building-multiple-pwas-on-the-same-domain).
+The optional subdomain deployment above requires DNS and a valid TLS certificate;
+changing only the install button or manifest ID is insufficient. The code does
+not provision DNS, TLS or cPanel configuration automatically.
 
 The visitor ID `/` and admin ID `/admin/` are unchanged, preserving their separate
 identities. Earlier development builds gave the admin app root scope and a

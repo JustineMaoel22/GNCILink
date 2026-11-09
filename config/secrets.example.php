@@ -13,7 +13,10 @@ return [
     'DB_PASS' => 'YOUR_EXISTING_DATABASE_PASSWORD',
     'DB_CHARSET' => 'utf8mb4',
 
-    // Public HTTPS URL for password reset links on the live host (e.g. 'https://gncipampanga.com')
+    // Enable only after creating this HTTPS subdomain with the SAME document root as the visitor site.
+    // 'ADMIN_PWA_ORIGIN' => 'https://admin.gncipampanga.com',
+    // When enabled, ADMIN_PWA_ORIGIN also owns password-reset links.
+    // Public HTTPS URL for password reset links when ADMIN_PWA_ORIGIN is not configured.
     'AUTH_PUBLIC_URL' => 'https://YOUR_LIVE_DOMAIN',
 
     // Email (PHPMailer SMTP)
