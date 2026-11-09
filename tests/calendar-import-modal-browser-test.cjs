@@ -1,0 +1,93 @@
+// Uses the local Docker site and a mocked import preview; never confirms an import.
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {spawn,spawnSync}=require('node:child_process');
+const sessionTool=args=>{
+    const result=spawnSync('docker',['compose','exec','-T','--user','www-data','web','php','cache/activity-log-session.php',...args],{encoding:'utf8',windowsHide:true});
+    if(result.status!==0)throw Error(result.stderr||result.stdout);
+    return result.stdout;
+};
+const profile=fs.mkdtempSync(path.join(os.tmpdir(),'gnci-import-modal-'));
+const browser=spawn(process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function until(fn,message){for(let end=Date.now()+20000;Date.now()<end;){if(await fn())return;await delay(100);}throw Error(message);}
+let socket,session;
+(async()=>{
+    session=JSON.parse(sessionTool(['Super Admin']));
+    await until(()=>fs.existsSync(path.join(profile,'DevToolsActivePort')),'Chrome unavailable');
+    const port=fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0];
+    const tabs=await(await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+    socket=new WebSocket(tabs.find(tab=>tab.type==='page').webSocketDebuggerUrl);
+    await new Promise(resolve=>socket.addEventListener('open',resolve,{once:true}));
+    let serial=0;const pending=new Map();
+    socket.addEventListener('message',event=>{const msg=JSON.parse(event.data);if(pending.has(msg.id)){pending.get(msg.id)(msg);pending.delete(msg.id);}});
+    const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++serial;pending.set(id,msg=>msg.error?reject(Error(JSON.stringify(msg.error))):resolve(msg.result));socket.send(JSON.stringify({id,method,params}));});
+    const evaluate=async expression=>{const result=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));return result.result.value;};
+    await send('Page.enable');await send('Network.enable');await send('Runtime.enable');
+    socket.addEventListener('message',event=>{const msg=JSON.parse(event.data);if(msg.method==='Runtime.exceptionThrown')console.error(JSON.stringify(msg.params.exceptionDetails));});
+    await send('Network.setCookie',{...session,url:'http://localhost:8080',httpOnly:true});
+    await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+    await send('Page.navigate',{url:'http://localhost:8080/admin/events.php'});
+    await until(()=>evaluate("Boolean(document.getElementById('calendarImportEditModal'))"),'Import interface unavailable');
+    await evaluate(`window.__pageMarker='no-reload';window.__importWrites=0;
+        const originalFetch=window.fetch;
+        window.fetch=(url,options)=>{
+            const action=options?.body instanceof FormData?options.body.get('ajax_action'):null;
+            if(action==='import_confirm'){window.__importWrites++;throw Error('Test must never confirm an import');}
+            if(action==='import_cancel')return Promise.resolve(Response.json({success:true}));
+            if(action==='import_preview')return Promise.resolve(Response.json({success:true,token:'fixture',categories:[{category_id:1,category_name:'School Event'},{category_id:2,category_name:'Holiday'}],existing:[],departments_ready:true,audience_groups_ready:true,departments:[{dept_id:1,dept_name:'College',department_type:'college'},{dept_id:2,dept_name:'Graduate School',slug:'graduate-school'}],programs:[{code:'TEST',name:'Test program',dept_id:1}],rows:[{title:'First event',start_date:'2026-11-10',category_id:1,description:'Original description',location:'Hall',warnings:[],action:'create'},{title:'Second event',start_date:'2026-11-11',category_id:1,warnings:[],action:'create'}]}));
+            return originalFetch(url,options);
+        };
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('calendarImportModal')).show();
+        const transfer=new DataTransfer();transfer.items.add(new File(['fixture'],'calendar.docx'));document.getElementById('calendarImportFile').files=transfer.files;
+        document.getElementById('calendarImportName').value='Test calendar';
+        document.getElementById('calendarImportUpload').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));`);
+    await until(()=>evaluate("document.querySelectorAll('#calendarImportRows tr').length===2"),'Preview not rendered');
+    const open=async(index=0)=>{await evaluate(`document.querySelectorAll('#calendarImportRows [data-edit-event]')[${index}].click()`);await until(()=>evaluate("document.getElementById('calendarImportEditModal').open"),'Editor not opened');};
+    const click=async label=>evaluate(`Array.from(document.querySelectorAll('#calendarImportEditModal button')).find(button=>button.textContent===${JSON.stringify(label)}).click()`);
+    const field=async(key,value)=>evaluate(`(()=>{const input=document.querySelector('#calendarImportEditModal [data-field="${key}"]');input.value=${JSON.stringify(value)};input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    const title=()=>evaluate("document.querySelector('#calendarImportRows .ci-title').textContent");
+    await open();
+    assert.equal(await evaluate("document.querySelector('#calendarImportRows .ci-editor')"),null,'No expanding editor row');
+    assert.equal(await evaluate("document.querySelectorAll('#calendarImportEditModal [data-field]').length"),7);
+    assert.equal(await evaluate("document.querySelectorAll('#calendarImportEditModal .ci-edit-section').length"),4);
+    await field('title','Unsaved title');assert.equal(await title(),'First event','Draft must not alter row');
+    await click('Cancel');await until(()=>evaluate("Boolean(document.querySelector('.gnc-dialog[open]'))"),'Discard prompt missing');
+    await evaluate("document.querySelector('.gnc-dialog[open] .gnc-dialog-cancel').click()");
+    await until(()=>evaluate("!document.querySelector('.gnc-dialog[open]')"),'Keep editing prompt did not close');
+    await delay(100); // Native close events resolve the confirmation promise on a later task.
+    assert.equal(await evaluate("document.getElementById('calendarImportEditModal').open"),true);
+    await click('Cancel');await until(()=>evaluate("Boolean(document.querySelector('.gnc-dialog[open]'))"),'Second discard prompt missing');
+    await evaluate("document.querySelector('.gnc-dialog[open] .gnc-dialog-accept').click()");
+    await until(()=>evaluate("!document.getElementById('calendarImportEditModal').open"),'Discard did not close editor');
+    assert.equal(await title(),'First event');
+    await open();await field('title','Saved event');await field('location','New venue');
+    await evaluate("const cat=document.querySelector('#calendarImportEditModal select');cat.value='2';cat.dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('ci-departments-0')._gncMsInstance.setSelected(['1'],true);document.getElementById('ci-programs-0')._gncMsInstance.setSelected(['TEST'],true)");
+    await click('Save Changes');assert.equal(await title(),'Saved event');
+    assert.ok(await evaluate("document.querySelector('#calendarImportRows tr').textContent.includes('New venue')"));
+    assert.equal(await evaluate("document.querySelector('#calendarImportRows select').value"),'2');
+    await open();assert.deepEqual(await evaluate("document.getElementById('ci-programs-0')._gncMsInstance.getSelected()"),['TEST']);
+    await field('start_date','');await click('Save Changes');
+    assert.ok(await evaluate("!document.querySelector('[data-editor-error]').hidden"),'Invalid dates need feedback in modal');
+    await field('start_date','2026-11-10');
+    for(const width of [1440,820,390]){
+        await send('Emulation.setDeviceMetricsOverride',{width,height:800,deviceScaleFactor:1,mobile:false});
+        assert.ok(await evaluate("(()=>{const d=document.getElementById('calendarImportEditModal'),r=d.getBoundingClientRect(),f=d.querySelector('.ci-edit-footer').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight&&f.bottom<=innerHeight&&d.scrollWidth<=d.clientWidth;})()"),'Modal and footer must fit viewport');
+        fs.writeFileSync(path.join(profile,`modal-${width}.png`),Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+    }
+    await click('Save & Approve');
+    assert.ok(await evaluate("document.querySelector('#calendarImportRows .ci-badge').textContent.includes('Approved')"));
+    await open();await click('Mark reviewed');assert.equal(await evaluate("document.getElementById('calendarImportEditModal').open"),false);
+    await open();await click('Exclude');assert.equal(await evaluate("document.querySelector('#calendarImportRows .ci-badge').textContent"),'Excluded');
+    await open();await click('Restore');await open();await click('Separate into 2 events');
+    assert.equal(await evaluate("document.querySelectorAll('#calendarImportRows tr').length"),3);
+    assert.equal(await evaluate("document.getElementById('calendarImportEditModal').open"),true,'Separated event opens in modal');
+    await click('Cancel');await open();await click('Merge with next row');
+    assert.equal(await evaluate("document.querySelectorAll('#calendarImportRows tr').length"),2);
+    await click('Remove entry');await until(()=>evaluate("Boolean(document.querySelector('.gnc-dialog[open]'))"),'Remove confirmation missing');await evaluate("document.querySelector('.gnc-dialog[open] .gnc-dialog-accept').click()");await until(()=>evaluate("document.querySelectorAll('#calendarImportRows tr').length===1"),'Confirmed removal did not apply');assert.equal(await evaluate("document.querySelectorAll('#calendarImportRows tr').length"),1);
+    await open();await field('title','Escape draft');await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape'});
+    await until(()=>evaluate("Boolean(document.querySelector('.gnc-dialog[open]'))"),'Escape must confirm unsaved changes');
+    await evaluate("document.querySelector('.gnc-dialog[open] .gnc-dialog-accept').click()");
+    assert.equal(await evaluate('window.__importWrites'),0);assert.equal(await evaluate('window.__pageMarker'),'no-reload');
+    console.log('Import modal checks passed: isolated drafts, discard/keep editing, all fields and audience, save/validation, approval/review, split/merge/exclude/restore/remove, Escape, and desktop/tablet/mobile footer fit. No import confirmed. Screenshots: '+profile);
+})().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{if(session)sessionTool(['destroy',session.value]);socket?.close();browser.kill();});

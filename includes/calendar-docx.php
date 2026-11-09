@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . "/calendar-categories.php";
 /** Bounded, read-only DOCX reader using PHP's libzip (or pure-PHP zlib fallback) and libxml libraries. */
 function calendarDocxXml(string $path): string {
     if (!class_exists('DOMDocument')) {
@@ -788,29 +789,9 @@ function calendarParseUnlabeledLine(string $line, int $year, ?int $contextMonth 
     ];
 }
 
+/** Compatibility wrapper for callers that only need the selected ID. */
 function calendarClassify(string $text, array $categories, string $explicitCategory = ''): ?int {
-    if ($explicitCategory !== '') {
-        foreach ($categories as $cat) {
-            if (strcasecmp($cat['category_name'], trim($explicitCategory)) === 0 || stripos($cat['category_name'], trim($explicitCategory)) !== false) {
-                return (int)$cat['category_id'];
-            }
-        }
-    }
-    $combined = trim($explicitCategory . ' ' . $text);
-    $rules = [
-        'Suspension' => '/\b(suspension|suspended|emergency|typhoon|evacuation|earthquake|flood|inclement weather)\b/i',
-        'Emergency'  => '/\b(suspension|suspended|emergency|typhoon|evacuation|earthquake|flood|inclement weather)\b/i',
-        'Holiday'    => '/\b(holiday|christmas break|christmas day|christmas eve|new year|holy week|maundy thursday|good friday|black saturday|easter|independence day|labor day|all saints|all souls|bonifacio day|rizal day|ninoy aquino day|national heroes day|eid|eidul|chinese new year|feast of|special non-working|regular holiday|semestral break|day of valor|araw ng kagitingan|people power|abad santos|pinatubo|pampanga day|town fiesta)\b/i',
-        'Academic'   => '/\b(exam(?:ination)?s?|prelim(?:inary)?|midterm|mid\s+term|final exam|summative\s+test|assessment|enrol(?:l)?ment|registration|classes|start of classes|end of classes|first day of classes|last day of classes|resumption of classes|summer class|grading|submission of .*grading|encoding of grades|report\s+cards?|deliberation|end-of-term|instructional\s+block|semester|trimester|academic|thesis|defense|colloquium|commencement|graduation|recognition day|completion|checking of permit|internship|deployment|evaluation)\b/i',
-        'School Event' => '/\b(foundation|founding\s+anniversary|anniversary|intramurals|sports\s*fest|zonal\s+meet|interzonal|pasdam|olympics|graduation|commencement|recognition|orientation|assembly|celebration|awareness|program|ceremony|pinning|cap(?:ping)?|hard\s+hatting|labcoating|send-off|seminar|workshop|training|teambuilding|congress|conference|pta\s+meeting|faculty\s+meeting|miting\s+de\s+avance|campaign|candidacy|election|voting|elected|induction|retreat|recollection|mass|rosary|blessing|pageant|parade|fair|booth|exhibit|contest|competition|quiz|challenge|scavenger\s+hunt|amazing\s+race|balagtasan|harana|culminating|acquaintance|promenade|gnc\s+night|party|trick\s+or\s+treat|gift\s+giving|outreach|blood\s+donation|vaccination|counseling|testing\s+service|needs\s+assessment|career|job\s+fair|tour|mice\s+event|pictorial|nat\b|ncae\b|festivals?|month|week|day|days|color(?:ing)?|pagkulay|draw(?:ing)?|painting|design|slogan|poster|bilao|recipe|kite|seed\s+planting|trash\s+to\s+treasure|tinig\s+ng\s+kuwento|vision\s+tree|growing\s+with\s+our\s+vision|commitment\s+wall|stick\s+it|dress\s+like|dress\s+up|book\s+marking|book\s+cover|big\s+book|story\s+circle|literacy|vocabulary|heart\s+craft|bracelet\s+making|collage|multimedia|portfolio|simulation|mapping|mix\s+and\s+match|picture\s+analysis|infomercial|vlog|school|exam(?:ination)?s?|enrol(?:l)?ment|registration|classes|grading|semester)\b/i',
-    ];
-    foreach ($rules as $name => $pattern) {
-        if (!preg_match($pattern, $combined)) continue;
-        foreach ($categories as $cat) {
-            if (strcasecmp($cat['category_name'], $name) === 0) return (int)$cat['category_id'];
-        }
-    }
-    return null;
+    return calendarCategorize($text, '', $categories, $explicitCategory)['category_id'];
 }
 
 function calendarIsDocumentNoise(string $text): bool {
@@ -1074,7 +1055,8 @@ function calendarFinalizeDraft(array $draft, int $defaultYear, ?int $defaultMont
         $missingFields[] = 'location';
     }
 
-    $cat = calendarClassify($title . ' ' . $description, $categories, $draft['category']);
+    $classification = calendarCategorize($title, $description, $categories, $draft['category']);
+    $cat = $classification['category_id'];
     if (!$cat) {
         $warnings[] = 'Category needs review.';
         $missingFields[] = 'category_id';
@@ -1090,6 +1072,8 @@ function calendarFinalizeDraft(array $draft, int $defaultYear, ?int $defaultMont
         'location' => $location,
         'location_provided' => (bool)$draft['location_provided'],
         'category_id' => $cat,
+        'category_confidence' => $classification['confidence'],
+        'category_reason' => $classification['reason'],
         'department_hint' => trim($draft['department'] ?? ''),
         'program_hint' => trim($draft['program'] ?? ''),
         'warnings' => array_values(array_unique($warnings)),

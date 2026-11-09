@@ -35,7 +35,8 @@ if (method_exists($db, 'createFunction')) $db->createFunction('CONCAT', $concat)
 else $db->sqliteCreateFunction('CONCAT', $concat);
 function getDB(): PDO { global $db; return $db; }
 function rbacIsSuper(): bool { return ($_SESSION['user_role'] ?? '') === 'Super Admin'; }
-$db->exec('CREATE TABLE media_library(media_id INTEGER,file_path TEXT);
+$db->exec('CREATE TABLE admin_settings(setting_key TEXT PRIMARY KEY,setting_value TEXT);
+CREATE TABLE media_library(media_id INTEGER,file_path TEXT);
 CREATE TABLE admin_people(person_id INTEGER,name TEXT,media_id INTEGER,image_path TEXT);
 CREATE TABLE admin_offices(office_id INTEGER,head_name TEXT,media_id INTEGER,image_path TEXT);
 CREATE TABLE departments(dept_id INTEGER,dean_name TEXT,dean_media_id INTEGER);
@@ -72,4 +73,19 @@ $_SESSION['person_photo_reviews'][$r['review_key']] = time()-1;
 checkPhoto(!personPhotoCheck(personPhotoPath($image),'Sir CJ','person:0',$compare)['ok'], 'Expired review does not unlock.');
 $r = personPhotoCheck(personPhotoPath($image),'Sir CJ','person:0',static function () { throw new RuntimeException('test'); });
 checkPhoto(!$r['ok'] && !$r['checked'], 'Comparison failure blocks saves.');
+// The real persisted setting must bypass comparison before inventory/worker access.
+$db->exec("INSERT INTO admin_settings VALUES('ai_image_checker_enabled','0')");
+$workerCalled=false;
+$disabled=personPhotoCheck(personPhotoPath($image),'Sir CJ','person:0',static function()use(&$workerCalled){$workerCalled=true;throw new RuntimeException('Worker must not run while disabled');});
+checkPhoto($disabled===['checked'=>false,'ok'=>true,'reason'=>'disabled','message'=>''],'Disabled checker returns an explicit successful skip.');
+checkPhoto(!$workerCalled,'Disabled checker never runs face comparison.');
+checkPhoto(!isset($disabled['matches'],$disabled['review_key']),'Disabled checks expose no duplicate matches or review tokens.');
+checkPhoto(personPhotoCheck(personPhotoPath($image),'','person:0',$compare)['reason']==='disabled','Disabled checks do not require a name for face processing.');
+$db->exec("UPDATE admin_settings SET setting_value='1'");
+checkPhoto(!personPhotoCheck(personPhotoPath($image),'Sir CJ','person:0',$compare)['ok'],'Re-enabling restores duplicate blocking without a process restart.');
+$db->exec("UPDATE admin_settings SET setting_value='0'");
+// With checking off there must be no attempt to read the comparison inventory.
+$db->exec('DROP TABLE admin_people');
+checkPhoto(personPhotoCheck(personPhotoPath($image),'Sir CJ','person:0',$compare)['reason']==='disabled','Disabled checks skip inventory preparation too.');
+
 echo "Personnel photo policy: $checks checks passed.\n";

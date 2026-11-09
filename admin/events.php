@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             $count=deleteSelectedContent('event',$_POST['ids']??null);
             echo json_encode(['success'=>true,'message'=>$count.' selected event(s) deleted.']);exit;
         }
-        if (in_array($action, ['import_preview', 'import_manage_preview', 'import_confirm', 'import_cancel'], true)) {
+        if (in_array($action, ['import_preview', 'import_manage_preview', 'import_confirm', 'import_cancel', 'import_review_save', 'import_review_resume', 'import_review_list'], true)) {
             echo json_encode(calendarImportHandle($db, $action, (int)$userId), JSON_INVALID_UTF8_SUBSTITUTE);
             exit;
         }

@@ -1,11 +1,11 @@
-## [0.21.2] - 11-9-2026
+## [0.21.3] - 11-9-2026
 
-### Added
-- Added a chatbot message allowance counter showing remaining messages (for example, "20 of 20 messages available") and when more messages become available. The counter updates automatically and keeps the existing limit when starting a new conversation.
 ### Minor Improvements/Additions
-- Added endpoint-specific IP/user quotas, provider budgets, request deadlines, abuse logging and friendly cooldown messages across public and admin API flows. Deduplicated recommendation and chatbot allowance requests; bounded editor retries and Facebook feed refreshes. See `docs/api-request-protection.md` for limits and verification.
+- Improved import calendar UI.
+- Matched News and Facebook Posts pinned badges to the announcement style, with an “On homepage slideshow” label and gold active pin buttons. Added a gold left border to pinned announcement rows on desktop and mobile.
+- Removed the confirmation dialog when pinning or unpinning announcements; archive and restore confirmations remain.
+- Added search without page refreshes to admin News, Announcements and Facebook Posts, and the visitor News & Announcements feed. Search keeps typing focus while filters, pagination and browser history update in place; Events retains its instant local filtering.
+- Widened the visitor search field to display the full placeholder, added a green hover state to the Sort button, and removed redundant search-result and loading notices. Search errors still provide a retry option.
 
 ### Bug Fixes
-- Hardened direct-cPanel HTTPS detection, host-independent private-file restrictions and upload execution isolation; added deployment checks and a cPanel rollout guide.
-- Fixed the admin Logout link to open its confirmation dialog inside the current page after URL rewriting.
-- Required CSRF-protected POSTs for photo diagnostics and Facebook recategorization; hardened chatbot throttle failures, analytics input, and Facebook image downloads.
+- Fixed duplicate-face checking continuing when the AI image checker was disabled. The setting now controls both duplicate-face and AI image checks during uploads and profile saves, while keeping file type, size, and image safety validation active.

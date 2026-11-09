@@ -1,0 +1,488 @@
+[
+  {
+    "origin": "http://localhost:8080",
+    "category": "board-of-trustees",
+    "mode": "original",
+    "timing": {
+      "frames": 90,
+      "over33ms": 1,
+      "max": 53,
+      "mean": 14
+    },
+    "info": {
+      "cards": 10,
+      "images": [
+        {
+          "src": "/uploads/administration/cf2e84021f4b9c36b5b95a8e10f23ad9.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/vice-chairman-lim.png",
+          "width": 240,
+          "height": 320,
+          "display": 273
+        },
+        {
+          "src": "/assets/images/idependent-trustee-beltran.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/trustee-limlingan.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/trustee-puno.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/trustee-nicdao.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/trustee-salvador.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/independent-trustee-baluyut.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/independent-trustee-carlos.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/independent-trustee-dela-fuente.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        }
+      ],
+      "blur": "blur(4px)",
+      "animations": [
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        }
+      ]
+    },
+    "reasons": [],
+    "layerCount": 4
+  },
+  {
+    "origin": "http://localhost:8080",
+    "category": "board-of-trustees",
+    "mode": "without-backdrop",
+    "timing": {
+      "frames": 90,
+      "over33ms": 0,
+      "max": 14,
+      "mean": 13
+    },
+    "layerCount": 4
+  },
+  {
+    "origin": "http://localhost:8080",
+    "category": "board-of-administration",
+    "mode": "original",
+    "timing": {
+      "frames": 90,
+      "over33ms": 0,
+      "max": 14,
+      "mean": 13
+    },
+    "info": {
+      "cards": 11,
+      "images": [
+        {
+          "src": "/assets/images/vice-chairman-lim.png",
+          "width": 240,
+          "height": 320,
+          "display": 273
+        },
+        {
+          "src": "/uploads/administration/5a852023245af00b642f91a5a251f0bf.jpg",
+          "width": 721,
+          "height": 1080,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/49acff95647f4a1c7e1481597d87c739.jpg",
+          "width": 721,
+          "height": 1080,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/34ba7d3127fc552e4ed8b19d16aa161c.jpg",
+          "width": 721,
+          "height": 1080,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/corporate-treasurer-isip.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/fd96a05fc5d6de302900c4bf4baf92f7.jpg",
+          "width": 721,
+          "height": 1080,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/39365b049508a93a3ffe3f927ced8cb4.jpg",
+          "width": 721,
+          "height": 1080,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/347e13cf41f9332698f1cba2be469a81.jpg",
+          "width": 721,
+          "height": 1080,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/2a74330785240c72182e82e3d8f29eb8.jpg",
+          "width": 721,
+          "height": 1080,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/fcb58b80dc52d16ede0d93df3fb04bc9.jpg",
+          "width": 721,
+          "height": 1080,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/561b14cb7bfb76d7fe961e5302c1da64.jpg",
+          "width": 721,
+          "height": 1080,
+          "display": 260
+        }
+      ],
+      "blur": "blur(4px)",
+      "animations": [
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        }
+      ]
+    },
+    "reasons": [],
+    "layerCount": 4
+  },
+  {
+    "origin": "http://localhost:8080",
+    "category": "board-of-administration",
+    "mode": "without-backdrop",
+    "timing": {
+      "frames": 90,
+      "over33ms": 0,
+      "max": 14,
+      "mean": 13
+    },
+    "layerCount": 4
+  },
+  {
+    "origin": "https://gncipampanga.com",
+    "category": "board-of-trustees",
+    "mode": "original",
+    "timing": {
+      "frames": 90,
+      "over33ms": 0,
+      "max": 14,
+      "mean": 13
+    },
+    "info": {
+      "cards": 10,
+      "images": [
+        {
+          "src": "/uploads/administration/469c8a6f71bad14e721fff3c7fd2aa6f.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/vice-chairman-lim.png",
+          "width": 240,
+          "height": 320,
+          "display": 273
+        },
+        {
+          "src": "/assets/images/idependent-trustee-beltran.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/trustee-limlingan.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/trustee-puno.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/trustee-nicdao.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/trustee-salvador.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/independent-trustee-baluyut.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/independent-trustee-carlos.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/independent-trustee-dela-fuente.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        }
+      ],
+      "blur": "blur(4px)",
+      "animations": [
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        }
+      ]
+    },
+    "reasons": [],
+    "layerCount": 4
+  },
+  {
+    "origin": "https://gncipampanga.com",
+    "category": "board-of-trustees",
+    "mode": "without-backdrop",
+    "timing": {
+      "frames": 90,
+      "over33ms": 0,
+      "max": 14,
+      "mean": 13
+    },
+    "layerCount": 4
+  },
+  {
+    "origin": "https://gncipampanga.com",
+    "category": "board-of-administration",
+    "mode": "original",
+    "timing": {
+      "frames": 90,
+      "over33ms": 4,
+      "max": 250,
+      "mean": 20
+    },
+    "info": {
+      "cards": 11,
+      "images": [
+        {
+          "src": "/assets/images/vice-chairman-lim.png",
+          "width": 240,
+          "height": 320,
+          "display": 273
+        },
+        {
+          "src": "/uploads/administration/9fa86263594769b5dcd9c54a9c8de4a3.jpg",
+          "width": 4016,
+          "height": 6016,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/9c6ea549a8024c093f48e32a8225c3d8.jpg",
+          "width": 4016,
+          "height": 6016,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/c23b9dd7afab76db1dd7e2f8d6e25ecb.jpg",
+          "width": 4016,
+          "height": 6016,
+          "display": 260
+        },
+        {
+          "src": "/assets/images/corporate-treasurer-isip.png",
+          "width": 240,
+          "height": 320,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/fd4a189f50e5ba54a8cdc385aa5c42aa.jpg",
+          "width": 4016,
+          "height": 6016,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/a1206c41592472ef9b6c76817b228ae7.jpg",
+          "width": 4016,
+          "height": 6016,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/747af9b602cc767ab29b6ad6b727dd79.jpg",
+          "width": 4016,
+          "height": 6016,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/0c880cbd359bbfb69c5c86f2d5bc2bfd.jpg",
+          "width": 4016,
+          "height": 6016,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/b18d86c48fe0042b01a1d6296eb0c201.jpg",
+          "width": 4016,
+          "height": 6016,
+          "display": 260
+        },
+        {
+          "src": "/uploads/administration/9c6ac566d9418a128000565dbd8a4e77.jpg",
+          "width": 4016,
+          "height": 6016,
+          "display": 260
+        }
+      ],
+      "blur": "blur(4px)",
+      "animations": [
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        }
+      ]
+    },
+    "reasons": [],
+    "layerCount": 4
+  },
+  {
+    "origin": "https://gncipampanga.com",
+    "category": "board-of-administration",
+    "mode": "without-backdrop",
+    "timing": {
+      "frames": 90,
+      "over33ms": 3,
+      "max": 360,
+      "mean": 20
+    },
+    "layerCount": 4
+  }
+]

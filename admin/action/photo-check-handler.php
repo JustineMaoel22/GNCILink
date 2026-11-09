@@ -67,18 +67,20 @@ if (!is_string($name) || mb_strlen($name) > 255 || !is_string($key)
 $info = @getimagesize($file['tmp_name']);
 if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)
     || $info[0]*$info[1] > 40000000) photoCheckFail('Please choose a JPG, PNG or WebP portrait up to 40 megapixels.', 422);
-// Local face comparison is independent of the optional AI-generated-image setting.
+// Both optional photo checks honor the shared setting after file validation.
 $r = personPhotoCheck($file['tmp_name'], $name, $key);
 if (($_POST['review_duplicate'] ?? '') === '1') {
     if (!rbacIsSuper()) photoCheckFail('Only Super Admin can review a possible duplicate.', 403);
-    if (($r['reason'] ?? '') !== 'duplicate_face' || empty($r['review_key'])) photoCheckFail('This comparison cannot be reviewed. Check the photo again.', 409);
-    if (!logActivity((int)$_SESSION['user_id'], 'UPDATE', null, null,
-        'Personnel photo review for ' . $name . ': confirmed reviewed assignment [comparison ' . $r['review_key'] . ']')) photoCheckFail('The review could not be recorded. Please try again.', 503);
-    $_SESSION['person_photo_reviews'] = array_filter($_SESSION['person_photo_reviews'] ?? [], static fn($expiry) => $expiry > time());
-    $_SESSION['person_photo_reviews'][$r['review_key']] = time() + 900;
-    $_SESSION['person_photo_reviews'] = array_slice($_SESSION['person_photo_reviews'], -20, null, true);
-    $r['ok'] = true;
-    $r['reviewed'] = true;
+    if (($r['reason'] ?? '') !== 'disabled') {
+        if (($r['reason'] ?? '') !== 'duplicate_face' || empty($r['review_key'])) photoCheckFail('This comparison cannot be reviewed. Check the photo again.', 409);
+        if (!logActivity((int)$_SESSION['user_id'], 'UPDATE', null, null,
+            'Personnel photo review for ' . $name . ': confirmed reviewed assignment [comparison ' . $r['review_key'] . ']')) photoCheckFail('The review could not be recorded. Please try again.', 503);
+        $_SESSION['person_photo_reviews'] = array_filter($_SESSION['person_photo_reviews'] ?? [], static fn($expiry) => $expiry > time());
+        $_SESSION['person_photo_reviews'][$r['review_key']] = time() + 900;
+        $_SESSION['person_photo_reviews'] = array_slice($_SESSION['person_photo_reviews'], -20, null, true);
+        $r['ok'] = true;
+        $r['reviewed'] = true;
+    }
 }
 if ($r['ok']) {
     $basic = photoCheckImage($file['tmp_name']);

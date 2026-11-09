@@ -204,7 +204,7 @@ include __DIR__ . '/../components/header-admin.php';
                             <?= $byName !== '' ? 'By ' . htmlspecialchars($byName) . ' &middot; ' : '' ?><?= newsLocalTime($n['created_at'], 'M j, Y') ?>
                         </div>
                         <?php if (!empty($n['is_pinned'])): ?>
-                        <span class="ann-pinned"><i class="bi bi-pin-angle-fill"></i> On homepage slideshow</span>
+                        <span class="ann-pinned content-homepage-pin"><i class="bi bi-pin-angle-fill" aria-hidden="true"></i> On homepage slideshow</span>
                         <?php endif; ?>
                     </td>
                     <td data-label="Category"><span class="program-badge"><?= htmlspecialchars($catLabel) ?></span></td>
@@ -827,24 +827,26 @@ function openEditModal(btn) {
 }
 
 document.getElementById('btn-new-news')?.addEventListener('click', openCreateModal);
-document.querySelectorAll('.js-new-news').forEach(b => b.addEventListener('click', openCreateModal));
+document.addEventListener('click', event => { if (event.target.closest('.js-new-news')) openCreateModal(); });
 
 newsModalEl.addEventListener('shown.bs.modal', () => modalTitleInput.focus());
 
-document.querySelectorAll('.btn-edit-news').forEach(btn => {
-    btn.addEventListener('click', () => openEditModal(btn));
+document.addEventListener('click', event => {
+    const btn = event.target.closest('.btn-edit-news');
+    if (btn) openEditModal(btn);
 });
 
 // Delete confirmation modal (replaces the browser's plain confirm() box)
 const deleteModalEl = document.getElementById('deleteNewsModal');
 const deleteModal   = deleteModalEl ? new bootstrap.Modal(deleteModalEl) : null;
-document.querySelectorAll('.btn-delete-news').forEach(btn => {
-    btn.addEventListener('click', () => {
+document.addEventListener('click', event => {
+    const btn = event.target.closest('.btn-delete-news');
+    if (btn) {
         document.getElementById('delete-news-id').value = btn.dataset.id;
         document.getElementById('delete-news-title').textContent = btn.dataset.title || '';
         document.getElementById('delete-news-btn').disabled = false;
         deleteModal?.show();
-    });
+    }
 });
 document.getElementById('delete-news-form')?.addEventListener('submit', () => {
     const b = document.getElementById('delete-news-btn');
@@ -935,6 +937,7 @@ renderExistingGallery(<?= $newsJson($modalGallery) ?>);
 newsModal.show();
 <?php endif; ?>
 </script>
+<script src="/assets/js/admin-content-search.js?v=<?= filemtime(__DIR__.'/../assets/js/admin-content-search.js') ?>"></script>
 <script src="/assets/js/admin-news.js?v=<?= filemtime(__DIR__.'/../assets/js/admin-news.js') ?>"></script>
 <?php $extraScripts = ob_get_clean(); ?>
 

@@ -35,13 +35,17 @@ const endpoint = (body,cookie) => fetch(base+'/admin/action/photo-check-handler.
     assert.equal(result.success,true);
     assert.equal(response.headers.get('cache-control'),'no-store');
     assert.ok(!('detail' in result) && !('review_key' in result));
-    if (process.env.FACE_CHECK_ALLOW_UNAVAILABLE === '1' && result.reason === 'unavailable') {
+    if (result.reason === 'disabled') {
+        assert.equal(result.checked,false,'Disabled checker must skip duplicate comparison');
+        assert.equal(result.ok,true,'Valid images must pass when optional checking is disabled');
+        assert.ok(!('matches' in result),'Disabled checking must not return duplicate matches');
+    } else if (process.env.FACE_CHECK_ALLOW_UNAVAILABLE === '1' && result.reason === 'unavailable') {
         assert.equal(result.ok,false,'Missing runtime must block');
     } else {
         assert.equal(result.checked,true,'The deployed runtime must complete real face comparison');
         assert.notEqual(result.reason,'unavailable','The deployed runtime must be available');
     }
-    console.log('Personnel photo endpoint: authentication, CSRF, role restrictions, private responses and actual runtime availability checks passed.');
+    console.log('Personnel photo endpoint: authentication, CSRF, role restrictions, private responses and configured checker behavior passed.');
 })().catch(error => { console.error(error); process.exitCode=1; }).finally(() => {
     for (const data of sessions) spawnSync('docker',['compose','exec','-T','--user','www-data','web','php','cache/activity-log-session.php','destroy',data.value],{encoding:'utf8',windowsHide:true});
 });

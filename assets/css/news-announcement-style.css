@@ -144,7 +144,8 @@ body {
     font-family: 'Inter', sans-serif;
     font-size: .88rem;
 }
-.na-search input { width: 140px; }
+.na-search { flex: 1 1 300px; min-width: 0; max-width: 100%; }
+.na-search input { width: 260px; min-width: 0; flex: 1 1 auto; }
 .na-select select { cursor: pointer; }
 
 .na-filter-btn {
@@ -160,7 +161,7 @@ body {
     font-weight: 600;
     color: var(--gnc-text-dark);
 }
-.na-filter-btn:hover { background: var(--gnc-cream); }
+.na-filter-btn:hover { background: var(--gnc-green-light, #094024); color: #fff; }
 
 /* --- Animated Feed Cards --- */
 .na-card {

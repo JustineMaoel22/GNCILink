@@ -46,7 +46,7 @@ if (!function_exists('gncSearchText')) {
 // ---------------------------------------------------------------
 $activeType   = $_GET['type'] ?? 'all';
 $activeType   = in_array($activeType, ['all', 'announcement', 'news'], true) ? $activeType : 'all';
-$searchTerm   = trim($_GET['q'] ?? '');
+$searchTerm   = is_string($_GET['q'] ?? null) ? mb_substr(trim($_GET['q']), 0, 200) : '';
 
 // ---------------------------------------------------------------
 // Program filter (replaces the old shared-categories dropdown).
@@ -563,6 +563,7 @@ function na_url(array $overrides = []): string {
     <section class="na-feed py-5">
         <div class="container">
 
+            <div id="na-pinned-results">
             <?php if ($showPinned): ?>
             <div class="gnc-pinned-label"><i class="bi bi-pin-angle-fill"></i> Pinned</div>
             <div id="gncPinnedCarousel" class="carousel slide gnc-pinned-carousel mb-5" data-bs-ride="carousel" data-bs-interval="7000">
@@ -625,6 +626,7 @@ function na_url(array $overrides = []): string {
             </div>
             <?php endif; ?>
 
+            </div>
             <div class="row na-head">
             <div class="col-lg-8">
             <h2 class="na-feed-title"><?= ['all' => 'Latest News &amp; Announcements', 'announcement' => 'Latest Announcements', 'news' => 'Latest News'][$activeType] ?></h2>
@@ -645,7 +647,7 @@ function na_url(array $overrides = []): string {
                     </a>
                 </div>
 
-                <form class="na-filters" method="get" action="news-and-announcement.php#na-results">
+                <form id="na-search-form" class="na-filters" method="get" action="news-and-announcement.php#na-results">
                     <input type="hidden" name="type" value="<?= htmlspecialchars($activeType) ?>">
                     <?php if ($selectedDepartment !== null): ?>
                     <input type="hidden" name="department" value="<?= htmlspecialchars($selectedDepartment) ?>">
@@ -653,7 +655,7 @@ function na_url(array $overrides = []): string {
 
                     <div class="na-search">
                         <i class="bi bi-search"></i>
-                        <input type="search" name="q" id="na-search" placeholder="Search news &amp; announcements" aria-label="Search news and announcements" autocomplete="off" value="<?= htmlspecialchars($searchTerm) ?>">
+                        <input type="search" name="q" id="na-search" placeholder="Search news &amp; announcements" aria-label="Search news and announcements" maxlength="200" autocomplete="off" value="<?= htmlspecialchars($searchTerm) ?>">
                     </div>
                     <button type="submit" class="visually-hidden">Search</button>
 
@@ -695,7 +697,7 @@ function na_url(array $overrides = []): string {
             </div>
 
             <div class="row g-4 na-layout">
-            <div class="col-lg-8">
+            <div class="col-lg-8" id="na-feed-results">
             <?php
                 $rangeFrom = $totalItems ? ($currentPage - 1) * ITEMS_PER_PAGE + 1 : 0;
                 $rangeTo   = min($totalItems, $currentPage * ITEMS_PER_PAGE);
@@ -856,7 +858,7 @@ function na_url(array $overrides = []): string {
                 ?>
 
                 <?php if (!empty($categoryGroups)): ?>
-                <div class="gnc-upcoming-card">
+                <div class="gnc-upcoming-card" id="na-category-results">
                     <div class="gnc-upcoming-header d-flex align-items-center justify-content-between">
                         <span><i class="bi bi-tags-fill"></i> Categories</span>
                         <?php if ($selectedCategory !== null): ?>
@@ -897,32 +899,7 @@ function na_url(array $overrides = []): string {
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
     <script src="/assets/js/skeleton-loader.js"></script>
     <script src="/assets/js/calendar-program-widget.js?v=<?= filemtime(__DIR__ . '/../assets/js/calendar-program-widget.js') ?>" defer></script>
-    <script>
-    // Live search: results update a moment after the visitor stops typing (Enter still works too).
-    (function () {
-        var input = document.getElementById('na-search');
-        if (!input) return;
-        var form = input.form, timer = null, last = input.value;
-        input.addEventListener('input', function () {
-            clearTimeout(timer);
-            timer = setTimeout(function () {
-                if (input.value.trim() === last.trim()) return;
-                last = input.value;
-                try { sessionStorage.setItem('naSearchFocus', '1'); } catch (e) {}
-                form.submit();
-            }, 500);
-        });
-        // After the page reloads with results, put the cursor back at the end of what they typed
-        try {
-            if (sessionStorage.getItem('naSearchFocus') === '1') {
-                sessionStorage.removeItem('naSearchFocus');
-                input.focus();
-                var end = input.value.length;
-                input.setSelectionRange(end, end);
-            }
-        } catch (e) {}
-    })();
-    </script>
+    <script src="/assets/js/visitor-news-search.js?v=<?= filemtime(__DIR__ . '/../assets/js/visitor-news-search.js') ?>" defer></script>
     <script>
     // Make the WHOLE card clickable (not only the "Read More" button).
     // Clicks on real links/buttons keep working normally, and selecting text does not trigger it.
@@ -935,6 +912,8 @@ function na_url(array $overrides = []): string {
             document.querySelectorAll(cardSelector).forEach(function (card) {
                 var link = card.querySelector(linkSelector);
                 if (!link) return;
+                if (card.dataset.naClickBound) return;
+                card.dataset.naClickBound = '1';
                 card.addEventListener('click', function (e) {
                     if (e.target.closest('a, button, input, select, textarea, label')) return;
                     var sel = window.getSelection && window.getSelection().toString();
@@ -998,6 +977,16 @@ function na_url(array $overrides = []): string {
             }
         }
 
+        document.addEventListener('news-feed:updated', function () {
+            wire('.na-card', 'a.na-read-more');
+            wire('.gnc-pinned-card', 'a.gnc-pinned-btn');
+            syncPinnedHeights();
+            var carousel = document.getElementById('gncPinnedCarousel');
+            if (carousel) {
+                carousel.addEventListener('slid.bs.carousel', syncPinnedHeights);
+                carousel.querySelectorAll('img').forEach(function (img) { if (!img.complete) img.addEventListener('load', syncPinnedHeights, {once:true}); });
+            }
+        });
         syncPinnedHeights();
         window.addEventListener('load', syncPinnedHeights);
         var resizeTimer;

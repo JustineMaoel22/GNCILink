@@ -117,5 +117,9 @@ async function until(fn, message) {
     await pick({...blocked,matches:[{...match,name:'Unavailable profile',image:'data:image/png;base64,invalid'}]});
     await until(()=>evaluate('Boolean(document.querySelector(".pc-photo-unavailable"))'),'Missing image fallback not displayed');
     assert.equal(await evaluate('accepted'),3,'A missing comparison image never auto-accepts the upload');
-    console.log('Personnel photo browser: comparison, escaping, blocking, acknowledgement, review, outage and responsive checks passed.');
+    await pick({success:true,checked:false,ok:true,reason:'disabled',message:''});
+    assert.equal(await evaluate('accepted'),4,'Disabled checking passes the upload to the editor');
+    assert.equal(await evaluate('document.querySelector(".pc-back")'),null,'Disabled checking shows no duplicate warning');
+    assert.equal(await evaluate('document.getElementById("adm-person-photo").files.length'),1,'Disabled checking retains the selected upload');
+    console.log('Personnel photo browser: comparison, escaping, blocking, acknowledgement, review, outage, disabled setting and responsive checks passed.');
 })().catch(error => { console.error(error); process.exitCode=1; }).finally(() => { if(socket) socket.close(); browser.kill(); });

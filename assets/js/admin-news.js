@@ -2,6 +2,9 @@
     'use strict';
     const page = document.querySelector('.news-management');
     const records = new Map(JSON.parse(document.getElementById('news-preview-data').textContent).map(item => [String(item.id), item]));
+    page.addEventListener('content-list:updated', event => {
+        records.clear(); event.detail.records.forEach(item => records.set(String(item.id), item));
+    });
     const dialog = document.getElementById('ann-preview-dialog');
     const edit = document.getElementById('news-preview-edit');
     const previewMessage = document.getElementById('news-preview-message');
@@ -28,7 +31,10 @@
         if (draft) document.getElementById('newsModal').append(dialog);
         dialog.showModal();
     }
-    page.querySelectorAll('[data-news-preview]').forEach(button => button.addEventListener('click', () => openPreview(records.get(button.dataset.newsPreview), button)));
+    page.addEventListener('click', event => {
+        const button = event.target.closest('[data-news-preview]');
+        if (button) openPreview(records.get(button.dataset.newsPreview), button);
+    });
     page.querySelector('[data-news-preview-close]').addEventListener('click', () => dialog.close());
     dialog.addEventListener('keydown', event => {
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dialog.close(); }
@@ -58,7 +64,9 @@
     page.querySelectorAll('form[method="POST"],form[method="post"]').forEach(form => {
         if (!form.querySelector('[name="return_query"]')) { const input = document.createElement('input'); input.type = 'hidden'; input.name = 'return_query'; input.value = returnQuery.toString(); form.append(input); }
     });
-    page.querySelectorAll('.ann-inline-form').forEach(form => form.addEventListener('submit', async event => {
+    page.addEventListener('submit', async event => {
+        const form = event.target.closest('.ann-inline-form');
+        if (!form) return;
         event.preventDefault(); if (form.dataset.busy) return; form.dataset.busy = '1';
         const action = form.elements.namedItem('action').value;
         try {
@@ -69,6 +77,7 @@
             form.querySelector('button[type="submit"]').disabled = true;
             HTMLFormElement.prototype.submit.call(form);
         } finally { delete form.dataset.busy; }
-    }));
+    });
     if (location.hash === '#pinned-content') page.querySelector('#pinned-content')?.setAttribute('open','');
+    GNCContentSearch.init({page, form: query, tableId: 'news-table', dataId: 'news-preview-data'});
 })();

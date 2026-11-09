@@ -5,6 +5,12 @@
     const feedback = document.getElementById('fb-feedback');
     let busy = false;
     let categoryId = '';
+    const query = root.querySelector('#fb-query');
+    let searchController;
+    root.addEventListener('content-list:updated', event => {
+        data.posts = event.detail.records.posts; data.pinned = event.detail.records.pinned;
+        data.limit = event.detail.records.limit; data.canManage = event.detail.records.canManage; renderPins();
+    });
     function announce(message, failed = false) {
         feedback.textContent = message;
         feedback.className = failed ? 'fb-feedback error' : 'fb-feedback';
@@ -56,9 +62,12 @@
             post.is_pinned = pinned ? 1 : 0;
             row.classList.toggle('is-pinned', pinned);
             const badge = row.querySelector('.fb-pin-status');
-            badge.classList.toggle('pinned', pinned); badge.textContent = pinned ? 'Pinned' : 'Not pinned';
+            badge.classList.toggle('pinned', pinned); badge.hidden = !pinned;
             const button = row.querySelector('[data-pin]');
             if (button) {
+                button.classList.toggle('is-pinned', pinned);
+                button.setAttribute('aria-pressed', String(pinned));
+                button.querySelector('i').className = pinned ? 'bi bi-pin-angle-fill' : 'bi bi-pin-angle';
                 button.querySelector('span').textContent = pinned ? 'Unpin' : 'Pin';
                 button.disabled = busy || (!pinned && count >= data.limit);
                 button.title = !pinned && count >= data.limit ? 'Slideshow full. Unpin an item in Manage slideshow first.' : (pinned ? 'Remove from slideshow' : 'Pin to homepage slideshow');
@@ -69,6 +78,10 @@
     async function update(values, button) {
         if (busy) return false;
         busy = true;
+        const resumeSearch = searchController?.pending();
+        searchController?.cancel();
+        const filters = Array.from(query.querySelectorAll('input,select'), input => [input,input.disabled]);
+        filters.forEach(([input]) => { input.disabled = true; });
         const content = [...button.childNodes];
         if(button.classList.contains('content-icon-action')){
             const spinner=document.createElement('i');spinner.className='spinner-border spinner-border-sm';spinner.setAttribute('aria-hidden','true');button.replaceChildren(spinner);button.setAttribute('aria-label','Saving');
@@ -95,13 +108,7 @@
             // Refresh only the cached results, retaining the form and scroll position.
             if (new URLSearchParams(location.search).get('category') || new URLSearchParams(location.search).get('pinned')) {
                 try {
-                    const page = await fetch(location.href, {headers: {'Accept': 'text/html'}});
-                    const doc = new DOMParser().parseFromString(await page.text(), 'text/html');
-                    const freshData = doc.getElementById('fb-page-data');
-                    if (!page.ok || !freshData) throw new Error('Results unavailable');
-                    const fresh = JSON.parse(freshData.textContent);
-                    data.posts = fresh.posts; data.pinned = fresh.pinned;
-                    for (const selector of ['.fb-results', '#fb-results', '.fb-pagination']) root.querySelector(selector).replaceWith(doc.querySelector(selector));
+                    await searchController.refresh();
                 } catch {
                     announce(`${result.message} Reload the page to update the filtered results.`);
                 }
@@ -115,6 +122,8 @@
         } finally {
             busy = false; button.replaceChildren(...content); button.disabled = false;
             root.removeAttribute('aria-busy'); renderPins();
+            filters.forEach(([input,disabled]) => { input.disabled = disabled; });
+            if (resumeSearch) await searchController.apply();
         }
     }
     root.addEventListener('click', event => {
@@ -143,6 +152,7 @@
             update({action: 'unpin', source: button.dataset.unpinSource, item_id: button.dataset.unpinId}, button);
         }
     });
+    searchController = GNCContentSearch.init({page: root, form: query, tableId: 'fb-results', dataId: 'fb-page-data', kind: 'facebook'});
     document.getElementById('fb-category-form')?.addEventListener('submit', async event => {
         event.preventDefault();
         const ok = await update({action: 'category', source: 'facebook', item_id: categoryId, category_choice: document.getElementById('fb-category-choice').value}, event.submitter || event.currentTarget.querySelector('button[type="submit"]'));

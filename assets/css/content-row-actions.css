@@ -14,3 +14,11 @@
     .facebook-management .fb-row-actions .btn.content-icon-action,
     .evt-table .evt-actions-cell .btn.content-icon-action { width: 42px; height: 42px; min-height: 42px; }
 }
+.news-management .ann-pinned.content-homepage-pin,
+.facebook-management .content-homepage-pin {
+    display: inline-block; margin-top: 7px; padding: 4px 7px; border: 0;
+    border-radius: 5px; background: #fff3d4; color: #785700;
+    font-size: .65rem; font-weight: 600; line-height: 1.6;
+}
+.facebook-management .content-homepage-pin[hidden] { display: none; }
+.facebook-management .fb-pin.is-pinned { background: #EABA3B; border-color: #EABA3B; color: #1F5E2C; }

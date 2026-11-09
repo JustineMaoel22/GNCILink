@@ -869,6 +869,7 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
 }
 </style>
 <?php if(!$facebookPostsPage): ?><link rel="stylesheet" href="/assets/css/admin-announcements.css?v=<?= (int)filemtime(__DIR__.'/../assets/css/admin-announcements.css') ?>">
+<script src="/assets/js/admin-content-search.js?v=<?= filemtime(__DIR__.'/../assets/js/admin-content-search.js') ?>"></script>
 <script src="/assets/js/admin-announcements.js?v=<?= (int)filemtime(__DIR__.'/../assets/js/admin-announcements.js') ?>" defer></script><?php endif; ?>
 </div>
 <link rel="stylesheet" href="/assets/css/multi-audience-select.css?v=<?= filemtime(__DIR__ . '/../assets/css/multi-audience-select.css') ?>">
@@ -1214,7 +1215,7 @@ function openEditModal(btn) {
 }
 
 document.getElementById('btn-new-announcement')?.addEventListener('click', openCreateModal);
-document.querySelectorAll('.js-new-announcement').forEach(b => b.addEventListener('click', openCreateModal));
+document.addEventListener('click', event => { if (event.target.closest('.js-new-announcement')) openCreateModal(); });
 
 announcementModalEl.addEventListener('shown.bs.modal', () => modalTitleInput.focus());
 
@@ -1232,20 +1233,22 @@ document.querySelectorAll('.btn-edit-fb').forEach(btn => {
     });
 });
 
-document.querySelectorAll('.btn-edit-announcement').forEach(btn => {
-    btn.addEventListener('click', () => openEditModal(btn));
+document.addEventListener('click', event => {
+    const btn = event.target.closest('.btn-edit-announcement');
+    if (btn) openEditModal(btn);
 });
 
 // Delete confirmation modal (replaces the browser's plain confirm() box)
 const deleteModalEl = document.getElementById('deleteAnnouncementModal');
 const deleteModal   = deleteModalEl ? new bootstrap.Modal(deleteModalEl) : null;
-document.querySelectorAll('.btn-delete-announcement').forEach(btn => {
-    btn.addEventListener('click', () => {
+document.addEventListener('click', event => {
+    const btn = event.target.closest('.btn-delete-announcement');
+    if (btn) {
         document.getElementById('delete-announcement-id').value = btn.dataset.id;
         document.getElementById('delete-announcement-title').textContent = btn.dataset.title || '';
         document.getElementById('delete-announcement-btn').disabled = false;
         deleteModal?.show();
-    });
+    }
 });
 document.getElementById('delete-announcement-form')?.addEventListener('submit', () => {
     const b = document.getElementById('delete-announcement-btn');
@@ -1342,33 +1345,6 @@ document.getElementById('announcement-form').addEventListener('submit', async (e
         modalSaveLabel.textContent = modalStatus?.value === 'pending' || !modalStatus ? 'Submitting…' : 'Saving…';
     }, 0);
 });
-
-// ---- Live search: results update while typing, no button needed ----
-(function () {
-    const input = document.getElementById('announcement-search');
-    if (!input) return;
-    const form = input.closest('form');
-    let timer = null;
-    let lastValue = input.value;
-
-    input.addEventListener('input', () => {
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-            if (input.value.trim() === lastValue.trim()) return;
-            lastValue = input.value;
-            sessionStorage.setItem('annSearchFocus', '1');
-            form.submit();
-        }, 400); // wait until the person pauses typing
-    });
-
-    // After the page reloads with results, put the cursor back at the end of the word
-    if (sessionStorage.getItem('annSearchFocus') === '1') {
-        sessionStorage.removeItem('annSearchFocus');
-        input.focus();
-        const end = input.value.length;
-        input.setSelectionRange(end, end);
-    }
-})();
 
 window.GncAnnouncementForm.init({quill: modalQuill});
 

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/../admin/settings-functions.php';
 /** Local-only personnel comparison. No embeddings are persisted or returned to browsers. */
 function personPhotoName(string $name): string {
     return mb_strtolower(trim(preg_replace('/\s+/u', ' ', $name)), 'UTF-8');
@@ -97,8 +98,11 @@ function personPhotoDecision(array $scores, array $profiles): array {
 }
 
 function personPhotoCheck(string $path, string $name, string $key = '', ?callable $compare = null): array {
-    if (personPhotoName($name) === '') return ['checked'=>false,'ok'=>false,'reason'=>'name_required','message'=>'Enter the person’s full name before checking their photo.'];
     try {
+        // The shared switch covers browser prechecks and server-side saves,
+        // including retained portraits checked after a rename or restoration.
+        if (!aiImageCheckerEnabled()) return ['checked'=>false,'ok'=>true,'reason'=>'disabled','message'=>''];
+        if (personPhotoName($name) === '') return ['checked'=>false,'ok'=>false,'reason'=>'name_required','message'=>'Enter the person’s full name before checking their photo.'];
         $profiles = []; $fingerprints = []; $missing = 0;
         $normalized=function_exists('personnelEnabled') && personnelEnabled(getDB());
         $identities=$normalized?personnelProfiles(getDB()):[];

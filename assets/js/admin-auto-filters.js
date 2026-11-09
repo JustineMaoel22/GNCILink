@@ -1,6 +1,7 @@
 (() => {
     'use strict';
     document.querySelectorAll('form[data-auto-filters]').forEach(form => {
+        if (form.hasAttribute('data-async-list')) return;
         let timer;
         let submitting = false;
         const apply = () => {

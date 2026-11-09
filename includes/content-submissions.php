@@ -44,7 +44,7 @@ function rbacShouldQueue(string $route,array $post): bool {
     $action=$route==='/admin/events.php'?($post['ajax_action']??$post['action']??''):($post['action']??$post['ajax_action']??'');
     // Calendar imports validate and store a canonical batch before explicitly
     // submitting it to this same approval queue. Uploads never enter the queue.
-    if ($route==='/admin/events.php' && in_array($action,['import_preview','import_manage_preview','import_confirm','import_cancel'],true)) return false;
+    if ($route==='/admin/events.php' && in_array($action,['import_preview','import_manage_preview','import_confirm','import_cancel','import_review_save','import_review_resume','import_review_list'],true)) return false;
     // These are read-only lookups; all other POSTs to content handlers are proposals.
     return !in_array($action,['list','get','fetch_one','load','upload_environment','categories','get_content'],true);
 }

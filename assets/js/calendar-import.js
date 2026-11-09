@@ -5,11 +5,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal=$('calendarImportModal'), body=$('calendarImportRows'), confirm=$('calendarImportConfirm');
     let token='', rows=[], categories=[], existing=[], departments=[], programs=[], departmentsReady=false, groupsReady=false, step=1, page=1, editing=null;
     let busy=false, dirty=false, finished=false, allowClose=false, asking=false, management='';
+    let reviewVersion=0;
+    const savedReviews=new Map();
+    const viewFilters=['ciSearch','ciMonth','ciYear','ciDepartment','ciCategory','ciStatus','ciSort','ciPageSize','ciIssue'];
     const selected=new Set();
+    let editDraft=null, editBaseline='', editOpener=null, editAsking=false, reviewFlow=false;
+    const editDialog=document.createElement('dialog');
+    editDialog.id='calendarImportEditModal';editDialog.className='ci-edit-modal';
+    editDialog.setAttribute('aria-labelledby','ciEditHeading');
+    modal.querySelector('.modal-content').append(editDialog);
     const el=(tag,text,className)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;};
     const show=(id,visible)=>$(id)?.classList.toggle('d-none',!visible);
     const showError=message=>{$('calendarImportError').textContent=message;show('calendarImportError',true);$('calendarImportError').scrollIntoView({block:'nearest'});};
-    const feedback=message=>{$('ciFeedback').textContent=message;};
+    let feedbackTimer=0;
+    const feedback=message=>{
+        const box=$('ciFeedback');clearTimeout(feedbackTimer);box.replaceChildren();if(!message)return;
+        const note=el('div',undefined,'ci-toast');note.append(el('i',undefined,'bi bi-check-circle-fill'),el('span',message));
+        const dismiss=el('button',undefined,'btn-close ci-toast-close');dismiss.type='button';dismiss.setAttribute('aria-label','Dismiss message');dismiss.addEventListener('click',()=>box.replaceChildren());
+        note.append(dismiss);box.append(note);feedbackTimer=setTimeout(()=>{if(box.contains(note))box.replaceChildren();},8000);
+    };
+    const confirmAction=(message,title,confirmText)=>window.AdminDialogs?window.AdminDialogs.confirm(message,{title,confirmText,cancelText:'Keep',danger:true}):Promise.resolve(window.confirm(message));
+    const plural=(count,word,many=word+'s')=>`${count} ${count===1?word:many}`;
     const categoryName=row=>categories.find(cat=>String(cat.category_id)===String(row.category_id))?.category_name||'Uncategorized';
     const dateValid=value=>/^\d{4}-\d{2}-\d{2}$/.test(value||'')&&Number(value.slice(0,4))>=1900&&Number(value.slice(0,4))<=2050&&!Number.isNaN(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;
     const timeValid=value=>!value||/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
@@ -53,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function warnings(row) {
         const issues=critical(row);if(row.reviewed)return issues;
-        return [...new Set([...issues,...(row.warnings||[]).filter(message=>{
+        return [...new Set([...issues,...(row.category_confidence==='review'?['Category needs review: event details changed. Confirm or change the category.']:[]),...(row.warnings||[]).filter(message=>{
             if(/category needs review/i.test(message))return !row.category_id;
             if(/title is missing/i.test(message))return !(row.title||'').trim();
             if(/date is missing|invalid date range/i.test(message))return !dateValid(row.start_date)||!!(row.end_date&&!dateValid(row.end_date));
@@ -62,6 +78,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if(/several departments/i.test(message))return !departmentIds(row).length&&!programIds(row).length;
             return true;
         })])];
+    }
+    function issueTypes(row){
+        const types=new Set();
+        for(const message of warnings(row)){
+            if(/choose a category|category needs review/i.test(message))types.add('category');
+            else if(/\bdates?\b|year round|month.wide|multi.month|schedule.*day/i.test(message))types.add('date');
+            else if(/time|venue|location|tba/i.test(message))types.add('tba');
+            else if(/duplicate/i.test(message))types.add('duplicate');
+            else if(/department|program/i.test(message))types.add('audience');
+            else types.add('other');
+        }
+        return types;
     }
     function flaggedFields(row) {
         if(row.action==='archive'||row.reviewed)return new Set();
@@ -73,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!timeValid(row.start_time)||w.some(m=>/time/i.test(m)))flags.add('start_time');
         if(!timeValid(row.end_time))flags.add('end_time');
         if(w.some(m=>/location/i.test(m)))flags.add('location');
-        if(!row.category_id)flags.add('category_id');
+        if(!row.category_id||row.category_confidence==='review')flags.add('category_id');
         if(w.some(m=>/several departments/i.test(m)))flags.add('dept_id');
         return flags;
     }
@@ -90,7 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 &&(!deptFilter||(deptFilter==='general'?!departmentIds(row).length:departmentIds(row).includes(deptFilter)))
                 &&(!$('ciCategory').value||($('ciCategory').value==='uncategorized'?!row.category_id:String(row.category_id)===$('ciCategory').value))
                 &&(!$('ciStatus').value||state(row)===$('ciStatus').value)
-                &&(!$('ciWarningsOnly').checked||warnings(row).length);
+                &&(!$('ciWarningsOnly').checked||warnings(row).length)
+                &&(!$('ciIssue').value||issueTypes(row).has($('ciIssue').value));
         });
         const sort=$('ciSort').value;
         return result.sort((a,b)=>(sort==='title'?(a.title||'').localeCompare(b.title||''):sort==='category'?categoryName(a).localeCompare(categoryName(b)):(a.start_date||'9999').localeCompare(b.start_date||'9999'))||a.index-b.index);
@@ -107,6 +136,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     }
     function updateSummary() {
+        show('ciSaveReview',!!token&&!management);
+        if(token&&!management&&dirty&&!busy)$('ciReviewSaveStatus').textContent=reviewVersion?'Unsaved changes since last save.':'Review not saved.';
+        $('ciSaveReview').disabled=busy||editDialog.open||!dirty;
         const approved=rows.filter(row=>row.include), excluded=rows.filter(row=>row.excluded).length, needsReview=rows.filter(row=>!row.include&&!row.excluded&&warnings(row).length).length, ready=rows.filter(row=>!row.include&&!row.excluded&&!warnings(row).length).length, pending=rows.length-approved.length-excluded;
         const summaryCards=[
             {name:'All Activities',count:rows.length,filter:'',cls:'total'},
@@ -119,7 +151,8 @@ document.addEventListener('DOMContentLoaded', () => {
         $('calendarImportSummary').replaceChildren(...summaryCards.map(card=>{
             const box=el('button',undefined,`ci-summary-card ${card.cls}${currentStatus===card.filter?' active':''}`);
             box.type='button';
-            box.title=`Filter by ${card.name}`;
+            box.title=currentStatus===card.filter&&card.filter?`Showing ${card.name}. Click to clear this filter.`:`Show ${card.name}`;
+            box.setAttribute('aria-pressed',String(currentStatus===card.filter));
             box.append(el('strong',card.count),el('span',card.name));
             box.addEventListener('click',()=>{
                 $('ciStatus').value=(currentStatus===card.filter&&card.filter!=='')?'':card.filter;
@@ -128,9 +161,18 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             return box;
         }));
-        $('calendarImportCount').textContent=`${approved.length} approved · ${needsReview} need review · ${ready} ready`;
-        $('ciFooterSummary').textContent=management?'Review all affected events before confirming.':token?`${approved.length} of ${rows.length} approved for import${needsReview?` · ${needsReview} need review`:''}${selected.size?` · ${selected.size} selected`:''}`:'';
+        const considered=rows.length-excluded, progress=considered?Math.round(approved.length/considered*100):0;
+        $('calendarImportCount').textContent=`${approved.length} of ${considered} approved`;
+        $('ciProgressBar').style.width=`${progress}%`;$('ciProgressBar').classList.toggle('bg-success',!needsReview&&!ready&&considered>0);$('ciProgress').setAttribute('aria-valuenow',String(progress));
+        const flaggedButton=$('ciReviewNext');flaggedButton.querySelector('span').textContent=needsReview?`Review ${needsReview} flagged`:'No flagged activities';flaggedButton.disabled=busy||!needsReview;
+        const footer=$('ciFooterSummary');footer.replaceChildren();
+        if(management)footer.textContent='Review all affected events before confirming.';
+        else if(token){
+            footer.append(el('span',`${approved.length} approved`,'ci-count approved'),el('span',needsReview?`${needsReview} need review`:'All reviewed',needsReview?'ci-count needs':'ci-count done'));
+            if(ready)footer.append(el('span',`${ready} ready`,'ci-count ready'));
+        }
         $('ciSelectedCount').textContent=`${selected.size} selected`;
+        $('ciBulk').classList.toggle('d-none',!selected.size||step!==2);
         for(const [id,text] of [['ciApproveSelected','Approve selected'],['ciExcludeSelected','Exclude selected'],['ciRemoveSelected','Remove selected'],['ciApplyCategory','Assign category'],['ciApplyAudience','Assign department/program']]){
             if($(id)){$(id).textContent=`${text} (${selected.size})`;$(id).disabled=busy||!selected.size;}
         }
@@ -140,8 +182,9 @@ document.addEventListener('DOMContentLoaded', () => {
             $('ciMergeSelected').disabled=busy||mergeable<2;
         }
         $('ciSelectMatching').textContent=`Select all ${matches().length} matching`;
-        const activeFilters=['ciMonth','ciYear','ciDepartment','ciCategory','ciStatus'].filter(id=>$(id)?.value).length+Number($('ciWarningsOnly').checked)+Number(!!$('ciSearch').value.trim());
-        $('ciToggleFilters').textContent=activeFilters?`Filters (${activeFilters})`:'Filters';
+        const activeFilters=['ciMonth','ciYear','ciDepartment','ciCategory','ciStatus','ciIssue'].filter(id=>$(id)?.value).length+Number($('ciWarningsOnly').checked)+Number(!!$('ciSearch').value.trim());
+        const advancedFilters=['ciMonth','ciYear','ciDepartment','ciCategory','ciStatus','ciIssue'].filter(id=>$(id)?.value).length+Number($('ciWarningsOnly').checked);
+        $('ciFiltersLabel').textContent=advancedFilters?`Advanced filters (${advancedFilters})`:'Advanced filters';$('ciToggleFilters').classList.toggle('active',!!advancedFilters);
         if($('ciResetFilters'))$('ciResetFilters').classList.toggle('d-none',!activeFilters);
         const valid=rows.filter(row=>!row.excluded&&!row.include&&!warnings(row).length&&row.action!=='archive').length;
         $('calendarImportSelectValid').textContent=`Approve all without warnings (${valid})`;
@@ -149,21 +192,28 @@ document.addEventListener('DOMContentLoaded', () => {
         confirm.disabled=busy||(management?!$('calendarManageReviewed').checked:!approved.length||approved.some(row=>critical(row).length)||duplicateIssues(approved));
         const additions=approved.filter(row=>row.action!=='archive'&&!row.event_id).length, updates=approved.filter(row=>row.action!=='archive'&&row.event_id).length, removals=approved.filter(row=>row.action==='archive').length;
         $('ciFinalSummary').textContent=`${approved.length} approved activities: ${additions} additions, ${updates} updates and ${removals} archives. ${excluded} excluded and ${pending} unapproved activities will be left out.`;
-        for(const id of ['ciContinue','ciBack','calendarImportExtract'])$(id).disabled=busy;
+        for(const id of ['ciContinue','ciBack','calendarImportExtract','ciResumeReview','ciDiscardReview'])$(id).disabled=busy;
         const visible=pageRows();$('ciSelectVisible').checked=visible.length>0&&visible.every(row=>selected.has(row.index));$('ciSelectVisible').indeterminate=visible.some(row=>selected.has(row.index))&&!$('ciSelectVisible').checked;
     }
     function change(row,key,value){
         if(key==='dept_id')row.audience_group='all';
-        row[key]=value;row.include=false;row.reviewed=false;if(['start_time','end_time'].includes(key))row.timeCorrected=true;dirty=true;updateSummary();
+        if(key==='category_id'){row.category_confidence='manual';row.category_reason='Category selected by administrator.';}
+        if(['title','description'].includes(key))invalidateCategory(row);
+        row[key]=value;row.include=false;row.reviewed=false;if(['start_time','end_time'].includes(key))row.timeCorrected=true;
+        if(row===editDraft){updateEditorIssues();return;}
+        dirty=true;updateSummary();
         const badge=body.querySelector(`tr[data-row-index="${row.index}"] .ci-badge`);if(badge){badge.textContent=label(row);badge.className=`ci-badge ${state(row)}`;}
         const approveButton=body.querySelector(`tr[data-row-index="${row.index}"] .ci-approve-action`);if(approveButton){approveButton.textContent='Approve';approveButton.className='btn btn-sm btn-outline-success ci-approve-action';}
         const list=body.querySelector('.ci-editor [data-editor-issues]');if(list)list.replaceChildren(...warnings(row).map(message=>el('li',message)));
     }
+    function invalidateCategory(row){
+        row.category_confidence='review';row.category_reason='Event details changed. Confirm or change the category before approval.';
+    }
     function categorySelect(row) {
         const input=el('select',undefined,'form-select form-select-sm');input.setAttribute('aria-label',`Category for ${row.title||'event'}`);input.append(new Option('Needs Review',''));
         categories.forEach(cat=>input.append(new Option(cat.category_name,cat.category_id)));input.value=row.category_id||'';
-        if(!row.category_id&&!row.reviewed)input.classList.add('ci-field-flagged');
-        input.addEventListener('change',()=>{change(row,'category_id',input.value);render();});return input;
+        if((!row.category_id||row.category_confidence==='review')&&!row.reviewed)input.classList.add('ci-field-flagged');
+        input.addEventListener('change',()=>{change(row,'category_id',input.value);if(row!==editDraft)render();});return input;
     }
     function fillDepartments(input,value='') {
         input.replaceChildren(new Option('All departments',''));
@@ -188,6 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
         row.dept_ids=[...new Set(deptIds.map(String))];row.programs=[...new Set(codes)];row.audience_group='all';
         row.dept_id=row.dept_ids.length===1?row.dept_ids[0]:'';
         change(row,'program',row.programs.length===1?row.programs[0]:'ALL');
+        if(row===editDraft)return;
         const main=body.querySelector(`tr[data-row-index="${row.index}"]`);let pill=main?.querySelector('.ci-dept-pill');
         if(main&&!pill){let meta=main.querySelector('.ci-meta-details');if(!meta){meta=el('div',undefined,'ci-meta-details');main.querySelector('.ci-title').parentElement.append(meta);}pill=el('span',undefined,'ci-detail-pill ci-dept-pill');meta.append(pill);}
         if(pill)pill.textContent=audienceName(row)||'All departments / All programs';
@@ -254,13 +305,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!primary.event_id&&other.event_id){primary.event_id=other.event_id;primary.action=other.action;}
             primary.source=[primary.source,other.source].filter(Boolean).join('\n');
         }
+        invalidateCategory(primary);
         primary.include=false;primary.reviewed=false;primary.excluded=false;
         rows=rows.filter(r=>!removeSet.has(r.index));
         reindexRows();
         selected.clear();
         editing=primary.index;
         dirty=true;
-        feedback(`Merged ${validTargets.length} entries into "${primary.title||'Untitled event'}". Review the combined details below.`);
+        feedback(`Merged ${validTargets.length} entries into "${primary.title||'Untitled event'}". Review the combined details in the editor.`);
         render();
     }
     function separateRow(row) {
@@ -283,12 +335,13 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             newEntries.push({...row,title:`${row.title||''} (Part 2)`.trim(),event_id:0,action:'create',include:false,reviewed:false,excluded:false});
         }
+        [row,...newEntries].forEach(invalidateCategory);
         row.include=false;row.reviewed=false;
         rows.splice(pos+1,0,...newEntries);
         reindexRows();
         editing=rows[pos+1].index;
         dirty=true;
-        feedback(`Separated into ${1+newEntries.length} entries. Edit the separated entry below.`);
+        feedback(`Separated into ${1+newEntries.length} entries. Review the separated entry in the editor.`);
         render();
     }
     function removeRows(targetRows) {
@@ -303,8 +356,72 @@ document.addEventListener('DOMContentLoaded', () => {
         render();
     }
     function button(text,callback,className='btn btn-sm btn-outline-secondary'){const node=el('button',text,className);node.type='button';node.addEventListener('click',callback);return node;}
+    const cloneRow=row=>JSON.parse(JSON.stringify(row));
+    function updateEditorIssues(message='') {
+        const list=editDialog.querySelector('[data-editor-issues]');
+        if(list&&editDraft){const issues=warnings(editDraft);list.replaceChildren(...issues.map(issue=>el('li',issue)));if(list.parentElement)list.parentElement.hidden=!issues.length;}
+        const error=editDialog.querySelector('[data-editor-error]');
+        if(error){error.textContent=message;error.hidden=!message;}
+    }
+    function destroyEditorFields(){editDialog.querySelectorAll('.gnc-ms-wrap').forEach(wrap=>wrap._gncMsInstance?.destroy());}
+    function refreshEditor(){
+        destroyEditorFields();editDialog.replaceChildren(editor(editDraft));
+        if(document.getElementById('ci-departments-'+editing))GncAdminFormAudience.enhance([['ci-departments-'+editing,'ci-departments-label-'+editing,'Search departments'],['ci-programs-'+editing,'ci-programs-label-'+editing,'Search programs']]);
+    }
+    function openEditor(row,flow=false){
+        reviewFlow=flow;editing=row.index;editDraft=cloneRow(row);editBaseline=JSON.stringify(editDraft);
+        editOpener=document.activeElement;refreshEditor();editDialog.showModal();
+        editDialog.querySelector('[data-field="title"]').focus();
+    }
+    function finishEditor(){
+        const index=editing,opener=editOpener;
+        editDraft=null;editing=null;editDialog.close();destroyEditorFields();editDialog.replaceChildren();
+        render();
+        (opener?.isConnected?opener:body.querySelector(`tr[data-row-index="${index}"] [data-edit-event]`))?.focus({preventScroll:true});
+    }
+    async function cancelEditor(){
+        if(editAsking)return;
+        editAsking=true;
+        try{
+            if(editDraft&&JSON.stringify(editDraft)!==editBaseline){
+                const accepted=await AdminDialogs.confirm('Discard your unsaved changes to this event?',{title:'Discard event changes?',confirmText:'Discard changes',cancelText:'Keep editing',danger:true});
+                if(!accepted)return;
+            }
+            finishEditor();
+        }finally{editAsking=false;}
+    }
+    function commitEditor(validate=true){
+        const issues=validate?critical(editDraft):[];
+        if(issues.length){updateEditorIssues(issues.join(' '));editDialog.querySelector('[data-editor-error]').scrollIntoView({block:'nearest'});return null;}
+        const row=rows.find(item=>item.index===editing);
+        if(!row){updateEditorIssues('This entry is no longer available. Cancel and open it again.');return null;}
+        if(JSON.stringify(editDraft)!==editBaseline){Object.assign(row,cloneRow(editDraft));dirty=true;}
+        return row;
+    }
+    editDialog.addEventListener('cancel',event=>{event.preventDefault();event.stopPropagation();cancelEditor();});
+    editDialog.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();cancelEditor();}});
+    editDialog.addEventListener('click',event=>{
+        if(event.target!==editDialog)return;
+        const rect=editDialog.getBoundingClientRect();
+        if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)cancelEditor();
+    });
     function editor(row) {
-        const tr=el('tr',undefined,'ci-editor'),td=el('td');td.colSpan=6;const grid=el('div',undefined,'ci-editor-grid');
+        const panel=el('div',undefined,'ci-editor'),header=el('header',undefined,'ci-edit-header');
+        const heading=el('h2','Edit imported event');heading.id='ciEditHeading';
+        const close=button('',cancelEditor,'btn-close');close.setAttribute('aria-label','Close event editor');
+        const titleBlock=el('div');titleBlock.append(heading);
+        if(reviewFlow){const left=rows.filter(item=>state(item)==='needs').length;titleBlock.append(el('p',`Reviewing flagged activities · ${left} left`,'ci-edit-sub'));}
+        else titleBlock.append(el('p','Changes apply to this review. Use Confirm Import when everything is ready.','ci-edit-sub'));
+        header.append(titleBlock,close);
+        const td=el('div',undefined,'ci-edit-body');
+        const flagBox=el('div',undefined,'ci-edit-flags'),flagList=el('ul');flagList.dataset.editorIssues='';flagList.setAttribute('aria-live','polite');warnings(row).forEach(message=>flagList.append(el('li',message)));flagBox.append(el('strong','Why this activity needs review'),flagList);flagBox.hidden=!flagList.childElementCount;td.append(flagBox);
+        const error=el('p',undefined,'alert alert-danger');error.dataset.editorError='';error.setAttribute('role','alert');error.hidden=true;td.append(error);
+        const grid=el('div',undefined,'ci-editor-grid');
+        const sections={};
+        for(const [key,title] of [['details','Event details'],['schedule','Date & time'],['audience','Departments & academic programs'],['import','Import options']]){
+            const section=el('section',undefined,'ci-edit-section'),titleNode=el('h3',title),fields=el('div',undefined,'ci-editor-grid');
+            section.append(titleNode,fields);grid.append(section);sections[key]=fields;
+        }
         const flags=flaggedFields(row);
         for(const [key,text,type,wide] of [['title','Event title','text',true],['location','Location','text',true],['start_date','Start date','date'],['end_date','End date','date'],['start_time','Start time','time'],['end_time','End time','time'],['description','Description','textarea',true]]){
             const wrapper=el('label',undefined,wide?'ci-wide':'');
@@ -313,8 +430,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const input=el(type==='textarea'?'textarea':'input',undefined,'form-control form-control-sm');if(type!=='textarea')input.type=type;
             if(flags.has(key))input.classList.add('ci-field-flagged');
             input.value=row[key]||'';input.dataset.field=key;if(['title','location','description'].includes(key))input.maxLength=key==='description'?10000:500;
-            input.addEventListener('input',()=>{input.classList.remove('ci-field-flagged');change(row,key,input.value);});wrapper.append(input);grid.append(wrapper);
+            input.addEventListener('input',()=>{input.classList.remove('ci-field-flagged');change(row,key,input.value);});wrapper.append(input);sections[['start_date','end_date','start_time','end_time'].includes(key)?'schedule':'details'].append(wrapper);
         }
+        const categoryLabel=el('label','Category','ci-wide');categoryLabel.append(categorySelect(row));sections.details.append(categoryLabel);
         if(row.action!=='archive'){
             const departmentLabel=el('div',undefined,'ci-wide'),department=el('div');department.id='ci-departments-'+row.index;
             const deptHeading=el('label','Departments');deptHeading.id='ci-departments-label-'+row.index;departmentLabel.append(deptHeading,department);
@@ -332,37 +450,74 @@ document.addEventListener('DOMContentLoaded', () => {
             }});
             departmentLabel.append(el('small','Select several departments, or leave empty for all departments.','text-muted'));
             programLabel.append(el('small','Select several programs. Basic Education is targeted through its departments.','text-muted'));
-            grid.append(departmentLabel,programLabel);
+            sections.audience.append(departmentLabel,programLabel);
             const wrapper=el('label','Save action','ci-wide'),target=el('select',undefined,'form-select form-select-sm');target.append(new Option('Add new event',0));
             existing.forEach(event=>target.append(new Option(`Update #${event.event_id}: ${event.title} (${event.start_date.slice(0,10)})`,event.event_id)));target.value=row.event_id||0;
-            target.addEventListener('change',()=>{change(row,'event_id',Number(target.value));const old=existing.find(event=>Number(event.event_id)===row.event_id);if(old){row.category_id=old.category_id;row.dept_id=old.audience_group&&old.audience_group!=='all'?'group:'+old.audience_group:old.dept_id||'';row.audience_group='all';row.program=old.program||'ALL';delete row.dept_ids;delete row.programs;if(Array.isArray(old.dept_ids))row.dept_ids=[...old.dept_ids];if(Array.isArray(old.programs))row.programs=[...old.programs];}render();});wrapper.append(target);grid.append(wrapper);
+            target.addEventListener('change',()=>{change(row,'event_id',Number(target.value));const old=existing.find(event=>Number(event.event_id)===row.event_id);if(old){row.category_confidence='preserved';row.category_reason='The current category has been kept for this revised activity.';row.category_id=old.category_id;row.dept_id=old.audience_group&&old.audience_group!=='all'?'group:'+old.audience_group:old.dept_id||'';row.audience_group='all';row.program=old.program||'ALL';delete row.dept_ids;delete row.programs;if(Array.isArray(old.dept_ids))row.dept_ids=[...old.dept_ids];if(Array.isArray(old.programs))row.programs=[...old.programs];}refreshEditor();});wrapper.append(target);sections.import.append(wrapper);
         }
-        td.append(grid);const list=el('ul',undefined,'small mt-3 mb-2');list.dataset.editorIssues='';list.setAttribute('aria-live','polite');warnings(row).forEach(message=>list.append(el('li',message)));td.append(list);
+        for(const section of Object.values(sections))if(!section.childElementCount)section.parentElement.remove();
+        td.append(grid);
         const source=el('details',undefined,'small my-2');source.append(el('summary','Document source and previous values'),el('p',row.source||''));if(row.previous)source.append(el('p',`Previously: ${row.previous.title}; ${row.previous.start_date}; ${row.previous.location||''}; ${row.previous.description||''}`));td.append(source);
-        const actions=el('div',undefined,'d-flex gap-2 flex-wrap');
-        actions.append(
-            button(row.action==='archive'?'Save & Approve Archive':'Save & Approve',()=>{
-                if(critical(row).length){feedback('Please fix the highlighted required fields before approving.');return;}
-                approve([row],false,true);
-                if(row.include)editing=null;
-                render();
-            },'btn btn-sm btn-success'),
-            button('Mark reviewed',()=>{if(critical(row).length){feedback('Correct the errors before marking this activity reviewed.');return;}row.reviewed=true;dirty=true;render();})
-        );
+        const actions=el('footer',undefined,'ci-edit-footer');
+        const tools=el('div',undefined,'ci-edit-tools'),primary=el('div',undefined,'ci-edit-primary');
+        const more=el('div',undefined,'dropdown dropup'),moreToggle=el('button','More actions','btn btn-outline-secondary');moreToggle.type='button';moreToggle.dataset.bsToggle='dropdown';moreToggle.setAttribute('aria-expanded','false');
+        const moreMenu=el('ul',undefined,'dropdown-menu');
+        const menuItem=(text,callback,className='')=>{const li=el('li'),node=button(text,callback,`dropdown-item ${className}`.trim());li.append(node);moreMenu.append(li);};
+        menuItem('Mark reviewed',()=>{const saved=commitEditor();if(!saved)return;saved.reviewed=true;dirty=true;finishEditor();if(reviewFlow)openNextFlagged();});
         if(row.action!=='archive'){
-            actions.append(button('Separate into 2 events',()=>separateRow(row),'btn btn-sm btn-outline-primary'));
+            menuItem('Separate into 2 events',()=>{const saved=commitEditor(false);if(saved){finishEditor();separateRow(saved);}});
             const filtered=matches();
             const curPos=filtered.findIndex(r=>r.index===row.index);
             if(curPos>=0&&curPos+1<filtered.length&&filtered[curPos+1].action!=='archive'){
-                actions.append(button('Merge with next row',()=>mergeRowList([row,filtered[curPos+1]]),'btn btn-sm btn-outline-primary'));
+                menuItem('Merge with next row',()=>{const next=filtered[curPos+1],saved=commitEditor(false);if(saved){finishEditor();mergeRowList([saved,next]);}});
             }
         }
-        actions.append(
-            button(row.excluded?'Restore':'Exclude',()=>{row.include=false;row.excluded=!row.excluded;dirty=true;render();}),
-            button('Remove entry',()=>removeRows([row]),'btn btn-sm btn-outline-danger'),
-            button('Close',()=>{editing=null;render();})
-        );
-        td.append(actions);tr.append(td);return tr;
+        menuItem(row.excluded?'Restore':'Exclude',()=>{const saved=commitEditor(false);if(saved){saved.include=false;saved.excluded=!saved.excluded;dirty=true;finishEditor();}});
+        moreMenu.append(el('li',undefined,'dropdown-divider'));
+        menuItem('Remove entry',()=>{const saved=rows.find(item=>item.index===editing);if(!saved)return;finishEditor();confirmRemove([saved]);},'text-danger');
+        more.append(moreToggle,moreMenu);tools.append(more);
+        if(window.bootstrap?.Dropdown)new bootstrap.Dropdown(moreToggle,{popperConfig:config=>({...config,strategy:'fixed'})});
+        primary.append(
+            button('Cancel',cancelEditor,'btn btn-outline-secondary'),
+            button(row.action==='archive'?'Save & Approve Archive':'Save & Approve',()=>{
+                if(duplicateIssues([...rows.filter(other=>other.include&&other.index!==editing),row])){updateEditorIssues('This event duplicates another approved event. Correct it before approving.');return;}
+                const saved=commitEditor();if(!saved)return;
+                finishEditor();approve([saved],false,true);if(reviewFlow)openNextFlagged();
+            },'btn btn-success'),
+            button('Save Changes',()=>{const saved=commitEditor();if(saved){finishEditor();feedback('Changes saved. The event row has been updated.');}},'btn btn-gnc')
+        );        actions.append(tools,primary);panel.append(header,td,actions);return panel;
+    }
+    async function confirmRemove(targets){
+        if(!targets.length)return;
+        const accepted=await confirmAction(`Remove ${plural(targets.length,'entry','entries')} from the import preview? This only changes this review. The Word document is not modified.`,'Remove from import?','Remove');
+        if(accepted)removeRows(targets);
+    }
+    function toggleExclude(targets,exclude){
+        targets.forEach(row=>{row.include=false;row.excluded=exclude;});dirty=true;
+        feedback(exclude?`${plural(targets.length,'activity','activities')} excluded. They will not be imported.`:'Activity restored to the review list.');render();
+    }
+    function rowMenu(row,filtered){
+        const wrap=el('div',undefined,'dropdown ci-more');
+        const toggle=el('button',undefined,'btn btn-sm btn-light ci-more-toggle');toggle.type='button';
+        toggle.dataset.bsToggle='dropdown';toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-label',`More actions for ${row.title||'untitled activity'}`);toggle.title='More actions';
+        toggle.append(el('i',undefined,'bi bi-three-dots-vertical'));toggle.firstChild.setAttribute('aria-hidden','true');
+        const menu=el('ul',undefined,'dropdown-menu dropdown-menu-end');
+        const item=(text,callback,className='')=>{const li=el('li'),node=el('button',text,`dropdown-item ${className}`.trim());node.type='button';node.addEventListener('click',callback);li.append(node);menu.append(li);};
+        if(row.action!=='archive'){
+            item('Separate into multiple events',()=>separateRow(row));
+            const position=filtered.findIndex(other=>other.index===row.index),next=filtered[position+1];
+            if(position>=0&&next&&next.action!=='archive')item('Merge with next row',()=>mergeRowList([row,next]));
+        }
+        item(row.excluded?'Restore to review':'Exclude from import',()=>toggleExclude([row],!row.excluded));
+        menu.append(el('li',undefined,'dropdown-divider'));
+        item('Remove entry',()=>confirmRemove([row]),'text-danger');
+        wrap.append(toggle,menu);
+        if(window.bootstrap?.Dropdown)new bootstrap.Dropdown(toggle,{popperConfig:config=>({...config,strategy:'fixed'})});
+        return wrap;
+    }
+    function openNextFlagged(){
+        const next=matches().find(row=>state(row)==='needs')||rows.find(row=>state(row)==='needs');
+        if(next)openEditor(next,true);else feedback('All flagged activities have been reviewed.');
     }
     function render() {
         const years=new Set(Array.from($('ciYear').options,option=>option.value));
@@ -410,8 +565,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Show inline warning explanations directly so admins don't need to guess why a row is flagged
             if(issues.length){
-                const warnList=el('div',undefined,'ci-warning-list');
-                issues.forEach(msg=>warnList.append(el('span',`⚠ ${msg}`,'ci-flag-chip')));
+                const warnList=el('ul',undefined,'ci-reasons');warnList.setAttribute('aria-label','Why this activity needs review');
+                issues.slice(0,2).forEach(msg=>warnList.append(el('li',msg)));
+                if(issues.length>2){const more=el('li',`+${issues.length-2} more — open Edit to see all`);more.title=issues.slice(2).join('\n');warnList.append(more);}
                 title.append(warnList);
             }
 
@@ -432,6 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const category=el('td');category.append(categorySelect(row));
+            if(row.category_reason){category.querySelector('select').title=row.category_reason;if(flags.has('category_id'))category.append(el('div',row.category_reason,'ci-category-note'));}
             const status=el('td');status.append(el('span',label(row),`ci-badge ${state(row)}`));
             const actionCell=el('td',undefined,'ci-actions-cell'),action=el('div',undefined,'ci-row-actions');
             actionCell.append(action);
@@ -442,7 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if(row.include){
                             row.include=false;dirty=true;render();
                         } else if(critical(row).length){
-                            editing=row.index;feedback('Please complete the required fields below before approving.');render();
+                            editing=row.index;feedback('Please complete the required fields in the event editor before approving.');render();
                         } else {
                             approve([row],false,true);
                         }
@@ -453,32 +610,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 quickApprove.classList.add('ci-approve-action');
                 action.append(quickApprove);
             }
-            const edit=button(editing===row.index?'Close':'Edit',()=>{editing=editing===row.index?null:row.index;render();});
-            edit.setAttribute('aria-expanded',String(editing===row.index));
+            const edit=button('Edit',()=>openEditor(row));
+            edit.dataset.editEvent='';edit.setAttribute('aria-haspopup','dialog');edit.setAttribute('aria-controls',editDialog.id);
             action.append(edit);
-            if(row.action!=='archive'){
-                const splitBtn=button('Separate',()=>separateRow(row),'btn btn-sm btn-outline-secondary');
-                splitBtn.title='Separate this entry into multiple events';
-                action.append(splitBtn);
-            }
-            const removeBtn=button('Remove',()=>removeRows([row]),'btn btn-sm btn-outline-danger');
-            removeBtn.title='Remove this entry from the import preview';
-            action.append(removeBtn);
-
-            tr.append(checkCell,title,dates,category,status,actionCell);body.append(tr);if(editing===row.index)body.append(editor(row));
+            action.append(rowMenu(row,filtered));
+            tr.append(checkCell,title,dates,category,status,actionCell);body.append(tr);
         });
-        if(editing!==null&&document.getElementById('ci-departments-'+editing))GncAdminFormAudience.enhance([['ci-departments-'+editing,'ci-departments-label-'+editing,'Search departments'],['ci-programs-'+editing,'ci-programs-label-'+editing,'Search programs']]);
+        if(editing!==null&&!editDraft){const row=rows.find(item=>item.index===editing);if(row)openEditor(row);else editing=null;}
         if(!visible.length){const tr=el('tr'),td=el('td','No activities match these filters.','text-center text-muted py-4');td.colSpan=6;tr.append(td);body.append(tr);}
         $('ciPageInfo').textContent=`Showing ${filtered.length?(page-1)*pageSize()+1:0}–${Math.min(page*pageSize(),filtered.length)} of ${filtered.length} matching · ${rows.length} total · Page ${page} of ${Math.max(1,Math.ceil(filtered.length/pageSize()))}`;
-        $('ciPrevious').disabled=page===1;$('ciNext').disabled=page*pageSize()>=filtered.length;updateSummary();
+        $('ciPrevious').disabled=page===1;$('ciFirst').disabled=page===1;$('ciLast').disabled=page*pageSize()>=filtered.length;$('ciNext').disabled=page*pageSize()>=filtered.length;updateSummary();
     }
     function setStep(next) {
         if(busy||next<1||next>3||(next>1&&!token)||management)return;if(step!==next)show('calendarImportError',false);step=next;
-        show('calendarImportUpload',step===1);show('calendarImportManagement',step===1);show('calendarImportPreview',step===2);show('ciFinal',step===3);show('calendarImportSummary',!!token);show('ciBack',step>1);show('ciContinue',step<3&&!!token);show('calendarImportConfirm',step===3);
-        document.querySelectorAll('[data-ci-step]').forEach(node=>{const number=Number(node.dataset.ciStep);node.classList.toggle('active',number===step);node.disabled=number>1&&!token;node.removeAttribute('aria-current');if(number===step)node.setAttribute('aria-current','step');});
+        show('calendarImportUpload',step===1);show('calendarImportManagement',step===1);show('calendarImportPreview',step===2);show('ciFinal',step===3);show('calendarImportSummary',!!token&&step===2);show('ciBack',step>1);show('ciContinue',step<3&&!!token);show('calendarImportConfirm',step===3);
+        document.querySelectorAll('[data-ci-step]').forEach(node=>{const number=Number(node.dataset.ciStep);node.classList.toggle('active',number===step);node.classList.toggle('done',number<step&&!!token);const num=node.querySelector('.ci-step-num');if(num)num.textContent=number<step&&token?'✓':String(number);node.disabled=number>1&&!token;node.removeAttribute('aria-current');if(number===step)node.setAttribute('aria-current','step');});
         $('calendarImportReviewHeading').textContent='Review and approve activities';
         $('calendarImportReviewHelp').textContent='Clean activities are automatically approved. Use Needs Review to inspect flagged items, correct details with Edit, and approve the activities you want to import. Pending and excluded activities are left out. Continue to the final summary when ready.';
-        $('ciContinue').textContent=step===2?'Review final summary':'Continue review';render();
+        show('ciSavedReviews',step===1&&savedReviews.size>0&&!management);
+        const hints={1:'Choose your calendar document, then extract its activities. Nothing is published until you confirm in step 3.',2:'Clean activities are approved automatically. Fix the flagged ones, then continue to the final summary.',3:'Check the totals below, then confirm. Only approved activities are imported.'};
+        $('ciStepHint').textContent=management?'Review the affected events, tick the confirmation box, then confirm.':hints[step];
+        $('calendarImportFileStatus').classList.toggle('d-none',step!==1);
+        $('ciContinue').textContent=step===2?'Continue to final summary':'Continue review';render();
     }
     async function request(action,data=new FormData(),useToken=token) {
         data.set('ajax_action',action);data.set('csrf_token',$('csrfToken').value);if(useToken)data.set('import_token',useToken);
@@ -486,7 +639,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try{result=await response.json();}catch{throw new Error('The server could not read this request. Check the file size or refresh and try again.');}
         if(!result.success)throw new Error(result.message||result.error||'The request could not be completed.');return result;
     }
-    async function discardPrompt(){return window.AdminDialogs?window.AdminDialogs.confirm('Discard your calendar review? Edits, selections and approvals in this workspace will be lost.',{title:'Discard calendar review?',confirmText:'Discard review',cancelText:'Keep reviewing',danger:true}):window.confirm('Discard your calendar review and unsaved changes?');}
+    async function discardPrompt(){return window.AdminDialogs?window.AdminDialogs.confirm(reviewVersion?'Discard changes since your last save? Your saved review will remain available.':'Discard your calendar review? Unsaved edits, selections and approvals will be lost.',{title:'Discard calendar review?',confirmText:'Discard review',cancelText:'Keep reviewing',danger:true}):window.confirm('Discard your calendar review and unsaved changes?');}
     function updateSelectedFileMeta(file) {
         const meta=$('calendarImportFileMeta');
         const zone=$('calendarImportDropzone');
@@ -519,22 +672,87 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+    async function loadSavedReviews(){
+        try{
+            const result=await request('import_review_list');savedReviews.clear();
+            for(const review of result.reviews)savedReviews.set(review.token,review);
+            $('ciSavedReview').replaceChildren(...result.reviews.map(review=>new Option(`${review.filename} · ${review.rows} activities · saved ${new Date(review.saved_at*1000).toLocaleString()}`,review.token)));
+            show('ciSavedReviews',step===1&&savedReviews.size>0&&!management);
+        }catch(error){showError(error.message);}
+    }
+    function workspaceData(){
+        const fields=['source_index','action','event_id','title','description','location','start_date','end_date','start_time','end_time','category_id','dept_id','program','dept_ids','programs','audience_group','include','reviewed','excluded','timeCorrected','category_confidence','category_reason'];
+        return {rows:rows.map(row=>Object.fromEntries(fields.filter(key=>row[key]!==undefined).map(key=>[key,row[key]]))),view:{...Object.fromEntries(viewFilters.map(id=>[id,$(id).value])),ciWarningsOnly:$('ciWarningsOnly').checked,step,page,selected:[...selected],import_status:$('ciImportStatus')?.value||'draft'}};
+    }
+    function fillReviewControls(){
+        fillDepartments($('ciBulkDepartment'));fillPrograms($('ciBulkProgram'),'');
+        fillDepartments($('ciDepartment'));$('ciDepartment').disabled=false;
+        $('ciDepartment').insertBefore(new Option('General / Institutional (No specific dept)','general'),$('ciDepartment').options[1]||null);
+        for(const id of ['ciCategory','ciBulkCategory']){
+            const select=$(id);while(select.options.length>(id==='ciCategory'?2:1))select.remove(select.options.length-1);
+            categories.forEach(cat=>select.append(new Option(cat.category_name,cat.category_id)));
+        }
+        $('ciYear').replaceChildren(new Option('All years',''));
+        [...new Set(rows.map(row=>row.start_date?.slice(0,4)).filter(Boolean))].sort().forEach(year=>$('ciYear').append(new Option(year,year)));
+    }
+    $('ciSaveReview').addEventListener('click',async()=>{
+        if(busy||!token||management||editDialog.open)return;
+        const workspace=workspaceData(),serialized=JSON.stringify(workspace);busy=true;updateSummary();show('calendarImportError',false);
+        $('ciReviewSaveStatus').textContent='Saving review…';
+        try{
+            const data=new FormData();data.set('review_workspace',JSON.stringify({...workspace,version:reviewVersion}));
+            const result=await request('import_review_save',data);reviewVersion=result.review_version;
+            dirty=JSON.stringify(workspaceData())!==serialized;
+            $('ciReviewSaveStatus').textContent=dirty?'Saved. More recent changes are unsaved.':`Review saved ${new Date(result.saved_at*1000).toLocaleTimeString()}`;
+        }catch(error){$('ciReviewSaveStatus').textContent='Review could not be saved.';showError(error.message);}
+        finally{busy=false;updateSummary();}
+    });
+    $('ciResumeReview').addEventListener('click',async()=>{
+        const resumeToken=$('ciSavedReview').value;if(busy||!resumeToken)return;
+        if(token&&dirty&&!(await discardPrompt()))return;
+        busy=true;updateSummary();show('calendarImportError',false);
+        try{
+            const result=await request('import_review_resume',new FormData(),resumeToken);
+            if(token&&token!==resumeToken&&!reviewVersion)await request('import_cancel',new FormData(),token);
+            token=result.token;reviewVersion=result.review_version;categories=result.categories;existing=result.existing;
+            departments=result.departments||[];programs=result.programs||[];departmentsReady=!!result.departments_ready;groupsReady=!!result.audience_groups_ready;
+            rows=result.rows.map((row,index)=>({...row,index}));selected.clear();
+            const view=result.view||{};for(const index of view.selected||[])if(rows[index])selected.add(index);
+            fillReviewControls();for(const id of viewFilters)$(id).value=view[id]||(id==='ciPageSize'?'20':id==='ciSort'?'date':'');
+            $('ciWarningsOnly').checked=!!view.ciWarningsOnly;
+            if($('ciImportStatus'))$('ciImportStatus').value=view.import_status||'draft';
+            page=view.page||1;editing=null;dirty=false;finished=false;management='';busy=false;
+            $('calendarImportFileStatus').textContent=`${result.filename} · Saved review restored · ${rows.length} activities`;
+            $('ciReviewSaveStatus').textContent='Saved review restored. Changes still need final confirmation.';
+            feedback('Your saved edits and approvals have been restored. Existing events will be checked again when you confirm.');
+            setStep(view.step===3?3:2);
+        }catch(error){showError(error.message);}finally{busy=false;updateSummary();}
+    });
+    $('ciDiscardReview').addEventListener('click',async()=>{
+        const saved=savedReviews.get($('ciSavedReview').value);if(busy||!saved)return;
+        const accepted=window.AdminDialogs?await window.AdminDialogs.confirm('Permanently discard this saved review? Existing events will be kept.',{title:'Discard saved review?',confirmText:'Discard saved review',danger:true}):window.confirm('Discard this saved review?');
+        if(!accepted)return;busy=true;updateSummary();
+        try{
+            const data=new FormData();data.set('discard_saved','1');data.set('review_version',String(saved.review_version));
+            await request('import_cancel',data,saved.token);await loadSavedReviews();feedback('Saved review discarded.');
+        }catch(error){showError(error.message);}finally{busy=false;updateSummary();}
+    });
+    modal.addEventListener('change',event=>{
+        if(token&&!management&&!editDialog.contains(event.target)){dirty=true;updateSummary();}
+    });
+    for(const id of ['ciSelectMatching','ciClearSelection','ciPrevious','ciNext','ciFirst','ciLast','ciResetFilters','ciBack','ciContinue'])$(id).addEventListener('click',()=>{if(token&&!management){dirty=true;updateSummary();}});
+    modal.addEventListener('shown.bs.modal',()=>{if(!token)loadSavedReviews();});
     $('calendarImportUpload').addEventListener('submit',async event=>{
         event.preventDefault();if(busy)return;const file=$('calendarImportFile').files[0];if(!file||file.size>5*1024*1024||!/\.docx$/i.test(file.name)){showError('Choose a .docx file up to 5 MB.');return;}
         if(token&&dirty&&!(await discardPrompt()))return;busy=true;updateSummary();show('calendarImportError',false);$('calendarImportExtract').textContent='Extracting…';$('calendarImportFileStatus').textContent=`${file.name} · Uploading and extracting activities…`;
         try{
-            const result=await request('import_preview',new FormData($('calendarImportUpload')));if(token)await request('import_cancel',new FormData(),token).catch(()=>{});
-            token=result.token;categories=result.categories;existing=result.existing;departments=result.departments||[];programs=result.programs||[];departmentsReady=!!result.departments_ready;groupsReady=!!result.audience_groups_ready;
+            const result=await request('import_preview',new FormData($('calendarImportUpload')));if(token&&!reviewVersion)await request('import_cancel',new FormData(),token).catch(()=>{});
+            reviewVersion=0;$('ciReviewSaveStatus').textContent='Unsaved review';token=result.token;categories=result.categories;existing=result.existing;departments=result.departments||[];programs=result.programs||[];departmentsReady=!!result.departments_ready;groupsReady=!!result.audience_groups_ready;
             rows=result.rows.map((row,index)=>({program:'ALL',...row,dept_id:row.audience_group&&row.audience_group!=='all'?'group:'+row.audience_group:row.dept_id||'',audience_group:'all',index,source_index:index,include:false,reviewed:false,excluded:false}));
             selected.clear();editing=null;page=1;dirty=true;finished=false;
-            fillDepartments($('ciBulkDepartment'));fillPrograms($('ciBulkProgram'),'');
-            if($('ciDepartment')){
-                fillDepartments($('ciDepartment'));
-                $('ciDepartment').disabled=false;
-                $('ciDepartment').insertBefore(new Option('General / Institutional (No specific dept)','general'),$('ciDepartment').options[1]||null);
-            }
-            for(const id of ['ciCategory','ciBulkCategory']){const select=$(id);while(select.options.length>(id==='ciCategory'?2:1))select.remove(select.options.length-1);categories.forEach(cat=>select.append(new Option(cat.category_name,cat.category_id)));}
-            $('ciYear').replaceChildren(new Option('All years',''));[...new Set(rows.map(row=>row.start_date?.slice(0,4)).filter(Boolean))].sort().forEach(year=>$('ciYear').append(new Option(year,year)));
+            fillReviewControls();
+            for(const id of ['ciSearch','ciMonth','ciYear','ciDepartment','ciCategory','ciStatus','ciIssue'])$(id).value='';
+            $('ciWarningsOnly').checked=false;
             // Auto-approve all clean rows without warnings so the admin only needs to review flagged items
             let autoApproved=0, flaggedCount=0;
             for(const row of rows){
@@ -550,7 +768,7 @@ document.addEventListener('DOMContentLoaded', () => {
             banner.append(el('span',`✓ ${autoApproved} clean ${autoApproved===1?'activity was':'activities were'} automatically approved.${flaggedCount?` ${flaggedCount} ${flaggedCount===1?'activity has':'activities have'} notes or TBA details to review.`:' All extracted activities are ready to import!'}`));
             if(flaggedCount>0){
                 const reviewBtn=button(`Review ${flaggedCount} flagged ${flaggedCount===1?'item':'items'}`,()=>{
-                    $('ciStatus').value='needs';page=1;render();
+                    $('ciReviewNext').click();
                 },'btn btn-sm btn-warning ms-2');
                 banner.append(reviewBtn);
             }
@@ -558,20 +776,21 @@ document.addEventListener('DOMContentLoaded', () => {
             $('calendarImportFileStatus').textContent=`${file.name} · Extraction complete · ${rows.length} ${rows.length===1?'activity':'activities'} detected`;busy=false;setStep(2);
         }catch(e){showError(e.message);$('calendarImportFileStatus').textContent=`${file.name} · Extraction failed. Your previous review is still available.`;}finally{busy=false;$('calendarImportExtract').textContent='Extract Activities';updateSummary();}
     });
-    for(const id of ['ciSearch','ciMonth','ciYear','ciDepartment','ciCategory','ciStatus','ciSort','ciWarningsOnly','ciPageSize'])$(id)?.addEventListener(id==='ciSearch'?'input':'change',()=>{page=1;render();});
+    for(const id of ['ciSearch','ciMonth','ciYear','ciDepartment','ciCategory','ciStatus','ciSort','ciWarningsOnly','ciPageSize','ciIssue'])$(id)?.addEventListener(id==='ciSearch'?'input':'change',()=>{dirty=!!token;page=1;render();});
     $('ciResetFilters')?.addEventListener('click',()=>{
-        for(const id of ['ciSearch','ciMonth','ciYear','ciDepartment','ciCategory','ciStatus'])if($(id))$(id).value='';
+        for(const id of ['ciSearch','ciMonth','ciYear','ciDepartment','ciCategory','ciStatus','ciIssue'])if($(id))$(id).value='';
         if($('ciWarningsOnly'))$('ciWarningsOnly').checked=false;
         page=1;render();
     });
-    for(const [id,selector] of [['ciToggleFilters','.ci-toolbar'],['ciToggleBulk','.ci-bulk']])$(id).addEventListener('click',()=>{const expanded=$(id).closest(selector).classList.toggle('ci-expanded');$(id).setAttribute('aria-expanded',String(expanded));});
+    $('ciReviewNext').addEventListener('click',()=>{for(const id of ['ciSearch','ciMonth','ciYear','ciDepartment','ciCategory','ciIssue'])$(id).value='';$('ciWarningsOnly').checked=false;$('ciStatus').value='needs';page=1;render();openNextFlagged();});
+    $('ciFirst').addEventListener('click',()=>{page=1;render();});$('ciLast').addEventListener('click',()=>{page=Math.max(1,Math.ceil(matches().length/pageSize()));render();});
     $('ciPrevious').addEventListener('click',()=>{page--;render();});$('ciNext').addEventListener('click',()=>{page++;render();});
     $('ciSelectVisible').addEventListener('change',event=>{pageRows().forEach(row=>event.target.checked?selected.add(row.index):selected.delete(row.index));render();});
     $('ciSelectMatching').addEventListener('click',()=>{matches().forEach(row=>selected.add(row.index));render();});$('ciClearSelection').addEventListener('click',()=>{selected.clear();render();});
     $('ciApproveSelected').addEventListener('click',()=>approve(rows.filter(row=>selected.has(row.index))));
     $('ciMergeSelected')?.addEventListener('click',()=>mergeRowList(rows.filter(row=>selected.has(row.index))));
-    $('ciExcludeSelected').addEventListener('click',()=>{const targets=rows.filter(row=>selected.has(row.index));targets.forEach(row=>{row.include=false;row.excluded=true;});dirty=true;feedback(`${targets.length} activities excluded.`);render();});
-    $('ciRemoveSelected')?.addEventListener('click',()=>removeRows(rows.filter(row=>selected.has(row.index))));
+    $('ciExcludeSelected').addEventListener('click',async()=>{const targets=rows.filter(row=>selected.has(row.index));if(!targets.length)return;if(await confirmAction(`Exclude ${plural(targets.length,'activity','activities')} from this import? You can restore them later from the Excluded filter.`,'Exclude activities?','Exclude')){selected.clear();toggleExclude(targets,true);}});
+    $('ciRemoveSelected')?.addEventListener('click',()=>confirmRemove(rows.filter(row=>selected.has(row.index))));
     $('ciApplyCategory').addEventListener('click',()=>{const category=$('ciBulkCategory').value;if(!category){feedback('Choose a category before assigning it.');return;}const targets=rows.filter(row=>selected.has(row.index));targets.forEach(row=>change(row,'category_id',category));feedback(`Category changed for ${targets.length} activities. Review them before approving.`);render();});
     $('ciBulkDepartment').addEventListener('change',()=>fillPrograms($('ciBulkProgram'),$('ciBulkDepartment').value,$('ciBulkProgram').value));
     $('ciApplyAudience').addEventListener('click',()=>{
@@ -585,12 +804,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function manageCalendar(operation) {
         if(busy)return;const series=$('calendarManageSeries').value;if(!series){showError('Choose an imported calendar first.');return;}if(token&&dirty&&!(await discardPrompt()))return;busy=true;show('calendarImportError',false);
         try{
-            const data=new FormData();data.set('series_id',series);data.set('calendar_action',operation);const result=await request('import_manage_preview',data);if(token)await request('import_cancel',new FormData(),token).catch(()=>{});
-            token=result.token;management=result.calendar_action;rows=[];selected.clear();dirty=true;const deleting=management==='delete';$('calendarManageHeading').textContent=`${deleting?'Delete':'Archive'}: ${result.calendar_name}`;
+            const data=new FormData();data.set('series_id',series);data.set('calendar_action',operation);const result=await request('import_manage_preview',data);if(token&&!reviewVersion)await request('import_cancel',new FormData(),token).catch(()=>{});
+            reviewVersion=0;$('ciReviewSaveStatus').textContent='';token=result.token;management=result.calendar_action;rows=[];selected.clear();dirty=true;const deleting=management==='delete';$('calendarManageHeading').textContent=`${deleting?'Delete':'Archive'}: ${result.calendar_name}`;
             $('calendarManageExplanation').textContent=`${result.rows.length} imported events will be ${deleting?'permanently deleted. This cannot be undone.':'archived and hidden from the public calendar. Records will be kept.'} Manually created events are preserved.`;
             $('calendarManageReviewLabel').textContent=deleting?'I reviewed the affected events and confirm permanent deletion of this imported calendar.':'I reviewed the affected events and confirm archiving this imported calendar.';
             $('calendarManageRows').replaceChildren(...result.rows.map(row=>{const tr=el('tr');tr.append(...['title','start_date','end_date','location'].map(key=>el('td',row[key]||'')));return tr;}));
-            $('calendarManageReviewed').checked=false;for(const id of ['calendarImportUpload','calendarImportManagement','calendarImportPreview','calendarImportSummary','ciFinal','ciContinue','ciBack'])show(id,false);show('calendarManagePreview',true);show('calendarImportConfirm',true);
+            $('calendarManageReviewed').checked=false;for(const id of ['calendarImportUpload','calendarImportManagement','calendarImportPreview','calendarImportSummary','ciFinal','ciContinue','ciBack','ciSavedReviews','ciSaveReview'])show(id,false);show('calendarManagePreview',true);show('calendarImportConfirm',true);
             confirm.textContent=deleting?'Confirm Delete Calendar':'Confirm Archive Calendar';confirm.classList.toggle('btn-danger',deleting);confirm.classList.toggle('btn-gnc-gold',!deleting);
         }catch(e){showError(e.message);}finally{busy=false;updateSummary();}
     }
@@ -600,17 +819,19 @@ document.addEventListener('DOMContentLoaded', () => {
         try{
             const data=new FormData();if(management)data.set('reviewed_all',$('calendarManageReviewed').checked?'1':'0');
             const fields=['source_index','action','event_id','title','description','location','start_date','end_date','start_time','end_time','category_id','dept_id','program','dept_ids','programs','include','reviewed'];
+            data.set('review_version',String(reviewVersion));
             data.set('import_rows',JSON.stringify(rows.map(row=>Object.fromEntries(fields.map(key=>[key,row[key]])))));data.set('import_status',$('ciImportStatus')?.value||'draft');
             const result=await request('import_confirm',data);finished=true;dirty=false;sessionStorage.setItem('calendarImportMessage',result.message);window.location.reload();
         }catch(e){showError(e.message);}finally{busy=false;updateSummary();confirm.textContent=management?(management==='delete'?'Confirm Delete Calendar':'Confirm Archive Calendar'):'Confirm Import';}
     });
     modal.addEventListener('hide.bs.modal',async event=>{
+        if(editDialog.open){event.preventDefault();cancelEditor();return;}
         if(busy){event.preventDefault();return;}if(allowClose||finished||!dirty)return;event.preventDefault();if(asking)return;asking=true;
         try{if(await discardPrompt()){allowClose=true;bootstrap.Modal.getInstance(modal).hide();}}finally{asking=false;}
     });
     modal.addEventListener('hidden.bs.modal',()=>{
-        const oldToken=token;token='';rows=[];selected.clear();categories=[];existing=[];management='';editing=null;dirty=false;finished=false;allowClose=false;page=1;if(oldToken)request('import_cancel',new FormData(),oldToken).catch(()=>{});
-        show('calendarManagePreview',false);show('calendarImportError',false);confirm.classList.remove('btn-danger');confirm.classList.add('btn-gnc-gold');confirm.textContent='Confirm Import';$('ciFeedback').textContent='';$('calendarImportFileStatus').textContent='Step 1 of 3 · Choose your calendar document to get started.';updateSelectedFileMeta(null);setStep(1);
+        const oldToken=reviewVersion?'':token;reviewVersion=0;token='';rows=[];selected.clear();categories=[];existing=[];management='';editing=null;dirty=false;finished=false;allowClose=false;page=1;if(oldToken)request('import_cancel',new FormData(),oldToken).catch(()=>{});
+        $('ciReviewSaveStatus').textContent='';show('calendarManagePreview',false);show('calendarImportError',false);confirm.classList.remove('btn-danger');confirm.classList.add('btn-gnc-gold');confirm.textContent='Confirm Import';$('ciFeedback').textContent='';$('calendarImportFileStatus').textContent='Step 1 of 3 · Choose your calendar document to get started.';updateSelectedFileMeta(null);setStep(1);
     });
     window.addEventListener('beforeunload',event=>{if(dirty&&!finished){event.preventDefault();event.returnValue='';}});setStep(1);
 });

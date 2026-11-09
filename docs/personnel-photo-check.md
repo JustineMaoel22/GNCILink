@@ -1,6 +1,6 @@
 # Personnel image validation
 
-Personnel portraits now have two independent checks: local face comparison and the existing optional AI-generated-image checker. Face comparison runs even when the optional AI checker is disabled. It uses OpenCV YuNet landmarks and SFace features, rather than filenames or whole-image hashes. It never sends images to an external face service. The pre-existing optional AI checker still uses its configured Gemini service.
+Personnel portraits have two checks controlled by Settings ? AI image checker: local face comparison and optional AI-generated-image validation. Turning the setting off skips both checks in upload prechecks and server-side saves, including retained-photo renames and restoration. File type, size, upload-origin and pixel limits remain active. Turning it back on restores normal duplicate detection and review requirements. It uses OpenCV YuNet landmarks and SFace features, rather than filenames or whole-image hashes. It never sends images to an external face service. The pre-existing optional AI checker still uses its configured Gemini service.
 
 Use `PHOTO_CHECK_API_KEY` for Gemini image validation and `CHATBOT_API_KEY` for
 the chatbot, in the private `.env` or `config/secrets.php`. Each dedicated key
@@ -35,7 +35,7 @@ FACE_CHECK_MODELS=/opt/gnci-face/models
 
 Use absolute paths. For Windows, set these to the environment's `Scripts/python.exe` and model directory. These paths belong to the PHP host: Windows paths do not work inside the Linux Docker container. Shared hosts that disable local processes cannot run this implementation without a hosting change.
 
-The feature fails closed if the runtime/models are missing, a present photo cannot be decoded, inference is incomplete, or processing exceeds 45 seconds. Missing legacy files that public pages already render as having no photograph are omitted with an explicit coverage notice. Replace them to restore full coverage; they cannot be compared until the images exist. Configure and smoke-test the runtime before deploying the PHP changes. There is no silent fallback to file hashes or AI guesses. The installed development runtime/models under `cache/face-*` are ignored by Git and are test artifacts, not production configuration.
+When the checker is enabled, the feature fails closed if the runtime/models are missing, a present photo cannot be decoded, inference is incomplete, or processing exceeds 45 seconds. Missing legacy files that public pages already render as having no photograph are omitted with an explicit coverage notice. Replace them to restore full coverage; they cannot be compared until the images exist. Configure and smoke-test the runtime before deploying the PHP changes. There is no silent fallback to file hashes or AI guesses. The installed development runtime/models under `cache/face-*` are ignored by Git and are test artifacts, not production configuration.
 
 SFace scores within 0.000001 of the cosine bounds are clamped to [-1, 1]
 to handle floating-point rounding on identical portraits. Non-finite or materially
@@ -77,6 +77,7 @@ Run:
 
 ```sh
 php tests/person-photo-check-test.php
+php tests/person-photo-setting-test.php
 php tests/person-photo-runtime-test.php
 /opt/gnci-face/bin/python tests/person-face-worker-test.py --models /opt/gnci-face/models --portrait /path/to/local/portrait.jpg
 node tests/person-photo-browser-test.cjs

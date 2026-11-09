@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/calendar-docx.php';
+require_once __DIR__.'/calendar-import-workspace.php';
 require_once __DIR__.'/event-audience.php';
 
 /** Reuse the normal Events audience rules, including department/program membership. */
@@ -439,6 +440,7 @@ function calendarImportCompare(array $rows, array $existing, array $all): array 
         if(count($matches)===1 && !isset($used[$matches[0]['event_id']])) {
             $event=$matches[0];$id=(int)$event['event_id'];$used[$id]=true;
             $row['event_id']=$id; $row['action']='update'; $row['category_id']=$event['category_id'];
+            $row['category_confidence']='preserved'; $row['category_reason']='The current category has been kept for this revised activity.';
             $row['dept_id']=$event['dept_id']??null; $row['program']=$event['program']??'ALL';
             $row['audience_group']=$event['audience_group']??'all';
             foreach(['dept_ids','programs'] as $key)if(isset($event[$key]))$row[$key]=$event[$key];
@@ -583,6 +585,16 @@ function calendarImportHandle(PDO $db, string $action, int $userId): array {
     if(!hasPermission('create_event')||!hasPermission('edit_event')) { http_response_code(403);throw new InvalidArgumentException('You do not have permission to import calendars.'); }
     if(!calendarImportReady($db))throw new InvalidArgumentException('Calendar import storage is not ready. Ask the developer to apply database/calendar-import-migration.sql.');
     $categories=calendarImportCategories($db);
+    if($action==='import_review_list') {
+        if(!empty($_SESSION['_rbac_worker']))throw new InvalidArgumentException('Review workspaces cannot be accessed during publishing approval.');
+        $savedAt="CAST(JSON_UNQUOTE(JSON_EXTRACT(preview_json,'$.review.saved_at')) AS UNSIGNED)";
+        $q=$db->prepare("SELECT token,filename,$savedAt AS saved_at,JSON_LENGTH(JSON_EXTRACT(preview_json,'$.review.rows')) AS row_count,CAST(JSON_EXTRACT(preview_json,'$.review.version') AS UNSIGNED) AS review_version FROM calendar_import_batches WHERE user_id=? AND state='preview' AND calendar_action IS NULL AND $savedAt>=? ORDER BY saved_at DESC LIMIT 100");
+        $q->execute([$userId,time()-30*86400]);$reviews=[];
+        while($batch=$q->fetch(PDO::FETCH_ASSOC)) {
+            $reviews[]=['token'=>$batch['token'],'filename'=>$batch['filename'],'saved_at'=>(int)$batch['saved_at'],'review_version'=>(int)$batch['review_version'],'rows'=>(int)$batch['row_count']];
+        }
+        return ['success'=>true,'reviews'=>$reviews];
+    }
     if($action==='import_manage_preview') {
         $operation=$_POST['calendar_action']??'';
         if(!in_array($operation,['archive','delete'],true))throw new InvalidArgumentException('Choose Archive or Delete.');
@@ -655,8 +667,36 @@ function calendarImportHandle(PDO $db, string $action, int $userId): array {
     $q=$db->prepare('SELECT *, TIMESTAMPDIFF(SECOND,created_at,NOW()) AS age_seconds FROM calendar_import_batches WHERE token=?');$q->execute([$token]);$batch=$q->fetch(PDO::FETCH_ASSOC);
     $worker=!empty($_SESSION['_rbac_worker']);
     if(!$batch||(int)$batch['user_id']!==($worker?rbacContentOwnerId():$userId))throw new InvalidArgumentException('Import preview not found for your account.');
+    if(in_array($action,['import_review_save','import_review_resume'],true)) {
+        if($worker||$batch['state']!=='preview'||!empty($batch['calendar_action']))throw new InvalidArgumentException('Only an active import preview can be saved or resumed.');
+        $snapshot=json_decode($batch['preview_json'],true,64,JSON_THROW_ON_ERROR);
+        if(calendarImportReviewExpired($batch,$snapshot))throw new InvalidArgumentException('This review expired. Extract the document again.');
+        $version=(int)($snapshot['review']['version']??0);
+        if($action==='import_review_resume') {
+            if(!$version)throw new InvalidArgumentException('This preview has no saved review.');
+            return ['success'=>true,'token'=>$token,'filename'=>$batch['filename'],'rows'=>$snapshot['review']['rows'],'view'=>$snapshot['review']['view'],'review_version'=>$version,'existing'=>$snapshot['existing'],'categories'=>$categories]+calendarImportReviewCatalog($db);
+        }
+        $raw=$_POST['review_workspace']??'';
+        if(!is_string($raw)||strlen($raw)>20*1024*1024)throw new InvalidArgumentException('The review workspace is too large.');
+        $workspace=json_decode($raw,true,64,JSON_THROW_ON_ERROR);
+        if(!is_array($workspace)||!is_array($workspace['rows']??null)||!is_array($workspace['view']??null))throw new InvalidArgumentException('Invalid review workspace.');
+        if(($workspace['version']??null)!==$version)throw new InvalidArgumentException('This review was saved in another tab. Resume its latest saved copy before making changes.');
+        $review=['rows'=>calendarImportReviewRows($workspace['rows'],$snapshot),'view'=>calendarImportReviewView($workspace['view']),'saved_at'=>time(),'version'=>$version+1];
+        $snapshot['review']=$review;
+        $q=$db->prepare("UPDATE calendar_import_batches SET preview_json=? WHERE token=? AND user_id=? AND state='preview' AND preview_json=?");
+        $q->execute([json_encode($snapshot,JSON_THROW_ON_ERROR|JSON_INVALID_UTF8_SUBSTITUTE),$token,$userId,$batch['preview_json']]);
+        if($q->rowCount()!==1)throw new InvalidArgumentException('This review changed in another request. Resume its latest saved copy.');
+        return ['success'=>true,'review_version'=>$review['version'],'saved_at'=>$review['saved_at']];
+    }
     if($action==='import_cancel') {
-        $db->prepare("UPDATE calendar_import_batches SET state='cancelled', preview_json='[]' WHERE token=? AND state='preview'")->execute([$token]);
+        $snapshot=json_decode($batch['preview_json'],true,64,JSON_THROW_ON_ERROR);
+        if(!empty($snapshot['review'])) {
+            if(($_POST['discard_saved']??'')!=='1')return ['success'=>true];
+            if($worker || (string)($_POST['review_version']??'')!==(string)$snapshot['review']['version'])throw new InvalidArgumentException('This saved review changed. Reload the saved review list before discarding.');
+        }
+        $q=$db->prepare("UPDATE calendar_import_batches SET state='cancelled', preview_json='[]' WHERE token=? AND state='preview' AND preview_json=?");
+        $q->execute([$token,$batch['preview_json']]);
+        if($q->rowCount()!==1)throw new InvalidArgumentException('This preview changed. Refresh before discarding.');
         logActivity($userId,'IMPORT_CANCEL','events',null,'Cancelled calendar preview.');return ['success'=>true];
     }
     if($action!=='import_confirm')throw new InvalidArgumentException('Unknown calendar import action.');
@@ -667,8 +707,9 @@ function calendarImportHandle(PDO $db, string $action, int $userId): array {
         return ['success'=>true,'message'=>!empty($batch['calendar_action'])?'Calendar '.$batch['calendar_action'].' request approved and applied.':'Calendar import approved and published.'];
     }
     if($batch['state']!=='preview')throw new InvalidArgumentException('This preview has already been submitted. Upload again to make another revision.');
-    if((int)$batch['age_seconds']>86400)throw new InvalidArgumentException('This preview expired. Upload again to compare current events.');
     $snapshot=json_decode($batch['preview_json'],true,64,JSON_THROW_ON_ERROR);
+    if(calendarImportReviewExpired($batch,$snapshot))throw new InvalidArgumentException('This preview expired. Upload again to compare current events.');
+    if(!empty($snapshot['review']) && (string)($_POST['review_version']??'')!==(string)$snapshot['review']['version'])throw new InvalidArgumentException('This review changed in another tab. Resume its latest saved copy before confirming.');
     $preview=$snapshot['rows'];
     $raw=(string)($_POST['import_rows']??'[]');
     if(strlen($raw)>20*1024*1024)throw new InvalidArgumentException('The edited calendar is too large. Import fewer activities at a time.');
@@ -684,8 +725,8 @@ function calendarImportHandle(PDO $db, string $action, int $userId): array {
         $rows=$preview;
     } else $rows=calendarImportValidate($edits,$preview,$existing,$categories);
     $status=hasPermission('publish_event')&&($_POST['import_status']??'')==='published'?'published':'draft';
-    $q=$db->prepare("UPDATE calendar_import_batches SET approved_json=?, state='ready' WHERE token=? AND state='preview'");
-    $q->execute([json_encode($rows,JSON_THROW_ON_ERROR),$token]);
+    $q=$db->prepare("UPDATE calendar_import_batches SET approved_json=?, state='ready' WHERE token=? AND state='preview' AND preview_json=?");
+    $q->execute([json_encode($rows,JSON_THROW_ON_ERROR),$token,$batch['preview_json']]);
     if($q->rowCount()!==1)throw new InvalidArgumentException('This preview is already being confirmed.');
     try {
         if(!hasPermission('publish_event')) {
