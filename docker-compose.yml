@@ -2,10 +2,12 @@ services:
   # The Web Server (Apache + PHP)
   web:
       build: .
+      command: ["/bin/sh", "-c", "a2enmod rewrite headers && exec apache2-foreground"]
       ports:
         - "8080:80"
       volumes:
         - .:/var/www/html
+        - ./config/apache-local-preview.conf:/etc/apache2/conf-enabled/zz-local-preview.conf:ro
 
   # The Database
   db:

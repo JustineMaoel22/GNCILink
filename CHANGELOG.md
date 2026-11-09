@@ -1,6 +1,7 @@
 ## [0.21.3] - 11-9-2026
 
 ### Minor Improvements/Additions
+- Centered public page headers below 1032px while retaining desktop compositions at 1032px and wider and preserving saved CMS content.
 - Improved import calendar UI.
 - Matched News and Facebook Posts pinned badges to the announcement style, with an “On homepage slideshow” label and gold active pin buttons. Added a gold left border to pinned announcement rows on desktop and mobile.
 - Removed the confirmation dialog when pinning or unpinning announcements; archive and restore confirmations remain.

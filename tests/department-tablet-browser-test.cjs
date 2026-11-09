@@ -36,7 +36,7 @@ async function until(fn, message) {
     const base='http://localhost:8080';
     const inspect=`(()=>{const title=document.querySelector('.dept-hero-title'),content=document.querySelector('.dept-hero-content'),copy=document.querySelector('.dept-hero-copy');return {alignment:getComputedStyle(title).textAlign,direction:getComputedStyle(content).flexDirection,copyAlignment:getComputedStyle(copy).textAlign,contentWidth:Math.round(content.getBoundingClientRect().width),fontSize:getComputedStyle(title).fontSize,viewport:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth};})()`;
     const publicMetrics={};
-    for(const width of [390,767,768,820,1024,1032,1199,1200,1366,1440,1536,1920]){
+    for(const width of [390,767,768,820,1024,1031,1032,1199,1200,1366,1440,1536,1920]){
         await send('Emulation.setDeviceMetricsOverride',{width,height:1024,deviceScaleFactor:1,mobile:width<1100});
         await evaluate("document.querySelectorAll('.dept-hero-title').forEach(el=>el.remove())");
         await send('Page.navigate',{url:base+'/departments/cased'});
@@ -50,10 +50,10 @@ async function until(fn, message) {
             fs.writeFileSync(path.join(__dirname,`../cache/department-tablet/public-${width}.png`),Buffer.from(shot.data,'base64'));
         }
         assert.equal(publicMetrics[width].overflow,false,'No horizontal overflow at '+width);
-        if(width<=1024)assert.equal(publicMetrics[width].alignment,'center','Phone and tablet headers must be centered');
+        if(width<1032)assert.equal(publicMetrics[width].alignment,'center','Phone and tablet headers must be centered');
         else assert.notEqual(publicMetrics[width].alignment,'center','Desktop retains its existing alignment');
     }
-    // Keep an intentionally positioned desktop heading proportional on iPad Pro.
+    // Keep an intentionally positioned desktop heading proportional on desktop.
     // The changes exist only in this browser; nothing is saved to the CMS.
     const stressHeading=`(()=>{const changes={};for(const [id,el] of GNCTextLayout.targets()){
         if(el.matches('[data-gnc-responsive-heading]')) changes[id]={desktop:{value:{x:7,y:12,w:38,h:170,fontSize:80,textAlign:'center'}}};
@@ -134,5 +134,5 @@ async function until(fn, message) {
     await evaluate("document.getElementById('veFrame').style.width='1032px';document.getElementById('veFrame').style.minWidth='1032px'");await delay(300);
     await evaluate(`document.getElementById('veFrame').contentWindow.eval(${JSON.stringify(stressHeading)})`);
     assert.equal(await evaluate("getComputedStyle(document.getElementById('veFrame').contentDocument.querySelector('.dept-hero-title')).position"),'absolute','Actual editor preview preserves the same proportional heading placement');
-    console.log('PASS: desktop composition and line breaks stay consistent from 1032px through 1919px; full desktop, centered tablet, editor preview and scaled editing values remain correct.');
+    console.log('PASS: desktop composition and line breaks stay consistent from 1032px through 1919px; centered phone/tablet headers, editor preview and scaled editing values remain correct.');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{if(auth)session(['destroy',auth.value]);if(socket)socket.close();browser.kill();});

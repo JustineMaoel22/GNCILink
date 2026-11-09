@@ -87,6 +87,15 @@
         targets().forEach((el,id) => {
             const box=settings[id]?.[mode()];
             if(!box || el.closest('[data-gnc-layout-ignore]') || (el.querySelector('[data-gnc-text]')&&!el.hasAttribute('data-gnc-layout-group')))return;
+            // Narrow public banners use centered flow, retaining saved desktop geometry
+            // and per-device typography without absolute-positioned text collisions.
+            if (!isMedia(el) && getComputedStyle(el).getPropertyValue('--gnc-center-page-header').trim() === '1') {
+                placed.set(el,{style:el.getAttribute('style'),wrap:null});
+                applyFont(el,box);
+                el.style.setProperty('--gnc-text-align','center');
+                el.style.setProperty('text-align','center','important');
+                return;
+            }
             if(!('x' in box)) {
                 placed.set(el,{style:el.getAttribute('style'),wrap:null});
                 applyFont(el,box);

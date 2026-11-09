@@ -1,0 +1,352 @@
+[
+  {
+    "route": "/departments/cased",
+    "width": 390,
+    "headings": [
+      {
+        "text": "College of Arts and Sciences, and Education",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/casa-gradeschool",
+    "width": 390,
+    "headings": [
+      {
+        "text": "CASA and Grade School Montessori",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/administration",
+    "width": 390,
+    "headings": [
+      {
+        "text": "Administration",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/athletics-sports",
+    "width": 390,
+    "headings": [
+      {
+        "text": "Athletics and Sports",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/programs/beed",
+    "width": 390,
+    "headings": [
+      {
+        "text": "ELEMENTARY EDUCATION",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/departments/cased",
+    "width": 820,
+    "headings": [
+      {
+        "text": "College of Arts and Sciences, and Education",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/casa-gradeschool",
+    "width": 820,
+    "headings": [
+      {
+        "text": "CASA and Grade School Montessori",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/administration",
+    "width": 820,
+    "headings": [
+      {
+        "text": "Administration",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/athletics-sports",
+    "width": 820,
+    "headings": [
+      {
+        "text": "Athletics and Sports",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/programs/beed",
+    "width": 820,
+    "headings": [
+      {
+        "text": "ELEMENTARY EDUCATION",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/departments/cased",
+    "width": 1031,
+    "headings": [
+      {
+        "text": "College of Arts and Sciences, and Education",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/casa-gradeschool",
+    "width": 1031,
+    "headings": [
+      {
+        "text": "CASA and Grade School Montessori",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/administration",
+    "width": 1031,
+    "headings": [
+      {
+        "text": "Administration",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/athletics-sports",
+    "width": 1031,
+    "headings": [
+      {
+        "text": "Athletics and Sports",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/programs/beed",
+    "width": 1031,
+    "headings": [
+      {
+        "text": "ELEMENTARY EDUCATION",
+        "alignment": "center",
+        "centered": "1",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/departments/cased",
+    "width": 1032,
+    "headings": [
+      {
+        "text": "College of Arts and Sciences, and Education",
+        "alignment": "left",
+        "centered": "",
+        "position": "absolute",
+        "offset": -202
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/casa-gradeschool",
+    "width": 1032,
+    "headings": [
+      {
+        "text": "CASA and Grade School Montessori",
+        "alignment": "left",
+        "centered": "",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/administration",
+    "width": 1032,
+    "headings": [
+      {
+        "text": "Administration",
+        "alignment": "start",
+        "centered": "",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/athletics-sports",
+    "width": 1032,
+    "headings": [
+      {
+        "text": "Athletics and Sports",
+        "alignment": "start",
+        "centered": "",
+        "position": "static",
+        "offset": -233
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/programs/beed",
+    "width": 1032,
+    "headings": [
+      {
+        "text": "ELEMENTARY EDUCATION",
+        "alignment": "start",
+        "centered": "",
+        "position": "static",
+        "offset": -234
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/departments/cased",
+    "width": 1440,
+    "headings": [
+      {
+        "text": "College of Arts and Sciences, and Education",
+        "alignment": "left",
+        "centered": "",
+        "position": "absolute",
+        "offset": -284
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/casa-gradeschool",
+    "width": 1440,
+    "headings": [
+      {
+        "text": "CASA and Grade School Montessori",
+        "alignment": "left",
+        "centered": "",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/administration",
+    "width": 1440,
+    "headings": [
+      {
+        "text": "Administration",
+        "alignment": "start",
+        "centered": "",
+        "position": "static",
+        "offset": 0
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/athletics-sports",
+    "width": 1440,
+    "headings": [
+      {
+        "text": "Athletics and Sports",
+        "alignment": "start",
+        "centered": "",
+        "position": "static",
+        "offset": -327
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "route": "/programs/beed",
+    "width": 1440,
+    "headings": [
+      {
+        "text": "ELEMENTARY EDUCATION",
+        "alignment": "start",
+        "centered": "",
+        "position": "static",
+        "offset": -348
+      }
+    ],
+    "overflow": false
+  }
+]

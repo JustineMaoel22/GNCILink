@@ -40,6 +40,7 @@ Locate existing CSS variables/tokens first. Add missing semantic aliases central
 ## Components
 - **Navbar:** same placement, dropdown logic, type scale, hover/focus behavior, and breakpoint handling across pages; preserve dynamic categories and links.
 - **Page header/hero:** common breadcrumb, heading hierarchy, intro width, and spacing; vary content, not the design language.
+- Public page banners center their headings, introductions and breadcrumbs below 1032px. Screens 1032px and wider use the desktop layout. Saved text stays in normal flow at those widths to avoid positioned heading overlaps; desktop placement and all CMS values remain stored. Shared rules live in `assets/css/page-headers.css` through the public navbar.
 - **Cards:** consistent padding, radius, border/shadow, image ratios, and action placement.
 - **Buttons/links:** clear primary/secondary styles and visible hover, focus, disabled, and loading states.
 - **Forms/editor:** clear labels, inline validation, error summaries, publish warnings, and predictable confirmation dialogs.

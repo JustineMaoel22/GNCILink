@@ -1,0 +1,80 @@
+/* Public page banners share centered copy below 1032px.
+   Screens 1032px and wider retain their saved desktop compositions. */
+@media (max-width: 1031px) {
+    body :is([class$="-hero"], [class*="-hero "], .hero-page, .hero-slideshow,
+        .hero-section, .faq-heading, .gnc-legal-main header) {
+        --gnc-center-page-header: 1;
+    }
+
+    body :is([class$="-hero-inner"], [class*="-hero-inner "],
+        [class$="-hero-content"], .hero-slide .hero-content, .history-hero .hero-content,
+        .athletics-hero-copy, .gnc-contact-hero, .faq-heading, .gnc-legal-main header,
+        .hero-section .text-ivory) {
+        text-align: center;
+    }
+
+    body :is([class$="-hero"], [class*="-hero "], .hero-page, .hero-slideshow,
+        .hero-section, .faq-heading, .gnc-legal-main header) h1 {
+        text-align: center;
+        margin-inline: auto;
+        overflow-wrap: anywhere;
+    }
+
+    body :is([class$="-hero-inner"], [class*="-hero-inner "], [class$="-hero-content"],
+        .hero-slide .hero-content, .athletics-hero-copy, .gnc-contact-hero) :is(p, .cms-rich) {
+        text-align: center;
+        margin-inline: auto;
+    }
+
+    body :is(nav[aria-label="breadcrumb" i], [class$="-breadcrumb"]) {
+        justify-content: safe center;
+        text-align: center;
+        max-width: 100%;
+        margin-inline: auto;
+    }
+
+    body :is([class$="-hero"], [class*="-hero "], .hero-page) h1::after {
+        margin-inline: auto;
+    }
+
+    body .dept-intro-program .dept-hero-inner { max-width: 100%; }
+    body .dept-intro-program .dept-hero-content {
+        width: 100%;
+        max-width: 100%;
+        flex-direction: column;
+        align-items: center;
+        margin-inline: auto;
+    }
+    body .dept-intro-program .dept-hero-copy { width: 100%; text-align: center; }
+    body .dept-intro-program :is(.dept-hero-title, .dept-hero-prefix, .dept-hero-subject) {
+        text-align: center;
+    }
+
+    body :is(.hero-page, .hero-section) .row > [class*="col-lg-"] {
+        flex: 0 0 100%;
+        width: 100%;
+        max-width: 100%;
+        margin-inline-start: 0;
+    }
+    body .hero-section .row > .col-lg-6 {
+        /* Balance the existing Bootstrap desktop padding around the title. */
+        padding-inline: calc(var(--bs-gutter-x, 1.5rem) / 2) !important;
+    }
+    body :is([class$="-hero-content"], .hero-slide .hero-content) { margin-inline: auto; }
+    body :is(.template-badges, .hero-ctas, .alumni-actions, .alumni-actions p) {
+        justify-content: center;
+        margin-inline: auto;
+    }
+    body .alumni-hero :is(.alumni-title, .alumni-intro) { margin-inline: auto; }
+    body .athletics-hero-copy { margin-inline: auto; }
+    body :is(.article-wrap .headline, main.container > article > h1) { text-align: center; }
+}
+
+@media (min-width: 992px) and (max-width: 1031px) {
+    body .athletics-hero-copy {
+        left: 50%;
+        width: calc(100% - 48px);
+        max-width: 560px;
+        transform: translateX(-50%);
+    }
+}
