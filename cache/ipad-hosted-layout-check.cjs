@@ -40,7 +40,12 @@ async function until(fn, message) {
         await until(()=>evaluate("document.readyState==='complete'&&!!document.querySelector('.dept-hero-title')"),'Department unavailable');await delay(1000);
         console.log(base,JSON.stringify(await evaluate(`(()=>{const selectors=['.dept-hero','.dept-hero-title','.dept-hero-prefix','.dept-hero-subject','.dept-hero-content','.dept-hero-inner'];return {headingScale:!!window.GNCTextLayout,marker:!!document.querySelector('[data-gnc-responsive-heading]'),items:selectors.map(s=>{const e=document.querySelector(s),r=e.getBoundingClientRect(),c=getComputedStyle(e);return {s,x:r.x,y:r.y,w:r.width,h:r.height,font:c.fontSize,line:c.lineHeight,position:c.position,style:e.getAttribute('style')}}),assets:[...document.querySelectorAll('script[src],link[rel=stylesheet]')].map(e=>e.src||e.href).filter(s=>/text-layout|college-dept/.test(s))}})()`)));
         console.log('SAVED',base,JSON.stringify(await evaluate("Array.from(GNCTextLayout.targets()).filter(([id,el])=>el.closest('[data-gnc-responsive-heading]')).map(([id,el])=>({id,tag:el.className,box:GNC_TEXT_LAYOUT[id]}))")));
-        const asset=await evaluate("fetch('/assets/js/text-layout.js').then(r=>r.text())");console.log('JS_MATCH',base,asset===fs.readFileSync('assets/js/text-layout.js','utf8'));
+        for (const file of ['assets/js/text-layout.js','assets/css/college-dept-style.css','assets/js/inline-text-style.js']) {
+            const asset=await evaluate(`fetch('/${file}').then(r=>r.text())`);
+            console.log('ASSET_MATCH',base,file,fs.existsSync(file) && asset.replace(/\r\n/g,'\n')===fs.readFileSync(file,'utf8').replace(/\r\n/g,'\n'));
+            if(base.startsWith('https'))fs.writeFileSync('cache/hosted-'+path.basename(file)+'.txt',asset);
+        }
+        console.log('MEDIA',base,JSON.stringify(await evaluate(`(()=>({banner:Array.from(document.querySelectorAll('.dept-header-banner img,.dept-hero-logo,.dept-about-logo img')).map(e=>({src:e.getAttribute('src'),natural:[e.naturalWidth,e.naturalHeight],style:e.getAttribute('style'),objectFit:getComputedStyle(e).objectFit,objectPosition:getComputedStyle(e).objectPosition,transform:getComputedStyle(e).transform})),copy:document.querySelector('.dept-hero-copy').innerHTML,hero:document.querySelector('.dept-intro').getAttribute('style'),scripts:[...document.scripts].map(s=>s.src).filter(Boolean)}))()`)));
         const shot=await send('Page.captureScreenshot',{format:'png'});
         fs.writeFileSync(path.join(__dirname,base.startsWith('https')?'ipad-live.png':'ipad-local.png'),Buffer.from(shot.data,'base64'));
     }

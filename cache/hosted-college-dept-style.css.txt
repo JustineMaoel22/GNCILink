@@ -1,0 +1,1823 @@
+@import url('https://fonts.googleapis.com/css2?family=Allison&family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Petit+Formal+Script&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Tiny5&display=swap');
+
+/* ==========================================================================
+   College of Arts, Sciences, and Education — Program Page
+   Guagua National Colleges, Inc.
+
+   Responsive breakpoints (desktop-first):
+     >= 1400px  large desktop
+     <= 1199px  small desktop / landscape tablet
+     <= 991px   tablet (single-column layouts)
+     <= 767px   large phone / small tablet portrait
+     <= 575px   phone
+     <= 380px   small phone
+   ========================================================================== */
+
+.dept-intro,
+.dept-about,
+.dept-programs,
+.dept-dean {
+    --gnc-green: #0b4228;
+    --gnc-green-light: #1F5E2C;
+    --gnc-green-dark: #08331e;
+    --gnc-gold: #d3a63a;
+    --gnc-gold-light: #e9b93c;
+    --gnc-maroon: #8f1230;
+    --gnc-cream: #f9f6f1;
+    --gnc-text-dark: #202020;
+    --gnc-text-gray: #6b6b66;
+    --gnc-border: #e6e1d8;
+    font-family: 'Noto Serif', serif;
+}
+
+/* Prevent decorative offsets (squares, dots) from causing sideways scroll */
+.dept-hero,
+.dept-about,
+.dept-programs,
+.dept-dean {
+    overflow-x: hidden;
+    overflow-x: clip;
+}
+
+.dept-hero *,
+.dept-about *,
+.dept-programs *,
+.dept-dean * {
+    box-sizing: border-box;
+}
+
+/* Let grid/flex children shrink instead of overflowing */
+.dept-programs-grid > .dept-program-add {
+    width: 100%;
+    min-height: 300px;
+    height: 100%;
+    margin: 0;
+}
+
+.dept-about-inner > *,
+.dept-dean-grid > *,
+.dept-programs-grid > *,
+.dept-dean-contacts-grid > * {
+    min-width: 0;
+}
+
+.dept-intro,
+.dept-about {
+    background-color: var(--gnc-cream);
+}
+
+/* ---------- Hero ---------- */
+.dept-hero {
+  position: relative;
+  background-color: var(--gnc-cream);
+  background-image: url('/assets/images/Section Header.png');
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: cover;
+  border-bottom: 1px solid var(--gnc-border);
+}
+
+.dept-hero-inner {
+  padding: 40px 15px 44px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.dept-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gnc-gold);
+  margin-bottom: 14px;
+}
+
+.dept-breadcrumb a {
+  color: var(--gnc-gold);
+  text-decoration: none;
+}
+
+.dept-breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.dept-breadcrumb i {
+  font-size: 10px;
+  color: var(--gnc-gold);
+  opacity: 0.8;
+}
+
+.dept-breadcrumb .dept-current {
+  color: var(--gnc-gold);
+}
+
+.dept-hero h1 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  color: var(--gnc-green-light);
+  font-size: clamp(24px, 4vw, 40px);
+  line-height: 1.2;
+  margin: 0 0 8px;
+  overflow-wrap: break-word;
+}
+
+.dept-hero p {
+  font-family: 'Inter', sans-serif;
+  color: var(--gnc-text-gray);
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 900px;
+  margin: 0;
+}
+
+/* ---------- About section ---------- */
+.dept-intro-program .dept-hero {
+  min-height: clamp(320px, 33vw, 630px);
+  background-image: none;
+}
+
+.dept-intro-program .dept-hero-inner {
+  position: relative;
+  z-index: 1;
+  min-height: inherit;
+  padding-top: 30px;
+  padding-bottom: 70px;
+  pointer-events: none;
+}
+
+.dept-intro-program .dept-hero-inner a,
+.dept-intro-program .dept-hero-content,
+.dept-intro-program .dept-breadcrumb [data-ve-field] {
+  pointer-events: auto;
+}
+
+.dept-intro-program .dept-breadcrumb {
+  max-width: 65%;
+}
+
+.dept-intro-program .dept-breadcrumb,
+.dept-intro-program .dept-breadcrumb a,
+.dept-intro-program .dept-breadcrumb i,
+.dept-intro-program .dept-breadcrumb .dept-current,
+.dept-intro-program .dept-hero-title,
+.dept-intro-program .dept-hero-blurb {
+  color: var(--gnc-template-text, var(--gnc-green-light));
+}
+
+.dept-intro-program .dept-hero-content {
+  display: flex;
+  align-items: center;
+  gap: clamp(20px, 2.5vw, 36px);
+  width: 58%;
+  margin-top: clamp(40px, 5vw, 76px);
+}
+
+.dept-intro-program .dept-hero-copy { min-width: 0; }
+
+.dept-intro-program .dept-hero-logo {
+  flex: 0 0 clamp(110px, 12.5vw, 180px);
+  width: clamp(110px, 12.5vw, 180px);
+  height: clamp(110px, 12.5vw, 180px);
+  object-fit: contain;
+}
+
+.dept-intro-program .dept-hero-title {
+  font-size: clamp(28px, 3.3vw, 48px);
+  line-height: 1.25;
+  margin: 0;
+}
+
+.dept-intro-program .dept-hero-prefix {
+  display: block;
+  margin-bottom: 8px;
+  font-size: .48em;
+  text-transform: uppercase;
+}
+
+.dept-intro-program .dept-hero-subject {
+  display: block;
+}
+
+.dept-intro-program .dept-hero-prefix:empty { margin-bottom: 0; }
+.dept-intro-program .dept-header-extra { margin: 12px 0 0; color: var(--gnc-template-text, var(--gnc-green-light)); font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere; }
+.dept-intro-program .dept-header-extra[hidden] { display: none !important; }
+
+.dept-intro-program .dept-header-banner {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.dept-intro-program .dept-header-banner img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.dept-intro-program .dept-header-banner img[hidden] { display: none; }
+
+@media (max-width: 767px) {
+  .dept-intro-program.dept-mobile-background-hidden .dept-header-banner { display: none; }
+}
+
+.dept-intro-program .dept-banner-help {
+  position: absolute;
+  z-index: 2;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  width: max-content;
+  padding: 10px 18px;
+  border: 1.5px dashed var(--gnc-template, var(--gnc-green));
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .94);
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  color: var(--gnc-template-text, var(--gnc-green));
+}
+
+.dept-banner-help small {
+  display: block;
+  margin-top: 6px;
+}
+
+@media (max-width: 991px) {
+  .dept-intro-program .dept-hero-content { width: 70%; gap: 18px; margin-top: 45px; }
+  .dept-intro-program .dept-hero-logo { flex-basis: 100px; width: 100px; height: 100px; }
+}
+
+@media (max-width: 575px) {
+  .dept-intro-program .dept-hero { min-height: 360px; }
+  .dept-intro-program .dept-breadcrumb { max-width: 100%; }
+  .dept-intro-program .dept-hero-content { width: 100%; gap: 14px; margin-top: 35px; }
+  .dept-intro-program .dept-hero-logo { flex-basis: 76px; width: 76px; height: 76px; }
+  .dept-intro-program .dept-hero-inner { padding-bottom: 110px; }
+}
+
+.dept-about {
+  padding: 70px 15px;
+}
+
+.dept-about-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 60px;
+  align-items: start;
+}
+
+/* Logo cluster */
+.dept-logo-wrap {
+  position: relative;
+  z-index: 1;
+  width: 280px;
+  height: 280px;
+}
+
+.dept-logo-square {
+  position: absolute;
+  top: -14px;
+  left: 4px;
+  width: 130px;
+  height: 130px;
+  background: var(--gnc-gold-light);
+  border-radius: 8px;
+  z-index: -1;
+}
+
+.dept-logo {
+  position: relative;
+  z-index: 2;
+  width: 280px;
+  height: 280px;
+  object-fit: contain;
+  display: block;
+}
+
+.dept-dots {
+  position: absolute;
+  right: -6px;
+  bottom: 6px;
+  width: 78px;
+  height: 45px;
+  background-image: radial-gradient(circle, var(--gnc-green) 2.2px, transparent 2.6px);
+  background-size: 15px 15px;
+  z-index: -1;
+}
+
+/* About content */
+.dept-about-content {
+  padding-top: 6px;
+}
+
+.dept-about-inner.dept-layout-text-only,
+.dept-dean-grid.dept-layout-text-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dept-dean-photo > .be-empty-media { height: 100%; min-height: 0; }
+.dept-dean-contact.office-location-trigger { padding: 0; }
+
+.dept-eyebrow {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gnc-gold);
+  margin-bottom: 8px;
+}
+
+.dept-about-content h2 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  color: var(--gnc-green-light);
+  font-size: clamp(20px, 2.6vw, 28px);
+  line-height: 1.3;
+  margin: 0 0 16px;
+}
+
+.dept-about-content h3,
+.dept-about-content h4 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  color: var(--gnc-green-light);
+  font-size: clamp(18px, 2.2vw, 24px);
+  line-height: 1.3;
+  margin: 0 0 16px;
+}
+
+.dept-about-content p,
+.dept-about-content .dept-about-raw {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--gnc-text-dark);
+  max-width: 100ch;
+  margin: 0 0 16px;
+}
+
+/* The editable wrapper contains the same paragraphs/lists as the live page. */
+.dept-about-content .dept-about-raw {
+  max-width: none;
+  margin: 0;
+}
+
+.dept-about-content blockquote {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  line-height: 1.75;
+  border-left: 3px solid var(--gnc-gold);
+  padding-left: 16px;
+  margin: 0 0 16px;
+}
+
+.dept-about-content a {
+  color: var(--gnc-green-light);
+  text-decoration: underline;
+}
+
+.dept-offers-label {
+  font-weight: 600;
+  margin-bottom: 6px !important;
+}
+
+.dept-offers-list,
+.dept-about-content ul,
+.dept-about-content ol {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  line-height: 1.5; /* was 1.0 — wrapped lines collided on narrow screens */
+  color: var(--gnc-text-dark);
+  margin: 0 0 16px;
+  padding-left: 20px;
+}
+
+.dept-offers-list li,
+.dept-about-content li {
+  margin-bottom: 6px;
+}
+
+.dept-offers-list .offer-green {
+  color: var(--gnc-green-light);
+}
+
+.dept-offers-list .offer-gold {
+  color: var(--gnc-gold);
+}
+
+.dept-offers-list .offer-maroon {
+  color: var(--gnc-maroon);
+}
+
+/* ---------- Programs section ---------- */
+.dept-programs {
+  background-color: var(--gnc-cream);
+  padding: 60px 15px 80px;
+}
+
+.dept-programs-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.dept-programs-inner .dept-eyebrow {
+  margin-bottom: 8px;
+}
+
+.dept-programs-inner h2 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  color: var(--gnc-green-light);
+  font-size: clamp(20px, 2.6vw, 28px);
+  line-height: 1.3;
+  margin: 0 0 32px;
+}
+
+/* Department mission and vision use the established ribbon-and-seal cards. */
+.dept-statements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 64px 32px;
+  padding: 32px 16px 0;
+}
+.dept-statement-card {
+  position: relative;
+  flex: 1 1 340px;
+  min-width: 0;
+  min-height: 300px;
+  padding: 52px 38px 30px;
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgba(232, 240, 237, .91), rgba(209, 224, 219, .79)),
+    url('/assets/images/gnc-front-II.jpg') center bottom / cover no-repeat;
+  box-shadow: 0 8px 28px rgba(31, 73, 56, .14);
+}
+.dept-statement-card:only-child {
+  max-width: 800px;
+  margin-inline: auto;
+}
+.dept-statement-head {
+  position: relative;
+  margin: -92px -22px 12px -54px;
+  display: flex;
+  align-items: center;
+}
+.dept-statement-icon {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 84px;
+  width: 84px;
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--gnc-gold-light);
+  border-radius: 50%;
+  background: #193f32;
+  color: #fff;
+  font-size: 34px;
+  box-shadow: inset 0 0 0 4px #f9f6f1, 0 5px 14px #0003;
+}
+.dept-programs-inner .dept-statement-title {
+  margin: 0 0 0 -24px;
+  padding: 14px 52px 14px 40px;
+  background: #245442;
+  color: #fff;
+  font-size: 20px;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  clip-path: polygon(0 0, calc(100% - 32px) 0, 100% 100%, 0 100%);
+}
+.dept-statement-icon-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: inherit;
+  line-height: 1;
+  color: inherit;
+}
+.dept-statement-text {
+  font-family: 'Inter', sans-serif;
+  color: #183b50;
+  font-size: 17px;
+  line-height: 1.8;
+  text-align: justify;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+@media (max-width: 575px) {
+  .dept-statements { gap: 64px; padding-inline: 8px; }
+  .dept-statement-card { flex-basis: 100%; min-height: 260px; padding: 48px 22px 24px; }
+  .dept-statement-head { margin: -80px -14px 12px -30px; }
+  .dept-statement-icon { flex-basis: 64px; width: 64px; height: 64px; font-size: 27px; }
+  .dept-programs-inner .dept-statement-title { font-size: 16px; padding: 12px 36px 12px 34px; }
+  .dept-statement-text { font-size: 15px; line-height: 1.7; text-align: left; }
+}
+
+.dept-programs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.dept-program-card {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--gnc-border);
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dept-program-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
+}
+
+.dept-program-img {
+  width: 100%;
+  height: 190px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.dept-program-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dept-program-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 20px 22px 24px;
+}
+
+.dept-program-body h3 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  font-size: 17px;
+  line-height: 1.35;
+  color: var(--gnc-green-light);
+  margin: 0 0 10px;
+}
+
+.dept-program-body p,
+.dept-program-body > .cms-rich {
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--gnc-text-gray);
+  margin: 0 0 16px;
+}
+
+.dept-program-link {
+  font-family: 'Inter', sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--gnc-gold);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;      /* keeps links aligned at card bottom */
+  padding: 6px 0;        /* larger touch target */
+}
+
+.dept-program-link:hover {
+  color: var(--gnc-green-light);
+}
+
+.dept-program-link i {
+  font-size: 12px;
+}
+
+/* ---------- Head of Office / Meet the Dean section ---------- */
+.dept-dean {
+  background-color: var(--gnc-cream);
+  padding: 60px 15px 90px;
+}
+
+.dept-dean-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.dept-dean-intro {
+  max-width: 100ch;
+  margin-bottom: 48px;
+}
+
+.dept-dean-intro h2 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  color: var(--gnc-green-light);
+  font-size: clamp(22px, 3vw, 32px);
+  line-height: 1.3;
+  margin: 0 0 10px;
+}
+
+.dept-dean-intro p,
+.dept-dean-intro > .cms-rich {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: var(--gnc-text-gray);
+  line-height: 1.7;
+  margin: 0;
+}
+
+.dept-dean-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 70px;
+  align-items: start;
+}
+
+/* Photo cluster */
+.dept-dean-photo-wrap {
+  position: relative;
+  width: 260px;
+  max-width: 100%;
+}
+
+.dept-dean-square {
+  position: absolute;
+  top: -18px;
+  left: -18px;
+  width: 130px;
+  height: 130px;
+  background: var(--gnc-gold-light);
+  border-radius: 8px;
+  z-index: 1;
+}
+
+.dept-dean-accent {
+  position: absolute;
+  bottom: -18px;
+  right: -18px;
+  width: 130px;
+  height: 130px;
+  background: var(--gnc-gold-light);
+  border-radius: 8px;
+  z-index: 1;
+}
+
+.dept-dean-photo {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  aspect-ratio: 13 / 16;  /* 260 x 320 */
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.15);
+}
+
+.dept-dean-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Wave Pattern Styling (Gold -> Maroon -> Green) */
+.dept-dean-wave {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 90px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.dept-dean-wave svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.dept-dean-wave .wave-gold {
+  fill: var(--gnc-gold);
+}
+
+.dept-dean-wave .wave-maroon {
+  fill: var(--gnc-maroon);
+}
+
+.dept-dean-wave .wave-green {
+  fill: var(--gnc-green-light);
+}
+
+/* Glassmorphism Nameplate Badge */
+.dept-dean-badge {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  background: rgba(11, 66, 40, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 3;
+}
+
+.dept-dean-badge-title {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--gnc-gold-light);
+}
+
+.dept-dean-badge-sub {
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #ffffff;
+}
+
+/* Content column */
+.dept-dean-content .dept-eyebrow {
+  margin-bottom: 8px;
+}
+
+.dept-dean-content h3 {
+  font-family: 'Noto Serif', serif;
+  font-weight: 700;
+  color: var(--gnc-green-light);
+  font-size: clamp(20px, 2.6vw, 27px);
+  line-height: 1.3;
+  margin: 0 0 14px;
+}
+
+.dept-dean-rule {
+  width: 60px;
+  height: 3px;
+  background: var(--gnc-gold);
+  margin: 0 0 20px;
+}
+
+.dept-dean-content p,
+.dept-dean-content > .cms-rich {
+  font-family: 'Inter', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: var(--gnc-text-dark);
+  max-width: 100ch;
+  margin: 0;
+}
+
+.dept-dean-divider {
+  border: none;
+  border-top: 1px solid var(--gnc-border);
+  margin: 28px 0 24px;
+}
+
+/* Two-column Get Connected Contacts Grid */
+.dept-dean-contacts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px 24px;
+  margin-top: 16px;
+}
+
+.dept-dean-contacts-grid .dept-dean-contact {
+  margin-top: 0;
+}
+
+.dept-dean-contact {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.dept-dean-contact i {
+  color: var(--gnc-green-light);
+  font-size: 16px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.dept-contact-label {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--gnc-green-light);
+  margin-bottom: 2px;
+}
+
+.dept-contact-value {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: var(--gnc-text-gray);
+  line-height: 1.4;
+  overflow-wrap: anywhere; /* long emails / URLs wrap instead of overflowing */
+}
+
+/* ---------- Accessibility & input-type refinements ---------- */
+.dept-breadcrumb a:focus-visible,
+.dept-program-link:focus-visible {
+  outline: 2px solid var(--gnc-green-light);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* No sticky hover lift on touch devices */
+@media (hover: none) {
+  .dept-program-card:hover {
+    transform: none;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dept-program-card {
+    transition: none;
+  }
+  .dept-program-card:hover {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+/* ---------- Large desktop (>= 1400px) ---------- */
+@media (min-width: 1400px) {
+  .dept-hero-inner,
+  .dept-about-inner,
+  .dept-programs-inner,
+  .dept-dean-inner {
+    max-width: 1320px;
+  }
+
+  .dept-about {
+    padding: 90px 15px;
+  }
+
+  .dept-programs-grid {
+    gap: 32px;
+  }
+}
+
+/* ---------- Small desktop / landscape tablet (<= 1199px) ---------- */
+@media (max-width: 1199px) {
+  .dept-hero-inner,
+  .dept-about-inner,
+  .dept-programs-inner,
+  .dept-dean-inner {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .dept-about-inner {
+    grid-template-columns: 280px 1fr;
+    gap: 44px;
+  }
+
+  .dept-dean-grid {
+    grid-template-columns: 280px 1fr;
+    gap: 48px;
+  }
+
+  .dept-programs-grid {
+    gap: 22px;
+  }
+
+  .dept-program-body {
+    padding: 18px 18px 22px;
+  }
+}
+
+/* ---------- Tablet (<= 991px) ---------- */
+@media (max-width: 991px) {
+  .dept-hero-inner {
+    padding: 32px 15px 36px;
+  }
+
+  .dept-about {
+    padding: 56px 15px;
+  }
+
+  .dept-about-inner {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+
+  .dept-logo-wrap {
+    width: 220px;
+    height: 220px;
+    margin: 0 auto;
+  }
+
+  .dept-logo {
+    width: 220px;
+    height: 220px;
+  }
+
+  .dept-logo-square {
+    width: 100px;
+    height: 100px;
+  }
+
+  .dept-about-content {
+    text-align: center;
+  }
+
+  .dept-about-content p,
+  .dept-about-content .dept-about-raw {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-offers-list {
+    text-align: left;
+    display: inline-block;
+  }
+
+  .dept-programs {
+    padding: 52px 15px 64px;
+  }
+
+  .dept-programs-inner h2 {
+    margin-bottom: 26px;
+  }
+
+  .dept-programs-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dept-dean {
+    padding: 52px 15px 72px;
+  }
+
+  .dept-dean-intro {
+    margin-bottom: 40px;
+  }
+
+  .dept-dean-grid {
+    grid-template-columns: 1fr;
+    gap: 56px;
+    justify-items: center;
+  }
+
+  .dept-dean-content {
+    text-align: center;
+    max-width: 600px;
+    width: 100%;
+  }
+
+  .dept-dean-content p,
+.dept-dean-content > .cms-rich {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-dean-rule {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-dean-contacts-grid {
+    text-align: left;
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* ---------- Large phone / small tablet portrait (<= 767px) ---------- */
+@media (max-width: 767px) {
+  .dept-program-img {
+    height: 170px;
+  }
+
+  .dept-programs-grid {
+    gap: 18px;
+  }
+
+  .dept-dean-intro,
+  .dept-dean-intro p,
+.dept-dean-intro > .cms-rich {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-dean-wave {
+    height: 70px;
+  }
+}
+
+/* ---------- Phone (<= 575px) ---------- */
+@media (max-width: 575px) {
+  .dept-hero {
+    background-position: center;
+  }
+
+  .dept-hero-inner {
+    padding: 24px 15px 28px;
+  }
+
+  .dept-breadcrumb {
+    font-size: 0.66rem;
+    margin-bottom: 10px;
+  }
+
+  .dept-hero p {
+    font-size: 13.5px;
+  }
+
+  .dept-about {
+    padding: 44px 15px;
+  }
+
+  .dept-about-inner {
+    gap: 30px;
+  }
+
+  .dept-logo-wrap {
+    width: 190px;
+    height: 190px;
+  }
+
+  .dept-logo {
+    width: 190px;
+    height: 190px;
+  }
+
+  .dept-logo-square {
+    width: 84px;
+    height: 84px;
+    top: -10px;
+  }
+
+  .dept-dots {
+    width: 60px;
+    height: 36px;
+    background-size: 12px 12px;
+  }
+
+  .dept-about-content p,
+  .dept-about-content .dept-about-raw,
+  .dept-about-content ul,
+  .dept-about-content ol,
+  .dept-offers-list {
+    font-size: 14.5px;
+    line-height: 1.7;
+  }
+
+  .dept-programs {
+    padding: 44px 15px 56px;
+  }
+
+  .dept-programs-grid {
+    grid-template-columns: 1fr;
+    max-width: 440px;
+    margin: 0 auto;
+  }
+
+  .dept-program-img {
+    height: 180px;
+  }
+
+  .dept-dean {
+    padding: 44px 15px 56px;
+  }
+
+  .dept-dean-grid {
+    gap: 44px;
+  }
+
+  .dept-dean-photo-wrap {
+    width: 220px;
+  }
+
+  /* Pull decorative squares in so they stay inside the 15px page gutter */
+  .dept-dean-square {
+    top: -12px;
+    left: -12px;
+    width: 100px;
+    height: 100px;
+  }
+
+  .dept-dean-accent {
+    bottom: -12px;
+    right: -12px;
+    width: 100px;
+    height: 100px;
+  }
+
+  .dept-dean-content p,
+.dept-dean-content > .cms-rich {
+    font-size: 14px;
+  }
+
+  .dept-dean-divider {
+    margin: 24px 0 20px;
+  }
+
+  .dept-dean-contacts-grid {
+    grid-template-columns: 1fr;
+    max-width: 320px;
+  }
+
+  .dept-dean-contacts-grid .dept-dean-contact {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+  }
+}
+
+/* ---------- Small phone (<= 380px) ---------- */
+@media (max-width: 380px) {
+  .dept-hero-inner,
+  .dept-about,
+  .dept-programs,
+  .dept-dean {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .dept-logo-wrap {
+    width: 170px;
+    height: 170px;
+  }
+
+  .dept-logo {
+    width: 170px;
+    height: 170px;
+  }
+
+  .dept-dean-photo-wrap {
+    width: 200px;
+  }
+
+  .dept-dean-badge {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    padding: 8px 10px;
+  }
+
+  .dept-dean-badge-title {
+    font-size: 14px;
+  }
+
+  .dept-dean-badge-sub {
+    font-size: 11px;
+  }
+
+  .dept-program-body {
+    padding: 16px 16px 20px;
+  }
+}
+
+/* ---------- Short landscape phones ---------- */
+@media (max-height: 480px) and (orientation: landscape) {
+  .dept-hero-inner {
+    padding-top: 20px;
+    padding-bottom: 22px;
+  }
+
+  .dept-about,
+  .dept-programs,
+  .dept-dean {
+    padding-top: 36px;
+    padding-bottom: 44px;
+  }
+}
+
+/* ==========================================================================
+   ANIMATIONS
+   - Hero intro runs on page load (pure CSS).
+   - [data-reveal] elements fade/slide in when scrolled into view
+     (see the small IntersectionObserver script in college-department.php).
+   - Content stays visible if JS is off (hiding only applies under .js-anim).
+   - Uses the individual `translate` / `scale` properties so it never
+     conflicts with the existing `transform` hover effects.
+   ========================================================================== */
+
+@keyframes dept-fade-up {
+  from { opacity: 0; translate: 0 26px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+
+@keyframes dept-fade-left {
+  from { opacity: 0; translate: 32px 0; }
+  to   { opacity: 1; translate: 0 0; }
+}
+
+@keyframes dept-pop-in {
+  from { opacity: 0; scale: 0.92; translate: 0 18px; }
+  to   { opacity: 1; scale: 1; translate: 0 0; }
+}
+
+@keyframes dept-square-in-tl {
+  from { opacity: 0; translate: -26px -26px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+
+@keyframes dept-square-in-br {
+  from { opacity: 0; translate: 26px 26px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+
+@keyframes dept-float {
+  0%, 100% { translate: 0 0; }
+  50%      { translate: 0 -8px; }
+}
+
+@keyframes dept-dots-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
+@keyframes dept-wave {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(1.12); }
+}
+
+@keyframes dept-rule-grow {
+  from { width: 0; }
+  to   { width: 60px; }
+}
+
+@keyframes dept-badge-in {
+  from { opacity: 0; translate: 0 16px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+
+/* ---------- Hero: staggered intro on load ---------- */
+.dept-breadcrumb,
+.dept-hero h1,
+.dept-hero p {
+  animation: dept-fade-up 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.dept-hero h1 { animation-delay: 0.12s; }
+.dept-hero p  { animation-delay: 0.24s; }
+
+/* ---------- Scroll reveal ---------- */
+.js-anim [data-reveal]:not(.is-visible) {
+  opacity: 0;
+}
+
+.js-anim [data-reveal].is-visible {
+  animation: dept-fade-up 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+.js-anim [data-reveal="left"].is-visible  { animation-name: dept-fade-left; }
+.js-anim [data-reveal="scale"].is-visible { animation-name: dept-pop-in; }
+
+/* Stagger the contact items */
+.dept-dean-contacts-grid .dept-dean-contact:nth-child(1) { --d: 150ms; }
+.dept-dean-contacts-grid .dept-dean-contact:nth-child(2) { --d: 250ms; }
+.dept-dean-contacts-grid .dept-dean-contact:nth-child(3) { --d: 350ms; }
+.dept-dean-contacts-grid .dept-dean-contact:nth-child(4) { --d: 450ms; }
+
+/* ---------- About: decorative shapes ---------- */
+.js-anim .dept-logo-wrap.is-visible .dept-logo-square {
+  animation:
+    dept-square-in-tl 0.8s 0.25s cubic-bezier(0.22, 0.61, 0.36, 1) both,
+    dept-float 6s 1.2s ease-in-out infinite;
+}
+
+.js-anim .dept-logo-wrap.is-visible .dept-dots {
+  animation: dept-dots-pulse 3.5s 1s ease-in-out infinite;
+}
+
+.dept-logo {
+  transition: transform 0.4s ease;
+}
+
+.dept-logo-wrap:hover .dept-logo {
+  transform: scale(1.04) rotate(-1deg);
+}
+
+/* ---------- Programs: image zoom + arrow nudge ---------- */
+.dept-program-img img {
+  transition: transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.dept-program-card:hover .dept-program-img img {
+  transform: scale(1.07);
+}
+
+.dept-program-link {
+  position: relative;
+}
+
+.dept-program-link i {
+  transition: transform 0.25s ease;
+}
+
+.dept-program-link:hover i {
+  transform: translateX(5px);
+}
+
+.dept-program-link::after {          /* underline that draws in on hover */
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 2px;
+  width: 100%;
+  height: 1.5px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+
+.dept-program-link:hover::after,
+.dept-program-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+/* ---------- Dean: shapes, wave, rule, badge ---------- */
+.js-anim .dept-dean-photo-wrap.is-visible .dept-dean-square {
+  animation: dept-square-in-tl 0.8s 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.js-anim .dept-dean-photo-wrap.is-visible .dept-dean-accent {
+  animation: dept-square-in-br 0.8s 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.js-anim .dept-dean-photo-wrap.is-visible .dept-dean-badge {
+  animation: dept-badge-in 0.7s 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.dept-dean-wave path {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: dept-wave 6s ease-in-out infinite;
+}
+
+.dept-dean-wave .wave-maroon { animation-duration: 7s; animation-delay: -2s; }
+.dept-dean-wave .wave-green  { animation-duration: 8s; animation-delay: -4s; }
+
+.dept-dean-photo img {
+  transition: transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.dept-dean-photo-wrap:hover .dept-dean-photo img {
+  transform: scale(1.05);
+}
+
+.js-anim .dept-dean-content.is-visible .dept-dean-rule {
+  animation: dept-rule-grow 0.8s 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.dept-dean-contact i {
+  transition: transform 0.25s ease, color 0.25s ease;
+}
+
+.dept-dean-contact:hover i {
+  transform: scale(1.25) rotate(-6deg);
+  color: var(--gnc-gold);
+}
+
+/* ---------- Touch devices: skip hover-only motion ---------- */
+@media (hover: none) {
+  .dept-program-card:hover .dept-program-img img,
+  .dept-dean-photo-wrap:hover .dept-dean-photo img,
+  .dept-logo-wrap:hover .dept-logo {
+    transform: none;
+  }
+}
+
+/* Shared centered layout for College, Basic Education and Graduate School. */
+.dept-programs-inner {
+  text-align: center;
+}
+
+.dept-hero-inner,
+.dept-about-content {
+  text-align: left;
+}
+
+.dept-about-content p,
+.dept-about-content .dept-about-raw {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.dept-dean-intro {
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.dept-breadcrumb {
+  justify-content: flex-start;
+}
+
+.dept-hero p {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.dept-logo-wrap {
+  justify-self: center;
+}
+
+.dept-about-inner {
+  align-items: center;
+}
+
+.dept-about-content ul,
+.dept-about-content ol {
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  text-align: start;
+}
+
+.dept-program-body {
+  align-items: center;
+}
+
+.dept-programs-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.dept-programs-grid > * {
+  flex: 0 1 calc((100% - 56px) / 3);
+}
+
+.dept-programs-grid > .dept-program-add {
+  height: auto;
+}
+
+@media (min-width: 1400px) {
+  .dept-programs-grid > * { flex-basis: calc((100% - 64px) / 3); }
+}
+
+@media (max-width: 991px) {
+  .dept-programs-grid > * { flex-basis: calc((100% - 28px) / 2); }
+}
+
+@media (max-width: 575px) {
+  .dept-programs-grid > * { flex-basis: 100%; }
+}
+
+/* Match the 1920px desktop header proportions on smaller monitors/iPad Pro.
+   Saved title positions stay active; typography and the original text origin
+   scale together so the public header keeps the editor's composition. */
+@media (min-width: 1025px) and (max-width: 1919px) {
+  .dept-intro-program .dept-hero-inner { max-width: 68.75%; padding: 1.5625vw .78125vw 3.645833vw; }
+  .dept-intro-program .dept-hero-content { width: 58%; margin-top: 3.958333vw; gap: 1.875vw; }
+  .dept-intro-program .dept-hero-title { font-size: 2.5vw; }
+  .dept-intro-program .dept-hero-prefix { margin-bottom: .416667vw; }
+  .dept-intro-program .dept-breadcrumb { max-width: 100%; margin-bottom: .729167vw; }
+  .dept-intro-program .dept-hero-logo { flex-basis: 9.375vw; width: 9.375vw; height: 9.375vw; }
+}
+
+/* Center department headers throughout the tablet range, including the editor preview. */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .dept-intro-program .dept-hero-inner,
+  .dept-intro-program .dept-hero-copy,
+  .dept-intro-program .dept-hero-title,
+  .dept-intro-program .dept-hero-blurb {
+    text-align: center;
+  }
+
+  .dept-intro-program .dept-hero-content {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-intro-program .dept-hero-copy { width: 100%; }
+
+  .dept-intro-program .dept-breadcrumb {
+    justify-content: safe center;
+    text-align: center;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Phone content stays centered below 768px. */
+@media (max-width: 767px) {
+  .dept-hero-inner {
+    text-align: center;
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .dept-breadcrumb,
+  .dept-intro-program .dept-breadcrumb {
+    justify-content: safe center;
+    text-align: center;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-intro-program .dept-hero-content {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 100%;
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+    gap: 14px;
+  }
+
+  .dept-intro-program .dept-hero-copy {
+    width: 100%;
+    text-align: center;
+  }
+
+  .dept-hero h1,
+  .dept-intro-program .dept-hero-title,
+  .dept-hero p,
+  .dept-intro-program .dept-hero-blurb,
+  .dept-intro-program .dept-header-extra {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-about-inner {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .dept-about-content,
+  .dept-about-content .dept-eyebrow,
+  .dept-about-content h2,
+  .dept-about-content h3,
+  .dept-about-content h4,
+  .dept-about-content p,
+  .dept-about-content .dept-about-raw,
+  .dept-about-content .dept-about-raw p,
+  .dept-offers-label {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-offers-list,
+  .dept-about-content ul,
+  .dept-about-content ol {
+    text-align: center;
+    list-style-position: inside;
+    padding-left: 0;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-about-content blockquote {
+    text-align: center;
+    border-left: none;
+    border-top: 3px solid var(--gnc-gold);
+    padding-left: 0;
+    padding-top: 12px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-statements-inner,
+  .dept-programs-inner,
+  .dept-dean-inner {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .dept-statements {
+    gap: 56px;
+    padding: 28px 8px 0;
+  }
+
+  .dept-statement-card {
+    flex-basis: 100%;
+    min-height: 0;
+    padding: 48px 24px 26px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .dept-statement-head {
+    margin: -78px -10px 14px -22px;
+  }
+
+  .dept-statement-icon {
+    flex-basis: 64px;
+    width: 64px;
+    height: 64px;
+    font-size: 27px;
+  }
+
+  .dept-statement-title,
+  .dept-programs-inner .dept-statement-title {
+    font-size: 16px;
+    padding: 12px 36px 12px 32px;
+    text-align: center;
+    margin-left: -20px;
+    margin-right: 0;
+  }
+
+  .dept-statement-text,
+  .dept-statement-text p,
+  .dept-statement-text.cms-rich,
+  .dept-statement-text.cms-rich p,
+  .dept-statement-text.cms-rich div,
+  .dept-statement-text.cms-rich span,
+  .dept-statement-text.cms-rich ul,
+  .dept-statement-text.cms-rich ol {
+    text-align: center !important;
+    hyphens: none;
+    -webkit-hyphens: none;
+    list-style-position: inside;
+    padding-left: 0;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-programs-inner,
+  .dept-programs-inner .dept-eyebrow,
+  .dept-programs-inner h2 {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-program-body {
+    align-items: center;
+    text-align: center;
+    padding: 20px 18px 22px;
+  }
+
+  .dept-program-body h3,
+  .dept-program-body p,
+  .dept-program-body > .cms-rich,
+  .dept-program-body > .cms-rich p {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-program-link {
+    justify-content: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-dean-intro,
+  .dept-dean-intro .dept-eyebrow,
+  .dept-dean-intro h2,
+  .dept-dean-intro p,
+  .dept-dean-intro > .cms-rich,
+  .dept-dean-intro > .cms-rich p {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-dean-badge,
+  .dept-dean-badge-title,
+  .dept-dean-badge-sub {
+    text-align: center;
+    align-items: center;
+  }
+
+  .dept-dean-content,
+  .dept-dean-content .dept-eyebrow,
+  .dept-dean-content h3,
+  .dept-dean-content p,
+  .dept-dean-content > .cms-rich,
+  .dept-dean-content > .cms-rich p {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-dean-rule {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dept-dean-contacts-grid {
+    grid-template-columns: 1fr;
+    max-width: 360px;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+    justify-items: center;
+  }
+
+  .dept-dean-contacts-grid .dept-dean-contact {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+    width: 100%;
+  }
+
+  .dept-contact-label,
+  .dept-contact-value {
+    text-align: center;
+  }
+
+  .dept-facebook,
+  .dept-fb-lead,
+  .dept-fb-lead p {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Extend the existing details link across the public card without covering editor fields. */
+.dept-program-card-clickable {
+  position: relative;
+}
+
+.dept-program-card-clickable .dept-program-link {
+  position: static;
+}
+
+.dept-program-card-clickable .dept-program-link::after {
+  inset: 0;
+  width: auto;
+  height: auto;
+  background: transparent;
+  transform: none;
+  z-index: 1;
+}
+
+.dept-program-card-clickable .cms-rich a {
+  position: relative;
+  z-index: 2;
+}
+
+.dept-program-card-clickable:has(.dept-program-link:focus-visible) {
+  outline: 3px solid var(--gnc-green-light);
+  outline-offset: 3px;
+}
+
+/* ---------- Respect reduced-motion preferences ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .dept-breadcrumb,
+  .dept-hero h1,
+  .dept-hero p,
+  .js-anim [data-reveal].is-visible,
+  .js-anim .dept-logo-wrap.is-visible .dept-logo-square,
+  .js-anim .dept-logo-wrap.is-visible .dept-dots,
+  .js-anim .dept-dean-photo-wrap.is-visible .dept-dean-square,
+  .js-anim .dept-dean-photo-wrap.is-visible .dept-dean-accent,
+  .js-anim .dept-dean-photo-wrap.is-visible .dept-dean-badge,
+  .js-anim .dept-dean-content.is-visible .dept-dean-rule,
+  .dept-dean-wave path {
+    animation: none !important;
+  }
+
+  .js-anim [data-reveal]:not(.is-visible) { opacity: 1; }
+
+  .dept-program-img img,
+  .dept-dean-photo img,
+  .dept-logo,
+  .dept-program-link i,
+  .dept-program-link::after,
+  .dept-dean-contact i {
+    transition: none;
+  }
+}
