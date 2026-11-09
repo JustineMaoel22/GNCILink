@@ -4,7 +4,7 @@ if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/../config/config.php';
 
 $apply = in_array('--apply', $argv, true);
-if (!class_exists('Imagick')) { fwrite(STDERR, "Enable PHP Imagick before running the optimizer.\n"); exit(1); }
+if (!class_exists('Imagick') && !function_exists('imagecreatetruecolor')) { fwrite(STDERR, "Enable PHP Imagick or GD before running the optimizer.\n"); exit(1); }
 $root = realpath(__DIR__ . '/../uploads/administration');
 if (!$root) { fwrite(STDERR, "Administration upload folder does not exist.\n"); exit(1); }
 $backupFolder = __DIR__ . '/../config/image-originals';
@@ -33,7 +33,9 @@ foreach (new DirectoryIterator($root) as $entry) {
         imageUploadOptimizePath($temporary);
         clearstatcache(true, $temporary);
         $outputInfo = getimagesize($temporary);
-        if (!$outputInfo || $outputInfo[0] > IMAGE_UPLOAD_MAX_WIDTH || $outputInfo[1] > IMAGE_UPLOAD_MAX_HEIGHT) throw new RuntimeException('Optimized image exceeds the dimension limit.');
+        $orientation = $outputInfo && $outputInfo[2] === IMAGETYPE_JPEG && function_exists('exif_read_data') ? (int)(@exif_read_data($temporary)['Orientation'] ?? 1) : 1;
+        $rotated = in_array($orientation, [5, 6, 7, 8], true);
+        if (!$outputInfo || $outputInfo[$rotated ? 1 : 0] > IMAGE_UPLOAD_MAX_WIDTH || $outputInfo[$rotated ? 0 : 1] > IMAGE_UPLOAD_MAX_HEIGHT) throw new RuntimeException('Optimized image exceeds the dimension limit.');
         $oldSize = filesize($path); $newSize = filesize($temporary);
         // Record a reversible mapping before changing the file. Originals stay outside public uploads.
         $record = json_encode(['path' => '/uploads/administration/' . $entry->getFilename(), 'backup' => basename($backup), 'sha256' => $originalHash], JSON_UNESCAPED_SLASHES) . "\n";

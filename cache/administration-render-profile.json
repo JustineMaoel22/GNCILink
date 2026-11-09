@@ -384,7 +384,7 @@
     "timing": {
       "frames": 90,
       "over33ms": 4,
-      "max": 250,
+      "max": 214,
       "mean": 20
     },
     "info": {
@@ -397,19 +397,19 @@
           "display": 273
         },
         {
-          "src": "/uploads/administration/9fa86263594769b5dcd9c54a9c8de4a3.jpg",
+          "src": "/uploads/administration/51ec5d2d676451a87601c97e6e2589a6.jpg",
           "width": 4016,
           "height": 6016,
           "display": 260
         },
         {
-          "src": "/uploads/administration/9c6ea549a8024c093f48e32a8225c3d8.jpg",
+          "src": "/uploads/administration/ef7e9c1cc788d9922d548069dc51a768.jpg",
           "width": 4016,
           "height": 6016,
           "display": 260
         },
         {
-          "src": "/uploads/administration/c23b9dd7afab76db1dd7e2f8d6e25ecb.jpg",
+          "src": "/uploads/administration/b0a64b3bd61c072e62aca0e7634c16ca.jpg",
           "width": 4016,
           "height": 6016,
           "display": 260
@@ -421,37 +421,37 @@
           "display": 260
         },
         {
-          "src": "/uploads/administration/fd4a189f50e5ba54a8cdc385aa5c42aa.jpg",
+          "src": "/uploads/administration/863c9965dbe1a8aea45fe1d484e1ef30.jpg",
           "width": 4016,
           "height": 6016,
           "display": 260
         },
         {
-          "src": "/uploads/administration/a1206c41592472ef9b6c76817b228ae7.jpg",
+          "src": "/uploads/administration/959ae6e2b88dd31495da882e4bcbfa6a.jpg",
           "width": 4016,
           "height": 6016,
           "display": 260
         },
         {
-          "src": "/uploads/administration/747af9b602cc767ab29b6ad6b727dd79.jpg",
+          "src": "/uploads/administration/b5e822fac109425d197671cda25df0d7.jpg",
           "width": 4016,
           "height": 6016,
           "display": 260
         },
         {
-          "src": "/uploads/administration/0c880cbd359bbfb69c5c86f2d5bc2bfd.jpg",
+          "src": "/uploads/administration/2b960309b34a65535389c761d1628f27.jpg",
           "width": 4016,
           "height": 6016,
           "display": 260
         },
         {
-          "src": "/uploads/administration/b18d86c48fe0042b01a1d6296eb0c201.jpg",
+          "src": "/uploads/administration/fa32c4cd9a972abd92a21ccf0d69c15f.jpg",
           "width": 4016,
           "height": 6016,
           "display": 260
         },
         {
-          "src": "/uploads/administration/9c6ac566d9418a128000565dbd8a4e77.jpg",
+          "src": "/uploads/administration/7216ab737a5706ecb5c91557d2adf6c8.jpg",
           "width": 4016,
           "height": 6016,
           "display": 260
@@ -459,6 +459,18 @@
       ],
       "blur": "blur(4px)",
       "animations": [
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
+        {
+          "state": "running"
+        },
         {
           "state": "running"
         },
@@ -480,8 +492,8 @@
     "timing": {
       "frames": 90,
       "over33ms": 3,
-      "max": 360,
-      "mean": 20
+      "max": 213,
+      "mean": 18
     },
     "layerCount": 4
   }

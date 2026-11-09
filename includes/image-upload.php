@@ -69,9 +69,8 @@ function imageUploadOptimizePath(string $path): void {
     }
     $needsResize = $info[0] > IMAGE_UPLOAD_MAX_WIDTH || $info[1] > IMAGE_UPLOAD_MAX_HEIGHT;
     if (!class_exists('Imagick') || !method_exists('Imagick', 'pingImage')) {
-        // Preserve existing upload compatibility on hosts without an image processor.
-        if ($originalSize <= IMAGE_UPLOAD_MAX_BYTES) return;
-        throw new RuntimeException('Automatic image optimization requires the PHP Imagick extension. Please use an image up to 5 MB.');
+        imageUploadOptimizeGd($path, $info, $originalSize);
+        return;
     }
     $probe = new Imagick();
     $probe->pingImage($path);
@@ -131,6 +130,134 @@ function imageUploadOptimizePath(string $path): void {
     } finally {
         $image->clear();
     }
+}
+
+/** Keep metadata (including photo-check provenance) without decoding entire files. */
+function imageUploadGdMetadata(string $path, int $type): array {
+    $stream = fopen($path, 'rb');
+    if (!$stream) throw new RuntimeException('Could not read the uploaded image.');
+    $metadata = ''; $animated = $type === IMAGETYPE_GIF;
+    try {
+        fseek($stream, $type === IMAGETYPE_JPEG ? 2 : ($type === IMAGETYPE_PNG ? 8 : 12));
+        while (!feof($stream)) {
+            if ($type === IMAGETYPE_JPEG) {
+                $marker = fread($stream, 2);
+                if (strlen($marker) !== 2 || $marker[0] !== "\xff" || in_array(ord($marker[1]), [0xda, 0xd9], true)) break;
+                $lengthBytes = fread($stream, 2);
+                if (strlen($lengthBytes) !== 2) break;
+                $length = unpack('n', $lengthBytes)[1] - 2;
+                if ($length < 0) break;
+                $payload = $length ? fread($stream, $length) : '';
+                if (strlen($payload) !== $length) break;
+                $code = ord($marker[1]);
+                if (($code >= 0xe1 && $code <= 0xef) || $code === 0xfe) $metadata .= $marker . $lengthBytes . $payload;
+            } elseif (in_array($type, [IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
+                $header = fread($stream, 8);
+                if (strlen($header) !== 8) break;
+                $png = $type === IMAGETYPE_PNG;
+                $length = unpack($png ? 'N' : 'V', substr($header, $png ? 0 : 4, 4))[1];
+                $chunk = substr($header, $png ? 4 : 0, 4);
+                $extra = $png ? 4 : ($length % 2);
+                if ($length > filesize($path) - ftell($stream) - $extra) break;
+                if (in_array($chunk, ['acTL', 'ANIM', 'ANMF'], true)) $animated = true;
+                if (in_array($chunk, ['tEXt', 'zTXt', 'iTXt', 'eXIf', 'iCCP', 'caBX', 'EXIF', 'XMP ', 'ICCP'], true)) {
+                    $metadata .= $header . fread($stream, $length + $extra);
+                } else {
+                    fseek($stream, $length + $extra, SEEK_CUR);
+                }
+            } else break;
+        }
+    } finally { fclose($stream); }
+    return [$metadata, $animated];
+}
+
+/** GD fallback for static photos; never flatten animations or silently accept large dimensions. */
+function imageUploadOptimizeGd(string $path, array $info, int $originalSize): void {
+    $orientation = 1;
+    if ($info[2] === IMAGETYPE_JPEG && function_exists('exif_read_data')) {
+        $exif = @exif_read_data($path);
+        $orientation = (int)($exif['Orientation'] ?? 1);
+    }
+    // Keep EXIF and sensor orientation together; browsers apply the retained orientation.
+    $rotated = in_array($orientation, [5, 6, 7, 8], true);
+    $maxWidth = $rotated ? IMAGE_UPLOAD_MAX_HEIGHT : IMAGE_UPLOAD_MAX_WIDTH;
+    $maxHeight = $rotated ? IMAGE_UPLOAD_MAX_WIDTH : IMAGE_UPLOAD_MAX_HEIGHT;
+    [$metadata, $animated] = imageUploadGdMetadata($path, $info[2]);
+    if ($info[2] === IMAGETYPE_JPEG && !function_exists('exif_read_data') && str_contains($metadata, "Exif\0\0")) {
+        // Without EXIF support, fit both axes within 1080 so any retained rotation fits.
+        $maxWidth = $maxHeight = IMAGE_UPLOAD_MAX_HEIGHT;
+    }
+    $scale = min(1, $maxWidth / $info[0], $maxHeight / $info[1]);
+    if ($scale === 1 && $originalSize <= IMAGE_UPLOAD_MAX_BYTES) return;
+    if ($animated) throw new InvalidArgumentException('Resizing GIF or animated images requires Imagick. Please upload an image already within 1920 x 1080 and 5 MB, or use a static JPG, PNG or WebP.');
+    $decoder = [IMAGETYPE_JPEG => 'imagecreatefromjpeg', IMAGETYPE_PNG => 'imagecreatefrompng', IMAGETYPE_WEBP => 'imagecreatefromwebp'][$info[2]] ?? '';
+    $encoder = [IMAGETYPE_JPEG => 'imagejpeg', IMAGETYPE_PNG => 'imagepng', IMAGETYPE_WEBP => 'imagewebp'][$info[2]] ?? '';
+    if (!$decoder || !function_exists($decoder) || !function_exists($encoder)) {
+        throw new RuntimeException('Automatic resizing is unavailable for this image format. Please upload a photo already within 1920 x 1080 and 5 MB.');
+    }
+    $width = max(1, (int)round($info[0] * $scale));
+    $height = max(1, (int)round($info[1] * $scale));
+    $limitText = trim(ini_get('memory_limit'));
+    $limit = (float)$limitText * match (strtolower(substr($limitText, -1))) { 'g' => 1073741824, 'm' => 1048576, 'k' => 1024, default => 1 };
+    $estimate = $info[0] * $info[1] * 4 + $width * $height * 8 + 16 * 1024 * 1024;
+    if (max($info[0], $info[1]) > 20000 || $info[0] * $info[1] > 80000000 || ($limit > 0 && memory_get_usage() + $estimate > $limit)) {
+        throw new InvalidArgumentException('This photo needs more memory than the server has available. Please resize it to 1920 x 1080 or smaller before uploading.');
+    }
+    $source = @$decoder($path);
+    if (!$source) throw new InvalidArgumentException('This photo could not be decoded. Please choose a valid JPG, PNG or WebP.');
+    try {
+        for ($attempt = 0; $attempt < 6; $attempt++) {
+            $output = imagecreatetruecolor($width, $height);
+            if (!$output) throw new RuntimeException('Could not allocate the resized image.');
+            try {
+                imagealphablending($output, false);
+                imagesavealpha($output, true);
+                if (!imagecopyresampled($output, $source, 0, 0, 0, 0, $width, $height, $info[0], $info[1])) throw new RuntimeException('Could not resize the photo.');
+                ob_start();
+                try {
+                    $written = $encoder($output, null, $info[2] === IMAGETYPE_PNG ? 6 : max(65, 82 - $attempt * 5));
+                    $bytes = ob_get_contents();
+                } finally { ob_end_clean(); }
+                if (!$written || !$bytes) throw new RuntimeException('Could not encode the resized photo.');
+            } finally { unset($output); }
+            if ($metadata !== '') {
+                if ($info[2] === IMAGETYPE_JPEG) $bytes = substr($bytes, 0, 2) . $metadata . substr($bytes, 2);
+                elseif ($info[2] === IMAGETYPE_PNG) $bytes = substr($bytes, 0, 33) . $metadata . substr($bytes, 33);
+                else {
+                    // Extended WebP is required when retaining EXIF, XMP or ICC chunks.
+                    $flags = 0; $icc = ''; $other = '';
+                    for ($offset = 0; $offset + 8 <= strlen($metadata);) {
+                        $chunk = substr($metadata, $offset, 4);
+                        $flags |= ['ICCP' => 32, 'EXIF' => 8, 'XMP ' => 4][$chunk] ?? 0;
+                        $length = unpack('V', substr($metadata, $offset + 4, 4))[1];
+                        $raw = substr($metadata, $offset, 8 + $length + $length % 2);
+                        if ($chunk === 'ICCP') $icc .= $raw;
+                        else $other .= $raw;
+                        $offset += 8 + $length + $length % 2;
+                    }
+                    $body = substr($bytes, 12);
+                    if (substr($body, 0, 4) === 'VP8X') {
+                        $body[8] = chr(ord($body[8]) | $flags);
+                        $body = substr($body, 0, 18) . $icc . substr($body, 18);
+                    } else {
+                        $alpha = substr($body, 0, 4) === 'VP8L' && (ord($body[12]) & 16) ? 16 : 0;
+                        $body = 'VP8X' . pack('V', 10) . chr($flags | $alpha) . "\0\0\0" . substr(pack('V', $width - 1), 0, 3) . substr(pack('V', $height - 1), 0, 3) . $icc . $body;
+                    }
+                    $body .= $other;
+                    $bytes = 'RIFF' . pack('V', strlen($body) + 4) . 'WEBP' . $body;
+                }
+            }
+            if (strlen($bytes) <= IMAGE_UPLOAD_MAX_BYTES) {
+                if (file_put_contents($path, $bytes, LOCK_EX) !== strlen($bytes)) throw new RuntimeException('Could not save the optimized photo.');
+                clearstatcache(true, $path);
+                return;
+            }
+            $retryScale = max(.25, min(.85, sqrt(IMAGE_UPLOAD_MAX_BYTES * .9 / strlen($bytes))));
+            $width = max(1, (int)round($width * $retryScale));
+            $height = max(1, (int)round($height * $retryScale));
+        }
+        throw new InvalidArgumentException('This photo could not be optimized to 5 MB. Please use a smaller image.');
+    } finally { unset($source); }
 }
 
 /** Optimize large dimensions as well as oversized files before validating saved uploads. */

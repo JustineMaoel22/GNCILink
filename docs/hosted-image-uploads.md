@@ -10,7 +10,7 @@ existing server optimizer path so animation is not flattened. The server optimiz
 oversized originals again when needed, and checks the resulting file size.
 Images already within the limit retain their original bytes. If optimization is
 unavailable or fails, the image is rejected and the existing modal explains the
-5 MB limit. The server optimization fallback requires the PHP Imagick extension.
+5 MB limit. Server optimization prefers PHP Imagick and falls back to GD for static JPG/PNG/WebP, fitting images within 1920 × 1080 even below 5 MB. Animations needing optimization still require Imagick. See `image-optimization.md` for memory limits and deployment.
 Hosting request limits must still allow the resulting image and complete request.
 
 For the homepage hosting fix, deploy `assets/js/image-upload.js` and refresh the

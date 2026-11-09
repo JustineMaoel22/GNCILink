@@ -8,4 +8,5 @@
 - Widened the visitor search field to display the full placeholder, added a green hover state to the Sort button, and removed redundant search-result and loading notices. Search errors still provide a retry option.
 
 ### Bug Fixes
+- Added GD fallback when Imagick is unavailable so static JPG, PNG and WebP uploads fit within 1920 × 1080 even below 5 MB, retaining transparency and photo metadata. Added memory checks and enabled the same fallback for the existing Administration image optimizer.
 - Fixed duplicate-face checking continuing when the AI image checker was disabled. The setting now controls both duplicate-face and AI image checks during uploads and profile saves, while keeping file type, size, and image safety validation active.
