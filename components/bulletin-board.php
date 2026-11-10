@@ -33,13 +33,13 @@
  * this component requires it itself — see the require_once below.
  *
  * -------------------------------------------------------------------
- * SCHEMA NOTES (from your actual gnc_admin database)
- * - `announcements` has a single `program` varchar column (default
- *   'ALL'). Relevance = program matches CURRENT_PROGRAM, or program
- *   is 'ALL'. `category_id` on this table is a topic tag (Holiday,
- *   School Event, Emergency, Reminder) and is NOT used for program
- *   filtering — it has nothing to do with which program an
- *   announcement belongs to.
+ * SCHEMA NOTES
+ * - Announcement audiences live in `announcement_programs` and
+ *   `announcement_departments`, with legacy `program`/`dept_id` fields
+ *   used only when the corresponding audience list is empty. A legacy
+ *   program value of 'ALL' can also represent multiple selected programs;
+ *   it does not override those selections. Both audience dimensions must
+ *   match. `category_id` is a topic tag, unrelated to audience filtering.
  * - `events` NOW has a `program` column (added via the migration
  *   below), following the exact same convention as
  *   `announcements.program`: default 'ALL' means "every program",
@@ -105,27 +105,35 @@ const BULLETIN_MAX_ITEMS = 5; // upper bound requested ("3–5 most recent")
 const BULLETIN_MIN_ITEMS = 3; // lower bound, informational — never padded
 
 /**
- * Recent Announcements — queries the real `announcements` table using
- * the exact same filter logic as news-and-announcement.php:
- * program = CURRENT_PROGRAM, OR program = 'ALL' (items meant for every
- * program page). Confirmed directly against that file's filter
- * function, not guessed. `category_id` on this table is a topic tag
- * (Holiday, School Event, Emergency, Reminder) — unrelated to program.
+ * Recent announcements scoped to the saved program and department
+ * audiences. Explicit audience lists take precedence over legacy fields.
  */
 function gnc_get_global_announcements(string $program, int $limit): array
 {
     $pdo = gnc_bulletin_get_verified_pdo();
 
-    $sql = "SELECT announcement_id, title, content, slug, COALESCE(published_at, created_at) AS item_date
+    $sql = "SELECT announcements.announcement_id, announcements.title, announcements.content, announcements.slug,
+                   COALESCE(announcements.published_at, announcements.created_at) AS item_date
             FROM announcements
-            WHERE status = 'published'
-            AND (program = :program OR program = 'ALL' OR EXISTS (SELECT 1 FROM announcement_programs ap WHERE ap.announcement_id = announcements.announcement_id AND ap.program_code = :prog_check))
-            ORDER BY COALESCE(published_at, created_at) DESC
+            LEFT JOIN programs bulletin_program ON bulletin_program.program_code = :dept_program
+            WHERE announcements.status = 'published'
+            AND COALESCE(
+                (SELECT MAX(ap.program_code = :prog_check) FROM announcement_programs ap
+                 WHERE ap.announcement_id = announcements.announcement_id),
+                announcements.program = :program OR announcements.program = 'ALL'
+            )
+            AND COALESCE(
+                (SELECT MAX(COALESCE(ad.dept_id = bulletin_program.dept_id, 0)) FROM announcement_departments ad
+                 WHERE ad.announcement_id = announcements.announcement_id),
+                announcements.dept_id IS NULL OR announcements.dept_id = bulletin_program.dept_id
+            )
+            ORDER BY COALESCE(announcements.published_at, announcements.created_at) DESC
             LIMIT :limit";
 
     $stmt = $pdo->prepare($sql);
     $stmt->bindValue(':program', $program, PDO::PARAM_STR);
     $stmt->bindValue(':prog_check', $program, PDO::PARAM_STR);
+    $stmt->bindValue(':dept_program', $program, PDO::PARAM_STR);
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
     $stmt->execute();
 
