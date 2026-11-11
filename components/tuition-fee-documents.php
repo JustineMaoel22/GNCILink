@@ -19,8 +19,39 @@ function tuitionFeeIcon(string $key, string $class, array $fields): string
         : '<i class="bi bi-' . $h($choice['glyph']) . '" aria-hidden="true"></i>';
     return '<span class="' . $h($class) . '"' . $mark . '>' . $icon . '</span>';
 }
-/** Published tuition PDFs, grouped by their category folder. No sample fee amounts. */
-function tuitionFeeFolderCategories(): array
+function tuitionFeeCategoryIcons(): array
+{
+    return ['mortarboard'=>'Graduation cap', 'bank'=>'School building', 'book'=>'Book', 'people'=>'People', 'folder'=>'Folder', 'journal-text'=>'Journal', 'briefcase'=>'Briefcase', 'file-earmark-text'=>'Document'];
+}
+
+/** Stable keys keep existing document folders and category links working. */
+function tuitionFeeValidateCategories(array $entries, array $existing = [], array $deleted = []): array
+{
+    if (!array_is_list($entries) || !$entries || count($entries) > 50) throw new InvalidArgumentException('Provide between 1 and 50 fee categories.');
+    $result = [];
+    $labels = [];
+    foreach ($entries as $entry) {
+        if (!is_array($entry) || !is_string($entry['key'] ?? null) || !preg_match('/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/D', $entry['key']) || strlen($entry['key']) > 40 || isset($result[$entry['key']])) throw new InvalidArgumentException('Invalid or duplicate fee category key.');
+        $label = $entry['label'] ?? null;
+        if (!is_string($label) || trim($label) === '' || mb_strlen($label) > 100 || strip_tags($label) !== $label) throw new InvalidArgumentException('Enter a category name of up to 100 characters.');
+        $label = trim($label);
+        $normalized = mb_strtolower($label);
+        if (isset($labels[$normalized])) throw new InvalidArgumentException('Category names must be unique.');
+        $icon = $entry['icon'] ?? 'folder';
+        if (!is_string($icon) || !isset(tuitionFeeCategoryIcons()[$icon])) throw new InvalidArgumentException('Choose a category icon from the list.');
+        $result[$entry['key']] = ['label'=>$label, 'icon'=>$icon];
+        $labels[$normalized] = true;
+    }
+    if (!array_is_list($deleted)) throw new InvalidArgumentException('Invalid category deletions.');
+    foreach ($deleted as $key) {
+        if (!is_string($key) || !isset($existing[$key]) || isset($result[$key])) throw new InvalidArgumentException('The fee category changed. Reload the editor and try again.');
+        unset($existing[$key]);
+    }
+    if (array_diff_key($existing, $result)) throw new InvalidArgumentException('Confirm which fee categories to delete. Reload the editor and try again.');
+    return $result;
+}
+
+function tuitionFeeCategoryDefinitions(?PDO $db = null): array
 {
     $categories = [
         'college' => ['label' => 'College', 'icon' => 'mortarboard'],
@@ -28,6 +59,19 @@ function tuitionFeeFolderCategories(): array
         'senior-high-school' => ['label' => 'Senior High School', 'icon' => 'book'],
         'basic-education' => ['label' => 'Basic Education', 'icon' => 'people'],
     ];
+    try {
+        $query = ($db ?? getDB())->prepare('SELECT content FROM tuition_fee_content WHERE field_key=?');
+        $query->execute(['fee_categories']);
+        $json = $query->fetchColumn();
+        if ($json !== false) $categories = tuitionFeeValidateCategories(json_decode($json, true, 16, JSON_THROW_ON_ERROR));
+    } catch (PDOException $e) { if ($e->getCode() !== '42S02') throw $e; }
+    return $categories;
+}
+
+/** Published tuition PDFs, grouped by their category folder. No sample fee amounts. */
+function tuitionFeeFolderCategories(): array
+{
+    $categories = tuitionFeeCategoryDefinitions();
     $root = dirname(__DIR__) . '/uploads/tuition-fees';
     foreach ($categories as $key => &$category) {
         $category['documents'] = [];

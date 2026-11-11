@@ -25,7 +25,7 @@ const endpoint = (body,cookie) => fetch(base+'/admin/action/photo-check-handler.
     assert.ok(token,'CSRF token absent from editor');
     const body = new FormData(); body.set('csrf_token',token[1]);
     body.set('photo',new Blob([fs.readFileSync(path.join(__dirname,'../uploads/administration/086f12f12d75f5d4788185497d0df834.jpg'))],{type:'image/jpeg'}),'portrait.jpg');
-    body.set('person_name','Face validation endpoint test'); body.set('profile_key','person:0');
+    body.set('person_name','Face validation endpoint test'); body.set('profile_key','president:1');
     body.set('review_duplicate','1');
     response = await endpoint(body,editor);
     assert.equal(response.status,403,'Content Editor must not grant review');

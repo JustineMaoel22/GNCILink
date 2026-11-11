@@ -9,6 +9,7 @@ require_once __DIR__ . '/../admin/admin-functions.php';
 require_once __DIR__ . '/../includes/multi-audience.php';
 require_once __DIR__ . '/../includes/event-audience.php';
 require_once __DIR__ . '/../includes/calendar-import.php';
+require_once __DIR__ . '/../includes/event-categories.php';
 
 initSession();
 requireLogin();
@@ -115,6 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             $startDate   = $startD;
             $endDate     = null;
             $categoryId  = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
+            validateEventCategory($db, $categoryId, isset($existingEvent['category_id']) ? (int)$existingEvent['category_id'] : null);
             $multiAudience = normalizeMultiAudienceInput(
                 $_POST['dept_ids'] ?? ($_POST['dept_id'] ?? null),
                 $_POST['programs'] ?? ($_POST['program'] ?? null)
@@ -298,7 +300,7 @@ try {
         SELECT e.event_id, e.title, e.location, e.start_date, e.end_date,
                e.status, e.category_id, e.program, c.category_name, c.category_color
         FROM events e
-        LEFT JOIN categories c ON e.category_id = c.category_id
+        LEFT JOIN " . eventCategoryTable($db) . " c ON e.category_id = c.category_id
         WHERE e.start_date <= ?
           AND COALESCE(e.end_date, e.start_date) >= ?
         ORDER BY e.start_date ASC
@@ -336,7 +338,7 @@ try {
                c.category_name, c.category_color,
                CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,'')) AS author
         FROM events e
-        LEFT JOIN categories c ON e.category_id = c.category_id
+        LEFT JOIN " . eventCategoryTable($db) . " c ON e.category_id = c.category_id
         LEFT JOIN users u ON e.user_id = u.user_id
         ORDER BY e.start_date DESC
     ")->fetchAll();
@@ -347,16 +349,10 @@ try {
     $eventAudiences = [];
 }
 
-// Only categories that make sense for an Event go in this dropdown.
-// Announcement/news categories stay available elsewhere; only this dropdown
-// excludes them. Existing category records and event assignments are preserved.
+// Dedicated event types; hidden legacy options preserve existing assignments.
 try {
-    $categories = $db->query("
-        SELECT category_id, category_name, category_color
-        FROM categories
-        WHERE category_name NOT IN ('Reminder', 'Job Opportunities', 'Scholarship')
-        ORDER BY category_name ASC
-    ")->fetchAll();
+    $categories = eventCategoryChoices($db);
+    $legacyCategories = array_filter(eventCategoryChoices($db, true), static fn($category) => !in_array((int)$category['category_id'], array_map('intval', array_column($categories, 'category_id')), true));
 } catch (Exception $e) {
     $categories = [];
 }
@@ -732,6 +728,9 @@ include __DIR__ . '/../components/header-admin.php';
                                 <span id="categoryColorDot" class="evt-cat-dot" style="width:14px;height:14px;background:#6c757d;flex:0 0 auto;"></span>
                                 <select class="form-select" name="category_id" id="eventCategory">
                                     <option value="">— Not set —</option>
+                                    <?php foreach ($legacyCategories ?? [] as $cat): ?>
+                                    <option hidden value="<?= (int)$cat['category_id'] ?>" data-color="<?= htmlspecialchars(evt_categoryColor($cat['category_color'], $cat['category_name']), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($cat['category_name'], ENT_QUOTES, 'UTF-8') ?> (existing category)</option>
+                                    <?php endforeach; ?>
                                     <?php foreach ($categories as $cat): ?>
                                         <option value="<?= $cat['category_id'] ?>" data-color="<?= evt_categoryColor($cat['category_color'] ?? null, $cat['category_name'] ?? null) ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
                                     <?php endforeach; ?>
@@ -746,7 +745,7 @@ include __DIR__ . '/../components/header-admin.php';
                         <div class="col-12 col-sm-6 mb-3">
                             <label class="form-label fw-semibold" id="eventProgramLabel">Academic programs</label>
                             <div id="event-program-multiselect"></div>
-                            <div class="form-text">Leave unrestricted for all programs.</div>
+                            <div class="form-text">Selecting a department automatically selects its programs. You can adjust the selection afterward.</div>
                         </div>
                         <div class="col-12 mb-3">
                             <div class="evt-audience-summary" id="eventAudienceHelp" role="status"></div>

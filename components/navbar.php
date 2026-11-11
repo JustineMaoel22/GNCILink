@@ -351,6 +351,7 @@ $renderMobileGroups = function (array $groups) use ($renderMobileMenu, $e) {
 ?>
 
 <link rel="stylesheet" href="/assets/css/choice-controls.css?v=<?= filemtime(__DIR__.'/../assets/css/choice-controls.css') ?>">
+<link rel="stylesheet" href="/assets/css/post-image-placeholder.css?v=<?= filemtime(__DIR__.'/../assets/css/post-image-placeholder.css') ?>">
 <link rel="stylesheet" href="/assets/css/privacy.css?v=<?= filemtime(__DIR__.'/../assets/css/privacy.css') ?>">
 <link rel="stylesheet" href="/assets/css/page-headers.css?v=<?= substr(hash_file('sha256', __DIR__.'/../assets/css/page-headers.css'), 0, 16) ?>">
 <script src="/assets/js/privacy-consent.js?v=<?= filemtime(__DIR__.'/../assets/js/privacy-consent.js') ?>" defer></script>

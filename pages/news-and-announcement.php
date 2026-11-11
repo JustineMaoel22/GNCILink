@@ -574,11 +574,11 @@ function na_url(array $overrides = []): string {
                     ?>
                     <div class="carousel-item <?= $i === 0 ? 'active' : '' ?>">
                         <article class="gnc-pinned-card">
-                            <div class="gnc-pinned-media skeleton-wrap">
+                            <div class="gnc-pinned-media skeleton-wrap<?= empty($pin['image_path']) ? ' is-loaded' : '' ?>">
                                 <?php if (!empty($pin['image_path'])): ?>
                                 <img src="<?= htmlspecialchars($pin['image_path']) ?>" alt="<?= htmlspecialchars($pin['title'] ?? 'Facebook post') ?>" loading="<?= $i === 0 ? 'eager' : 'lazy' ?>" decoding="async">
                                 <?php else: ?>
-                                <div class="gnc-pinned-slide-fallback">
+                                <div class="gnc-pinned-slide-fallback gnc-empty-post-image" aria-hidden="true">
                                     <i class="bi <?= $isFbPin ? 'bi-facebook' : ($pin['type_label'] === 'News' ? 'bi-newspaper' : 'bi-megaphone') ?>"></i>
                                 </div>
                                 <?php endif; ?>
@@ -758,9 +758,7 @@ function na_url(array $overrides = []): string {
                                      loading="lazy" decoding="async">
                             </div>
                             <?php else: ?>
-                            <div class="na-card-img-wrap na-card-img-fallback">
-                                <i class="bi <?= $fallbackIcon ?>"></i>
-                            </div>
+                            <div class="na-card-img-wrap na-card-img-fallback gnc-empty-post-image" aria-hidden="true"></div>
                             <?php endif; ?>
 
                             <div class="na-card-body">

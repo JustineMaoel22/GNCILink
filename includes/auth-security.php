@@ -127,18 +127,19 @@ function authClearSession(bool $forgetDevice = false): void {
         unset($_COOKIE['gnc_remember_me']);
     }
 }
-function authCheckCredentials(string $email,string $password): ?array {
+function authCheckCredentials(string $email,string $password,?int &$retryAfter=null): ?array {
+    $retryAfter=0;
     if(!authRateAllowed('login-ip',authIp(),30,900)){authAudit(null,'LOGIN_RATE_LIMIT','Login rate limit reached.');return null;}
     $db=getDB();$db->beginTransaction();
     try{
-        $q=$db->prepare('SELECT * FROM users WHERE LOWER(TRIM(email))=LOWER(TRIM(?)) FOR UPDATE');$q->execute([$email]);$user=$q->fetch();
+        $q=$db->prepare('SELECT *,GREATEST(0,COALESCE(TIMESTAMPDIFF(SECOND,NOW(),locked_until),0)) AS login_retry_after FROM users WHERE LOWER(TRIM(email))=LOWER(TRIM(?)) FOR UPDATE');$q->execute([$email]);$user=$q->fetch();
         if(!$user){password_verify($password,'$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.');$db->commit();authAudit(null,'LOGIN_FAILED','Invalid login credentials.');return null;}
-        $id=(int)$user['user_id'];$locked=!empty($user['locked_until'])&&strtotime($user['locked_until'])>time();
+        $id=(int)$user['user_id'];$retryAfter=(int)$user['login_retry_after'];$locked=$retryAfter>0;
         if($locked||$user['status']!=='active'){$db->commit();authAudit($id,'LOGIN_FAILED','Login refused.');return null;}
         if(!password_verify($password,$user['password'])){
             $attempts=(!empty($user['locked_until'])?0:(int)$user['login_attempts'])+1;
-            $db->prepare('UPDATE users SET login_attempts=?,locked_until=IF(? >= 5,DATE_ADD(NOW(),INTERVAL 15 MINUTE),NULL) WHERE user_id=?')->execute([$attempts,$attempts,$id]);
-            $db->commit();authAudit($id,'LOGIN_FAILED','Invalid login credentials.');if($attempts>=5)authAudit($id,'LOGIN_LOCKOUT','Login locked for 15 minutes after five failed attempts.');return null;
+            $db->prepare('UPDATE users SET login_attempts=?,locked_until=IF(? >= 10,DATE_ADD(NOW(),INTERVAL 15 MINUTE),NULL) WHERE user_id=?')->execute([$attempts,$attempts,$id]);
+            $db->commit();authAudit($id,'LOGIN_FAILED','Invalid login credentials.');if($attempts>=10){$retryAfter=900;authAudit($id,'LOGIN_LOCKOUT','Login locked for 15 minutes after ten failed attempts.');}return null;
         }
         $db->prepare('UPDATE users SET login_attempts=0,locked_until=NULL WHERE user_id=?')->execute([$id]);$db->commit();return $user;
     }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
@@ -175,32 +176,59 @@ function authLoadMailer(): bool {
     }
     return false;
 }
-/** Email is successful when PHPMailer SMTP or verified host MTA accepts the message. */
+/** Build local MTA messages independently of PHPMailer and SMTP credentials. */
+function authLocalMailMessage(string $email,string $subject,string $body,string $fromAddr,string $fromName,?string $htmlBody=null): array {
+    if (!filter_var($email,FILTER_VALIDATE_EMAIL) || !filter_var($fromAddr,FILTER_VALIDATE_EMAIL)
+        || preg_match('/[\r\n\x00]/', $email.$fromAddr.$fromName.$subject)) {
+        throw new InvalidArgumentException('Invalid email address or header.');
+    }
+    $encodedName='=?UTF-8?B?'.base64_encode($fromName).'?=';
+    $headers="From: $encodedName <$fromAddr>\r\nReply-To: $fromAddr\r\nMIME-Version: 1.0\r\n";
+    if ($htmlBody!==null && $htmlBody!=='') {
+        $boundary='gnci_alt_'.bin2hex(random_bytes(16));
+        $headers.='Content-Type: multipart/alternative; boundary="'.$boundary.'"';
+        $message=authEmailAlternativeBody($body,$htmlBody,$boundary);
+    } else {
+        $headers.="Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64";
+        $message=chunk_split(base64_encode($body),76,"\r\n");
+    }
+    return ['subject'=>'=?UTF-8?B?'.base64_encode($subject).'?=','body'=>$message,'headers'=>$headers];
+}
+/** Success means the configured mail transport accepted the message, not inbox delivery. */
 function authSendMail(string $email,string $name,string $subject,string $body,?int $id=null,?string $htmlBody=null): bool {
     $host=trim((string)MAIL_HOST);
     $user=trim((string)MAIL_USERNAME);
-    $rawPass=trim((string)MAIL_PASSWORD);
-    $fromAddr=trim((string)env('MAIL_FROM_ADDRESS',$user));
-    if(!filter_var($fromAddr,FILTER_VALIDATE_EMAIL))$fromAddr=filter_var($user,FILTER_VALIDATE_EMAIL)?$user:'no-reply@gnc.edu.ph';
+    $rawPass=(string)MAIL_PASSWORD;
+    $fromAddr=MAIL_FROM_ADDRESS;
     $fromName=trim((string)MAIL_FROM_NAME)?:'GNC Admin System';
     $errors=[];
+    if (!filter_var($email,FILTER_VALIDATE_EMAIL) || !filter_var($fromAddr,FILTER_VALIDATE_EMAIL)
+        || preg_match('/[\r\n\x00]/', $email.$fromAddr.$fromName.$subject)) {
+        authAudit($id,'AUTH_MAIL_FAILED','Email delivery refused: invalid sender, recipient or header.');
+        return false;
+    }
+    if (MAIL_TRANSPORT==='mail') {
+        $message=authLocalMailMessage($email,$subject,$body,$fromAddr,$fromName,$htmlBody);
+        if (function_exists('mail') && @mail($email,$message['subject'],$message['body'],$message['headers'])) return true;
+        authAudit($id,'AUTH_MAIL_FAILED','Email delivery failed: local hosting mail service did not accept the message.');
+        error_log('Authentication email delivery failed: local hosting mail service unavailable.');
+        return false;
+    }
+    if (MAIL_TRANSPORT!=='smtp') {
+        authAudit($id,'AUTH_MAIL_FAILED','Email delivery failed: invalid MAIL_TRANSPORT configuration.');
+        return false;
+    }
 
     if($host!==''&&$user!==''&&$rawPass!==''&&authLoadMailer()){
-        $compactPass=preg_replace('/\s+/','',$rawPass);
-        // Gmail App Passwords are 16 chars often copied as 19 chars with spaces ("xxxx xxxx xxxx xxxx").
-        $passwords=($compactPass!==''&&$compactPass!==$rawPass)?[$compactPass,$rawPass]:[$rawPass];
+        // Mailbox passwords are used exactly as configured, including spaces.
+        $passwords=[$rawPass];
         $cfgPort=(int)MAIL_PORT?:587;
         $cfgEnc=strtolower(trim((string)MAIL_ENCRYPTION));
         $primaryEnc=($cfgPort===465||$cfgEnc==='ssl'||$cfgEnc==='smtps')
             ?\PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS
             :\PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
         $transports=[[$cfgPort,$primaryEnc]];
-        // Only add automatic port fallback for real external SMTP servers (not custom local test ports)
-        if(!in_array(strtolower($host),['localhost','127.0.0.1','::1'],true)&&in_array($cfgPort,[465,587],true)){
-            $altPort=$cfgPort===465?587:465;
-            $altEnc=$altPort===465?\PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS:\PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-            $transports[]=[$altPort,$altEnc];
-        }
+        // Honor the exact port/encryption supplied by cPanel; do not guess alternatives.
 
         foreach($transports as [$port,$enc]){
             foreach($passwords as $passAttempt){
@@ -235,8 +263,6 @@ function authSendMail(string $email,string $name,string $subject,string $body,?i
                 }catch(Throwable $e){
                     $err=authSanitizeMailError($e->getMessage());
                     $errors[]="SMTP($host:$port): $err";
-                    // If the error is a network/socket timeout rather than authentication failure, skip testing second password format on same dead port
-                    if(!preg_match('/authenticate|username|password|535|534/i',$err))break;
                 }
             }
         }
@@ -247,23 +273,6 @@ function authSendMail(string $email,string $name,string $subject,string $body,?i
         if($rawPass==='')$missing[]='MAIL_PASSWORD';
         if(!authLoadMailer())$missing[]='PHPMailer(vendor)';
         $errors[]='Missing configuration: '.implode(', ',$missing);
-    }
-
-    // Hosted cPanel fallback: if external SMTP is blocked by the host's outbound SMTP firewall, attempt local MTA delivery when not running against a local mock SMTP port.
-    if(!authLocalDevelopment()&&function_exists('mail')){
-        $safeFrom=str_replace(["\r","\n"],'',$fromAddr);
-        $headers="From: $fromName <$safeFrom>\r\nReply-To: $safeFrom\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8";
-        $message=$body;
-        if($htmlBody!==null&&$htmlBody!==''){
-            $boundary='gnci_alt_'.bin2hex(random_bytes(16));
-            $headers="From: $fromName <$safeFrom>\r\nReply-To: $safeFrom\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"$boundary\"";
-            $message=authEmailAlternativeBody($body,$htmlBody,$boundary);
-        }
-        if(@mail($email,$subject,$message,$headers)){
-            error_log('Authentication email sent via local MTA fallback after SMTP error: '.implode(' | ',$errors));
-            return true;
-        }
-        $errors[]='Local mail() fallback also failed';
     }
 
     $summary=authSanitizeMailError(implode(' | ',$errors));

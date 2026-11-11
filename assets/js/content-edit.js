@@ -44,7 +44,7 @@
         return el;
     }
     function icon(name) { return h('i', { class: 'bi bi-' + name, 'aria-hidden': 'true' }); }
-    function clip(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+    function clip(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '...' : s; }
     function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
     function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
 
@@ -139,7 +139,7 @@
         var t = h('div', { class: 'ce-toast ce-toast-' + (type === 'error' ? 'error' : 'ok'), role: type === 'error' ? 'alert' : 'status' }, [
             icon(type === 'error' ? 'exclamation-octagon-fill' : 'check-circle-fill'),
             h('span', { text: message }),
-            h('button', { type: 'button', class: 'ce-toast-x', 'aria-label': 'Dismiss', text: '×' })
+            h('button', { type: 'button', class: 'ce-toast-x', 'aria-label': 'Dismiss', text: '\u00D7' })
         ]);
         toastBox.appendChild(t);
         var kill = function () { if (t.parentNode) t.parentNode.removeChild(t); };
@@ -388,7 +388,7 @@
         if(C.requiresApproval && drafts && drafts.supported() && !(options.root && options.root.ownerDocument !== D)) {
             window.AdminDialogs.confirm('Submit these changes for Super Admin approval? The published page will stay unchanged.', {title:'Submit for approval',confirmText:'Submit'}).then(async function(ok){
                 if(!ok){if(options.cancel)options.cancel();return;}
-                try{await run('Submitting…',async function(){var result=await drafts.submit();toast(result.message || 'Submitted for approval.','ok');});}
+                try{await run('Submitting...',async function(){var result=await drafts.submit();toast(result.message || 'Submitted for approval.','ok');});}
                 catch(error){toast(error.message,'error');}
                 if(options.cancel)options.cancel();
             });
@@ -461,7 +461,7 @@
         var row = h('div', { class: 've-pop-row' }, [
             h('button', { type: 'button', class: 'btn btn-sm btn-gnc', text: opts.cta || 'Apply', on: { click: go } })
         ].concat(opts.extra || []));
-        var form = h('div', { class: 've-pop-form' }, [h('label', { class: 've-pop-label', text: opts.label }), input, opts.hint ? h('small', { class: 've-pop-hint', text: opts.hint }) : null, row]);
+        var form = h('div', { class: 've-pop-form' + (opts.scroll ? ' ve-tuition-pdfs' : '') }, [h('label', { class: 've-pop-label', text: opts.label }), input, opts.hint ? h('small', { class: 've-pop-hint', text: opts.hint }) : null, row]);
         if (opts.anchor) {
             var anchor = opts.anchor.getBoundingClientRect();
             var offset = opts.anchor.ownerDocument === D ? {left:0,top:0} : S.frame.getBoundingClientRect();
@@ -1126,7 +1126,7 @@
         var range = sel.getRangeAt(0).cloneRange();
         var node = range.commonAncestorContainer; var a = node.nodeType === 1 ? node : node.parentNode; a = a && a.closest ? a.closest('a') : null;
         askText({
-            label: 'Link address', value: a ? a.getAttribute('href') : '', placeholder: 'https://…   or   /pages/…', max: 500,
+            label: 'Link address', value: a ? a.getAttribute('href') : '', placeholder: 'https://...   or   /pages/...', max: 500,
             hint: 'Select the words first. Leave it empty and press Apply to remove a link.',
             done: function (v) {
                 S.win.focus(); sel.removeAllRanges(); sel.addRange(range);
@@ -1689,7 +1689,7 @@
                 var plain = el.ownerDocument.createElement('div'); plain.innerHTML = s.html;
                 el.textContent = plain.textContent;
             } else el.innerHTML = s.html || '<p></p>';
-            el.setAttribute('data-ve-ph', 'Write here…');
+            el.setAttribute('data-ve-ph', 'Write here...');
             el.setAttribute('spellcheck', 'true');
             setLock(s);
             el.classList.toggle('ve-empty', !(el.textContent || '').trim());
@@ -1772,7 +1772,7 @@
                 return;
             }
             if (S.doc.querySelector('[data-admission-scope]')) {
-                run('Publishing…', function () {
+                run('Publishing...', function () {
                     var orders = admissionOrders();
                     var changes = list.map(function (s) { return {key:s.key,title:s.title,content:html(s),removed:!!s.removed}; });
                     return send('/admin/action/admission-category-handler.php',{action:'publish_page',page:page,sections:JSON.stringify(changes),orders:JSON.stringify(orders)}).then(function (res) {
@@ -1789,18 +1789,18 @@
                 });
                 return;
             }
-            run('Publishing…', function () { return each(list, 'publish').then(function (r) { report(r, 'published. It is live now'); return publishPhotos(); }); });
+            run('Publishing...', function () { return each(list, 'publish').then(function (r) { report(r, 'published. It is live now'); return publishPhotos(); }); });
         }
 
         async function review(s, what) {
             if (what === 'approve') {
                 if (window.ContentCompleteness && s.el && !await window.ContentCompleteness.review({ root: s.el, csrf: C.csrf })) return;
                 if (!await window.AdminDialogs.confirm('Approve and publish this change?\n\nIt will go live on the website.')) return;
-                return run('Publishing…', function () { return sendReview({ action: 'approve', page: page, section_key: s.key }).then(function (res) {
+                return run('Publishing...', function () { return sendReview({ action: 'approve', page: page, section_key: s.key }).then(function (res) {
                     if (res.ok) { apply(s, res, true); toast(res.message, 'ok'); } else toast(res.error, 'error'); }); });
             }
             askText({ label: 'Note to the editor (what should change?)', required: true, multiline: true, max: 500, cta: 'Send back', done: function (note) {
-                run('Sending back…', function () { return sendReview({ action: 'reject', page: page, section_key: s.key, note: note }).then(function (res) {
+                run('Sending back...', function () { return sendReview({ action: 'reject', page: page, section_key: s.key, note: note }).then(function (res) {
                     if (res.ok) { apply(s, res, true); toast(res.message, 'ok'); } else toast(res.error, 'error'); }); });
             } });
         }
@@ -2215,13 +2215,13 @@
                     it.push({ icon: 'arrow-counterclockwise', label: 'Request changes', run: function () { review(s, 'reject'); } });
                 } else if (locked(s)) {
                     it.push({ icon: 'arrow-90deg-left', label: 'Take back', title: 'Take this back so you can keep editing', run: function () {
-                        run('Taking back…', function () { return sendReview({ action: 'withdraw', page: page, section_key: s.key }).then(function (res) { if (res.ok) { apply(s, res, true); toast(res.message, 'ok'); } else toast(res.error, 'error'); }); }); } });
+                        run('Taking back...', function () { return sendReview({ action: 'withdraw', page: page, section_key: s.key }).then(function (res) { if (res.ok) { apply(s, res, true); toast(res.message, 'ok'); } else toast(res.error, 'error'); }); }); } });
                 } else if (s.dirty || s.has_draft) {
                     it.push({ icon: 'arrow-counterclockwise', title: s.has_draft ? 'Throw away my draft and go back to what is live' : 'Undo my unsaved changes', run: async function () {
                         if (!await window.AdminDialogs.confirm(s.has_draft ? 'Discard your draft and go back to what is on the website?' : 'Undo your unsaved changes in this section?')) return;
                         if (s.isNew) { removeNewAdmissionCategory(s); return; }
                         if (!s.has_draft) { s.el.innerHTML = s.base || '<p></p>'; s.dirty = false; admissionItemControls(s); rememberAdmissionItems(s); markAdmissionChanges(s); renderToolbar(); chrome(); return; }
-                        run('Discarding…', function () { return sendReview({ action: 'discard', page: page, section_key: s.key }).then(function (res) { if (res.ok) { apply(s, res, true); toast(res.message, 'ok'); } else toast(res.error, 'error'); }); });
+                        run('Discarding...', function () { return sendReview({ action: 'discard', page: page, section_key: s.key }).then(function (res) { if (res.ok) { apply(s, res, true); toast(res.message, 'ok'); } else toast(res.error, 'error'); }); });
                     } });
                 }
                 if(page==='alumni'&&s&&s.key==='actions'&&!locked(s)){
@@ -2263,17 +2263,17 @@
             runSecondary: function () {
                 if (mediaChangeCount()) return;
                 var list = secs.filter(function (s) { return s.dirty && !locked(s); }); if (!list.length) return;
-                run('Saving draft…', function () { return each(list, 'save_draft').then(function (r) { report(r, 'saved as a draft (visitors cannot see it yet)'); }); });
+                run('Saving draft...', function () { return each(list, 'save_draft').then(function (r) { report(r, 'saved as a draft (visitors cannot see it yet)'); }); });
             },
             runPrimary: function () {
                 if (C.canPublish) {
                     var list = secs.filter(publishable), count = list.length + mediaChangeCount() + admissionOrderCount(); if (!count) return;
                     confirmPublish(plural(count, 'change') + ' will go live on the website.', function () { if (!S.allowIncomplete && !validateEnrollmentCanvas()) return; publishSections(list); });
                     return;
-                    run('Publishing…', function () { return each(list, 'publish').then(function (r) { report(r, 'published. It is live now'); }); });
+                    run('Publishing...', function () { return each(list, 'publish').then(function (r) { report(r, 'published. It is live now'); }); });
                 } else {
                     var l2 = secs.filter(submittable); if (!l2.length) return;
-                    run('Sending…', function () { return each(l2, 'submit').then(function (r) { report(r, 'sent for approval'); }); });
+                    run('Sending...', function () { return each(l2, 'submit').then(function (r) { report(r, 'sent for approval'); }); });
                 }
             },
             openOutline: function (x, y) {
@@ -2473,7 +2473,7 @@
         async function addSlide() {
             if (!await guardDirty('Adding a slide reloads the preview, so your unsaved changes would be lost.\n\nContinue?')) return;
             pickFile('image/*,video/*', function (f) {
-                run('Adding slide…', function () {
+                run('Adding slide...', function () {
                     return sendContent({ action: 'save', slide_id: 0, title: '', subtitle: '', btn1_text: '', btn1_link: '', btn2_text: '', btn2_link: '', status: 'draft', show_on_mobile: '1', show_gradient: '1' }, { media: f }).then(function (res) {
                         if (!res.ok) { toast(res.error, 'error'); return; }
                         toast('Slide added as a draft. Write on it, then press Publish when it is ready.', 'ok');
@@ -2485,7 +2485,7 @@
         async function deleteSlide(s) {
             if (!await guardDirty('Deleting a slide reloads the preview, so your other unsaved changes would be lost.\n\nContinue?')) return;
             if (!await window.AdminDialogs.confirm('Delete this slide for good?\n\nIt is removed from the website straight away. This cannot be undone.')) return;
-            run('Deleting…', function () {
+            run('Deleting...', function () {
                 return sendContent({ action: 'delete', slide_id: s.id }).then(function (res) {
                     if (!res.ok) { toast(res.error, 'error'); return; }
                     toast('Slide deleted.', 'ok'); return refresh(Math.max(0, idx(s) - 1));
@@ -2530,7 +2530,7 @@
         // ── toolbars ──
         function editLink(sel) {
             var s = sel.slide, n = sel.el.getAttribute('data-ve-field').slice(-1), a = s.el.querySelector('[data-ve-btn="' + n + '"]');
-            askText({ label: 'Where does this button go?', value: s['btn' + n + '_link'], placeholder: '/auth/login.php   or   https://…', max: 255,
+            askText({ label: 'Where does this button go?', value: s['btn' + n + '_link'], placeholder: '/auth/login.php   or   https://...', max: 255,
                 hint: 'Pages on this website start with /. Leave empty for no link.',
                 done: function (v) {
                     var ok = safeLink(v); if (ok === null) { toast('That kind of link is not allowed.', 'error'); return; }
@@ -2640,7 +2640,7 @@
                     var lk = sel.key, v2 = sel.el.__ve || {};
                     it.push({ type: 'chip', icon: 'cursor', text: 'Button  ·  ' + readField(sel.el).length + ' / ' + (v2.max || 30) });
                     it.push({ icon: 'link-45deg', label: clip(hc[lk] || 'Add a link', 30), title: 'Where the button goes', run: function () {
-                        askText({ label: 'Where does this button go?', value: hc[lk], placeholder: '/pages/…   or   https://…', max: 255, hint: 'Pages on this website start with /. Leave empty to use the original link.',
+                        askText({ label: 'Where does this button go?', value: hc[lk], placeholder: '/pages/...   or   https://...', max: 255, hint: 'Pages on this website start with /. Leave empty to use the original link.',
                             done: function (v) { var ok = safeLink(v); if (ok === null) { toast('That kind of link is not allowed.', 'error'); return; }
                                 hc[lk] = ok; sel.a.setAttribute('data-ve-link', ok); sel.a.setAttribute('href', ok || '#'); renderToolbar(); chrome(); } });
                     } });
@@ -2702,7 +2702,7 @@
                 if (!list.length && !doPres && !doOrder && !doHome) return;
                 var published = list.filter(function (s) { return s.status === 'published'; }).length;
                 confirmPublish('Publish your changes to the live website?' + (published ? '\n\n' + plural(published, 'published slide') + ' will change for visitors.' : ''), function () {
-                    run('Publishing…', function () {
+                    run('Publishing...', function () {
                         var errs = [], done = 0, p = Promise.resolve();
                         list.forEach(function (s) { p = p.then(function () { return saveSlide(s).then(function (r) { if (r.ok) done++; else errs.push('Slide ' + (idx(s) + 1) + ': ' + r.error); }); }); });
                         if (doOrder) p = p.then(function () { return sendContent({ action: 'reorder', order: JSON.stringify(slides.map(function (s) { return s.id; })) }).then(function (r) { if (r.ok) done++; else errs.push('Order: ' + r.error); }); });
@@ -2899,16 +2899,16 @@
                 formField('Office name', f.office), formField('Head of office', f.head), formField('Position', f.role), formField('Phone', f.phone),
                 formField('Email', f.email), formField('Location', f.loc), formField('Operating hours (one per line)', f.hours), formField('Services (one per line)', f.svc),
                 h('div', { class: 've-span2 ve-pop-row' }, [
-                    h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Choose photo', on: { click: function () { pickPersonPhoto(function (file) { photo = file; pname.textContent = 'New photo: ' + file.name; }, null, function () { return {name:f.head.value,key:'office:'+(o?o.id:0)}; }); } } }), go]),
+                    h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Choose photo', on: { click: function () { pickPersonPhoto(function (file) { photo = file; pname.textContent = 'New photo: ' + file.name; }, null, function () { return {name:f.head.value,key:'office:'+(o?o.id:0),section:sec.key}; }); } } }), go]),
                 h('div', { class: 've-span2' }, [pname])]);
         }
-        function personForm(done) {
+        function personForm(section, done) {
             var name = h('input', { class: 'form-control form-control-sm', maxlength: 255, placeholder: 'Full name' });
             var role = h('input', { class: 'form-control form-control-sm', maxlength: 500, placeholder: 'Position (optional)' });
             var photo = null, pn = h('small', { class: 've-pop-hint', text: 'A photo is optional. You can add one later.' });
             return h('div', { class: 've-pop-form' }, [h('div', { class: 've-pop-label', text: 'Add a person' }), formField('Name', name), formField('Position', role),
                 h('div', { class: 've-pop-row' }, [
-                    h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Choose photo', on: { click: function () { pickPersonPhoto(function (f) { photo = f; pn.textContent = 'Photo: ' + f.name; }, null, function () { return {name:name.value,key:'person:0'}; }); } } }),
+                    h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Choose photo', on: { click: function () { pickPersonPhoto(function (f) { photo = f; pn.textContent = 'Photo: ' + f.name; }, null, function () { return {name:name.value,key:'person:0',section:section}; }); } } }),
                     h('button', { type: 'button', class: 'btn btn-sm btn-gnc', text: 'Add to page', on: { click: function () {
                         if (!name.value.trim()) { name.focus(); return; } closePop(); done({ name: name.value, role: role.value }, photo); } } })]), pn]);
         }
@@ -2921,26 +2921,26 @@
         // ── structural actions (add / archive / delete): done on purpose, so they apply straight away ──
         async function addPerson(key, pos, anchorX, anchorY) {
             if (!await guardDirty('Adding a person reloads the preview, so your unsaved changes would be lost.\n\nContinue?')) return;
-            openPop(personForm(function (v, photo) {
-                run('Adding…', function () { return sendContent({ action: 'admin_save_person', person_id: 0, section_key: key, name: v.name, role: v.role }, { photo: photo }).then(function (r) { if (take(r, 'Added. They are on the page now.')) reload(); }); });
+            openPop(personForm(key, function (v, photo) {
+                run('Adding...', function () { return sendContent({ action: 'admin_save_person', person_id: 0, section_key: key, name: v.name, role: v.role }, { photo: photo }).then(function (r) { if (take(r, 'Added. They are on the page now.')) reload(); }); });
             }), anchorX, anchorY);
         }
         async function addOffice(key, anchorX, anchorY) {
             if (!await guardDirty('Adding an office reloads the preview, so your unsaved changes would be lost.\n\nContinue?')) return;
             openPop(officeForm(secBy(key), null, function (v, photo) {
-                run('Adding…', function () { v.action = 'admin_save_office'; v.office_id = 0; v.section_key = key; return sendContent(v, { photo: photo }).then(function (r) { if (take(r, 'Added. The office is on the page now.')) reload(); }); });
+                run('Adding...', function () { v.action = 'admin_save_office'; v.office_id = 0; v.section_key = key; return sendContent(v, { photo: photo }).then(function (r) { if (take(r, 'Added. The office is on the page now.')) reload(); }); });
             }), anchorX, anchorY, null, true);
         }
         async function archiveItem(kind, id, name) {
             if (!await guardDirty('This reloads the preview, so your unsaved changes would be lost.\n\nContinue?')) return;
             if (!await window.AdminDialogs.confirm('Hide “' + name + '” from the website?\n\nThey are kept safely. You can bring them back from “More settings” → Archived.')) return;
-            run('Archiving…', function () { var f = { action: kind === 'office' ? 'admin_archive_office' : 'admin_archive_person', archived: '1' }; f[kind === 'office' ? 'office_id' : 'person_id'] = id;
+            run('Archiving...', function () { var f = { action: kind === 'office' ? 'admin_archive_office' : 'admin_archive_person', archived: '1' }; f[kind === 'office' ? 'office_id' : 'person_id'] = id;
                 return sendContent(f).then(function (r) { if (take(r, 'Hidden from the website.')) reload(); }); });
         }
         async function deleteItem(kind, id, name) {
             if (!await guardDirty('This reloads the preview, so your unsaved changes would be lost.\n\nContinue?')) return;
             if (!await window.AdminDialogs.confirm('Delete “' + name + '” for good?\n\nThis removes them from the website now and cannot be undone. (Use Archive to keep them.)')) return;
-            run('Deleting…', function () { var f = { action: kind === 'office' ? 'admin_delete_office' : 'admin_delete_person' }; f[kind === 'office' ? 'office_id' : 'person_id'] = id;
+            run('Deleting...', function () { var f = { action: kind === 'office' ? 'admin_delete_office' : 'admin_delete_person' }; f[kind === 'office' ? 'office_id' : 'person_id'] = id;
                 return sendContent(f).then(function (r) { if (take(r, 'Deleted.')) reload(); }); });
         }
         function shift(sel, dir) {
@@ -3088,7 +3088,7 @@
                 confirmPublish('Publish your changes to the live website?', function () {
                     for (var id in edits.person) { var e0 = edits.person[id]; if (!S.allowIncomplete && e0.name != null && !e0.name.trim()) { toast('A person’s name cannot be empty.', 'error'); return; } }
                     for (var k in edits.sec) { if (!S.allowIncomplete && edits.sec[k].title != null && !edits.sec[k].title.trim()) { toast('A heading cannot be empty.', 'error'); return; } }
-                    run('Publishing…', function () {
+                    run('Publishing...', function () {
                         var p = Promise.resolve(), errs = [], done = 0;
                         function step(fields, files) { p = p.then(function () { return sendContent(fields, files).then(function (r) { if (r.ok) { done++; if (r.sections) syncSettings(r.sections); } else errs.push(r.error); }); }); }
                         Object.keys(edits.sec).forEach(function (k) { var s = secBy(k), e = edits.sec[k]; step({ action: 'admin_save_section', section_key: k, title: e.title != null ? e.title : s.title, description: e.desc != null ? e.desc : s.desc }); });
@@ -3118,7 +3118,7 @@
         function libraryIconPicker(choices, current, apply) {
             ensureMaterialIcons();
             var visible = 80;
-            var search = h('input', { type: 'search', class: 'form-control form-control-sm', placeholder: 'Search icons: book, science, building…', 'aria-label': 'Search icons', on: { input: function () { visible = 80; draw(); } } });
+            var search = h('input', { type: 'search', class: 'form-control form-control-sm', placeholder: 'Search icons: book, science, building...', 'aria-label': 'Search icons', on: { input: function () { visible = 80; draw(); } } });
             var family = h('select', { class: 'form-select form-select-sm', 'aria-label': 'Icon library', on: { change: function () { visible = 80; draw(); } } }, [
                 h('option', { value: '', text: 'All icon libraries' }), h('option', { value: 'material', text: 'Material Symbols' }),
                 h('option', { value: 'bi', text: 'Bootstrap Icons' }), Object.keys(choices).some(function (key) { return !!choices[key].path; }) ? h('option', { value: 'svg', text: 'Original icons' }) : null
@@ -3368,7 +3368,7 @@
         function commit(L, rows, okMsg) {
             if(Object.keys(slideTextEdits).length){toast('Publish or discard the pending slide text edits before changing slide order or count.','error');return Promise.resolve();}
             if(Object.keys(slideReplacements).length){toast('Publish or discard the pending slide replacements before changing slide names, order or count.','error');return Promise.resolve();}
-            return run('Publishing slides…', function () {
+            return run('Publishing slides...', function () {
                 return postRows(L, rows).then(function (res) {
                     if (!res.ok) { toast(res.error, 'error'); return; }
                     afterSave(L, res);
@@ -3381,12 +3381,12 @@
         function commitSequential(L, base, newRows) {
             if(Object.keys(slideTextEdits).length){toast('Publish or discard the pending slide text edits before adding slides.','error');return Promise.resolve();}
             if(Object.keys(slideReplacements).length){toast('Publish or discard the pending slide replacements before adding slides.','error');return Promise.resolve();}
-            return run('Publishing slides…', function () {
+            return run('Publishing slides...', function () {
                 var cur = base.slice(), done = 0, last = null;
                 return newRows.reduce(function (p, nr, idx) {
                     return p.then(function (go) {
                         if (!go) return false;
-                        setStatus('Uploading ' + (idx + 1) + ' of ' + newRows.length + '…', 'busy');
+                        setStatus('Uploading ' + (idx + 1) + ' of ' + newRows.length + '...', 'busy');
                         return postRows(L, cur.concat([nr])).then(function (res) {
                             if (!res.ok) { toast(res.error + (done ? ' (' + plural(done, 'slide') + ' added before this one.)' : ''), 'error'); return false; }
                             done++; last = res; cur = (res.items || []).map(itemToRow); return true;
@@ -3593,7 +3593,7 @@
         var DFIELD = { 'dept-name': 'dept_name', 'dept-hero': 'hero_text', 'dept-about': 'about_text', 'dept-office-label': 'office_label',
             'dean-name': 'dean_name', 'dean-title': 'dean_title', 'dean-bio': 'dean_bio', 'dean-phone': 'dean_phone',
             'dean-email': 'dean_email', 'dean-office': 'dean_office', 'dean-hours': 'dean_hours' };
-        var DEPT_KEYS = ['dept_name', 'hero_text', 'about_text', 'office_label', 'facebook_url', 'theme_color'];
+        var DEPT_KEYS = ['dept_name', 'short_code', 'hero_text', 'about_text', 'office_label', 'facebook_url', 'theme_color'];
         var DEAN_KEYS = ['dean_name', 'dean_title', 'dean_bio', 'dean_phone', 'dean_email', 'dean_office', 'dean_hours'];
         function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
         function dBase(k) { return DD[k] == null ? '' : String(DD[k]); }
@@ -3707,6 +3707,11 @@
 
         // ── small forms next to an element on the page ──
         function popAtEl(el, content, wide) {
+            if (el.ownerDocument === D) {
+                var anchor = el.getBoundingClientRect();
+                openPop(content, anchor.left, anchor.bottom + 8, null, wide);
+                return;
+            }
             var fr = S.frame.getBoundingClientRect(), r = el.getBoundingClientRect();
             openPop(content, fr.left + r.left, fr.top + Math.max(8, Math.min(r.bottom + 8, fr.height - 280)), null, wide);
         }
@@ -3883,12 +3888,16 @@
             }, null, true);
         }
         function addDepartment(el) {
-            formPop(el, 'Add a department', [{ name: 'name', label: 'Department name', max: 255, required: true, placeholder: 'e.g. College of Nursing' }], 'Create', async function (o) {
+            formPop(el, 'Add a department', [
+                { name: 'name', label: 'Department name', max: 255, required: true, placeholder: 'e.g. College of Nursing' },
+                { name: 'code', label: 'Short code', max: 20, required: true, placeholder: 'e.g. CON' }
+            ], 'Create', async function (o) {
+                if (!/^[A-Za-z0-9][A-Za-z0-9-]{1,19}$/.test(o.code.trim())) { toast('Enter a short code of 2–20 letters or numbers (a dash is allowed).', 'error'); return; }
                 if (!await okToReload()) return;
-                run('Creating…', function () {
-                    return sendContent({ action: 'save_department_details', dept_id: 0, dept_name: o.name, description: '', hero_text: '', about_text: '', facebook_url: '', office_label: '', theme_color: '' }).then(function (r) {
+                run('Creating...', function () {
+                    return sendContent({ action: 'save_department_details', dept_id: 0, dept_name: o.name, short_code: o.code, description: '', hero_text: '', about_text: '', facebook_url: '', office_label: '', theme_color: '' }).then(function (r) {
                         if (!r.ok) { toast(r.error, 'error'); return; }
-                        reloadEditor('Department created. It is live: click its text to fill the page in.', { page: 'college-departments', sub: (r.department && r.department.slug) || '' });
+                        reloadEditor('Department created and hidden from the website. Add its content, then choose Show on the website when ready.', { page: 'college-departments', sub: (r.department && r.department.slug) || '' });
                     });
                 });
             });
@@ -3907,12 +3916,21 @@
             Array.prototype.forEach.call(card.querySelectorAll('[data-ve-key]'), function (el) { el.setAttribute('data-ve-key', key); });
             card.querySelector('[data-ve-program-image]').setAttribute('data-ve-program-image', key);
             departmentPrograms[key] = savedRecord || { program_id: 0, program_name: '', description: '', baseName: '', baseDescription: '', hasImage: false, added: added };
+            card.querySelector('h3').textContent = departmentPrograms[key].program_name;
             grid.insertBefore(fragment, grid.querySelector('[data-ve-add="program"]'));
             bindEditing(doc);
             if (added) card.querySelector('h3').focus();
         }
         function departmentProgramActions(items, key) {
             var row = departmentPrograms[key]; if (!row) return;
+            if (!row.program_id) items.push({ icon: 'pencil', label: 'Short code', run: function () {
+                formPop(S.doc.querySelector('[data-ve-program-card="' + key + '"]'), 'Program short code', [
+                    { name: 'code', label: 'Short code', value: row.program_code || '', max: 10, required: true, placeholder: 'e.g. BSIT' }
+                ], 'Apply', function (values) {
+                    if (!/^[A-Za-z0-9][A-Za-z0-9-]{1,9}$/.test(values.code.trim())) { toast('Use 2 to 10 letters or numbers (a dash is allowed).', 'error'); return; }
+                    row.program_code = values.code.trim(); row.added = true; chrome();
+                });
+            } });
             if (row.url) items.push({ icon: 'pencil-square', label: 'Edit this program', primary: true, run: function () { openPage(row.url); } });
             items.push({ icon: 'trash', label: 'Delete program', title: 'Delete this program', danger: true, run: async function () {
                 if (!await window.AdminDialogs.confirm('Delete “' + (row.program_name || 'this empty program card') + '” for good?\n\n' + (row.program_id ? 'The whole program page is removed from the website immediately. This cannot be undone.' : 'This unpublished card will be removed.'))) return;
@@ -3922,7 +3940,7 @@
                     delete departmentPrograms[key]; select(null); chrome(); return;
                 }
                 if (!await okToReload(programCardDirty(key) ? 1 : 0)) return;
-                run('Deleting program…', function () {
+                run('Deleting program...', function () {
                     return send(PROG_URL, { action: 'delete_program', program_id: row.program_id }).then(function (response) {
                         if (!response.ok) { toast(response.error, 'error'); return; }
                         reloadEditor('Program deleted.', routeNow());
@@ -3933,7 +3951,16 @@
         function addProgram(el) {
             if (BD) return;
             if (DD && S.doc.querySelector('[data-ve-program-grid]')) {
-                appendProgramCard(S.doc, true); renderToolbar(); chrome(); return;
+                formPop(el, 'Add a program', [
+                    { name: 'code', label: 'Short code', max: 10, required: true, placeholder: 'e.g. BSIT', hint: '2 to 10 letters or numbers (a dash is allowed).' },
+                    { name: 'name', label: 'Full program name', max: 255, required: true, placeholder: 'e.g. Bachelor of Science in Information Technology' }
+                ], 'Add to preview', function (values) {
+                    if (!/^[A-Za-z0-9][A-Za-z0-9-]{1,9}$/.test(values.code.trim())) { toast('Use 2 to 10 letters or numbers (a dash is allowed).', 'error'); return; }
+                    appendProgramCard(S.doc, true, null, { program_id: 0, program_code: values.code.trim(), program_name: values.name.trim(), description: '', baseName: '', baseDescription: '', hasImage: false, added: true });
+                    renderToolbar(); chrome();
+                    toast('Program added to the preview. Publish when ready.', 'ok');
+                });
+                return;
             }
             var units = Array.isArray(C.programDepartments) ? C.programDepartments : [];
             var options = units.map(function (unit) {
@@ -3947,7 +3974,7 @@
                 if (!await okToReload()) return;
                 var deptId = Number(o.department || 0);
                 if (deptId <= 0) { toast('Choose a college or Graduate School department.', 'error'); return; }
-                run('Creating…', function () {
+                run('Creating...', function () {
                     return send(PROG_URL, { action: 'create_program', program_code: o.code, program_name: o.name, dept_id: deptId, theme: 'green', theme_custom: '' }).then(function (r) {
                         if (!r.ok) { toast(r.error, 'error'); return; }
                         reloadEditor('Program created. Click its text to fill the page in.', { page: 'programs', program: r.program_id });
@@ -3959,7 +3986,7 @@
             return TD && TD.fields[key] && (own(textChanges, key) ? textChanges[key] : TD.fields[key].value) === '1';
         }
         function previewDepartmentColor(doc) {
-            if (!DD || DD.kind !== 'college') return;
+            if (!DD || (DD.kind !== 'college' && DD.kind !== 'graduate')) return;
             var header = doc.querySelector('.dept-intro-program');
             if (!header) return;
             if (!header.hasAttribute('data-ve-original-theme')) header.setAttribute('data-ve-original-theme', header.getAttribute('style') || '');
@@ -4005,30 +4032,41 @@
             if (el) el.classList.toggle('dept-header-hidden', value === '1');
             select(null); closePop(); chrome();
         }
+        async function removeDepartment() {
+            if (!DD || DD.kind !== 'college') return;
+            closePop();
+            if (dRemove.department) {
+                delete dRemove.department;
+                chrome();
+                toast('Department deletion canceled.', 'ok');
+                return;
+            }
+            if (!await window.AdminDialogs.confirm('Mark “' + DD.dept_name + '” for deletion?\n\nIt stays on the website until you click Publish. Publishing permanently deletes the department; its programs remain but lose this department.')) return;
+            dRemove.department = true;
+            chrome();
+            toast('Deletion pending. Publish to delete the department, or cancel to keep it.', 'ok');
+        }
         function deptOptions(x, y) {
             if (!DD || (DD.kind !== 'college' && DD.kind !== 'graduate')) return;
             var hidden = !!DD.archived;
             var toggle = h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', on: { click: async function () {
                 closePop(); if (!await okToReload()) return;
-                run(hidden ? 'Showing…' : 'Hiding…', function () {
+                run(hidden ? 'Showing...' : 'Hiding...', function () {
                     return sendContent({ action: 'archive_department', dept_id: DD.dept_id, archived: hidden ? '0' : '1' }).then(function (r) {
                         if (!r.ok) { toast(r.error, 'error'); return; }
                         reloadEditor(r.message || 'Done.', routeNow());
                     });
                 });
             } } }, [icon(hidden ? 'eye' : 'eye-slash'), hidden ? ' Show on the website' : ' Hide from the website']);
-            var del = h('button', { type: 'button', class: 'btn btn-sm btn-outline-danger', on: { click: async function () {
-                closePop();
-                if (!await window.AdminDialogs.confirm('Delete “' + DD.dept_name + '” for good?\n\nIt is removed from the website straight away. Its programs stay but lose this department. This cannot be undone.')) return;
-                if (!await okToReload()) return;
-                run('Deleting…', function () {
-                    return sendContent({ action: 'delete_department', dept_id: DD.dept_id }).then(function (r) {
-                        if (!r.ok) { toast(r.error, 'error'); return; }
-                        reloadEditor('Department deleted.', { page: 'college-departments', sub: '' });
-                    });
-                });
-            } } }, [icon('trash'), ' Delete this department']);
+            var del = h('button', { type: 'button', class: 'btn btn-sm btn-outline-danger', on: { click: removeDepartment } }, [icon('trash'), dRemove.department ? ' Cancel department deletion' : ' Delete this department']);
             var headerControls = [];
+            headerControls.push(h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Edit department short code', on: { click: function () {
+                formPop(btnPageOpts, 'Department short code', [{ name: 'code', label: 'Short code', value: dVal('short_code'), max: 20, required: true, placeholder: 'e.g. CON' }], 'Apply', function (values) {
+                    if (!/^[A-Za-z0-9][A-Za-z0-9-]{1,19}$/.test(values.code.trim())) { toast('Enter a short code of 2–20 letters or numbers (a dash is allowed).', 'error'); return; }
+                    dSet('short_code', values.code.trim().toUpperCase()); chrome();
+                    toast('Short code updated in the preview. Publish to save it.', 'ok');
+                });
+            } } }));
             if (DD.kind === 'college' && TD) {
                 headerControls.push(h('small', { class: 've-pop-hint', text: 'Header changes apply only here. Publish to save them.' }));
                 if (TD.fields.header_mobile_background_hidden) {
@@ -4059,6 +4097,14 @@
                 h('small', { class: 've-pop-hint', text: hidden ? 'This department is hidden from visitors.' : 'This department is showing on the website.' })].concat(headerControls, [toggle, del])), x, y);
         }
         function saveDept() {
+            if (DD && dRemove.department) {
+                if (!S.publishing) return Promise.resolve({ did: 0, errs: ['Department deletion requires Publish.'] });
+                return sendContent({ action: 'delete_department', dept_id: DD.dept_id }).then(function (r) {
+                    if (!r.ok) return { did: 0, errs: [r.error] };
+                    resetPending();
+                    return { did: 1, errs: [], departmentDeleted: true };
+                });
+            }
             var errs = [], did = 0, p = Promise.resolve();
             if (departmentOrder && departmentOrder.dirty()) p = p.then(function(){
                 return sendContent({action:'save_department_order',scope:departmentOrder.scope,order:JSON.stringify(departmentOrder.order())}).then(function(r){
@@ -4076,6 +4122,7 @@
                         remove_image: row.removeImage ? '1' : '' };
                     // Send only edited text: another card edit must not replay an old description.
                     if (!row.program_id || row.program_name !== row.baseName) fields.program_name = row.program_name;
+                    if (!row.program_id && row.program_code) fields.program_code = row.program_code;
                     if (!row.program_id || row.description !== row.baseDescription) fields.description = row.description;
                     return send(PROG_URL, fields, row.file ? { image: row.file } : {}).then(function (response) {
                         if (response.ok) {
@@ -4116,6 +4163,7 @@
             var deanKeys = DEAN_KEYS.filter(function (k) { return own(dChange, k); });
             if (deptKeys.length) p = p.then(function () {
                 return sendContent({ action: 'save_department_details', dept_id: DD.dept_id, dept_name: dVal('dept_name'), description: dBase('description'), hero_text: dVal('hero_text'),
+                    ...(own(dChange, 'short_code') ? { short_code: dVal('short_code') } : {}),
                     about_text: dVal('about_text'), facebook_url: dVal('facebook_url'), office_label: dVal('office_label'), theme_color: dVal('theme_color') }).then(function (r) {
                     if (r.ok) { did++; deptKeys.forEach(function (k) { delete dChange[k]; }); if (r.department) Object.keys(r.department).forEach(function (k) { DD[k] = r.department[k]; }); }
                     else errs.push('Department: ' + r.error);
@@ -4311,7 +4359,7 @@
                 chrome();toast((type==='badge'?'Badges':type==='why'?'Reasons':'Career opportunities')+' updated. Save draft or Publish when ready.','ok');return;
             }
             if (!await okToReload(rowsChanged(type) ? 1 : 0)) return;
-            run('Saving…', function () {
+            run('Saving...', function () {
                 return postItems(type, rows).then(function (r) {
                     if (!r.ok) { toast(r.error, 'error'); return; }
                     reloadEditor(msg, routeNow());
@@ -4426,10 +4474,9 @@
             department.addEventListener('change',function(){pMetaSet('dept_id',Number(department.value),PD.dept_id);chrome();});
             box.appendChild(h('label',{class:'ve-pop-label',text:'Department'},[department]));
             box.appendChild(h('div',{class:'ve-pop-row'},[
-                h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Replace program seal',on:{click:function(){programMedia('seal');}}}),
-                h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Replace fallback banner',on:{click:function(){programMedia('hero');}}})
+                h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Replace program seal',on:{click:function(){programMedia('seal');}}})
             ]));
-            ['seal','hero'].forEach(function(key){if(PD[key+'_upload']||(pMedia[key]&&pMedia[key].file))box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Use default '+(key==='seal'?'seal':'banner'),on:{click:function(){pMedia[key]={remove:true};closePop();chrome();}}}));});
+            if(PD.seal_upload||(pMedia.seal&&pMedia.seal.file))box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Use default seal',on:{click:function(){pMedia.seal={remove:true};closePop();chrome();}}}));
             var cur = metaVal('theme'), curHex = metaVal('theme_custom');
             var sws = h('div', { class: 've-swatches' });
             Object.keys(PD.presets).forEach(function (k) {
@@ -4452,7 +4499,7 @@
                 closePop();
                 if (!await window.AdminDialogs.confirm('Delete “' + PD.name + '” for good?\n\nThe whole page is removed from the website straight away. This cannot be undone.')) return;
                 if (!await okToReload()) return;
-                run('Deleting…', function () {
+                run('Deleting...', function () {
                     return send(PROG_URL, { action: 'delete_program', program_id: PD.program_id }).then(function (r) {
                         if (!r.ok) { toast(r.error, 'error'); return; }
                         reloadEditor('Program deleted.', { page: 'programs', sub: '' });
@@ -4723,7 +4770,7 @@
                     if (sel.programId > 0) it.push({ icon: 'trash', label: 'Delete program', title: 'Delete this program', danger: true, run: async function () {
                         if (!await window.AdminDialogs.confirm('Delete “' + (sel.label || 'this program') + '” for good?\n\nThe whole program page is removed from the website immediately. This cannot be undone.')) return;
                         if (!await okToReload()) return;
-                        run('Deleting program…', function () {
+                        run('Deleting program...', function () {
                             return send(PROG_URL, { action: 'delete_program', program_id: sel.programId }).then(function (r) {
                                 if (!r.ok) { toast(r.error, 'error'); return; }
                                 reloadEditor('Program deleted.', routeNow());
@@ -4743,6 +4790,7 @@
             hasPageOptions: function () { return (mode === 'dept' && DD && DD.kind === 'college') || mode === 'prog'; },
             pageOptions: function (x, y) { if (mode === 'dept') deptOptions(x, y); else if (mode === 'prog') progOptions(x, y); },
             status: function () {
+                if (DD && dRemove.department) return { text: 'Department deletion pending — Publish to delete', tone: 'warn' };
                 var n = pendingCount();
                 if (n) return { text: plural(n, 'unsaved change'), tone: 'warn' };
                 if (mode === 'dept') return DD.archived ? { text: 'Hidden from the website', tone: 'warn' } : { text: 'Everything here is live', tone: 'ok' };
@@ -4750,19 +4798,21 @@
                 return { text: 'Click a department or program to open it, then click any text or picture to edit it.', tone: 'ok' };
             },
             actions: function () {
-                if (departmentOrder || mode === 'dept' || mode === 'prog' || mode === 'basic') return { secondary: null, primary: { label: 'Publish', icon: 'cloud-upload', disabled: pendingCount() === 0, title: 'Your changes go live on the website as soon as you publish.' } };
+                if (departmentOrder || mode === 'dept' || mode === 'prog' || mode === 'basic') return { secondary: mode === 'dept' && DD && DD.kind === 'college' ? { label: dRemove.department ? 'Cancel deletion' : 'Delete department', icon: 'trash', title: 'Stage or cancel department deletion; Publish applies it' } : null, primary: { label: 'Publish', icon: 'cloud-upload', disabled: pendingCount() === 0, title: 'Your changes go live on the website as soon as you publish.' } };
                 return { secondary: null, primary: C.hasDrawer ? { label: 'More settings', icon: 'sliders', title: 'Open the extra settings for this page' } : null };
             },
+            runSecondary: removeDepartment,
             runPrimary: function () {
                 if (!departmentOrder && mode !== 'dept' && mode !== 'prog' && mode !== 'basic') { openDrawer(); return; }
                 if (!pendingCount()) return;
-                confirmPublish('Publish your changes to the live website?', function () {
+                confirmPublish(DD && dRemove.department ? 'Permanently delete this department? Its programs will remain without this department. Other pending edits to this department will be discarded. This cannot be undone.' : 'Publish your changes to the live website?', function () {
                     var reasonsChanged = mode === 'prog' && rowsChanged('why');
-                    run('Publishing…', function () {
+                    run('Publishing...', function () {
                         return (mode === 'prog' ? saveProg() : saveDept()).then(function (r) {
                             r.errs.forEach(function (m) { toast(m, 'error'); });
                             if (r.did && !r.errs.length) {
-                                if (reasonsChanged) toast('Published. Your changes are live now.', 'ok');
+                                if (r.departmentDeleted) reloadEditor('Department deleted.', { page: 'college-departments', sub: '' });
+                                else if (reasonsChanged) toast('Published. Your changes are live now.', 'ok');
                                 else reloadEditor('Published. Your changes are live now.', routeNow(), true);
                             }
                             else if (r.did) toast('Some changes were saved. Fix the problem above and publish again.', 'ok');
@@ -4872,7 +4922,7 @@
             status:function(){return {text:dirty()?plural(dirty(),'unsaved achievement'):'Everything here is saved',tone:dirty()?'warn':'ok'};},
             actions:function(){return {secondary:{label:'Add Achievement',icon:'plus-circle',disabled:!data},primary:{label:'Publish',icon:'cloud-upload',disabled:!data||!dirty()}};},
             runSecondary:add,
-            runPrimary:function(){if(!dirty())return;confirmPublish('Publish these achievement changes?',function(){run('Publishing…',async function(){try{await save(Object.keys(records).filter(function(key){return changed(records[key]);}));reloadEditor('Published. Your changes are live now.',{page:'student-achievements'},true);}catch(error){failure(error);}});});}
+            runPrimary:function(){if(!dirty())return;confirmPublish('Publish these achievement changes?',function(){run('Publishing...',async function(){try{await save(Object.keys(records).filter(function(key){return changed(records[key]);}));reloadEditor('Published. Your changes are live now.',{page:'student-achievements'},true);}catch(error){failure(error);}});});}
         };
     }
 
@@ -5263,7 +5313,7 @@
             runPrimary: function(){
                 if (!data) return;
                 confirmPublish('Publish these organization changes?',function(){
-                    run('Publishing…',function(){
+                    run('Publishing...',function(){
                         return (async function(){try{
                             if(Object.keys(settings).length||Object.keys(pageFiles).length||Object.keys(pageRemoved).length){var page=await request({action:'save_page',texts:JSON.stringify(settings),remove_images:JSON.stringify(Object.keys(pageRemoved))},pageFiles);Object.keys(settings).forEach(function(key){data.fields[key].value=settings[key];});if(page.images)data.images=page.images;settings={};pageFiles={};pageRemoved={};}
                             for(var id of Object.keys(records)){var rec=records[id];if(changed(rec)||(data.organization&&rec.base.status!=='published'))await save(rec,'published');}
@@ -5801,7 +5851,7 @@
             runSecondary:add,
             runPrimary:function(){
                 if(!dirty())return;
-                confirmPublish('Publish community activity changes?',function(){run('Publishing…',async function(){
+                confirmPublish('Publish community activity changes?',function(){run('Publishing...',async function(){
                     if(!S.allowIncomplete&&content.activities.some(function(row){return !row.title.trim()||!row.description.trim()||!row.category.trim();})){toast('Each activity needs a title, description and category.','error');return;}
                     var response=await send('/admin/action/community-activities-handler.php',{content:JSON.stringify(content),revision:revision},files);
                     if(!response.ok){toast(response.error,'error');return;}
@@ -5815,14 +5865,18 @@
     function ScholarshipAdapter() { return AdmissionsContentAdapter(true); }
     function AdmissionsContentAdapter(scholarship) {
         var textSelector = scholarship ? '[data-ve-field="scholarship-text"]' : '[data-ve-field="payment-guide-text"]';
-        var imageSelector = scholarship ? '[data-ve-img="scholarship-image"]' : '[data-ve-img="payment-guide-image"]';
+        var imageSelector = '[data-ve-img="payment-guide-image"]';
         var dataId = scholarship ? 'veScholarshipData' : 'vePaymentGuideData';
         var title = scholarship ? 'scholarship' : 'payment guide';
-        var data, changes = {}, texts = {}, urls = [], entries = [], entryFiles = {};
-        function dirty() { return Object.keys(changes).length + Object.keys(texts).length + (scholarship && data && JSON.stringify(entries) !== JSON.stringify(data.entries || []) ? 1 : 0) + Object.keys(entryFiles).length; }
+        var data, changes = {}, texts = {}, urls = [], entries = [], entryFiles = {}, categories=[];
+        function dirty() { return Object.keys(changes).length + Object.keys(texts).length + (scholarship && data && (JSON.stringify(entries) !== JSON.stringify(data.entries || []) || JSON.stringify(categories)!==JSON.stringify(data.categories||[])) ? 1 : 0) + Object.keys(entryFiles).length; }
         function entryOf(id) { return entries.find(function(entry){return entry.id === id;}); }
         function renderEntries() {
             if (!scholarship || !S.doc) return;
+            if(S.doc.defaultView.GNCScholarships){
+                var preview=entries.map(function(entry){var copy=Object.assign({},entry);if(entryFiles[entry.id])copy.pdf=previewUrl(entryFiles[entry.id]);return copy;});
+                S.doc.defaultView.GNCScholarships.render(preview,categories);bindFields(S.doc);return;
+            }
             ['gnc','government'].forEach(function(category){
                 var grid=S.doc.querySelector('[data-scholarship-list="'+category+'"]');
                 var template=S.doc.getElementById('sch-entry-template-'+category);
@@ -5846,43 +5900,38 @@
             });
         }
         function entryForm(category, current) {
-            var name=h('input',{class:'form-control',type:'text',maxlength:255,value:current?current.title:'','aria-label':'Scholarship title'});
-            var description=h('textarea',{class:'form-control',rows:5,maxlength:6000,'aria-label':'Scholarship details'});description.value=current?current.description:'';
-            var url=h('input',{class:'form-control',type:'text',maxlength:2048,value:current?current.url:'','aria-label':'Scholarship link'});
-            var group=h('select',{class:'form-select','aria-label':'Scholarship category'},[
-                h('option',{value:'gnc',text:'GNC Scholarships'}),h('option',{value:'government',text:'Government Scholarships'})
-            ]);group.value=category;
-            var selectedPdf=null;
-            var pdfInput=h('input',{type:'file',accept:'application/pdf,.pdf',class:'form-control','aria-label':'Scholarship PDF',on:{change:function(){selectedPdf=pdfInput.files[0] || null;}}});
-            var error=h('p',{class:'text-danger',role:'alert'});
-            var save=h('button',{type:'button',class:'btn btn-gnc',text:current?'Save changes':'Add scholarship',on:{click:function(){
-                var destination=url.value.trim();
-                if (!name.value.trim() || name.value.trim().length>255 || description.value.length>6000) {error.textContent='Enter a title and keep the details within the allowed length.';return;}
-                var valid=!destination || (!/[\s\x00-\x1f\x7f<>"\\]/.test(destination) && /^\/(?!\/)/.test(destination));
-                if (!valid) {try {var parsed=new URL(destination);valid=['http:','https:'].includes(parsed.protocol)&&!!parsed.hostname&&!/[\s\x00-\x1f\x7f<>"\\]/.test(destination);}catch(ignore){}}
-                if (!valid || destination.length>2048) {error.textContent='Use an HTTP or HTTPS link, or a local path starting with /.';return;}
-                if (!current && !selectedPdf) {error.textContent='Choose a PDF for the scholarship.';return;}
-                if(selectedPdf && (!/\.pdf$/i.test(selectedPdf.name) || !selectedPdf.size || selectedPdf.size>20*MB)){error.textContent='Choose a PDF of up to 20 MB.';return;}
-                if (!current && entries.length>=100) {error.textContent='Use up to 100 scholarship entries.';return;}
-                var entry=current || {id:Array.from(crypto.getRandomValues(new Uint8Array(8)),function(value){return value.toString(16).padStart(2,'0');}).join('')};
-                Object.assign(entry,{category:group.value,title:name.value.trim(),description:description.value.trim(),url:destination});
-                if(selectedPdf)entryFiles[entry.id]=selectedPdf;
-                if (!current) entries.push(entry);
-                closePop();renderEntries();select(null);chrome();
-            }}});
-            popBelowToolbar(h('div',{class:'ve-pop-form'},[
-                h('strong',{text:current?'Edit scholarship':'Add scholarship'}),h('label',{text:'Category'},[group]),h('label',{text:'Title'},[name]),
-                h('label',{text:'Details and requirements'},[description]),h('label',{text:'Learn more link (optional)'},[url]),h('label',{text:current?'Replace PDF (optional)':'Scholarship PDF'},[pdfInput]),h('p',{class:'ve-pop-hint',text:'PDF files up to 20 MB. Visitors can view, open, or download the document.'}),error,
-                h('div',{class:'ve-pop-row'},[h('button',{type:'button',class:'btn btn-outline-secondary',text:'Cancel',on:{click:closePop}}),save])
-            ]),null,true);
+            var manager = manageScholarships();
+            if (manager) manager.edit(category, current);
+        }
+        function uploadScholarshipPdf(entry) {
+            if(!entry)return;
+            pickFile('application/pdf,.pdf',function(file){
+                if(!/\.pdf$/i.test(file.name)||!file.size||file.size>20*MB){toast('Choose a PDF of up to 20 MB.','error');return;}
+                entryFiles[entry.id]=file;closePop();renderEntries();
+                S.doc.defaultView.GNCScholarships.show(entry.id);select(null);chrome();
+                toast('PDF selected. Publish to make it available on the website.','ok');
+            });
         }
         function entryTools(el) {
             var card=el.closest('[data-scholarship-entry]'), entry=card&&entryOf(card.getAttribute('data-scholarship-entry'));
             if (!entry) return [];
             return [
+                {icon:'upload',label:entry.pdf||entryFiles[entry.id]?'Replace PDF':'Upload PDF',primary:true,run:function(){uploadScholarshipPdf(entry);}},
                 {icon:'pencil',label:'Edit scholarship',run:function(){entryForm(entry.category,entry);}},
                 {icon:'trash',label:'Remove scholarship',danger:true,run:function(){confirmPop('Remove scholarship?','This entry will be removed from the website when you publish.','Remove',function(){entries=entries.filter(function(item){return item.id!==entry.id;});delete entryFiles[entry.id];renderEntries();select(null);chrome();});}}
             ];
+        }
+        function manageScholarships() {
+            closePop();
+            return window.GNCScholarshipManager.open({
+                read:function(){return {categories:categories,entries:entries};},
+                selection:function(){return S.doc.defaultView.GNCScholarships.selection();},
+                hasPdf:function(entry){return !!(entry.pdf||entryFiles[entry.id]);},
+                attachFile:function(entry,file){entryFiles[entry.id]=file;},
+                forgetFile:function(id){delete entryFiles[id];},
+                preview:function(id){renderEntries();S.doc.defaultView.GNCScholarships.show(id);},
+                changed:function(){renderEntries();select(null);chrome();}
+            });
         }
         function bindFields(doc) {
             $$(textSelector, doc).forEach(function (el) {
@@ -5896,6 +5945,10 @@
                             if (field.type === 'rich') other.innerHTML = node.innerHTML; else other.textContent = value;
                         }
                     });
+                    if(scholarship&&S.doc.defaultView.GNCScholarships){
+                        var legacyKind={copy_10:'basic',copy_13:'college',copy_8:'athletic'}[key];
+                        if(legacyKind){entries.forEach(function(entry){if(entry.legacy===legacyKind)entry.title=value;});renderEntries();}
+                    }
                 });
             });
         }
@@ -5922,9 +5975,9 @@
             chrome(); renderToolbar();
         }
         function replace(el, key) {
-            pickFile(scholarship ? 'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp' : 'image/svg+xml,image/png,image/jpeg,image/webp,.svg,.png,.jpg,.jpeg,.webp', function (file) {
-                if (!(scholarship ? /\.(png|jpe?g|webp)$/i : /\.(svg|png|jpe?g|webp)$/i).test(file.name) || file.size > 5 * MB) {
-                    toast(scholarship ? 'Choose a PNG, JPG, or WEBP image of up to 5 MB.' : 'Choose an SVG, PNG, JPG, or WEBP image of up to 5 MB.', 'error'); return;
+            pickFile('image/svg+xml,image/png,image/jpeg,image/webp,.svg,.png,.jpg,.jpeg,.webp', function (file) {
+                if (!/\.(svg|png|jpe?g|webp)$/i.test(file.name) || file.size > 5 * MB) {
+                    toast('Choose an SVG, PNG, JPG, or WEBP image of up to 5 MB.', 'error'); return;
                 }
                 var url = previewUrl(file); urls.push(url);
                 changes[key] = {reset:false, file:file}; imageOf(el).src = url;
@@ -5936,27 +5989,33 @@
             window.open('https://storyset.com/', '_blank', 'noopener,noreferrer');
         }
         return {
-            draftState:function(value){if(!value)return {changes:changes,texts:texts,entries:entries,entryFiles:entryFiles};changes=value.changes;texts=value.texts;entries=value.entries || (data && data.entries) || [];entryFiles=value.entryFiles || {};renderEntries();},
+            draftState:function(value){if(!value)return {changes:changes,texts:texts,entries:entries,entryFiles:entryFiles,categories:categories};changes=scholarship?{}:value.changes;texts=value.texts;entries=value.entries || (data && data.entries) || [];if(scholarship&&!value.categories){var oldIds=entries.map(function(entry){return entry.id;});entries=(data.entries||[]).filter(function(entry){return entry.legacy&&oldIds.indexOf(entry.id)<0;}).concat(entries);}categories=value.categories || (data&&data.categories)||[];entryFiles=value.entryFiles || {};renderEntries();},
+            draftRebind:function(){bindFields(S.doc);},
             mount:function (doc) {
                 urls.forEach(function (url) { URL.revokeObjectURL(url); }); urls = []; changes = {}; texts = {}; data = null;
                 try { data = JSON.parse(doc.getElementById(dataId).textContent); } catch (_) {}
                 if (data && data.fields) bindFields(doc);
                 entryFiles={};
                 entries=data && data.entries ? JSON.parse(JSON.stringify(data.entries)) : [];
+                categories=data&&data.categories?JSON.parse(JSON.stringify(data.categories)):[];
                 renderEntries();
                 return false;
             },
-            pick:function (target) {
+            pick:function (target,event) {
+                if(scholarship&&target.closest('[data-ve-scholarship-upload]')){var chosenEntry=entryOf(S.doc.defaultView.GNCScholarships.selection().id);uploadScholarshipPdf(chosenEntry);return {kind:'none'};}
+                if(scholarship&&target.closest('[data-ve-scholarship-manage]')){manageScholarships();return {kind:'none'};}
+                var chosen=scholarship&&target.closest('[data-sch-select]');
+                if(chosen){if(event)event.stopImmediatePropagation();S.doc.defaultView.GNCScholarships.show(chosen.dataset.schSelect);select(null);return {kind:'none'};}
                 var add=scholarship && target.closest('[data-ve-scholarship-add]');
                 if(add){entryForm(add.getAttribute('data-ve-scholarship-add'));return {kind:'none'};}
                 var field = fieldOf(target);
                 if (field && field.__ve) return {kind:'field',el:field};
-                var entry=scholarship && target.closest('[data-scholarship-entry]');
-                if(entry)return {kind:'scholarship-entry',el:entry};
                 var link = target.closest('[data-ve-payment-link]');
                 if (link && data) return {kind:'payment-guide-link',el:link};
-                var el = target.closest(imageSelector);
-                return el && data ? {kind:'payment-guide-image', el:el, key:el.getAttribute('data-ve-key'),stop:!!scholarship} : null;
+                var el = !scholarship && target.closest(imageSelector);
+                if(el&&data)return {kind:'payment-guide-image',el:el,key:el.getAttribute('data-ve-key'),stop:!!scholarship};
+                var entry=scholarship && target.closest('[data-scholarship-entry]');
+                return entry?{kind:'scholarship-entry',el:entry}:null;
             },
             toolbar:function (sel) {
                 if (sel.kind === 'field' || sel.kind === 'payment-guide-link') {
@@ -5964,30 +6023,24 @@
                     var items = [{type:'chip',text:sel.kind === 'field' ? sel.el.__ve.label : 'Button destination',icon:'pencil'}];
                     if (scholarship) items=items.concat(entryTools(sel.el));
                     if (link) items.push({icon:'link-45deg',label:'Edit destination',run:function () { editDestination(link); }});
-                    var scholarshipLink = scholarship && sel.el.closest('a[data-bs-target]');
-                    if (scholarshipLink) items.push({icon:'card-text',label:'Edit scholarship details',run:function(){S.doc.defaultView.bootstrap.Modal.getOrCreateInstance(S.doc.querySelector(scholarshipLink.getAttribute('data-bs-target'))).show();}});
                     return items;
                 }
                 if (sel.kind === 'scholarship-entry') return entryTools(sel.el);
-                if (sel.kind !== 'payment-guide-image') return [];
+                if (scholarship || sel.kind !== 'payment-guide-image') return [];
                 return [
                     {type:'chip', text:data.images[sel.key].label, icon:'image'},
-                    scholarship && sel.el.closest('[data-bs-target]') ? {icon:'card-text',label:'Edit scholarship details',run:function(){var link=sel.el.closest('[data-bs-target]');S.doc.defaultView.bootstrap.Modal.getOrCreateInstance(S.doc.querySelector(link.getAttribute('data-bs-target'))).show();}} : null,
-                    {icon:'image', label:scholarship ? 'Change photo' : 'Change illustration', primary:true, run:function () { replace(sel.el, sel.key); }},
-                    {icon:'arrow-counterclockwise', label:scholarship ? 'Restore original photo' : 'Restore Storyset illustration', run:function () { restore(sel.el, sel.key); }},
-                    scholarship ? null : {icon:'box-arrow-up-right', label:'Browse Storyset', run:browse}
+                    {icon:'image', label:'Change illustration', primary:true, run:function () { replace(sel.el, sel.key); }},
+                    {icon:'arrow-counterclockwise', label:'Restore Storyset illustration', run:function () { restore(sel.el, sel.key); }},
+                    {icon:'box-arrow-up-right', label:'Browse Storyset', run:browse}
                 ].filter(Boolean);
             },
             dirtyCount:dirty,
-            status:function () { return {text:dirty() ? plural(dirty(),'unsaved change') : scholarship ? 'Click text or a photo to edit. Open scholarship details to edit discounts and requirements.' : 'Click text, a button, or an illustration to edit. Publish when ready.', tone:dirty()?'warn':'ok'}; },
-            actions:function () { return {secondary:scholarship ? {label:'Open scholarship details',icon:'card-text'} : {label:'Browse Storyset',icon:'box-arrow-up-right'}, primary:{label:'Publish',icon:'cloud-upload',disabled:!data || !dirty()}}; },
+            status:function () { return {text:dirty() ? plural(dirty(),'unsaved change') : scholarship ? 'Manage scholarship categories and upload or replace PDF documents.' : 'Click text, a button, or an illustration to edit. Publish when ready.', tone:dirty()?'warn':'ok'}; },
+            actions:function () { return {secondary:scholarship ? {label:'Manage scholarships',icon:'list-ul'} : {label:'Browse Storyset',icon:'box-arrow-up-right'}, primary:{label:'Publish',icon:'cloud-upload',disabled:!data || !dirty()}}; },
             runSecondary:function () {
                 if (!scholarship) return browse();
-                popBelowToolbar(h('div',{class:'ve-pop-body'},[
-                    h('button',{type:'button',class:'ve-btn',text:'Basic Education scholarships',on:{click:function(){closePop();S.doc.defaultView.bootstrap.Modal.getOrCreateInstance(S.doc.getElementById('basicEdModal')).show();}}}),
-                    h('button',{type:'button',class:'ve-btn',text:'College scholarships and requirements',on:{click:function(){closePop();S.doc.defaultView.bootstrap.Modal.getOrCreateInstance(S.doc.getElementById('collegeModal')).show();}}}),
-                    h('button',{type:'button',class:'ve-btn',text:'Government scholarships',on:{click:function(){closePop();S.doc.defaultView.bootstrap.Tab.getOrCreateInstance(S.doc.getElementById('gov-tab')).show();}}})
-                ]));
+                if(S.doc.defaultView.GNCScholarships)return manageScholarships();
+                toast('The scholarship PDF manager could not load. Refresh the editor and try again.', 'error');
             },
             runPrimary:function () {
                 confirmPublish('Publish ' + title + ' changes?', function () {
@@ -5997,8 +6050,9 @@
                             payload[key] = {reset:changes[key].reset};
                             if (changes[key].file) files['image_'+key] = changes[key].file;
                         });
-                        var fields={images:JSON.stringify(payload),texts:JSON.stringify(texts)};
-                        if(scholarship){fields.entries=JSON.stringify(entries);Object.keys(entryFiles).forEach(function(id){files['pdf_'+id]=entryFiles[id];});}
+                        var fields={texts:JSON.stringify(texts)};
+                        if(!scholarship)fields.images=JSON.stringify(payload);
+                        if(scholarship){fields.entries=JSON.stringify(entries);fields.categories=JSON.stringify(categories);Object.keys(entryFiles).forEach(function(id){files['pdf_'+id]=entryFiles[id];});}
                         return send(scholarship ? '/admin/action/scholarship-handler.php' : '/admin/action/payment-guide-handler.php', fields, files).then(function (result) {
                             if (!result.ok) { toast(result.error,'error'); return; }
                             changes = {}; texts = {}; if(scholarship){data.entries=JSON.parse(JSON.stringify(entries));entryFiles={};} reloadEditor('Published. Your changes are live now.');
@@ -6010,9 +6064,59 @@
         };
     }
     function TuitionAdapter() {
-        var data, api, texts = {}, changes = {}, serial = 0, urls = [];
+        var data, api, texts = {}, changes = {}, serial = 0, urls = [], categoryBaseline = '';
         function own(object,key) { return Object.prototype.hasOwnProperty.call(object,key); }
-        function dirty() { return Object.keys(texts).length + Object.keys(changes).length; }
+        function categoryEntries() { return Object.keys(api.categories).map(function(key){var c=api.categories[key];return {key:key,label:c.label,icon:c.icon};}); }
+        function dirty() { return Object.keys(texts).length + Object.keys(changes).length + (api && JSON.stringify(categoryEntries())!==categoryBaseline ? 1 : 0); }
+        function categoryFields() {
+            Object.keys(api.categories).forEach(function(key){
+                if (!data.fields['category_'+key]) data.fields['category_'+key]={value:api.categories[key].label,label:'Category name',max:100};
+            });
+        }
+        function manageCategories(x,y) {
+            if (!api) return;
+            if(typeof x!=='number'||typeof y!=='number'){var rect=btnSecondary.getBoundingClientRect();x=rect.left;y=rect.bottom+8;}
+            var keys=Object.keys(api.categories);
+            var box=h('div',{class:'ve-pop-form ve-tuition-pdfs'},[
+                h('strong',{text:'Fee categories'}),
+                h('p',{class:'small text-muted',text:'Add categories and use the arrows to change their order. Changes go live when you publish.'})
+            ]);
+            keys.forEach(function(key,index){
+                var category=api.categories[key];
+                var controls=h('div',{style:'display:flex;gap:8px;align-items:center;margin-bottom:10px'},[
+                    h('span',{style:'flex:1',text:category.label})
+                ]);
+                [-1,1].forEach(function(step){controls.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:step<0?'↑':'↓','aria-label':'Move '+category.label+(step<0?' up':' down'),disabled:index+step<0||index+step>=keys.length,on:{click:function(){
+                    var entries=Object.keys(api.categories).map(function(k){return [k,api.categories[k]];});
+                    var swap=entries[index];entries[index]=entries[index+step];entries[index+step]=swap;
+                    api.replaceCategories(entries);bindFields();chrome();manageCategories(x,y);
+                }}}));});
+                controls.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-danger',text:'Delete','aria-label':'Delete '+category.label,disabled:keys.length===1,title:keys.length===1?'Keep at least one fee category':'Delete category',on:{click:async function(){
+                    if(!await window.AdminDialogs.confirm('Delete '+category.label+' when you publish? Its PDFs will remain stored, but will no longer appear in the fee categories.'))return;
+                    Object.keys(changes).forEach(function(id){if(changes[id].category===key)delete changes[id];});
+                    delete texts['category_'+key];
+                    var entries=Object.keys(api.categories).filter(function(k){return k!==key;}).map(function(k){return [k,api.categories[k]];});
+                    api.replaceCategories(entries);bindFields();chrome();manageCategories(x,y);
+                }}}));
+                box.appendChild(controls);
+            });
+            var name=h('input',{type:'text',class:'form-control form-control-sm',maxlength:'100',placeholder:'Category name','aria-label':'New category name'});
+            var choice=h('select',{id:'veFeeCategoryIcon',class:'form-select form-select-sm','aria-label':'New category icon'});
+            Object.keys(data.categoryIcons).forEach(function(key){choice.appendChild(h('option',{value:key,text:data.categoryIcons[key],selected:key==='folder'}));});
+            box.append(name,h('label',{for:'veFeeCategoryIcon',class:'form-label small',style:'margin:8px 0 0',text:'Category icon'}),choice,h('button',{type:'button',class:'btn btn-sm btn-success',style:'margin-top:8px',text:'Add category',disabled:keys.length>=50,on:{click:function(){
+                var label=name.value.trim();
+                if(!label||label.length>100||/[<>]/.test(label)){toast('Enter a category name of up to 100 characters.','error');name.focus();return;}
+                if(keys.some(function(key){return api.categories[key].label.trim().toLocaleLowerCase()===label.toLocaleLowerCase();})){toast('That category name already exists.','error');return;}
+                var base=label.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30).replace(/-+$/,'');
+                if(!/^[a-z]/.test(base))base='category-'+base;
+                var key=base,n=2;while(own(api.categories,key))key=base+'-'+(n++);
+                var entries=Object.keys(api.categories).map(function(k){return [k,api.categories[k]];});
+                entries.push([key,{label:label,icon:choice.value,documents:[]}]);
+                data.fields['category_'+key]={value:label,label:'Category name',max:100};
+                api.replaceCategories(entries);api.show(key);bindFields();chrome();manageCategories(x,y);
+            }}}));
+            openPop(box,x,y);
+        }
         function chooseIcon(sel) {
             var field = data.fields[sel.key];
             libraryIconPicker(data.icons, own(texts, sel.key) ? texts[sel.key] : field.value, function (spec, choice) {
@@ -6057,7 +6161,8 @@
             var category=api.selection().category, records=api.categories[category].documents;
             var box=h('div',{class:'ve-pop-form ve-tuition-pdfs'},[
                 h('strong',{text:api.categories[category].label+' PDFs'}),
-                h('p',{class:'small text-muted',text:'Upload, rename, replace or remove schedules. Changes go live when you publish.'})
+                h('p',{class:'small text-muted',text:'Upload, rename, replace or remove schedules. Changes go live when you publish.'}),
+                h('button',{type:'button',class:'btn btn-sm btn-outline-success',style:'margin-bottom:12px',text:'Manage categories',on:{click:function(){manageCategories(x,y);}}})
             ]);
             records.forEach(function(doc,index){
                 var title=h('input',{type:'text',class:'form-control form-control-sm',value:doc.title,maxlength:'255','aria-label':'PDF document title',on:{input:function(){doc.title=title.value;remember(doc,category);refresh();}}});
@@ -6077,15 +6182,17 @@
             openPop(box,x,y);
         }
         return {
-            draftState:function(value){if(!value)return {texts:texts,changes:changes,serial:serial,categories:api&&api.categories};texts=value.texts;changes=value.changes;serial=value.serial;if(api&&value.categories){Object.keys(value.categories).forEach(function(key){Object.assign(api.categories[key],value.categories[key]);});refresh();}},
+            draftState:function(value){if(!value)return {texts:texts,changes:changes,serial:serial,categories:api&&api.categories};texts=value.texts||{};changes=value.changes||{};serial=value.serial||0;if(api&&value.categories){api.replaceCategories(Object.keys(value.categories).map(function(key){return [key,value.categories[key]];}));categoryFields();refresh();}},
             draftRebind:function(){bindFields();},
             mount:function(doc){
                 urls.forEach(function(url){URL.revokeObjectURL(url);});urls=[];texts={};changes={};
                 try {data=JSON.parse(doc.getElementById('veTuitionData').textContent);api=doc.defaultView.GNCTuitionFees;}catch(_){data=null;}
                 if(!data||!api)return false;
+                categoryBaseline=JSON.stringify(categoryEntries());
                 bindFields();doc.addEventListener('tuition:changed',bindFields);return false;
             },
             pick:function(target,event){
+                if(target.closest('[data-ve-fee-categories]')){manageCategories(event.clientX,event.clientY);return {kind:'none'};}
                 if(target.closest('[data-ve-fee-manage]')){manage(event.clientX,event.clientY);return {kind:'none'};}
                 var icon = target.closest('[data-ve-icon="tuition"]');
                 if (icon) return {kind:'tuition-icon',el:icon,key:icon.getAttribute('data-ve-key')};
@@ -6104,11 +6211,12 @@
             actions:function(){return {secondary:{label:'Manage PDFs',icon:'file-earmark-pdf',disabled:!api},primary:{label:'Publish',icon:'cloud-upload',disabled:!data||!dirty()}};},
             runSecondary:function(){manage();},
             runPrimary:function(){
-                confirmPublish('Publish tuition and fee changes?',function(){run('Publishing…',function(){
+                confirmPublish('Publish tuition and fee changes?',function(){run('Publishing...',function(){
                     var list=Object.keys(changes).map(function(key){return changes[key];}),files={};
                     list.forEach(function(change,index){if(change.file&&!change.remove)files['pdf_'+index]=change.file;});
                     var payload=list.map(function(change){return {id:change.id,category:change.category,title:change.title,remove:!!change.remove};});
-                    return send('/admin/action/tuition-fees-handler.php',{texts:JSON.stringify(texts),documents:JSON.stringify(payload)},files).then(function(result){
+                    var deleted=JSON.parse(categoryBaseline).filter(function(category){return !own(api.categories,category.key);}).map(function(category){return category.key;});
+                    return send('/admin/action/tuition-fees-handler.php',{texts:JSON.stringify(texts),documents:JSON.stringify(payload),categories:JSON.stringify(categoryEntries()),deleted_categories:JSON.stringify(deleted)},files).then(function(result){
                         if(!result.ok){toast(result.error,'error');return;}
                         texts={};changes={};reloadEditor('Published. Your changes are live now.');
                     });
@@ -6190,7 +6298,7 @@
         adapter.runPrimary = function () {
             if (displayPlacementCount() && dirty.call(adapter) === 0) {
                 confirmPublish('Publish the updated placements to the live website?', function () {
-                    run('Publishing…', function () { toast('Published. Your changes are live now.', 'ok'); });
+                    run('Publishing...', function () { toast('Published. Your changes are live now.', 'ok'); });
                 });
             } else if (primary) return primary.call(adapter);
         };
@@ -6198,7 +6306,7 @@
     withImagePositions(S.adapter);
     if(window.GNCEditorPresence)presence=window.GNCEditorPresence.create({
         page:C.page.slug,csrf:C.csrf,dirty:function(){return !!S.adapter.dirtyCount();},
-        recover:function(){if(drafts&&drafts.supported()&&!S.busy)return run('Saving recovery draft…',function(){return drafts.save(true);});},
+        recover:function(){if(drafts&&drafts.supported()&&!S.busy)return run('Saving recovery draft...',function(){return drafts.save(true);});},
         preview:function(){return S.preview;},busy:function(){return S.busy;},publishing:function(){return S.publishing;}
     });
     if (window.GNCEditorHistory) {
@@ -6237,12 +6345,12 @@
         clean:cleanHtml,notify:toast,refresh:chrome,
         send:function(fields){if(C.reviewSubmission)fields.review_submission=C.reviewSubmission;return send('/admin/action/editor-draft-handler.php',fields);}
     });
-    function savePageDraft(){if(drafts && drafts.supported() && !S.busy)return run('Saving draft…',function(){return drafts.save();});}
+    function savePageDraft(){if(drafts && drafts.supported() && !S.busy)return run('Saving draft...',function(){return drafts.save();});}
     var draftSaveButton=$('#veSaveDraft'),draftDiscardButton=$('#veDiscardDraft');
     if(draftSaveButton)draftSaveButton.addEventListener('click',savePageDraft);
     if(draftDiscardButton)draftDiscardButton.addEventListener('click',async function(){
         if(S.busy||!await window.AdminDialogs.confirm('Discard the saved draft and return to the published page?'))return;
-        await run('Discarding draft…',async function(){await drafts.clear();leaving=true;window.location.reload();});
+        await run('Discarding draft...',async function(){await drafts.clear();leaving=true;window.location.reload();});
     });
     S.url = C.page.url;
     if (kind === 'organizations') window.OrganizationEditor = { hasChanges: unsavedPageChanges, refreshOrder: function(){return S.adapter.refreshOrder();} };
@@ -6331,6 +6439,6 @@
     D.addEventListener('show.bs.modal', function (e) { var m = e.target; if (m && m.parentNode !== D.body) D.body.appendChild(m); });
 
     window.VE = { state: S, adapter: function () { return S.adapter; }, cleanHtml: cleanHtml, presence: function(){return presence;} };   // handy for support and tests
-    setStatus('Opening the page…', 'busy');
+    setStatus('Opening the page...', 'busy');
     if (!S.url && S.adapter.startFallback) S.adapter.startFallback(); else loadFrame(S.url);
 })();

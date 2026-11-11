@@ -41,6 +41,14 @@ boundaries.
 
 ## Data and database changes
 
+Event category reads use `includes/event-categories.php`. After the CLI migration
+in `database/migrate-event-categories.php`, the Events category foreign key points
+to `event_categories`; that foreign key activates the new reader for admin,
+calendar imports, approval summaries and public event feeds. Existing category
+IDs and assignments are preserved, with non-event topics retained as inactive
+legacy entries. News and Announcements keep their original storage. See
+`docs/event-categories.md` for deployment, backup and rollback.
+
 Calendar import review workspaces use an additive `review` object inside the existing `calendar_import_batches.preview_json`. Owner-scoped save/resume/list/discard actions share the Events permissions and CSRF checks, preserve the original extraction and event snapshots, and use saved versions plus conditional writes to reject stale tabs. Saved workspaces remain available for 30 days after the last save; final confirmation retains category/audience validation, approval routing and event/revision conflict checks. No workspace schema migration is required. See `docs/calendar-import.md`.
 
 The reviewed local cleanup removed only the unused `office_services`, `program_sections` and abandoned `community_extension_page` tables, with verified private rollback archives. Active normalized office services use `admin_office_services`; the current community feature uses `community_activity_page`. `database/migrate-unused-tables.php` rechecks code, data and SQL dependencies before any deletion. See `docs/unused-table-cleanup.md` for the audit, verification and recovery steps. Empty feature/workflow tables remain in place.
@@ -63,7 +71,7 @@ for the additive migration and verification commands.
 
 Shared raster uploads are preprocessed in `includes/image-upload.php`: with PHP Imagick enabled, large images fit within 1920 × 1080 without cropping, retaining format, transparency, animation and photo-check metadata. Without Imagick, GD provides a memory-checked fallback for static JPG/PNG/WebP, retaining transparency and embedded provenance metadata; animations requiring resizing are refused rather than flattened. Existing Administration images can be optimized using either processor through the CLI-only `scripts/optimize-administration-images.php`, with verified original backups and unchanged URLs. See `docs/image-optimization.md` for setup and recovery.
 
-Personnel portraits additionally use `includes/person-photo-check.php` and the local YuNet/SFace worker in `scripts/person-face-check.py`. The upload precheck and personnel saves share the comparison policy and honor the AI image checker setting; when enabled, strong matches require a short-lived, audited Super Admin review or replacement. Turning it off skips face comparison and AI validation while retaining file safety checks. Face features are not persisted. See `docs/personnel-photo-check.md` for required Python/model configuration, identity matching limitations, thresholds and verification.
+Personnel portraits additionally use `includes/person-photo-check.php` and the local YuNet/SFace worker in `scripts/person-face-check.py`. The upload precheck and personnel saves share a page-specific comparison policy (Administration section, individual department, or homepage), exclude only the current entry, and honor the AI image checker setting; when enabled, strong matches require a short-lived, audited Super Admin review or replacement. Turning it off skips face comparison and AI validation while retaining file safety checks. Face features are not persisted. See `docs/personnel-photo-check.md` for required Python/model configuration, identity matching limitations, thresholds and verification.
 - Inventory impacted tables, foreign keys, indexes, code references, and backups first.
 - Prefer additive migrations and phased cleanup. Never drop tables or columns simply because they look unused.
 - Supply a rollback strategy, identify irreversible operations, and obtain explicit approval before destructive production work.
@@ -72,6 +80,8 @@ Personnel portraits additionally use `includes/person-photo-check.php` and the l
 - Document any required environment variables and schema migrations.
 
 ## Frontend architecture
+
+- Scholarship Opportunities shares the Tuition and Fees sidebar and PDF viewer styles. After `database/migrate-scholarship-categories.php --apply`, ordered categories use the dedicated `scholarship_categories` table through `components/scholarship-content.php`; stable category IDs keep existing entry links intact. Scholarship opportunities and PDF references retain their JSON format in `tuition_fee_content`. Category rows and their compatibility JSON mirror are saved in the same transaction as the catalog; the `scholarship-categories-v1` marker activates the new reader, with legacy readers available before migration or after rollback. The public content panel is a PDF view; existing scholarship text, awards, requirements and photos remain stored. The scholarship handler keeps the existing publishing/approval boundary and saves the catalog atomically. See `docs/scholarship-workspace.md` for storage compatibility and verification.
 
 - The visitor News & Announcements feed uses `assets/js/visitor-news-search.js` to fetch its existing published GET page for search, sort, type/category/audience filters and pagination. Result regions and filter URLs update without replacing the search input, navigation, footer or chatbot. Image skeletons and pinned carousels are initialized for the new results; article links retain normal navigation. Requests are cancelled and versioned so stale results cannot overwrite newer searches, with retry feedback on failure and server-rendered links/forms as the no-JavaScript fallback. Visual-editor previews retain normal navigation. Verify with `node tests/visitor-news-search-browser-test.cjs`.
 

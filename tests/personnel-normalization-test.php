@@ -69,7 +69,10 @@ try {
     $face=personPhotoCheck($image,'Renamed Person','person:'.$first,$compare);
     identityCheck(!$face['ok'],'Same-name independent identities can still be face matches.');
     personnelLink($db,'office:'.$office,$identity);$face=personPhotoCheck($image,'Renamed Person','person:'.$first,$compare);
-    identityCheck(!in_array('office:'.$office,array_column($face['matches'],'key'),true),'Confirmed identity reuse is excluded across sections.');
+    identityCheck(!in_array('office:'.$office,array_column($face['matches'],'key'),true),'Other sections are excluded regardless of shared identity.');
+    $db->exec("UPDATE admin_offices SET section_key='identity-people'");
+    $face=personPhotoCheck($image,'Renamed Person','person:'.$first,$compare);
+    identityCheck(in_array('office:'.$office,array_column($face['matches'],'key'),true),'Shared identity cannot bypass a duplicate within the same page.');
     $count=(int)$db->query('SELECT COUNT(*) FROM personnel')->fetchColumn();personnelMigrationRollback($db);
     identityCheck(!personnelEnabled($db),'Rollback disables normalized readers.');
     identityCheck($db->query('SELECT head_name FROM admin_offices')->fetchColumn()==='Renamed Person','Rollback preserves the current shared name.');

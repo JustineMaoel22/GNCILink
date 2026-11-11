@@ -1,6 +1,32 @@
 <?php
 require_once __DIR__.'/../includes/content-publish-policy.php';
 
+function cleanDepartmentShortCode($value): string {
+    if (!is_string($value) || !preg_match('/^[A-Za-z0-9][A-Za-z0-9-]{1,19}$/D', trim($value))) {
+        throw new InvalidArgumentException('Enter a department short code of 2–20 letters or numbers (a dash is allowed), for example CON.');
+    }
+    return strtoupper(trim($value));
+}
+
+function departmentShortCode(array $dept): string {
+    try {
+        $stmt = getDB()->prepare("SELECT content FROM department_page_content WHERE dept_id = ? AND field_key = 'short_code'");
+        $stmt->execute([(int)$dept['dept_id']]);
+        return (string)($stmt->fetchColumn() ?: '');
+    } catch (PDOException $e) {
+        if ($e->getCode() !== '42S02') throw $e;
+        return '';
+    }
+}
+
+/** Older departments without a saved code use initials, never their URL slug. */
+function departmentBreadcrumbLabel(array $dept): string {
+    $code = departmentShortCode($dept);
+    if ($code !== '') return $code;
+    $words = preg_split('/[^\p{L}\p{N}]+/u', (string)($dept['dept_name'] ?? ''), -1, PREG_SPLIT_NO_EMPTY);
+    return mb_strtoupper(implode('', array_map(static fn($word) => mb_substr($word, 0, 1), $words)));
+}
+
 /** Banner media uses the existing per-department content storage, separate from editable text. */
 function departmentBanner(array $dept): ?array {
     try {
@@ -176,18 +202,24 @@ function saveDepartmentProgramCard(array $data, ?array $image = null): array {
     if ($ownsTransaction) $db->beginTransaction();
     try {
         if (!$current) {
-            // Program cards need no extra form: derive an unused internal code from the heading.
-            $words = preg_split('/[^A-Za-z0-9]+/', $name, -1, PREG_SPLIT_NO_EMPTY);
-            $base = strtoupper(substr(implode('', array_map(fn($word) => $word[0], $words)), 0, 6));
-            if (strlen($base) < 2) $base = 'PRG';
-            $code = $base;
-            $check = $db->prepare('SELECT 1 FROM programs WHERE program_code = ?');
-            for ($suffix = 2; ; $suffix++) {
-                $check->execute([$code]);
-                if (!$check->fetchColumn()) break;
-                if ($suffix > 9999) throw new RuntimeException('Could not assign a program code.');
-                $code = $base . $suffix;
+            // Older drafts without a code retain the automatic-code compatibility path.
+            if (array_key_exists('program_code', $data)) {
+                if (!is_string($data['program_code'])) throw new InvalidArgumentException('Invalid program short code.');
+                $code = trim($data['program_code']);
+            } else {
+                $words = preg_split('/[^A-Za-z0-9]+/', $name, -1, PREG_SPLIT_NO_EMPTY);
+                $base = strtoupper(substr(implode('', array_map(fn($word) => $word[0], $words)), 0, 6));
+                if (strlen($base) < 2) $base = 'PRG';
+                $code = $base;
+                $check = $db->prepare('SELECT 1 FROM programs WHERE program_code = ?');
+                for ($suffix = 2; ; $suffix++) {
+                    $check->execute([$code]);
+                    if (!$check->fetchColumn()) break;
+                    if ($suffix > 9999) throw new RuntimeException('Could not assign a program code.');
+                    $code = $base . $suffix;
+                }
             }
+            // The shared creator validates the supplied code and rejects duplicates.
             $id = createProgramPage(['dept_id' => $deptId, 'program_name' => $name, 'program_code' => $code, 'theme' => 'green']);
         }
         // Omitted fields retain their stored values, including edits made in another tab.

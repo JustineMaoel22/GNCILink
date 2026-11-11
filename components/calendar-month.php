@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/event-categories.php';
 require_once __DIR__.'/../includes/event-display.php';
 // The caller supplies an optional category and department/program scope.
 $calendarFilterSql = $calendarFilterSql ?? "";
@@ -34,7 +35,7 @@ try {
     $stmt = ($db ?? getDB())->prepare("
         SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, c.category_name, c.category_color
         FROM events e
-        LEFT JOIN categories c ON e.category_id = c.category_id
+        LEFT JOIN " . eventCategoryTable($db ?? getDB()) . " c ON e.category_id = c.category_id
         WHERE e.status = 'published'
           AND e.start_date <= ?
           AND COALESCE(e.end_date, e.start_date) >= ?

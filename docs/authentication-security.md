@@ -6,7 +6,7 @@ Super Admin publishing requires the signed-in administrator's current password, 
 
 1. Back up the database. Import `sql/first-login-password-migration.sql` if not already applied, then import `sql/auth-security-migration.sql`. The new migration creates three tables and preserves accounts and content. Deploy the migration before the new authentication code: login fails closed while its required tables are missing.
 2. In the existing backend `.env`, configure `APP_URL` for your deployment and `AUTH_PUBLIC_URL=https://your-real-domain.example`. Reset links use this configured origin, never the request Host header. The admin application must be installed at `/admin`.
-3. Configure the existing `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_ENCRYPTION` (`tls` for STARTTLS/587 or `ssl` for implicit TLS/465), and `MAIL_FROM_NAME`. Optional `MAIL_FROM_ADDRESS` must be a sender your provider allows. Install the existing Composer dependencies (including PHPMailer) on the host. Do not put credentials in public files or source control.
+3. Use `MAIL_TRANSPORT=smtp` (the default) and configure `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_ENCRYPTION` (`tls` for STARTTLS/587 or `ssl` for implicit TLS/465), and `MAIL_FROM_NAME` using cPanel's Email Accounts > Connect Devices settings. `MAIL_FROM_ADDRESS` must be the mailbox or another allowed sender; it defaults to `MAIL_USERNAME`. Install the existing PHPMailer client library on the host. Passwords retain their exact configured characters. For a host-provided local mail service, `MAIL_TRANSPORT=mail` bypasses SMTP and PHPMailer. The selected transport does not silently fall back to another provider. `config/secrets.php` overrides `.env`. Do not put credentials in public files or source control.
 4. Enable a valid HTTPS certificate. HTTP admin GET requests redirect to the configured HTTPS origin; HTTP POST requests are rejected. Local development permits HTTP only when APP_URL names localhost or a loopback address. Production must never use a localhost APP_URL. When using a reverse proxy, set `AUTH_TRUSTED_PROXIES` to the comma-separated exact IPs of your trusted proxy servers, and configure those servers to replace X-Forwarded-Proto. Do not trust arbitrary forwarded headers.
 5. PHP needs PDO MySQL, cURL with a working CA certificate store, and PHPMailer. Allow outbound SMTP and HTTPS to `api.pwnedpasswords.com`. Never disable TLS certificate verification. Configure SPF/DKIM/DMARC with your mail provider and check its delivery logs.
 6. Request a reset for a controlled real account on the hosted site; verify inbox delivery, expiry, reset, notification and normal login. SMTP acceptance does not guarantee inbox delivery. Local isolated tests cannot prove hosted SMTP connectivity or inbox delivery.
@@ -15,7 +15,7 @@ The new session-version requirement signs out legacy sessions lacking a version.
 
 ## Behavior
 
-- Five incorrect account passwords lock that account for 15 minutes. Requests during the lock do not extend it. A separate 30-attempt/15-minute IP limit protects login attempts, including unknown accounts. Wrong credentials, inactive accounts, and locked accounts receive `Invalid username/email or password`.
+- Ten incorrect account passwords lock that account for 15 minutes. Requests during the lock do not extend it. The tenth failure and attempts during the lock receive HTTP 429 with a remaining-minute message and `Retry-After` header. Successful password verification or an expired lock resets the failure count. A separate 30-attempt/15-minute IP limit protects login attempts, including unknown accounts. Other wrong credentials and inactive accounts receive `Invalid username/email or password`.
 - OTP verification allows five attempts per account per 15 minutes across sessions. Resends require POST and CSRF, allow one per minute and at most three sends per 15 minutes. They never reset verification attempts. Pending OTP sessions carry the credential version and cannot survive password reset.
 - Recovery requests allow three per email and ten per IP in 15 minutes. Reset submissions allow twenty attempts per IP in 15 minutes. Rate limits live in MySQL and survive browser/session changes.
 - Reset links contain a 32-byte cryptographic random token. Only its SHA-256 hash is stored. A new request replaces the previous token; expiration uses the database clock. On opening a link, the token is kept in the server session and the browser redirects to a clean URL. Configure web-server/proxy/access/APM logs to omit query strings on `/admin/reset-password.php` so the first incoming link is not recorded.
@@ -40,5 +40,18 @@ References: [PHP session security](https://www.php.net/manual/en/session.securit
 Restore the previous application release if necessary; retain the additive tables and password hashes. Do not restore an old password database over new password changes. Reverting authentication code can also revert session revocation and recovery protections, so disable recovery routes during a rollback.
 
 ## Verification
+
+Email configuration tests do not send messages:
+
+```sh
+php tests/auth-smtp-config-test.php 465
+php tests/auth-smtp-config-test.php 587
+php -d disable_functions=mail tests/auth-mail-transport-test.php
+php tests/auth-email-templates-test.php
+```
+
+SMTP configuration tests use a recording client. The local mail test disables
+PHP's real `mail()` function before installing a recording stub. Confirm inbox
+delivery separately through the deployed host with a controlled account.
 
 Run `php tests/first-login-password-test.php` and `node tests/rbac-http-test.cjs` (Docker and Chrome required). The latter creates an isolated schema and synthetic accounts, runs real authentication/recovery handlers and browser checks, and removes the test resources. The SMTP integration uses a local protocol receiver, never a real recipient. The isolated password breach check supplies deterministic compromised/clean/unavailable responses; it does not test live service availability. Screenshots in `cache/admin-design-audit/` contain empty password fields. Hosted SMTP delivery and outbound breach-service connectivity require a deployment check.

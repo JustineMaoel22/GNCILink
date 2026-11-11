@@ -4,10 +4,10 @@
     if (!data) return;
     const categories = JSON.parse(data.textContent);
     const $ = id => document.getElementById(id);
-    const links = Array.from(document.querySelectorAll('[data-fee-category]'));
+    let links = Array.from(document.querySelectorAll('[data-fee-category]'));
     let selected = new URLSearchParams(location.search).get('category') || 'college';
     let selectedDocument = 0;
-    if (!categories[selected]) selected = 'college';
+    if (!Object.hasOwn(categories, selected)) selected = Object.keys(categories)[0];
     function show(key, documentIndex = 0, updateHistory = true) {
         if (!categories[key]) return;
         if (!Number.isInteger(documentIndex) || documentIndex < 0 || !categories[key].documents[documentIndex]) documentIndex = 0;
@@ -63,10 +63,12 @@
         filter();
         document.dispatchEvent(new CustomEvent('tuition:changed'));
     }
-    links.forEach(link => link.addEventListener('click', event => {
+    $('feeCategoryList').addEventListener('click', event => {
+        const link = event.target.closest('[data-fee-category]');
+        if (!link) return;
         if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
         event.preventDefault(); show(link.dataset.feeCategory);
-    }));
+    });
     function filter() {
         const term = $('feeSearch').value.trim().toLocaleLowerCase();
         let matches = 0;
@@ -95,11 +97,43 @@
     $('feeDocumentSelect').addEventListener('change', event => show(selected, Number(event.target.value)));
     window.addEventListener('popstate', () => {
         const key = new URLSearchParams(location.search).get('category');
-        show(categories[key] ? key : 'college', Number(new URLSearchParams(location.search).get('document') || 0), false);
+        show(Object.hasOwn(categories, key) ? key : Object.keys(categories)[0], Number(new URLSearchParams(location.search).get('document') || 0), false);
     });
     show(selected, Number(new URLSearchParams(location.search).get('document') || 0), false);
     window.GNCTuitionFees = {
         categories,
+        replaceCategories: entries => {
+            const oldLinks = new Map(links.map(link => [link.dataset.feeCategory, link]));
+            const template = links[0].querySelector('span');
+            Object.keys(categories).forEach(key => delete categories[key]);
+            entries.forEach(([key, category]) => { categories[key] = category; });
+            links = entries.map(([key, category]) => {
+                let link = oldLinks.get(key);
+                if (!link) {
+                    link = document.createElement('a');
+                    link.className = 'fee-category';
+                    link.href = '?category=' + encodeURIComponent(key);
+                    link.dataset.feeCategory = key;
+                    const icon = document.createElement('i');
+                    icon.setAttribute('aria-hidden', 'true');
+                    const label = template.cloneNode(false);
+                    label.removeAttribute('contenteditable');
+                    if (label.hasAttribute('data-ve-field')) label.setAttribute('data-ve-key', 'category_' + key);
+                    // New categories get their own display identity when published.
+                    label.removeAttribute('data-gnc-text');
+                    const arrow = document.createElement('i');
+                    arrow.className = 'bi bi-chevron-right';
+                    arrow.setAttribute('aria-hidden', 'true');
+                    link.append(icon, label, arrow);
+                }
+                link.querySelector('i').className = 'bi bi-' + category.icon;
+                link.querySelector('span').textContent = category.label;
+                return link;
+            });
+            $('feeCategoryList').replaceChildren(...links);
+            if (!categories[selected]) selected = entries[0][0];
+            show(selected, selectedDocument, false);
+        },
         show: (key, index = 0) => show(key, index, false),
         selection: () => ({category:selected, index:selectedDocument}),
         refresh: () => show(selected, Math.min(selectedDocument, Math.max(0,categories[selected].documents.length-1)), false),

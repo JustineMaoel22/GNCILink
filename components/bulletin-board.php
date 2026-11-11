@@ -40,17 +40,8 @@
  *   program value of 'ALL' can also represent multiple selected programs;
  *   it does not override those selections. Both audience dimensions must
  *   match. `category_id` is a topic tag, unrelated to audience filtering.
- * - `events` NOW has a `program` column (added via the migration
- *   below), following the exact same convention as
- *   `announcements.program`: default 'ALL' means "every program",
- *   otherwise it must match CURRENT_PROGRAM to be relevant.
- *
- *   Migration (run once against your DB if you haven't already):
- *     ALTER TABLE events ADD COLUMN program VARCHAR(10) NOT NULL DEFAULT 'ALL';
- *
- *   Existing rows will default to 'ALL' (i.e. shown on every program
- *   page) until you edit them in the admin to assign a specific
- *   program.
+ * - Events follow the same audience precedence through `event_programs`
+ *   and `event_departments`, retaining legacy fields and audience groups.
  * =====================================================================
  */
 
@@ -150,32 +141,37 @@ function gnc_get_global_announcements(string $program, int $limit): array
 }
 
 /**
- * Upcoming Events — now filtered by program using the same
- * "matches CURRENT_PROGRAM, OR program = 'ALL'" convention as
- * announcements. Requires the `events.program` column added by the
- * migration documented at the top of this file. If that column
- * doesn't exist yet, this query will throw — run the migration first.
+ * Upcoming and ongoing published events matching both saved audience dimensions.
+ * Explicit lists override legacy ALL values, which may represent multiple choices.
  */
 function gnc_get_global_events(string $program, int $limit): array
 {
     $pdo = gnc_bulletin_get_verified_pdo();
     require_once __DIR__ . '/../includes/event-audience.php';
-    $departmentScope = eventDepartmentsReady() ? " AND (dept_id IS NULL OR dept_id = (SELECT dept_id FROM programs WHERE program_code = :department_program LIMIT 1))" : '';
-    $groupScope=eventAudienceGroupsReady()?" AND (audience_group='all' OR EXISTS (SELECT 1 FROM programs gp JOIN departments gd ON gd.dept_id=gp.dept_id WHERE gp.program_code=:group_program AND gd.department_type=events.audience_group AND (events.audience_group<>'college' OR (COALESCE(gd.slug,'')<>'graduate-school' AND gd.dept_name<>'Graduate School'))))":'';
+    $departmentScope = eventDepartmentsReady() ? " AND COALESCE(
+        (SELECT MAX(COALESCE(ed.dept_id=bulletin_program.dept_id,0)) FROM event_departments ed WHERE ed.event_id=events.event_id),
+        events.dept_id IS NULL OR events.dept_id=bulletin_program.dept_id
+    )" : '';
+    $groupScope=eventAudienceGroupsReady()?" AND (audience_group='all' OR EXISTS (SELECT 1 FROM departments gd WHERE gd.dept_id=bulletin_program.dept_id AND gd.department_type=events.audience_group AND (events.audience_group<>'college' OR (COALESCE(gd.slug,'')<>'graduate-school' AND gd.dept_name<>'Graduate School'))))":'';
 
     $sql = "SELECT event_id, title, location, start_date, end_date
             FROM events
+            LEFT JOIN programs bulletin_program ON bulletin_program.program_code=:department_program
             WHERE status = 'published'
-              AND start_date >= NOW()
-              AND (program = :program OR (program = 'ALL' {$departmentScope}) OR EXISTS (SELECT 1 FROM event_programs ep WHERE ep.event_id = events.event_id AND ep.program_code = :prog_evt_check)) {$groupScope}
+              AND (COALESCE(end_date, start_date) >= NOW()
+                   OR (TIME(start_date)='00:00:00' AND TIME(COALESCE(end_date,start_date))='00:00:00'
+                       AND DATE(COALESCE(end_date,start_date))>=CURRENT_DATE()))
+              AND COALESCE(
+                  (SELECT MAX(ep.program_code=:prog_evt_check) FROM event_programs ep WHERE ep.event_id=events.event_id),
+                  events.program=:program OR events.program='ALL'
+              ) {$departmentScope} {$groupScope}
             ORDER BY start_date ASC
             LIMIT :limit";
 
     $stmt = $pdo->prepare($sql);
     $stmt->bindValue(':program', $program, PDO::PARAM_STR);
     $stmt->bindValue(':prog_evt_check', $program, PDO::PARAM_STR);
-    if ($departmentScope !== '') $stmt->bindValue(':department_program', $program, PDO::PARAM_STR);
-    if ($groupScope !== '') $stmt->bindValue(':group_program', $program, PDO::PARAM_STR);
+    $stmt->bindValue(':department_program', $program, PDO::PARAM_STR);
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
     $stmt->execute();
 
@@ -244,14 +240,11 @@ function render_bulletin_board(): void
 
     // Real routes, confirmed from news-and-announcement.php:
     // - the combined feed page takes ?type=announcement&program=CODE
-    // - each item's own detail page is announcement.php?slug=...
+    // - each item's detail page uses the shared announcement article route.
     $announcementsUrl = '/pages/news-and-announcement.php?type=announcement&program=' . urlencode($program);
 
-    // The homepage's Calendar of Events section (#events) already filters
-    // by evt_program (see index.php / normalizeProgramCategory()), so we
-    // link straight there instead of a separate events page — it
-    // auto-filters to this program's events on load.
-    $eventsUrl = '/index.php?evt_program=' . urlencode($program) . '#events';
+    // Use the calendar's current query parameter so the program remains selected.
+    $eventsUrl = '/index.php?program=' . urlencode($program) . '#events';
 
     $eventBadgeColors = ['badge-green', 'badge-gold', 'badge-maroon'];
     ?>
@@ -285,7 +278,7 @@ function render_bulletin_board(): void
                             <div class="bulletin-list">
                                 <?php foreach ($announcements as $item): ?>
                                     <a class="bulletin-item"
-                                       href="/pages/announcement.php?slug=<?= urlencode($item['slug']) ?>">
+                                       href="/announcement-article.php?slug=<?= urlencode($item['slug']) ?>">
                                         <div class="bulletin-item-icon">
                                             <i class="bi bi-megaphone-fill"></i>
                                         </div>

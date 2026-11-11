@@ -1,0 +1,15 @@
+/* Layout, sidebar, document header and PDF viewer share Tuition and Fees styles. */
+.scholarship-workspace { align-items: start; }
+.scholarship-workspace .fee-sidebar { min-width: 0; }
+.scholarship-workspace .fee-viewer { scroll-margin-top: 110px; }
+.sch-navigation > summary { display: none; }
+.sch-category-group { margin-top: 10px; }
+.sch-category-group > summary { list-style: none; cursor: pointer; }
+.sch-category-group > summary::-webkit-details-marker { display: none; }
+.sch-category-group[open] > summary > i:last-child { transform: rotate(180deg); }
+.sch-category-group .fee-document-list { margin: 6px 0 10px; padding: 8px 0 0 10px; }
+.sch-category-group a { text-decoration: none; }
+.scholarship-workspace [hidden] { display: none !important; }
+@media(max-width:767px) {
+    .sch-navigation > summary { display: list-item; cursor: pointer; margin-top: 16px; color: #163f28; font-weight: 600; }
+}

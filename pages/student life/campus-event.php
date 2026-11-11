@@ -138,7 +138,7 @@ $campusPageUrl = static fn($page) => '?' . http_build_query(array_merge($calenda
                                 <img class="campus-recent-image" src="<?= $campusH($postImage) ?>" alt="" loading="lazy"
                                     decoding="async">
                             <?php else: ?>
-                                <div class="campus-recent-placeholder" aria-hidden="true"><i class="bi bi-calendar-event"></i></div>
+                                <div class="campus-recent-placeholder gnc-empty-post-image" aria-hidden="true"></div>
                             <?php endif; ?>
                             <time class="campus-recent-date" datetime="<?= date('Y-m-d', $postDate) ?>"
                                 aria-label="<?= date('F j, Y', $postDate) ?>">

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/event-categories.php';
 function publicEventCategoryColor(?string $color, ?string $name = null): string {
     if($color && preg_match('/^#[0-9a-f]{6}$/iD',$color))return $color;
     if($color && preg_match('/^#([0-9a-f])([0-9a-f])([0-9a-f])$/iD',$color,$m))return '#'.$m[1].$m[1].$m[2].$m[2].$m[3].$m[3];
@@ -11,7 +12,7 @@ function publicEventCategoryColor(?string $color, ?string $name = null): string 
 
 /** Read only published events that overlap a whole calendar day, including multi-day activities. */
 function publicEventsForDate(PDO $db,string $date,array $filters,?string $category=null): array {
-    $query=$db->prepare("SELECT e.*,c.category_name,c.category_color FROM events e LEFT JOIN categories c ON c.category_id=e.category_id
+    $query=$db->prepare("SELECT e.*,c.category_name,c.category_color FROM events e LEFT JOIN " . eventCategoryTable($db) . " c ON c.category_id=e.category_id
         WHERE e.status='published' AND e.start_date<=? AND COALESCE(e.end_date,e.start_date)>=? ". $filters['condition'] . ($category!==null?' AND c.category_name=?':'').' ORDER BY e.start_date,e.title,e.event_id');
     $params=array_merge([$date.' 23:59:59',$date.' 00:00:00'],$filters['params']);
     if($category!==null)$params[]=$category;

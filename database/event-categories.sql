@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS event_categories (
+    category_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    category_name VARCHAR(150) NOT NULL,
+    category_color VARCHAR(7) DEFAULT NULL,
+    description TEXT DEFAULT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

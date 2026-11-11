@@ -100,33 +100,24 @@ function scholarshipCards(array $fields): array {
     unset($cards, $card);
     return $groups;
 }
-function scholarshipImageDefaults(): array {
-    return [
-        'photo_1' => ['label'=>'Students gathered in a classroom for a school program', 'url'=>'/assets/images/acad_scholar_basic_edu.png', 'default'=>'/assets/images/acad_scholar_basic_edu.png'],
-        'photo_2' => ['label'=>'Group of smiling college students', 'url'=>'/assets/images/acad_scholar_college.png', 'default'=>'/assets/images/acad_scholar_college.png'],
-        'photo_3' => ['label'=>'Student athletes performing in green team uniforms', 'url'=>'/assets/images/athletic_scholar.png', 'default'=>'/assets/images/athletic_scholar.png'],
-        'photo_4' => ['label'=>'Requirements illustration', 'url'=>'/assets/images/scholarship/requirements-illustration.png', 'default'=>'/assets/images/scholarship/requirements-illustration.png'],
-    ];
-}
-function scholarshipImages(?PDO $db = null): array {
-    $images = scholarshipImageDefaults();
-    foreach (scholarshipStoredValues('scholarship_image_', $db) as $key => $value) {
-        $key = substr($key, strlen('scholarship_image_'));
-        if (isset($images[$key]) && preg_match('#^/uploads/scholarships/[a-f0-9]{32}\.(png|jpg|webp)$#D', $value)) $images[$key]['url'] = $value;
-    }
-    return $images;
-}
-
-function scholarshipValidateEntries(array $entries): array {
+function scholarshipValidateEntries(array $entries, ?array $categories = null): array {
+    $categories = $categories ?? scholarshipCategories();
     if (!array_is_list($entries) || count($entries) > 100) throw new InvalidArgumentException('Use up to 100 scholarship entries.');
     $seen = [];
     foreach ($entries as &$entry) {
-        if (!is_array($entry) || array_diff(array_keys($entry), ['id','category','title','description','url','pdf'])) throw new InvalidArgumentException('Invalid scholarship entry.');
+        if (!is_array($entry) || array_diff(array_keys($entry), ['id','category','title','description','url','pdf','eligibility','benefits','application','information','legacy'])) throw new InvalidArgumentException('Invalid scholarship entry.');
+        if (isset($entry['legacy']) && !in_array($entry['legacy'], ['basic','college','athletic'], true)) throw new InvalidArgumentException('Invalid scholarship information reference.');
         if (isset($entry['pdf']) && (!is_string($entry['pdf']) || ($entry['pdf'] !== '' && !preg_match('#^/uploads/scholarships/[a-f0-9]{32}\.pdf$#D', $entry['pdf'])))) throw new InvalidArgumentException('Invalid scholarship PDF.');
         foreach (['id','category','title','description','url'] as $key) if (!isset($entry[$key]) || !is_string($entry[$key])) throw new InvalidArgumentException('Invalid scholarship details.');
         if (!preg_match('/^[a-f0-9]{16}$/D', $entry['id']) || isset($seen[$entry['id']])) throw new InvalidArgumentException('Invalid or duplicate scholarship ID.');
         $seen[$entry['id']] = true;
-        if (!in_array($entry['category'], ['gnc','government'], true)) throw new InvalidArgumentException('Choose a scholarship category.');
+        if (!isset($categories[$entry['category']])) throw new InvalidArgumentException('Choose a scholarship category.');
+        foreach (['eligibility','benefits','application','information'] as $key) {
+            if (!isset($entry[$key])) continue;
+            if (!is_string($entry[$key])) throw new InvalidArgumentException('Invalid scholarship section.');
+            $entry[$key] = trim(strip_tags($entry[$key]));
+            if ((function_exists('mb_strlen') ? mb_strlen($entry[$key]) : strlen($entry[$key])) > 6000) throw new InvalidArgumentException('Scholarship sections must be within 6000 characters.');
+        }
         foreach (['title'=>255,'description'=>6000] as $key => $max) {
             $entry[$key] = trim(strip_tags($entry[$key]));
             $length = function_exists('mb_strlen') ? mb_strlen($entry[$key]) : strlen($entry[$key]);
@@ -147,5 +138,70 @@ function scholarshipValidateEntries(array $entries): array {
 function scholarshipEntries(?PDO $db = null): array {
     $values = scholarshipStoredValues('scholarship_entries', $db);
     if (!isset($values['scholarship_entries'])) return [];
-    return scholarshipValidateEntries(json_decode($values['scholarship_entries'], true, 16, JSON_THROW_ON_ERROR));
+    return scholarshipValidateEntries(json_decode($values['scholarship_entries'], true, 16, JSON_THROW_ON_ERROR), scholarshipCategories($db));
+}
+
+function scholarshipValidateCategories(array $categories): array {
+    if (!array_is_list($categories) || !$categories || count($categories)>50) throw new InvalidArgumentException('Use between 1 and 50 scholarship categories.');
+    $result=[]; $names=[];
+    foreach ($categories as $category) {
+        if (!is_array($category) || !is_string($category['id']??null) || !preg_match('/^[a-z][a-z0-9-]{0,39}$/D',$category['id']) || isset($result[$category['id']])) throw new InvalidArgumentException('Invalid or duplicate scholarship category.');
+        $label=$category['label']??null;
+        if (!is_string($label) || trim($label)==='' || strip_tags($label)!==$label || (function_exists('mb_strlen')?mb_strlen($label):strlen($label))>100) throw new InvalidArgumentException('Enter a category name of up to 100 characters.');
+        $label=trim($label);$name=function_exists('mb_strtolower')?mb_strtolower($label):strtolower($label);
+        if(isset($names[$name]))throw new InvalidArgumentException('Use unique scholarship category names.');
+        $result[$category['id']]=['id'=>$category['id'],'label'=>$label];$names[$name]=true;
+    }
+    return $result;
+}
+
+function scholarshipCategoriesEnabled(PDO $db): bool {
+    try {
+        $query = $db->prepare('SELECT 1 FROM content_migrations WHERE migration_key = ?');
+        $query->execute(['scholarship-categories-v1']);
+        return (bool)$query->fetchColumn();
+    } catch (PDOException $error) { if ($error->getCode() !== '42S02') throw $error; return false; }
+}
+
+/** Compatibility reader used before migration and to seed existing category IDs. */
+function scholarshipLegacyCategories(?PDO $db = null): array {
+    $values=scholarshipStoredValues('scholarship_categories',$db);
+    if(isset($values['scholarship_categories'])) return scholarshipValidateCategories(json_decode($values['scholarship_categories'],true,16,JSON_THROW_ON_ERROR));
+    $fields=scholarshipFields($db);
+    return ['gnc'=>['id'=>'gnc','label'=>$fields['copy_3']['value']], 'government'=>['id'=>'government','label'=>$fields['copy_4']['value']]];
+}
+
+function scholarshipCategories(?PDO $db = null): array {
+    $db = $db ?? getDB();
+    if (!scholarshipCategoriesEnabled($db)) return scholarshipLegacyCategories($db);
+    $rows = $db->query('SELECT category_id AS id,category_name AS label FROM scholarship_categories ORDER BY display_order,category_id')->fetchAll(PDO::FETCH_ASSOC);
+    return scholarshipValidateCategories($rows);
+}
+
+/** Caller owns the transaction shared with entries, PDF references and page text. */
+function scholarshipSaveCategories(PDO $db, array $categories): void {
+    if (!$db->inTransaction()) throw new LogicException('Save scholarship categories inside a transaction.');
+    $categories = scholarshipValidateCategories(array_values($categories));
+    if (scholarshipCategoriesEnabled($db)) {
+        $save = $db->prepare('INSERT INTO scholarship_categories (category_id,category_name,display_order) VALUES (?,?,?) ON DUPLICATE KEY UPDATE category_name=VALUES(category_name),display_order=VALUES(display_order)');
+        foreach (array_values($categories) as $order=>$category) $save->execute([$category['id'],$category['label'],$order]);
+        $delete = $db->prepare('DELETE FROM scholarship_categories WHERE category_id NOT IN (' . implode(',',array_fill(0,count($categories),'?')) . ')');
+        $delete->execute(array_keys($categories));
+    }
+    // Keep old readers and rollback compatible without making JSON authoritative.
+    $mirror = $db->prepare('INSERT INTO tuition_fee_content (field_key,content) VALUES (?,?) ON DUPLICATE KEY UPDATE content=VALUES(content)');
+    $mirror->execute(['scholarship_categories',json_encode(array_values($categories),JSON_THROW_ON_ERROR)]);
+}
+
+/** Bring existing editable scholarship information into the catalog without rewriting it. */
+function scholarshipCatalog(?PDO $db = null): array {
+    $entries=scholarshipEntries($db);
+    $version=scholarshipStoredValues('scholarship_catalog_version',$db);
+    if(isset($version['scholarship_catalog_version']))return $entries;
+    $fields=scholarshipFields($db);$legacy=[];
+    foreach(['basic'=>['0000000000000001','copy_10'], 'college'=>['0000000000000002','copy_13'], 'athletic'=>['0000000000000003','copy_8']] as $kind=>[$id,$key]) {
+        if(in_array($id,array_column($entries,'id'),true))continue;
+        $legacy[]=['id'=>$id,'category'=>'gnc','title'=>$fields[$key]['value'],'description'=>'','url'=>'','legacy'=>$kind];
+    }
+    return array_merge($legacy,$entries);
 }

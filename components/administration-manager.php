@@ -549,6 +549,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
     var editingPerson = null;
     function openPerson(p) {
         editingPerson = p;
+        $('adm-person-photo').dataset.sectionKey = state.active;
         $('adm-person-photo').dataset.profileKey = 'person:' + (p ? p.id : 0);
         $('adm-person-title').textContent = p ? 'Edit this person' : 'Add a new person';
         $('adm-person-name').value = p ? p.name : '';
@@ -580,6 +581,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
     var editingOffice = null;
     function openOffice(o) {
         editingOffice = o;
+        $('adm-office-photo').dataset.sectionKey = state.active;
         $('adm-office-photo').dataset.profileKey = 'office:' + (o ? o.id : 0);
         var c = (o && o.contact) || {};
         $('adm-office-title').textContent = o ? 'Edit this office' : 'Add a new office';

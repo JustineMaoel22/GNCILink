@@ -670,6 +670,7 @@ try {
                 $isNew = (int)($_POST['dept_id'] ?? 0) <= 0;
                 $dept  = saveDepartmentDetails([
                     'dept_id'      => (int)($_POST['dept_id'] ?? 0),
+                    ... (array_key_exists('short_code', $_POST) ? ['short_code' => $_POST['short_code']] : []),
                     'dept_name'    => $_POST['dept_name']    ?? '',
                     'description'  => $_POST['description']  ?? '',
                     'hero_text'    => $_POST['hero_text']    ?? '',
@@ -681,7 +682,7 @@ try {
                 echo json_encode([
                     'success'    => true,
                     'message'    => $isNew
-                        ? 'Department created. It is now live on the College Departments page — add its logo and page text below.'
+                        ? 'Department created and hidden from the website. Add its content, then choose Show on the website when ready.'
                         : 'Department details saved.',
                     'department' => departmentAdminPayload($dept),
                 ]);

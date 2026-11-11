@@ -355,7 +355,7 @@ if ($program !== null) {
                     <a href="<?= $e($departmentIndexUrl) ?>" title="<?= $e($departmentIndexTitle) ?>"><?= $e(gncBreadcrumbShortLabel($departmentIndexTitle)) ?></a>
                     <?php if ($deptName !== ''): ?>
                     <i class="bi bi-chevron-right"></i>
-                    <a href="<?= $e($deptUrl) ?>" title="<?= $e($deptName) ?>"><?= $e(gncBreadcrumbShortLabel($deptName, (string)($program['dept_slug'] ?? ''))) ?></a>
+                    <a href="<?= $e($deptUrl) ?>" title="<?= $e($deptName) ?>"><?= $e($programDepartment && !$isBasicProgram && !$isGraduateProgram ? departmentBreadcrumbLabel($programDepartment) : $deptName) ?></a>
                     <?php endif; ?>
                     <i class="bi bi-chevron-right"></i>
                     <span title="<?= $e($fullName) ?>" aria-current="page"><?= $e($program['program_code'] ?: $shortName) ?></span>

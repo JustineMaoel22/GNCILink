@@ -1,189 +1,70 @@
 <?php
 require_once __DIR__ . '/../../components/scholarship-content.php';
 cePreviewActive();
-$schFields = scholarshipFields();
-$schImages = scholarshipImages();
-$schEntries = scholarshipEntries();
-$schMark = fn($key) => ceField('scholarship-text', ['key'=>$key, 'label'=>$schFields[$key]['label'], 'max'=>$schFields[$key]['max'], 'multiline'=>$schFields[$key]['max'] > 255, 'optional'=>str_ends_with($key, '_grade')]);
-$schText = fn($key) => nl2br(ceAttr($schFields[$key]['value']));
-$schCards = scholarshipCards($schFields);
-$schRequirements = [];
-foreach (scholarshipDefaultRequirements() as $i => $value) $schRequirements[] = $schFields['requirement_' . $i]['value'];
+$schFields=scholarshipFields();$schEntries=scholarshipCatalog();$schCategories=scholarshipCategories();
+$schPreview=cePreviewCanManage();
+$schMark=fn($key)=>ceField('scholarship-text',['key'=>$key,'label'=>$schFields[$key]['label'],'max'=>$schFields[$key]['max'],'multiline'=>$schFields[$key]['max']>255,'optional'=>str_ends_with($key,'_grade')]);
+$schText=fn($key)=>nl2br(ceAttr($schFields[$key]['value']));
+$requested=is_string($_GET['scholarship']??null)?$_GET['scholarship']:'';
+$category=is_string($_GET['category']??null)?$_GET['category']:array_key_first($schCategories);
+if(!isset($schCategories[$category]))$category=array_key_first($schCategories);
+$selected=null;
+foreach($schEntries as $entry)if($entry['id']===$requested){$selected=$entry;$category=$entry['category'];break;}
+if(!$selected)foreach($schEntries as $entry)if($entry['category']===$category){$selected=$entry;break;}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= ceAttr($schFields['copy_1']['value']) ?> | Guagua National Colleges</title>
     <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/assets/css/navbar-style.css" rel="stylesheet">
-    <link href="/assets/css/footer-style.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-    <link href="/assets/css/scholarship-style.css?v=<?= filemtime(__DIR__ . '/../../assets/css/scholarship-style.css') ?>" rel="stylesheet">
-    <link href="/assets/css/skeleton-style.css" rel="stylesheet">
-    <link rel="icon" type="image/x-icon" href="/assets/images/logos/gnc-logo-v1.svg">
+    <link href="/assets/css/navbar-style.css" rel="stylesheet"><link href="/assets/css/footer-style.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="/assets/css/tuition-fees-style.css?v=<?= filemtime(__DIR__.'/../../assets/css/tuition-fees-style.css') ?>" rel="stylesheet">
+    <link href="/assets/css/scholarship-workspace.css?v=<?= filemtime(__DIR__.'/../../assets/css/scholarship-workspace.css') ?>" rel="stylesheet">
+    <link rel="icon" href="/assets/images/logos/gnc-logo-v1.svg">
 </head>
 <body>
-    <?php $activeSection = 'admissions'; ?>
-    <?php include_once __DIR__ . '/../../components/navbar.php'; ?>
-
-    <section class="scholarship-intro">
-        <div class="scholarship-hero">
-            <div class="scholarship-hero-inner">
-                <nav class="scholarship-breadcrumb" aria-label="breadcrumb">
-                    <a class="gnc-breadcrumb-home" href="/" aria-label="Home" title="Home"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 1 0 7h2v8h4v-5h4v5h4V7h2L8 1Z"/></svg></a><i class="bi bi-chevron-right" aria-hidden="true"></i>
-                    <span>Admissions</span>
-                    <i class="bi bi-chevron-right"></i>
-                    <span class="scholarship-current"><?= $schText('copy_1') ?></span>
-                </nav>
-                <h1<?= $schMark('copy_1') ?>><?= $schText('copy_1') ?></h1>
-                <p<?= $schMark('copy_2') ?>><?= $schText('copy_2') ?></p>
-            </div>
-        </div>
+<?php $activeSection='admissions';include_once __DIR__.'/../../components/navbar.php'; ?>
+<section class="tuition-intro">
+    <div class="tuition-hero"><div class="tuition-hero-inner">
+        <nav class="tuition-breadcrumb" aria-label="breadcrumb"><a href="/">Home</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span>Admissions</span><i class="bi bi-chevron-right" aria-hidden="true"></i><span><?= $schText('copy_1') ?></span></nav>
+        <h1<?= $schMark('copy_1') ?>><?= $schText('copy_1') ?></h1>
+        <p<?= $schMark('copy_2') ?>><?= $schText('copy_2') ?></p>
+    </div></div>
+</section>
+<main class="tuition-documents scholarship-workspace" id="scholarshipWorkspace">
+    <aside class="fee-sidebar" aria-labelledby="schCategoriesTitle">
+        <h2 id="schCategoriesTitle"><i class="bi bi-mortarboard" aria-hidden="true"></i> Scholarship Categories</h2>
+        <label class="fee-search"><i class="bi bi-search" aria-hidden="true"></i><span class="visually-hidden">Search scholarships</span><input id="scholarshipSearch" type="search" placeholder="Search scholarships…" aria-controls="scholarshipNavigation" autocomplete="off"></label>
+        <?php if($schPreview): ?><button type="button" class="fee-editor-manage" data-ve-scholarship-manage>Manage scholarships</button><?php endif; ?>
+        <details class="sch-navigation" open><summary>Browse categories and scholarships</summary>
+        <nav id="scholarshipNavigation" aria-label="Scholarship categories">
+        <?php foreach($schCategories as $key=>$group): ?>
+            <details class="sch-category-group" data-sch-category="<?= ceAttr($key) ?>"<?= $key===$category?' open':'' ?>>
+                <summary class="fee-category<?= $key===$category?' is-active':'' ?>"><i class="bi bi-mortarboard" aria-hidden="true"></i><span><?= ceAttr($group['label']) ?></span><i class="bi bi-chevron-down" aria-hidden="true"></i></summary>
+                <div class="fee-document-list">
+                <?php foreach($schEntries as $entry): if($entry['category']!==$key)continue; ?>
+                    <a class="fee-document-choice" data-sch-select="<?= ceAttr($entry['id']) ?>" href="?category=<?= ceAttr($key) ?>&amp;scholarship=<?= ceAttr($entry['id']) ?>"<?= $entry['id']===($selected['id']??'')?' aria-current="true"':'' ?>><?= ceAttr($entry['title']) ?></a>
+                <?php endforeach; ?>
+                </div>
+            </details>
+        <?php endforeach; ?>
+        </nav></details>
+        <p id="scholarshipSearchStatus" class="fee-search-status" role="status" hidden>No matching scholarships or categories.</p>
+    </aside>
+    <section class="fee-viewer" aria-label="Scholarship PDF document" id="scholarshipDetails"<?= $selected?' data-scholarship-entry="'.ceAttr($selected['id']).'"':'' ?>>
+        <header class="fee-document-header"><div class="fee-document-info"><span class="fee-pdf-icon"><i class="bi bi-file-earmark-pdf-fill" aria-hidden="true"></i></span><div><h2 id="scholarshipTitle" tabindex="-1"><?= ceAttr($selected['title']??$schCategories[$category]['label']) ?></h2><p id="scholarshipCategory"><?= !empty($selected['pdf'])?'PDF Document · ':'' ?><?= ceAttr($schCategories[$category]['label']) ?></p></div></div>
+        <a class="fee-download" id="scholarshipDownload"<?= !empty($selected['pdf'])?' href="'.ceAttr($selected['pdf']).'"':' hidden' ?> download><i class="bi bi-download" aria-hidden="true"></i> Download PDF</a></header>
+        <?php if($schPreview): ?><button type="button" class="fee-editor-manage" data-ve-scholarship-upload<?= !$selected?' disabled':'' ?>><i class="bi bi-upload" aria-hidden="true"></i> <span id="scholarshipUploadLabel"><?= !empty($selected['pdf'])?'Replace PDF':'Upload PDF' ?></span></button><?php endif; ?>
+        <div class="fee-document-stage" id="scholarshipPdf"<?= empty($selected['pdf'])?' hidden':'' ?>><iframe id="scholarshipPdfFrame" title="<?= ceAttr(($selected['title']??'Scholarship').' (PDF)') ?>"<?= !empty($selected['pdf'])?' src="'.ceAttr($selected['pdf']).'#view=FitH"':'' ?>></iframe></div>
+        <p class="fee-viewer-note" id="scholarshipPdfNote"<?= empty($selected['pdf'])?' hidden':'' ?>>Having trouble viewing the document? <a id="scholarshipOpenPdf"<?= !empty($selected['pdf'])?' href="'.ceAttr($selected['pdf']).'"':'' ?> target="_blank" rel="noopener">Open PDF in a new tab</a></p>
+        <div class="fee-empty" id="scholarshipEmpty"<?= !empty($selected['pdf'])?' hidden':'' ?>><span class="fee-empty-icon"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i></span><h3 id="scholarshipEmptyTitle"><?= $selected?'Scholarship document coming soon':'No scholarships available in this category yet.' ?></h3><p>No PDF document is available yet.</p><a href="/pages/contact-us.php">Contact us for scholarship information</a></div>
     </section>
-
-    <section class="scholarship-body">
-        <div class="scholarship-container">
-
-            <ul class="nav scholarship-tabs" id="scholarshipTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="gnc-tab" data-bs-toggle="tab" data-bs-target="#gnc-pane" type="button" role="tab" aria-controls="gnc-pane" aria-selected="true"<?= $schMark('copy_3') ?>><?= $schText('copy_3') ?></button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="gov-tab" data-bs-toggle="tab" data-bs-target="#gov-pane" type="button" role="tab" aria-controls="gov-pane" aria-selected="false"<?= $schMark('copy_4') ?>><?= $schText('copy_4') ?></button>
-                </li>
-            </ul>
-
-            <div class="tab-content">
-                <div class="tab-pane fade show active" id="gnc-pane" role="tabpanel" aria-labelledby="gnc-tab" tabindex="0">
-                    <p class="sch-lead"<?= $schMark('copy_5') ?>><?= $schText('copy_5') ?></p>
-
-                    <div class="sch-photo-grid">
-                        <a href="#basicEdModal" class="sch-photo-card blue" role="button" data-bs-toggle="modal" data-bs-target="#basicEdModal">
-                            <img src="<?= ceAttr($schImages['photo_1']['url']) ?>" alt="Students gathered in a classroom for a school program" loading="lazy"<?= ceManageMark('data-ve-img="scholarship-image" data-ve-key="photo_1"') ?>>
-                            <div class="sch-photo-caption">
-                                <h2<?= $schMark('copy_6') ?>><?= $schText('copy_6') ?></h2>
-                                <span<?= $schMark('copy_18') ?>><?= $schText('copy_18') ?></span>
-                            </div>
-                        </a>
-
-                        <a href="#collegeModal" class="sch-photo-card gold" role="button" data-bs-toggle="modal" data-bs-target="#collegeModal">
-                            <img src="<?= ceAttr($schImages['photo_2']['url']) ?>" alt="Group of smiling college students" loading="lazy"<?= ceManageMark('data-ve-img="scholarship-image" data-ve-key="photo_2"') ?>>
-                            <div class="sch-photo-caption">
-                                <h2<?= $schMark('copy_7') ?>><?= $schText('copy_7') ?></h2>
-                                <span<?= $schMark('copy_19') ?>><?= $schText('copy_19') ?></span>
-                            </div>
-                        </a>
-
-                        <a href="#athletic" class="sch-photo-card green">
-                            <img src="<?= ceAttr($schImages['photo_3']['url']) ?>" alt="Student athletes performing in green team uniforms" loading="lazy"<?= ceManageMark('data-ve-img="scholarship-image" data-ve-key="photo_3"') ?>>
-                            <div class="sch-photo-caption">
-                                <h2<?= $schMark('copy_8') ?>><?= $schText('copy_8') ?></h2>
-                            </div>
-                        </a>
-                    </div>
-                    <?php $schEntryCategory = 'gnc'; include __DIR__ . '/../../components/scholarship-entry-list.php'; ?>
-                </div>
-
-                <div class="tab-pane fade" id="gov-pane" role="tabpanel" aria-labelledby="gov-tab" tabindex="0">
-                    <?php if (cePreviewCanManage() || !array_filter($schEntries, static fn($entry) => $entry['category'] === 'government') || $schFields['copy_9']['value'] !== scholarshipFieldDefaults()['copy_9']['value']): ?>
-                    <p class="sch-lead"<?= $schMark('copy_9') ?>><?= $schText('copy_9') ?></p>
-                    <?php endif; ?>
-                    <?php $schEntryCategory = 'government'; include __DIR__ . '/../../components/scholarship-entry-list.php'; ?>
-                </div>
-            </div>
-
-        </div>
-    </section>
-
-    <?php
-    function renderScholarshipCard(array $c, string $prefix, callable $mark): void { ?>
-        <div class="sch-voucher <?= $c['type'] ?>">
-            <div class="sch-voucher-paper">
-                <span class="sch-voucher-badge"<?= $mark($prefix . '_badge') ?>><?= htmlspecialchars($c['badge']) ?></span>
-                <div class="sch-voucher-label"<?= $mark($prefix . '_label') ?>><?= htmlspecialchars($c['label']) ?></div>
-                <div class="sch-voucher-pct" aria-label="<?= (int)$c['pct'] ?> percent off">
-                    <span class="num"<?= $mark($prefix . '_pct') ?>><?= (int)$c['pct'] ?></span>
-                    <span class="tag"><span class="sign">%</span><span class="off">OFF</span></span>
-                </div>
-                <div class="sch-voucher-pill">
-                    <?php if ($c['grade'] || cePreviewCanManage()): ?><strong<?= $mark($prefix . '_grade') ?>><?= htmlspecialchars($c['grade']) ?></strong><?php endif; ?>
-                    <span<?= $mark($prefix . '_program') ?>><?= htmlspecialchars($c['program']) ?></span>
-                </div>
-            </div>
-        </div>
-    <?php } ?>
-
-    <div class="modal fade sch-modal" id="basicEdModal" tabindex="-1" aria-labelledby="basicEdModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 class="modal-title" id="basicEdModalLabel"<?= $schMark('copy_10') ?>><?= $schText('copy_10') ?></h2>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <h3 class="sch-modal-heading"<?= $schMark('copy_11') ?>><?= $schText('copy_11') ?></h3>
-                    <div class="sch-voucher-grid">
-                        <?php foreach ($schCards['incomingGrade7'] as $i => $card) renderScholarshipCard($card, 'incomingGrade7_' . $i, $schMark); ?>
-                    </div>
-
-                    <h3 class="sch-modal-heading"<?= $schMark('copy_12') ?>><?= $schText('copy_12') ?></h3>
-                    <div class="sch-voucher-grid">
-                        <?php foreach ($schCards['oldStudents'] as $i => $card) renderScholarshipCard($card, 'oldStudents_' . $i, $schMark); ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-
-    <div class="modal fade sch-modal" id="collegeModal" tabindex="-1" aria-labelledby="collegeModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 class="modal-title" id="collegeModalLabel"<?= $schMark('copy_13') ?>><?= $schText('copy_13') ?></h2>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <h3 class="sch-modal-heading"<?= $schMark('copy_14') ?>><?= $schText('copy_14') ?></h3>
-                    <div class="sch-voucher-grid">
-                        <?php foreach ($schCards['collegeIncoming'] as $i => $card) renderScholarshipCard($card, 'collegeIncoming_' . $i, $schMark); ?>
-                    </div>
-
-                    <h3 class="sch-modal-heading"<?= $schMark('copy_15') ?>><?= $schText('copy_15') ?></h3>
-                    <div class="sch-voucher-grid">
-                        <?php foreach ($schCards['collegeOld'] as $i => $card) renderScholarshipCard($card, 'collegeOld_' . $i, $schMark); ?>
-                    </div>
-
-                    <h3 class="sch-modal-heading"<?= $schMark('copy_16') ?>><?= $schText('copy_16') ?></h3>
-                    <div class="sch-req">
-                        <div class="sch-req-main">
-                            <p class="sch-req-lead"<?= $schMark('copy_17') ?>><?= $schText('copy_17') ?></p>
-                            <ul class="sch-req-list">
-                                <?php foreach ($schRequirements as $i => $req): ?>
-                                    <li>
-                                        <span class="sch-req-icon"><i class="bi bi-file-earmark-text"></i></span>
-                                        <span class="sch-req-text"<?= $schMark('requirement_' . $i) ?>><?= htmlspecialchars($req) ?></span>
-                                        <i class="bi bi-check-square sch-req-check" aria-hidden="true"></i>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-                        <!-- ILLUSTRATION GOES HERE: replace the src with your requirements illustration -->
-                        <img class="sch-req-art" src="<?= ceAttr($schImages['photo_4']['url']) ?>" alt="" loading="lazy"<?= ceManageMark('data-ve-img="scholarship-image" data-ve-key="photo_4"') ?>>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <?= ceData('veScholarshipData', ['fields'=>$schFields, 'images'=>$schImages, 'entries'=>$schEntries]) ?>
-    <?php include_once __DIR__ . '/../../components/footer.php'; ?>
-    <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>
-
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
-    <script src="/assets/js/skeleton-loader.js"></script>
-
+</main>
+<script type="application/json" id="scholarshipCatalogData"><?= json_encode(['categories'=>array_values($schCategories),'entries'=>$schEntries,'category'=>$category,'selected'=>$selected['id']??null],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_SLASHES) ?></script>
+<?= ceData('veScholarshipData',['fields'=>$schFields,'images'=>new stdClass(),'entries'=>$schEntries,'categories'=>array_values($schCategories)]) ?>
+<script src="/assets/js/scholarship-workspace.js?v=<?= filemtime(__DIR__.'/../../assets/js/scholarship-workspace.js') ?>" defer></script>
+<?php include_once __DIR__.'/../../components/footer.php'; ?>
 </body>
 </html>

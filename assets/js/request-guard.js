@@ -20,11 +20,14 @@
         const url=new URL(input instanceof Request?input.url:String(input),location.href);
         if (url.origin!==location.origin || !/^https?:$/.test(url.protocol)) return nativeFetch(input,options);
         const init=Object.assign({},options), method=String(init.method||(input instanceof Request?input.method:'GET')).toUpperCase();
+        // Forms with their own error display can suppress duplicate transport notices.
+        const notify=init.requestGuardNotice!==false;
+        delete init.requestGuardNotice;
         const key=url.pathname;
         const until=cooldowns.get(key)||0;
         if (until>Date.now()) {
             const seconds=Math.ceil((until-Date.now())/1000), message='Please wait '+seconds+' seconds before trying again.';
-            inform(message);
+            if(notify)inform(message);
             return new Response(JSON.stringify({success:false,ok:false,error:message,message,retry_after:seconds}),{status:429,headers:{'Content-Type':'application/json','Retry-After':String(seconds)}});
         }
         cooldowns.delete(key);
@@ -47,11 +50,11 @@
                 const seconds=Math.min(86400,Math.max(1,Number.isFinite(numeric)?numeric:(Date.parse(value)-Date.now())/1000||60));
                 if(cooldowns.size>=100)cooldowns.delete(cooldowns.keys().next().value);
                 cooldowns.set(key,Date.now()+seconds*1000);
-                inform('This service is busy. Please wait '+Math.ceil(seconds)+' seconds before trying again.');
+                if(notify)inform('This service is busy. Please wait '+Math.ceil(seconds)+' seconds before trying again.');
             }
             return response;
         } catch(error) {
-            if(init.signal.aborted && !caller?.aborted) inform('The request took too long. Check whether your change was saved before trying again.');
+            if(notify && init.signal.aborted && !caller?.aborted) inform('The request took too long. Check whether your change was saved before trying again.');
             throw error;
         }
     };

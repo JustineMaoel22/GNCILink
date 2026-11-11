@@ -905,7 +905,7 @@ try {
                         <?php if (!empty($pin['image_path'])): ?>
                         <img class="gnc-pin-img" src="<?= htmlspecialchars($pin['image_path']) ?>" alt=""<?= gncImageDimensionAttributes($pin['image_path'],1280,720) ?> loading="<?= $i === 0 ? 'eager' : 'lazy' ?>" decoding="async">
                         <?php else: ?>
-                        <div class="gnc-pin-fallback">
+                        <div class="gnc-pin-fallback gnc-empty-post-image" aria-hidden="true">
                             <i class="bi <?= $isFbPin ? 'bi-facebook' : ($pin['type_label'] === 'News' ? 'bi-newspaper' : 'bi-megaphone') ?>"></i>
                         </div>
                         <?php endif; ?>
@@ -945,13 +945,13 @@ try {
                     if ($rawTitle === '') { $rawTitle = $isFacebook ? 'Facebook Update' : 'Announcement'; }
                 ?>
                 <div class="gnc-news-row<?= $idx % 2 === 1 ? ' gnc-news-row--reverse' : '' ?> gnc-reveal"<?= (!$isFacebook && !empty($item['id'])) ? ceManageMark('data-ve-post="' . ($isNews ? 'news' : 'announcement') . '" data-ve-id="' . (int)$item['id'] . '" data-ve-label="' . htmlspecialchars($rawTitle, ENT_QUOTES) . '"') : '' ?>>
-                    <div class="gnc-news-img skeleton-wrap">
+                    <div class="gnc-news-img skeleton-wrap<?= empty($item['image_path']) ? ' is-loaded' : '' ?>">
                         <?php if (!empty($item['image_path'])): ?>
                         <img src="<?= htmlspecialchars($item['image_path']) ?>"
                              alt="<?= htmlspecialchars($item['title'] ?? 'Facebook post') ?>"
                              <?= gncImageDimensionAttributes($item['image_path'],1280,720) ?> loading="lazy" decoding="async">
                         <?php else: ?>
-                        <div class="gnc-news-img-fallback"><i class="bi <?= $fallbackIcon ?>"></i></div>
+                        <div class="gnc-news-img-fallback gnc-empty-post-image" aria-hidden="true"></div>
                         <?php endif; ?>
                         <span class="gnc-news-shine" aria-hidden="true"></span>
                     </div>

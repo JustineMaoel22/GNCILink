@@ -18,13 +18,13 @@ function personPhotoPath(?string $path): ?string {
 
 function personPhotoInventory(PDO $db): array {
     // Include archived profiles too: their images can return through restoration.
-    $sql = "SELECT CONCAT('person:',p.person_id) AS profile_key,p.name,COALESCE(m.file_path,p.image_path) AS image
+    $sql = "SELECT CONCAT('person:',p.person_id) AS profile_key,p.name,COALESCE(m.file_path,p.image_path) AS image,CONCAT('administration:',p.section_key) AS scope
         FROM admin_people p LEFT JOIN media_library m ON m.media_id=p.media_id
-        UNION ALL SELECT CONCAT('office:',o.office_id),o.head_name,COALESCE(m.file_path,o.image_path)
+        UNION ALL SELECT CONCAT('office:',o.office_id),o.head_name,COALESCE(m.file_path,o.image_path),CONCAT('administration:',o.section_key)
         FROM admin_offices o LEFT JOIN media_library m ON m.media_id=o.media_id
-        UNION ALL SELECT CONCAT('dean:',d.dept_id),d.dean_name,m.file_path
+        UNION ALL SELECT CONCAT('dean:',d.dept_id),d.dean_name,m.file_path,CONCAT('department:',d.dept_id)
         FROM departments d LEFT JOIN media_library m ON m.media_id=d.dean_media_id
-        UNION ALL SELECT 'president:1',p.name,m.file_path
+        UNION ALL SELECT 'president:1',p.name,m.file_path,'homepage'
         FROM homepage_president p LEFT JOIN media_library m ON m.media_id=p.media_id
         ORDER BY profile_key";
     $rows=$db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
@@ -38,6 +38,21 @@ function personPhotoInventory(PDO $db): array {
         unset($row);
     }
     return $rows;
+}
+
+/** Existing records always use their persisted page, never a client override. */
+function personPhotoScope(string $key, string $section, array $inventory): string {
+    foreach ($inventory as $profile) {
+        if ($profile['profile_key'] === $key) return $profile['scope'];
+    }
+    if ($key === 'president:1') return 'homepage';
+    if (in_array($key, ['person:0', 'office:0'], true) && $section !== '') {
+        $stmt = getDB()->prepare('SELECT section_key FROM admin_sections WHERE section_key = ?');
+        $stmt->execute([$section]);
+        $saved = $stmt->fetchColumn();
+        if ($saved !== false) return 'administration:' . $saved;
+    }
+    throw new InvalidArgumentException('Choose a valid page before checking this photo.');
 }
 
 function personPhotoUnavailable(): array {
@@ -93,23 +108,23 @@ function personPhotoDecision(array $scores, array $profiles): array {
     $blocked = count(array_filter($matches, static fn($m) => $m['high_confidence'])) > 0;
     return ['checked'=>true,'ok'=>!$blocked,'reason'=>$matches ? 'duplicate_face' : 'clear',
         'matches'=>$matches,'message'=>$matches
-            ? "Possible Duplicate Photo Detected: This person's face appears to be already assigned to another profile (".$matches[0]['name']."). Please verify that you uploaded the correct photo."
+            ? "This person's photo or face is already assigned to another entry on this page (".$matches[0]['name']."). Please upload a different photo."
             : ''];
 }
 
-function personPhotoCheck(string $path, string $name, string $key = '', ?callable $compare = null): array {
+function personPhotoCheck(string $path, string $name, string $key = '', ?callable $compare = null, string $section = ''): array {
     try {
         // The shared switch covers browser prechecks and server-side saves,
         // including retained portraits checked after a rename or restoration.
         if (!aiImageCheckerEnabled()) return ['checked'=>false,'ok'=>true,'reason'=>'disabled','message'=>''];
         if (personPhotoName($name) === '') return ['checked'=>false,'ok'=>false,'reason'=>'name_required','message'=>'Enter the person’s full name before checking their photo.'];
         $profiles = []; $fingerprints = []; $missing = 0;
-        $normalized=function_exists('personnelEnabled') && personnelEnabled(getDB());
-        $identities=$normalized?personnelProfiles(getDB()):[];
-        $identity=(int)($GLOBALS['personnel_write_identity'][$key]??($identities[$key]['personnel_id']??0));
-        foreach (personPhotoInventory(getDB()) as $profile) {
+        $inventory = personPhotoInventory(getDB());
+        try { $scope = personPhotoScope($key, $section, $inventory); }
+        catch (InvalidArgumentException $e) { return ['checked'=>false,'ok'=>false,'reason'=>'invalid_scope','message'=>$e->getMessage()]; }
+        foreach ($inventory as $profile) {
+            if ($profile['scope'] !== $scope) continue;
             if ($profile['profile_key'] === $key) continue;
-            if ($normalized ? ($identity>0 && (int)($profile['personnel_id']??0)===$identity) : personPhotoName((string)$profile['name']) === personPhotoName($name)) continue;
             if (empty($profile['image'])) continue;
             $local = personPhotoPath($profile['image']);
             if (!$local) {
@@ -129,7 +144,7 @@ function personPhotoCheck(string $path, string $name, string $key = '', ?callabl
         $result['coverage_notice'] = $missing ? $missing . ' existing profile photo(s) are missing and could not be compared. Replace those photos to restore full coverage.' : '';
         $hash = hash_file('sha256',$path);
         $hash = $GLOBALS['imageUploadOriginalHashes'][$hash] ?? $hash;
-        $reviewKey = hash('sha256', json_encode([$hash,personPhotoName($name),$key,$fingerprints]));
+        $reviewKey = hash('sha256', json_encode([$hash,personPhotoName($name),$key,$scope,$fingerprints]));
         $result['review_key'] = $reviewKey;
         $result['can_review'] = rbacIsSuper();
         if (rbacIsSuper() && ($_SESSION['person_photo_reviews'][$reviewKey] ?? 0) > time()) {
@@ -151,7 +166,7 @@ function personPhotoCheck(string $path, string $name, string $key = '', ?callabl
 }
 
 /** Called before any personnel write, including renames without a new upload. */
-function personPhotoEnforce(?array $upload, bool $remove, ?string $existing, string $name, string $key): void {
+function personPhotoEnforce(?array $upload, bool $remove, ?string $existing, string $name, string $key, string $section = ''): void {
     // Serialize personnel writes across sessions; hold the DB lock through the subsequent save.
     static $locked = false;
     if (!$locked) {
@@ -172,6 +187,6 @@ function personPhotoEnforce(?array $upload, bool $remove, ?string $existing, str
     $info = @getimagesize($path);
     if (!$info || !in_array($info[2], [IMAGETYPE_JPEG,IMAGETYPE_PNG,IMAGETYPE_WEBP], true)
         || filesize($path) > 5*1024*1024 || $info[0]*$info[1] > 40000000) throw new RuntimeException('Please choose a valid portrait up to 5 MB and 40 megapixels.');
-    $result = personPhotoCheck($path, $name, $key);
+    $result = personPhotoCheck($path, $name, $key, null, $section);
     if (!$result['ok']) throw new RuntimeException($result['message']);
 }

@@ -9,6 +9,7 @@
     const alertBox = document.getElementById('alert-container');
     const toggle = document.getElementById('show-login-password');
     let submitting = false;
+    let countdown = null;
 
     function fieldError(input, message) {
         document.getElementById(`${input.id}-error`).textContent = message;
@@ -16,11 +17,32 @@
         input.setAttribute('aria-invalid', String(Boolean(message)));
     }
     function showAlert(message) {
+        clearInterval(countdown);
+        countdown = null;
         alertBox.replaceChildren();
         const alert = document.createElement('div');
         alert.className = 'alert alert-danger';
         alert.textContent = message;
         alertBox.append(alert);
+    }
+    function showCountdown(seconds) {
+        showAlert('Too many sign-in attempts. Please wait before trying again.');
+        const timer = document.createElement('span');
+        timer.setAttribute('role', 'timer');
+        timer.setAttribute('aria-live', 'off');
+        alertBox.firstElementChild.append(timer);
+        const deadline = Date.now() + seconds * 1000;
+        function update() {
+            const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+            if (remaining === 0) {
+                showAlert('The waiting period has ended. You can try signing in again.');
+                return;
+            }
+            const minutes = Math.floor(remaining / 60);
+            timer.textContent = ` Time remaining: ${minutes}:${String(remaining % 60).padStart(2, '0')}.`;
+        }
+        countdown = setInterval(update, 1000);
+        update();
     }
     function validate() {
         const address = email.value.trim();
@@ -43,6 +65,8 @@
     form.addEventListener('submit', async event => {
         event.preventDefault();
         if (submitting) return;
+        clearInterval(countdown);
+        countdown = null;
         alertBox.replaceChildren();
         if (!validate()) {
             (email.classList.contains('is-invalid') ? email : password).focus();
@@ -56,6 +80,7 @@
         let redirecting = false;
         try {
             const response = await fetch('/admin/auth/auth_handler.php', {
+                requestGuardNotice: false,
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: new URLSearchParams({
@@ -66,13 +91,27 @@
                     remember_me: document.getElementById('remember-me').checked ? '1' : '0'
                 })
             });
+            // Session expiry can redirect an AJAX request to the HTML login page.
+            if (response.redirected) {
+                const destination = new URL(response.url, window.location.href);
+                if (destination.origin === window.location.origin && /^\/admin\/login(?:\.php)?$/.test(destination.pathname)) {
+                    redirecting = true;
+                    window.location.assign(destination.href);
+                    return;
+                }
+            }
             const data = await response.json();
             if (response.ok && typeof data.redirect === 'string' && data.redirect.startsWith('/admin/')) {
                 redirecting = true;
                 window.location.assign(data.redirect);
                 return;
             }
-            showAlert(response.status === 401 ? 'Invalid email or password. Please try again.' : (typeof data.error === 'string' ? data.error : 'Unable to sign in. Please try again.'));
+            const retryAfter = Number(response.headers.get('Retry-After'));
+            if (response.status === 429 && Number.isFinite(retryAfter) && retryAfter > 0) {
+                showCountdown(retryAfter);
+            } else {
+                showAlert(response.status === 401 ? 'Invalid email or password. Please try again.' : (typeof data.error === 'string' ? data.error : 'Unable to sign in. Please try again.'));
+            }
         } catch (_) {
             showAlert('Unable to sign in right now. Please try again.');
         } finally {

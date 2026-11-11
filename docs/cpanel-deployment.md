@@ -63,7 +63,16 @@ Target: shared hosting with direct HTTPS, confirmed 2026-11-09.
 8. Run `php scripts/check-deployment.php` using the host's actual PHP executable.
    It reads configuration/schema/grants without printing credentials or migrating
    anything. Check web PHP settings separately using cPanel MultiPHP INI Editor.
-9. Verify SMTP TLS/credentials and SPF/DKIM/DMARC. Use a controlled account to test
+9. Use `MAIL_TRANSPORT=smtp` (the default), with `MAIL_HOST`, `MAIL_PORT`,
+   `MAIL_ENCRYPTION`, `MAIL_USERNAME` and `MAIL_PASSWORD` from cPanel's Email
+   Accounts > Connect Devices page. Use `ssl` for implicit TLS (usually 465) or
+   `tls` for STARTTLS (usually 587), matching that account's settings. Set
+   `MAIL_FROM_ADDRESS` to the mailbox address or another allowed sender, plus
+   `MAIL_FROM_NAME`. PHPMailer is the SMTP client library; cPanel is the provider.
+   Deploy the existing PHPMailer dependency. Alternatively, `MAIL_TRANSPORT=mail`
+   uses a host-provided local PHP mail service without SMTP credentials.
+   `config/secrets.php` overrides `.env`. Verify SMTP access and SPF/DKIM/DMARC.
+   Use a controlled account to test
    login, OTP delivery/resend, password recovery/expiry, remembered-device logout,
    and session revocation after a password change. Confirm actual inbox delivery.
 10. On staging, test role restrictions, draft/save/approve/publish, image and PDF

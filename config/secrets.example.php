@@ -19,11 +19,16 @@ return [
     // Public HTTPS URL for password reset links when ADMIN_PWA_ORIGIN is not configured.
     'AUTH_PUBLIC_URL' => 'https://YOUR_LIVE_DOMAIN',
 
-    // Email (PHPMailer SMTP)
-    'MAIL_HOST' => 'smtp.gmail.com',
-    'MAIL_PORT' => 587,
-    'MAIL_ENCRYPTION' => 'tls',
-    'MAIL_USERNAME' => 'YOUR_SMTP_EMAIL',
-    'MAIL_PASSWORD' => 'YOUR_16_CHAR_GMAIL_APP_PASSWORD',
+    // cPanel mailbox SMTP: copy values from Email Accounts > Connect Devices.
+    // PHPMailer is the SMTP client library, not the email provider.
+    'MAIL_TRANSPORT' => 'smtp',
+    'MAIL_HOST' => 'YOUR_CPANEL_MAIL_HOST',
+    'MAIL_PORT' => 465,
+    'MAIL_ENCRYPTION' => 'ssl',
+    'MAIL_USERNAME' => 'YOUR_CPANEL_MAILBOX_ADDRESS',
+    'MAIL_PASSWORD' => 'YOUR_CPANEL_MAILBOX_PASSWORD',
+    'MAIL_FROM_ADDRESS' => 'no-reply@YOUR_LIVE_DOMAIN',
     'MAIL_FROM_NAME' => 'GNC Admin System',
+    // Optional alternative, only when the host provides a local PHP mail service:
+    // 'MAIL_TRANSPORT' => 'mail',
 ];

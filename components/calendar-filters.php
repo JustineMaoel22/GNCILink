@@ -18,7 +18,6 @@ function publicCalendarFilters(array $query): array
         if (eventDepartmentsReady()) {
             $condition=" AND (e.dept_id = ? OR EXISTS (SELECT 1 FROM event_departments ed WHERE ed.event_id = e.event_id AND ed.dept_id = ?) OR (e.dept_id IS NULL AND e.program IN (SELECT program_code FROM programs WHERE dept_id = ?)))";
             $params=[$departmentId,$departmentId,$departmentId];
-            $params=[$departmentId,$departmentId];
         } else {
             $condition=' AND e.program IN (SELECT program_code FROM programs WHERE dept_id = ?)';
             $params[]=$departmentId;
@@ -28,13 +27,21 @@ function publicCalendarFilters(array $query): array
             $params[]=eventDepartmentGroup($departments[$department]);
         }
     } elseif ($program!==null) {
-        $condition=' AND e.program = ?';$params[]=$program;
+        $condition=" AND COALESCE(
+            (SELECT MAX(ep.program_code=?) FROM event_programs ep WHERE ep.event_id=e.event_id),
+            e.program=? OR e.program='ALL'
+        )";
+        $params=[$program,$program];
         if (eventDepartmentsReady()) {
-            $condition=" AND (e.program = ? OR (e.program = 'ALL' AND e.dept_id = (SELECT dept_id FROM programs WHERE program_code = ? LIMIT 1)))";
-            $params[]=$program;
+            $programDepartmentId = getProgramDepartmentMap()[$program] ?? null;
+            $condition.=" AND COALESCE(
+                (SELECT MAX(COALESCE(ed.dept_id=?,0)) FROM event_departments ed WHERE ed.event_id=e.event_id),
+                e.dept_id IS NULL OR e.dept_id=?
+            )";
+            array_push($params,$programDepartmentId,$programDepartmentId);
         }
         if(eventAudienceGroupsReady()) {
-            $condition=' AND ('.substr($condition,5)." OR EXISTS (SELECT 1 FROM programs gp JOIN departments gd ON gd.dept_id=gp.dept_id WHERE gp.program_code=? AND gd.department_type=e.audience_group AND (e.audience_group<>'college' OR (COALESCE(gd.slug,'')<>'graduate-school' AND gd.dept_name<>'Graduate School'))))";
+            $condition.=" AND (e.audience_group='all' OR EXISTS (SELECT 1 FROM programs gp JOIN departments gd ON gd.dept_id=gp.dept_id WHERE gp.program_code=? AND gd.department_type=e.audience_group AND (e.audience_group<>'college' OR (COALESCE(gd.slug,'')<>'graduate-school' AND gd.dept_name<>'Graduate School'))))";
             $params[]=$program;
         }
     }

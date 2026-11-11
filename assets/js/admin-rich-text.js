@@ -1,6 +1,13 @@
 (function (window, document) {
     'use strict';
 
+    function linkUrl(value) {
+        const url = String(value).trim();
+        if (/[\x00-\x20\x7f<>"'\\]/.test(url)) return url;
+        const domain = url.match(/^((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(?::[0-9]{1,5})?(?:[/?#].*)?$/i);
+        return domain && !/\.(?:php|html?|pdf|jpe?g|png|gif|webp|svg|css|js|json|txt|xml|zip|docx?|xlsx?|pptx?)$/i.test(domain[1]) ? 'https://' + url : url;
+    }
+
     // Used by both saved and unsaved previews. Keep only the editor's safe formats.
     function previewHtml(html) {
         const template = document.createElement('template');
@@ -9,7 +16,7 @@
         for (const node of [...template.content.querySelectorAll('*')].reverse()) {
             if (['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'MATH', 'TEMPLATE'].includes(node.tagName)) { node.remove(); continue; }
             if (!allowed.has(node.tagName)) { node.replaceWith(...node.childNodes); continue; }
-            const href = node.tagName === 'A' ? node.getAttribute('href') : null;
+            const href = node.tagName === 'A' && node.hasAttribute('href') ? linkUrl(node.getAttribute('href')) : null;
             const alignment = node.style.textAlign || [...node.classList].find(value => /^ql-align-(center|right|justify)$/.test(value))?.slice(9);
             for (const attribute of [...node.attributes]) node.removeAttribute(attribute.name);
             if (['P', 'H1', 'H2', 'H3', 'H4', 'LI', 'BLOCKQUOTE'].includes(node.tagName) && ['left', 'center', 'right', 'justify'].includes(alignment)) node.style.textAlign = alignment;
@@ -24,6 +31,12 @@
 
     window.GncRichText = { previewHtml };
     window.initQuill = function (containerId, hiddenInputId, options = {}) {
+        const Link = Quill.import('formats/link');
+        if (!Link.gncDomainLinks) {
+            const sanitize = Link.sanitize;
+            Link.sanitize = function (value) { return sanitize.call(this, linkUrl(value)); };
+            Link.gncDomainLinks = true;
+        }
         const quill = new Quill('#' + containerId, {
             theme: 'snow',
             placeholder: options.placeholder || 'Write content here…',

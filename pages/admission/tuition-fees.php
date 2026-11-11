@@ -7,7 +7,7 @@ $feeMark = function ($key) use ($feeFields) { $f=$feeFields[$key]; return ceFiel
 $feeText = fn($key) => $feeFields[$key]['max']>255 ? renderSectionContent($feeFields[$key]['value']) : htmlspecialchars($feeFields[$key]['value'],ENT_QUOTES,'UTF-8');
 $feeCategories = tuitionFeeCategories();
 $feeCategory = (string)($_GET['category'] ?? 'college');
-if (!isset($feeCategories[$feeCategory])) $feeCategory = 'college';
+if (!isset($feeCategories[$feeCategory])) $feeCategory = array_key_first($feeCategories);
 $feeSelected = $feeCategories[$feeCategory];
 $feeDocumentIndex = filter_var($_GET['document'] ?? 0, FILTER_VALIDATE_INT);
 if ($feeDocumentIndex === false || $feeDocumentIndex < 0 || !isset($feeSelected['documents'][$feeDocumentIndex])) $feeDocumentIndex = 0;
@@ -53,6 +53,7 @@ $feeH = fn($value) => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
         <aside class="fee-sidebar" aria-labelledby="feeCategoriesTitle">
             <h2 id="feeCategoriesTitle"><i class="bi bi-file-earmark-text" aria-hidden="true"></i> <span<?= $feeMark('categories_title') ?>><?= $feeText('categories_title') ?></span></h2>
             <label class="fee-search"><i class="bi bi-search" aria-hidden="true"></i><span class="visually-hidden">Search fee documents</span><input type="search" id="feeSearch" placeholder="Search documents…" autocomplete="off" aria-controls="feeCategoryList feeDocumentList"></label>
+            <?php if ($feePreview): ?><button type="button" class="fee-editor-manage" data-ve-fee-categories><i class="bi bi-list-ol" aria-hidden="true"></i> Manage categories</button><?php endif; ?>
             <nav id="feeCategoryList" class="fee-categories" aria-label="Fee categories">
                 <?php foreach ($feeCategories as $key => $category): ?>
                 <a class="fee-category<?= $key === $feeCategory ? ' is-active' : '' ?>" href="?category=<?= $feeH($key) ?>" data-fee-category="<?= $feeH($key) ?>"<?= $key === $feeCategory ? ' aria-current="true"' : '' ?>><i class="bi bi-<?= $feeH($category['icon']) ?>" aria-hidden="true"></i><span<?= $feeMark('category_' . $key) ?>><?= $feeH($category['label']) ?></span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
@@ -106,7 +107,7 @@ $feeH = fn($value) => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
         </section>
     </main>
     <script type="application/json" id="feeDocumentsData"><?= json_encode($feeCategories, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) ?></script>
-    <?= ceData('veTuitionData', ['fields'=>$feeFields, 'icons'=>tuitionFeeIconChoices()]) ?>
+    <?= ceData('veTuitionData', ['fields'=>$feeFields, 'icons'=>tuitionFeeIconChoices(), 'categoryIcons'=>tuitionFeeCategoryIcons()]) ?>
     <script src="/assets/js/tuition-fees.js?v=<?= filemtime(__DIR__ . '/../../assets/js/tuition-fees.js') ?>" defer></script>
     <?php include_once __DIR__ . '/../../components/footer.php'; ?>
 

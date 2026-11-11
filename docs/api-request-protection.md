@@ -40,7 +40,7 @@ policies additionally share a total budget of 2400/IP/hour and 800/user/hour.
 Ordinary unfiltered public navigation and static assets are not throttled here.
 
 Existing authentication limits remain: 30 login attempts/IP/15 minutes, account
-lockout after five failed password attempts, and OTP send/resend/verification
+lockout for 15 minutes after ten failed password attempts, and OTP send/resend/verification
 controls in `includes/auth-security.php` and `admin/auth/auth_handler.php`.
 The chatbot retains its rolling `GNCBOT_IP_LIMIT` allowance (default 20/10 minutes)
 and `GNCBOT_DAILY_LIMIT` (default 3000); greetings/status do not consume that

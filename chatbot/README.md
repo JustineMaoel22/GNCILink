@@ -2,6 +2,12 @@
 
 Floating chat widget + PHP endpoint that answers from the live GNCILink database (RAG) using Gemini.
 
+For local Docker diagnostics that call Gemini, run PHP as the web-server user:
+`docker compose exec -T --user www-data web php chatbot/tests/cli_test.php --live`.
+Running provider calls as root can create rate-limit counters the web process
+cannot update, which can appear as a busy response. Preserve counter contents
+when correcting ownership; do not reset or loosen limits to work around it.
+
 ## Install (3 steps)
 1. Upload the `chatbot/` folder to the project root (next to `config/`, `index.php`).
 2. Add to the existing `.env` (the one `config/config.php` already loads):

@@ -1,11 +1,12 @@
 <?php
+require_once __DIR__ . '/../../includes/event-categories.php';
 if (!isset($payload, $row, $e)) { http_response_code(404); exit; }
 // The enclosing submission has already been restricted to its owner or a Super Admin.
 $calendarReviewQuery=getDB()->prepare('SELECT approved_json,series_id,calendar_action,filename FROM calendar_import_batches WHERE token=? AND user_id=?');
 $calendarReviewQuery->execute([$payload['post']['import_token']??'', $row['user_id']]);
 $calendarReviewBatch=$calendarReviewQuery->fetch(PDO::FETCH_ASSOC);
 $calendarReviewRows=$calendarReviewBatch?json_decode($calendarReviewBatch['approved_json']??'[]',true):[];
-$calendarReviewCategories=getDB()->query('SELECT category_id,category_name FROM categories')->fetchAll(PDO::FETCH_KEY_PAIR);
+$calendarReviewCategories=array_column(eventCategoryChoices(getDB(), true), 'category_name', 'category_id');
 $calendarReviewDepartments=getDB()->query('SELECT dept_id,dept_name FROM departments')->fetchAll(PDO::FETCH_KEY_PAIR);
 ?>
 <?php if (!empty($calendarReviewBatch['calendar_action'])): ?>

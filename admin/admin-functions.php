@@ -44,7 +44,9 @@ function initSession() {
             session_regenerate_id(true);
             $_SESSION['_initiated'] = true;
         }
-        if(isset($_SESSION['last_activity'])&&time()-(int)$_SESSION['last_activity']>SESSION_TIMEOUT){authClearSession();header('Location: /admin/login.php?timeout=1');exit;}
+        // A visitor waiting out a login lockout has no authenticated session to expire.
+        // Keep inactivity expiry for signed-in users and pending OTP verification.
+        if((isLoggedIn()||isset($_SESSION['temp_user_id']))&&isset($_SESSION['last_activity'])&&time()-(int)$_SESSION['last_activity']>SESSION_TIMEOUT){authClearSession();header('Location: /admin/login.php?timeout=1');exit;}
         // Background presence polling must not keep an abandoned login alive.
         if (rbacRequestRoute()!=='/admin/action/editor-presence-handler.php') $_SESSION['last_activity'] = time();
     }
@@ -462,7 +464,7 @@ function createAnnouncement(array $data): ?int {
             rbacContentOwnerId(),
             $data['title'],
             $slug,
-            $data['content'],
+            richTextNormalizeLinks((string)$data['content']),
             $data['category_id'] ?? null,
             $program,
             $deptId,
@@ -553,7 +555,7 @@ function updateAnnouncement(int $id, array $data): bool {
         $stmt->execute([
             $data['title'],
             $slug,
-            $data['content'],
+            richTextNormalizeLinks((string)$data['content']),
             $data['category_id'] ?? null,
             $program,
             $deptId,
@@ -1150,7 +1152,7 @@ function createNews(array $data): ?int {
             $category,
             $data['title'],
             $slug,
-            $data['content'],
+            richTextNormalizeLinks((string)$data['content']),
             $data['author'] !== '' && $data['author'] !== null ? $data['author'] : null,
             $data['featured_image'] ?? null,
             $status,
@@ -1228,7 +1230,7 @@ function updateNews(int $id, array $data): bool {
         $stmt->execute([
             $data['title'],
             $slug,
-            $data['content'],
+            richTextNormalizeLinks((string)$data['content']),
             $author,
             $category,
             $featuredImage,
@@ -3482,6 +3484,7 @@ function departmentAdminPayload(array $dept): array {
         'slug'            => $dept['slug'] ?? null,
         'name'            => $dept['dept_name'],
         'dept_name'       => $dept['dept_name'],   // the editor's field key
+        'short_code'      => departmentShortCode($dept),
         'description'     => $dept['description']  ?? null,
         'hero_text'       => $dept['hero_text']    ?? null,
         'about_text'      => $dept['about_text']   ?? null,
@@ -3639,6 +3642,8 @@ function saveDepartmentDetails(array $data): array {
     $db      = getDB();
     $deptId  = (int)($data['dept_id'] ?? 0);
     $details = cleanDepartmentDetails($data);
+    $shortCode = array_key_exists('short_code', $data) || $deptId <= 0
+        ? cleanDepartmentShortCode($data['short_code'] ?? '') : null;
 
     if ($deptId > 0) {
         $current = getDepartmentById($deptId);
@@ -3648,7 +3653,9 @@ function saveDepartmentDetails(array $data): array {
         }
     }
 
+    $ownsTransaction = !$db->inTransaction();
     try {
+        if ($ownsTransaction) $db->beginTransaction();
         if ($deptId > 0) {
             if (!getDepartmentById($deptId)) {
                 throw new Exception('Department not found.');
@@ -3679,8 +3686,8 @@ function saveDepartmentDetails(array $data): array {
 
             $stmt = $db->prepare("
                 INSERT INTO departments (dept_name, slug, description, about_text, hero_text,
-                                         facebook_url, office_label, theme_color)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                         facebook_url, office_label, theme_color, archived_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())
             ");
             $stmt->execute([
                 $details['dept_name'],
@@ -3696,7 +3703,14 @@ function saveDepartmentDetails(array $data): array {
             logActivity((int)($_SESSION['user_id'] ?? 0), 'CREATE', 'departments', $deptId,
                 'Created department: ' . $details['dept_name'] . ' (slug: ' . $slug . ')');
         }
-    } catch (PDOException $e) {
+        if ($shortCode !== null) {
+            $stmt = $db->prepare("INSERT INTO department_page_content (dept_id, field_key, content) VALUES (?, 'short_code', ?) ON DUPLICATE KEY UPDATE content = VALUES(content)");
+            $stmt->execute([$deptId, $shortCode]);
+        }
+        if ($ownsTransaction) $db->commit();
+    } catch (Throwable $e) {
+        if ($ownsTransaction && $db->inTransaction()) $db->rollBack();
+        if (!($e instanceof PDOException)) throw $e;
         error_log('Save department details error: ' . $e->getMessage());
         throw new Exception('Could not save the department. Please try again.');
     }
@@ -4398,7 +4412,7 @@ function saveAdministrationPersonRecord(
         $q->execute([$current['media_id']]);
         $photoPath = $q->fetchColumn() ?: $photoPath;
     }
-    personPhotoEnforce($photoFile, $removePhoto, $photoPath, $name, 'person:' . $personId);
+    personPhotoEnforce($photoFile, $removePhoto, $photoPath, $name, 'person:' . $personId, $sectionKey);
 
     $oldMediaId = ($current && $current['media_id'] !== null) ? (int)$current['media_id'] : null;
     [$mediaId, $imagePath, $stored] = administrationResolvePhoto(
@@ -4505,7 +4519,7 @@ function saveAdministrationOfficeRecord(
         $photoPath = $q->fetchColumn() ?: $photoPath;
     }
     $phone = contactNumberSave($phone, $current['phone'] ?? null);
-    personPhotoEnforce($photoFile, $removePhoto, $photoPath, $headName, 'office:' . $officeId);
+    personPhotoEnforce($photoFile, $removePhoto, $photoPath, $headName, 'office:' . $officeId, $sectionKey);
 
     $oldMediaId = ($current && $current['media_id'] !== null) ? (int)$current['media_id'] : null;
     [$mediaId, $imagePath, $stored] = administrationResolvePhoto(

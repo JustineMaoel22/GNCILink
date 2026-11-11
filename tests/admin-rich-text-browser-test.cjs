@@ -79,9 +79,10 @@ async function until(fn, message) {
             }
             await setText();await click('.ql-link');
             assert.equal(await evaluate("document.activeElement===modalQuill.theme.tooltip.textbox"),true,'Link input retains modal focus');
-            await evaluate("modalQuill.theme.tooltip.textbox.value='https://example.com/one'");
+            await evaluate("modalQuill.theme.tooltip.textbox.value='youtube.com'");
             await click('.ql-tooltip .ql-action');
-            assert.equal(await evaluate('modalQuill.getFormat(0,5).link'),'https://example.com/one');
+            assert.equal(await evaluate('modalQuill.getFormat(0,5).link'),'https://youtube.com','Bare domain links use HTTPS');
+            assert.equal(await evaluate(`new DOMParser().parseFromString(GncRichText.previewHtml('<a href="youtube.com">Video</a>'),'text/html').querySelector('a').getAttribute('href')`),'https://youtube.com','Preview normalizes existing bare links');
             await evaluate("modalQuill.setSelection(2,0,'user')");await delay(50);
             await click('.ql-tooltip .ql-action');
             await evaluate("modalQuill.theme.tooltip.textbox.value='https://example.com/two'");await click('.ql-tooltip .ql-action');

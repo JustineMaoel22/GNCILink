@@ -1633,6 +1633,7 @@ img { max-width: 100%; }
    Additions for the dynamic program page
    ===================================================================== */
 .template-hero { background-color: var(--gnc-template-tint); }
+.template-hero:not(.has-banner) { background-color: var(--gnc-cream, #F9F6F1); }
 .template-curriculum-intro { color: #333; margin-bottom: 0; }
 .uniform-lightbox-close:hover { color: #fff; opacity: .8; }
 

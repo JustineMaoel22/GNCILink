@@ -26,4 +26,14 @@ rtCheck(sectionToEditorHtml("Plain\n\nText") === '<p>Plain</p><p>Text</p>', 'Leg
 $unsafe = richTextSanitize('<h1 onclick="bad()">Title</h1><p class="ql-align-center malicious" style="position:fixed;background:url(javascript:bad())">Text<script>bad()</script><a href="javascript:bad()">Bad link</a></p>');
 rtCheck(!preg_match('/onclick|javascript|script|position|background|malicious/', $unsafe), 'Unsupported attributes, scripts and unsafe links are removed.');
 rtCheck(str_contains($unsafe, 'text-align:center'), 'Safe alignment survives removal of unsafe attributes.');
+
+foreach (['youtube.com'=>'https://youtube.com','www.youtube.com/watch?v=abc'=>'https://www.youtube.com/watch?v=abc','example.edu.ph/info?q=one&sort=asc'=>'https://example.edu.ph/info?q=one&sort=asc'] as $input=>$expected) {
+    rtCheck(richTextLinkUrl($input)===$expected,'Bare domain uses HTTPS.');
+    rtCheck(str_contains(richTextSanitize('<p><a href="'.htmlspecialchars($input,ENT_QUOTES).'">Visit</a></p>'),'href="'.htmlspecialchars($expected,ENT_QUOTES).'"'),'Sanitized link retains normalized destination.');
+}
+foreach (['/news-and-announcement','#events','../news-article.php?slug=test','guide.pdf','images/photo.jpg','https://example.com','http://example.com','mailto:office@example.com','tel:+639123456789'] as $url) {
+    rtCheck(richTextLinkUrl($url)===$url,'Existing schemes and local paths remain unchanged.');
+}
+rtCheck(richTextNormalizeLinks('<p><strong>Story</strong> <a href="youtube.com">Video</a></p>')==='<p><strong>Story</strong> <a href="https://youtube.com">Video</a></p>','Only the bare anchor destination changes.');
+rtCheck(!str_contains(richTextSanitize('<a href="javascript:alert(1)">Bad</a><a href="data:text/html,bad">Bad</a>'),'href='),'Unsafe schemes remain rejected.');
 echo "$checks rich-text storage, reopening, rendering, compatibility and security checks passed.\n";

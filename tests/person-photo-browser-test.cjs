@@ -30,7 +30,7 @@ async function until(fn, message) {
     const portrait = fs.readFileSync(path.join(__dirname,'../uploads/administration/086f12f12d75f5d4788185497d0df834.jpg')).toString('base64');
     await evaluate(`document.head.innerHTML='<meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif}</style>';
         window.portrait=${JSON.stringify(portrait)};
-        document.body.innerHTML='<label>Full name<input id="adm-person-name" value="Sir CJ"></label><input type="file" id="adm-person-photo" data-profile-key="person:2">';
+        document.body.innerHTML='<label>Full name<input id="adm-person-name" value="Sir CJ"></label><input type="file" id="adm-person-photo" data-profile-key="person:2" data-section-key="trustees">';
         window.CE_CONFIG={csrf:'test-csrf'}; window.accepted=0;window.requests=[];
         document.getElementById('adm-person-photo').addEventListener('change',()=>accepted++);
         window.fetch=async (url,options)=>{requests.push(Object.fromEntries(options.body));return {json:async()=>window.reply};};`);
@@ -52,6 +52,7 @@ async function until(fn, message) {
     assert.equal(await evaluate('document.querySelectorAll(".pc-compare [onerror]").length'),0);
     assert.deepEqual(await evaluate('requests[0].person_name'), 'Sir CJ');
     assert.equal(await evaluate('requests[0].profile_key'),'person:2');
+    assert.equal(await evaluate('requests[0].section_key'),'trustees');
     assert.equal(await evaluate('document.querySelectorAll(".pc-actions button").length'),1);
     await evaluate('document.querySelector(".pc-actions button").click()');
     assert.equal(await evaluate('document.getElementById("adm-person-photo").files.length'),0);

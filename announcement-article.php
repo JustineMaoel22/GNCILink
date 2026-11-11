@@ -30,6 +30,7 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
  */
 function announcementSanitizeHtml(string $html): string {
     if (trim($html) === '') return '';
+    $html = richTextNormalizeLinks($html);
     // Fallback if the server has no DOM extension: strip to a basic safe tag list, no attributes except link/image URLs.
     if (!class_exists('DOMDocument')) {
         $html = preg_replace('#<(script|style|iframe|object|embed|form|svg)\b.*?</\1>#is', '', $html);
@@ -368,7 +369,7 @@ $bannerTitle = 'Announcements';
                     <?php if (!empty($r['image'])): ?>
                         <div class="rel-img" style="background-image:url('<?= e(str_replace("'", '%27', $r['image'])) ?>')" role="img" aria-label=""></div>
                     <?php else: ?>
-                        <div class="rel-img"><i class="bi bi-image"></i></div>
+                        <div class="rel-img gnc-empty-post-image" aria-hidden="true"></div>
                     <?php endif; ?>
                     <div class="rel-body"><small><?= e($rDate) ?><?= $r['external'] ? ' · <i class="bi bi-facebook"></i> Facebook' : '' ?></small><h3><?= e($r['title']) ?></h3></div>
                 </a>

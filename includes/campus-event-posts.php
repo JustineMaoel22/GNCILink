@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/event-categories.php';
 require_once __DIR__ . '/announcement-categories.php';
 
 function campusEventPosts(PDO $db, array $query, string $category = 'School Event', bool $includeEvents = false): array {
@@ -33,7 +34,7 @@ function campusEventPosts(PDO $db, array $query, string $category = 'School Even
             SELECT e.event_id AS post_id, 'event' AS post_type,
                 e.title, NULL AS slug, COALESCE(e.start_date,e.created_at) AS post_date,
                 m.file_path AS image_path, NULL AS permalink_url
-            FROM events e JOIN categories c ON c.category_id=e.category_id
+            FROM events e JOIN " . eventCategoryTable($db) . " c ON c.category_id=e.category_id
             LEFT JOIN media_library m ON m.media_id=e.media_id
             WHERE e.status='published' AND c.category_name=?";
         $params[] = $category;

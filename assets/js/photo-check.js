@@ -36,7 +36,7 @@
             input.id === 'president-photo' ? '#president-name' : '.dean-name-input';
         var scope = input.closest('[data-dept-id]') || document;
         var field = scope.querySelector(selector);
-        return { name: field ? field.value : '', key: input.dataset.profileKey || '' };
+        return { name: field ? field.value : '', key: input.dataset.profileKey || '', section: input.dataset.sectionKey || '' };
     }
 
     // ── popup ──
@@ -103,7 +103,7 @@
         open('<header class="pc-header"><span class="pc-warning-icon" aria-hidden="true">' +
             '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.8 2.1 18a2 2 0 0 0 1.7 3h16.4a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></svg></span>' +
             '<div><span class="pc-eyebrow">Photo verification</span><h2 id="pc-comparison-title">Possible Duplicate Photo Detected</h2>' +
-            '<p id="pc-comparison-description">This photo looks similar to an existing profile photo. Compare the photos before continuing.</p></div></header>' +
+            '<p id="pc-comparison-description">This photo or face may already be assigned to another entry on this page. Compare the photos below or upload a different photo.</p></div></header>' +
             '<div class="pc-body"><div class="pc-results"></div>' +
             '<aside class="pc-guidance"><strong>A similarity match is not proof of identity.</strong><p>Check the person\u2019s name and photo to make sure this assignment is correct.</p></aside>' +
             '<div class="pc-coverage" hidden></div></div>' +
@@ -224,6 +224,7 @@
         var person = context(input);
         fd.append('person_name', person.name);
         fd.append('profile_key', person.key);
+        fd.append('section_key', person.section || '');
 
         function accept() {
             close();

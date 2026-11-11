@@ -108,14 +108,17 @@ define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_DURATION', 900); // 15 minutes
 
 // ------------------------------------------------------------
-// Email Configuration (PHPMailer)
+// Email Configuration
 // ------------------------------------------------------------
-define('MAIL_HOST', trim((string)($_ENV['MAIL_HOST'] ?? 'smtp.gmail.com')));
+// cPanel mailbox SMTP uses the hosting account's mail client settings.
+define('MAIL_TRANSPORT', strtolower(trim((string)env('MAIL_TRANSPORT', 'smtp'))));
+define('MAIL_HOST', trim((string)env('MAIL_HOST', '')));
 define('MAIL_PORT', (int) env('MAIL_PORT',587));
-define('MAIL_USERNAME', trim((string)($_ENV['MAIL_USERNAME'] ?? '')));
-define('MAIL_PASSWORD', trim((string)($_ENV['MAIL_PASSWORD'] ?? '')));
-define('MAIL_FROM_NAME', trim((string)($_ENV['MAIL_FROM_NAME'] ?? 'GNC Admin System')));
-define('MAIL_ENCRYPTION', strtolower(trim((string)($_ENV['MAIL_ENCRYPTION'] ?? 'tls'))));
+define('MAIL_USERNAME', trim((string)env('MAIL_USERNAME', '')));
+define('MAIL_PASSWORD', (string)env('MAIL_PASSWORD', ''));
+define('MAIL_FROM_ADDRESS', trim((string)env('MAIL_FROM_ADDRESS', MAIL_USERNAME)));
+define('MAIL_FROM_NAME', trim((string)env('MAIL_FROM_NAME', 'GNC Admin System')));
+define('MAIL_ENCRYPTION', strtolower(trim((string)env('MAIL_ENCRYPTION', 'tls'))));
 
 // ------------------------------------------------------------
 // Facebook Page Feed

@@ -289,8 +289,8 @@ if ($editorMode) {
         $subs[] = ['label' => 'All departments', 'url' => $withPreview('/pages/academics/college/college-dept.php')];
         try {
             foreach (getDepartments() as $d) {
-                if (!empty($d['archived_at']) || empty($d['slug']) || in_array((string)$d['slug'], $basicEduSlugs, true) || $d['slug'] === 'graduate-school') continue;
-                $subs[] = ['key' => (string)$d['slug'], 'label' => (string)$d['dept_name'], 'url' => $withPreview('/pages/academics/college/college-department.php?slug=' . rawurlencode($d['slug']))];
+                if (empty($d['slug']) || in_array((string)$d['slug'], $basicEduSlugs, true) || $d['slug'] === 'graduate-school') continue;
+                $subs[] = ['key' => (string)$d['slug'], 'label' => (string)$d['dept_name'] . (!empty($d['archived_at']) ? ' (Hidden)' : ''), 'url' => $withPreview('/pages/academics/college/college-department.php?slug=' . rawurlencode($d['slug']))];
             }
         } catch (Throwable $e) { error_log('visual editor departments: ' . $e->getMessage()); }
         $pageUrl = $subs[0]['url'];
@@ -435,7 +435,7 @@ foreach (getContentHubPages() as $row) {
               'where' => $publicUrls[$slug] ?? ''];
 }
 if ($canManagePages) {
-    $hub[] = ['title'=>'Scholarship Opportunities','type'=>'Admissions','status'=>'live','ts'=>0,'note'=>'Scholarship information, photos, discounts and application requirements','open'=>'scholarships','href'=>'?page=scholarships','where'=>$publicUrls['scholarships']];
+    $hub[] = ['title'=>'Scholarship Opportunities','type'=>'Admissions','status'=>'live','ts'=>0,'note'=>'Scholarship categories, titles and PDF documents','open'=>'scholarships','href'=>'?page=scholarships','where'=>$publicUrls['scholarships']];
     $hub[] = ['title'=>'Online Payment Guide','type'=>'Admissions','status'=>'live','ts'=>0,'note'=>'Payment instructions, account details, links and illustrations','open'=>'online-payment-guide','href'=>'?page=online-payment-guide','where'=>$publicUrls['online-payment-guide']];
     $hub[] = ['title'=>'Tuition and Fees','type'=>'Admissions','status'=>'live','ts'=>0,'note'=>'Tuition text, fee categories and PDF schedules','open'=>'tuition-fees','href'=>'?page=tuition-fees','where'=>$publicUrls['tuition-fees']];
     foreach ($customPages as $cp) {
@@ -680,6 +680,8 @@ include __DIR__ . '/../components/header-admin.php';
 <script src="/assets/js/editor-history.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/editor-history.js'),0,12) ?>"></script>
 <script src="/assets/js/editor-presence.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/editor-presence.js'),0,12) ?>"></script>
 <?php if ($activeSlug === 'alumni'): ?><script src="/assets/js/alumni-voices-editor.js?v=<?= filemtime(__DIR__ . '/../assets/js/alumni-voices-editor.js') ?>"></script><?php endif; ?>
+<link rel="stylesheet" href="/assets/css/scholarship-manager.css?v=<?= (int)filemtime(__DIR__ . '/../assets/css/scholarship-manager.css') ?>">
+<script src="/assets/js/scholarship-manager.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/scholarship-manager.js'),0,12) ?>"></script>
 <script src="/assets/js/content-edit.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/content-edit.js'),0,12) ?>"></script>
 
 <?php else: ?>

@@ -1,0 +1,7 @@
+/* Shared empty image treatment for public post thumbnails. */
+.gnc-empty-post-image {
+    background: #eee url('/assets/images/post-image-placeholder.svg') center / min(22%, 80px) auto no-repeat !important;
+}
+.gnc-empty-post-image > i {
+    display: none;
+}

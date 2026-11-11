@@ -6,7 +6,7 @@ requireLogin();
 requirePermission('view_logs');
 require_once __DIR__.'/activity-log-view.php';
 header('Cache-Control: no-store, max-age=0');
-$filters = activityLogFilters($_GET);
+$filters = activityLogFilters(array_diff_key($_GET, ['module' => true]));
 $logs = $actions = $users = $modules = [];
 $total = 0; $pages = 1; $error = '';
 try {
@@ -18,7 +18,7 @@ try {
 }
 $e = fn($value) => htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $url = fn($changes = []) => '/admin/logs.php?'.http_build_query(array_merge($filters, $changes));
-$active = count(array_filter(array_intersect_key($filters, array_flip(['q','action','user','module','from','to'])), fn($v) => $v !== ''));
+$active = count(array_filter(array_intersect_key($filters, array_flip(['q','action','user','from','to'])), fn($v) => $v !== ''));
 $pageTitle = 'Activity Logs';
 require __DIR__.'/../components/header-admin.php';
 ?>
@@ -38,11 +38,10 @@ require __DIR__.'/../components/header-admin.php';
 <noscript><button class="btn btn-gnc" type="submit">Apply filters</button></noscript>
 
 </div>
-<details class="logs-more"<?= array_filter(array_intersect_key($filters,array_flip(['user','module','from','to'])),fn($v)=>$v!=='')?' open':'' ?>>
-<summary>More filters <span class="logs-muted">User, module and date range</span></summary>
+<details class="logs-more"<?= array_filter(array_intersect_key($filters,array_flip(['user','from','to'])),fn($v)=>$v!=='')?' open':'' ?>>
+<summary>More filters <span class="logs-muted">User and date range</span></summary>
 <div class="logs-filter-grid">
 <label for="log-user">User<select class="form-select" name="user" id="log-user"><option value="">All users</option><?php foreach($users as $user): ?><option value="<?= (int)$user['user_id'] ?>"<?= $filters['user']===(string)$user['user_id']?' selected':'' ?>><?= $e(activityLogUser($user)) ?></option><?php endforeach; ?></select></label>
-<label for="log-module">Module<select class="form-select" name="module" id="log-module"><option value="">All modules</option><?php foreach($modules as $module): ?><option value="<?= $e($module?:'__general') ?>"<?= $filters['module']===($module?:'__general')?' selected':'' ?>><?= $e(activityLogModule($module)) ?></option><?php endforeach; ?></select></label>
 <label for="log-from">From date<input class="form-control" type="date" id="log-from" name="from" value="<?= $e($filters['from']) ?>"></label>
 <label for="log-to">To date<input class="form-control" type="date" id="log-to" name="to" value="<?= $e($filters['to']) ?>"></label>
 </div></details>

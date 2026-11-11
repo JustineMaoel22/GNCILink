@@ -29,7 +29,7 @@ if (isset($alumni['recent_events_title'])):
             $editorMark = !$isFacebook ? ceManageMark('data-ve-post="' . ceAttr($post['post_type']) . '" data-ve-id="' . (int)$post['post_id'] . '" data-ve-date="' . $date->format('Y-m') . '" data-ve-label="' . ceAttr($title) . '"') : '';
         ?>
         <<?= $isEvent ? 'article' : 'a' ?> class="campus-recent-card"<?= $url ? ' href="' . $escape($url) . '"' : '' ?><?= $isFacebook ? ' target="_blank" rel="noopener noreferrer"' : '' ?><?= $editorMark ?>>
-            <?php if ($image !== ''): ?><img class="campus-recent-image" src="<?= $escape($image) ?>" alt="" loading="lazy" decoding="async"><?php else: ?><div class="campus-recent-placeholder" aria-hidden="true"><i class="bi bi-calendar-event"></i></div><?php endif; ?>
+            <?php if ($image !== ''): ?><img class="campus-recent-image" src="<?= $escape($image) ?>" alt="" loading="lazy" decoding="async"><?php else: ?><div class="campus-recent-placeholder gnc-empty-post-image" aria-hidden="true"></div><?php endif; ?>
             <time class="campus-recent-date" datetime="<?= $date->format('Y-m-d') ?>" aria-label="<?= $date->format('F j, Y') ?>"><span><?= strtoupper($date->format('M')) ?></span><strong><?= $date->format('d') ?></strong><span><?= $date->format('Y') ?></span></time>
             <div class="campus-recent-content"><span class="campus-recent-type"><?= $escape($label) ?><?= $isFacebook ? ' · From Facebook' : '' ?></span><h3><?= $escape($title) ?></h3><span class="campus-recent-meta"><i class="bi bi-calendar3" aria-hidden="true"></i> <?= $date->format('F j, Y') ?></span></div>
         </<?= $isEvent ? 'article' : 'a' ?>>

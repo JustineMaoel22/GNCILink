@@ -14,11 +14,19 @@ $db = getDB(); $newFiles = []; $oldFiles = [];
 try {
     $texts = json_decode((string)($_POST['texts'] ?? '{}'), true, 32, JSON_THROW_ON_ERROR);
     $changes = json_decode((string)($_POST['documents'] ?? '[]'), true, 32, JSON_THROW_ON_ERROR);
+    $categoryEntries = isset($_POST['categories']) ? json_decode((string)$_POST['categories'], true, 16, JSON_THROW_ON_ERROR) : null;
+    $deletedCategories = json_decode((string)($_POST['deleted_categories'] ?? '[]'), true, 16, JSON_THROW_ON_ERROR);
+    if (!is_array($deletedCategories) || count($deletedCategories) > 50 || ($deletedCategories && $categoryEntries === null)) throw new InvalidArgumentException('Invalid category deletions.');
     if (!is_array($texts) || !is_array($changes) || count($changes)>50) throw new InvalidArgumentException('Invalid tuition changes.');
-    if (($texts || $changes) && !function_exists('mb_strlen')) {
+    if (($texts || $changes || $categoryEntries !== null) && !function_exists('mb_strlen')) {
         throw new InvalidArgumentException('Enable the PHP mbstring extension in your hosting PHP settings, then publish again.');
     }
     $fields = tuitionFeeFields(); $categories = tuitionFeeCategories();
+    if (isset($_POST['categories'])) {
+        if (!is_array($categoryEntries)) throw new InvalidArgumentException('Invalid fee categories.');
+        $categories = tuitionFeeValidateCategories($categoryEntries, $categories, $deletedCategories);
+        foreach ($categories as $key => $category) $fields['category_' . $key] = ['max'=>100];
+    }
     foreach ($texts as $key => &$value) {
         if (!isset($fields[$key]) || !is_string($value)) throw new InvalidArgumentException('Unknown tuition text field.');
         if (($fields[$key]['type'] ?? '') === 'icon') {
@@ -30,6 +38,9 @@ try {
         if (mb_strlen($value)>$fields[$key]['max']) throw new InvalidArgumentException('The tuition text is too long.');
     } unset($value);
     $db->beginTransaction();
+    if ($categoryEntries !== null) {
+        $db->prepare('INSERT INTO tuition_fee_content (field_key,content) VALUES (?,?) ON DUPLICATE KEY UPDATE content=VALUES(content)')->execute(['fee_categories', json_encode($categoryEntries, JSON_THROW_ON_ERROR)]);
+    }
     foreach ($texts as $key => $value) $db->prepare('INSERT INTO tuition_fee_content (field_key,content) VALUES (?,?) ON DUPLICATE KEY UPDATE content=VALUES(content)')->execute([$key,$value]);
     $seen = [];
     foreach ($changes as $index => $change) {

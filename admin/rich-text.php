@@ -1,5 +1,27 @@
 <?php
 /** Shared safe rich-text storage and rendering, independent of database helpers. */
+/** Add HTTPS to a bare domain; retain explicit schemes, local paths and files. */
+function richTextLinkUrl(string $url): string {
+    $url = trim($url);
+    if (preg_match('~[\x00-\x20\x7f<>"\'\\\\]~', $url)) return $url;
+    if (preg_match('~\A((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(?::[0-9]{1,5})?(?:[/?#].*)?\z~iD', $url, $match)
+        && !preg_match('~\.(?:php|html?|pdf|jpe?g|png|gif|webp|svg|css|js|json|txt|xml|zip|docx?|xlsx?|pptx?)\z~iD', $match[1])) {
+        return 'https://' . $url;
+    }
+    return $url;
+}
+
+/** Change only anchor destinations so existing stored markup stays intact. */
+function richTextNormalizeLinks(string $html): string {
+    return preg_replace_callback('~<a\b[^>]*>~i', static function ($anchor) {
+        return preg_replace_callback('~\bhref\s*=\s*(["\'])(.*?)\1~is', static function ($attribute) {
+            $url = html_entity_decode($attribute[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $normalized = richTextLinkUrl($url);
+            return $normalized === $url ? $attribute[0] : 'href="' . htmlspecialchars($normalized, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"';
+        }, $anchor[0]);
+    }, $html);
+}
+
 function richTextLooksLikeHtml(string $s): bool {
     return (bool)preg_match('#<(p|br|h[1-4]|strong|em|u|s|strike|ul|ol|li|a|blockquote)[\s>/]#i', $s);
 }
@@ -61,7 +83,7 @@ function richTextSanitize(string $html): string {
             if ($tag === 'div') $tag = 'p';        // browsers add <div> for new lines
 
             if ($tag === 'a') {
-                $href = trim((string)$c->getAttribute('href'));
+                $href = richTextLinkUrl((string)$c->getAttribute('href'));
                 $href = preg_replace('/[\x00-\x1F\x7F\s]+/', '', $href);
                 if ($href === '' || !preg_match('#^(https?://|mailto:|tel:|/(?!/)|\#)#i', $href)) { $out .= $inner; continue; }
                 $ext = preg_match('#^https?://#i', $href);

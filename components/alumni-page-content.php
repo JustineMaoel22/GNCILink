@@ -1,6 +1,7 @@
 <?php
 /** Alumni content uses the existing page_sections draft/publish workflow. */
 require_once __DIR__ . '/../includes/responsive-backgrounds.php';
+require_once __DIR__ . '/../includes/event-categories.php';
 
 function alumniPageValidate(string $key, string $value): string {
     $limits = ['title_start'=>100, 'title_accent'=>100, 'title_continues'=>100, 'title_end'=>100, 'intro'=>2000, 'actions'=>5000, 'hero_image'=>500, 'stories'=>100000, 'voices_label'=>100, 'voices_title'=>100, 'voices_subtitle'=>100, 'events_title'=>100, 'events_subtitle'=>100, 'events_intro'=>2000, 'events_image'=>500, 'recent_events_title'=>100, 'survey_label'=>100, 'survey_title'=>100, 'survey_subtitle'=>100, 'survey_scan_label'=>100, 'survey_caption'=>100, 'survey_image'=>500];
@@ -19,7 +20,7 @@ function alumniPageValidate(string $key, string $value): string {
 /** Published upcoming/ongoing Alumni events only; never exposes drafts or pending entries. */
 function alumniUpcomingEvents(PDO $db, string $today): array {
     $query = $db->prepare("SELECT e.event_id,e.title,e.location,e.start_date,e.end_date
-        FROM events e JOIN categories c ON c.category_id=e.category_id
+        FROM events e JOIN " . eventCategoryTable($db) . " c ON c.category_id=e.category_id
         WHERE c.category_name=? AND e.status='published'
           AND COALESCE(e.end_date,e.start_date)>=?
         ORDER BY e.start_date ASC,e.event_id ASC LIMIT 3");

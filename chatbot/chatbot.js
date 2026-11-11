@@ -136,11 +136,7 @@
   }
 
   function suggestions() {
-    var p = pageContext().program;
-    if (p) {
-      return ['What events are coming up for ' + p + '?', 'Show me ' + p + ' announcements.', 'Tell me about ' + p + '.', 'Where is GNC located?'];
-    }
-    return ['What programs does GNC offer?', 'What are the latest announcements?', 'Where is GNC located?'];
+    return ['What programs does GNC offer?', 'How do I enroll at GNC?', 'Where can I view tuition and fees?', 'What scholarships are available?'];
   }
 
   /* ------------------------------------------------------------ safe rendering */

@@ -15,8 +15,14 @@ preflight(!filter_var(ini_get('display_errors'),FILTER_VALIDATE_BOOLEAN),'PHP di
 preflight((bool)filter_var(ini_get('log_errors'),FILTER_VALIDATE_BOOLEAN),'PHP log_errors enabled');
 preflight(is_writable(UPLOAD_PATH),'Uploads writable by this PHP account');
 preflight(is_file(UPLOAD_PATH.'.htaccess'),'Upload execution restrictions deployed');
-preflight(trim((string)env('MAIL_USERNAME',''))!==''&&trim((string)env('MAIL_PASSWORD',''))!=='','SMTP credentials configured (values withheld)');
-preflight(is_file(__DIR__.'/../vendor/autoload.php'),'Composer dependencies deployed');
+preflight(in_array(MAIL_TRANSPORT,['mail','smtp'],true),'Email transport is mail or smtp');
+preflight((bool)filter_var(MAIL_FROM_ADDRESS,FILTER_VALIDATE_EMAIL),'Email sender address configured (value withheld)');
+if (MAIL_TRANSPORT==='mail') {
+    preflight(function_exists('mail'),'cPanel/local PHP mail service available');
+} elseif (MAIL_TRANSPORT==='smtp') {
+    preflight(MAIL_HOST!==''&&MAIL_USERNAME!==''&&MAIL_PASSWORD!=='','SMTP credentials configured (values withheld)');
+    preflight(is_file(__DIR__.'/../vendor/autoload.php'),'SMTP dependencies deployed');
+}
 preflight(trim((string)env('FACE_CHECK_PYTHON',''))!==''&&is_dir((string)env('FACE_CHECK_MODELS',''))&&function_exists('proc_open'),'Personnel face-check runtime configured');
 $limitDir=(string)env('REQUEST_LIMIT_DIR','');
 $root=str_replace('\\','/',realpath(__DIR__.'/..'));

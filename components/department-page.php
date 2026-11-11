@@ -243,7 +243,7 @@ $cdText = function (?string $v) use ($cePreview): string {
                         <a href="<?= cd_h($departmentIndexUrl) ?>" title="<?= cd_h($departmentIndexTitle) ?>"><?= cd_h(gncBreadcrumbShortLabel($departmentIndexTitle)) ?></a>
                         <?php if ($dept): ?>
                         <i class="bi bi-chevron-right" aria-hidden="true"></i>
-                        <span class="dept-current" aria-current="page"<?= $isCollegeHeader ? ceField('dept-name', ['key'=>'navigation-name', 'max'=>255, 'label'=>'Department name in navigation and list cards']) : '' ?>><?= cd_h($pageTitle) ?></span>
+                        <span class="dept-current" aria-current="page" title="<?= cd_h($pageTitle) ?>"><?= cd_h($isCollegeHeader ? departmentBreadcrumbLabel($dept) : $pageTitle) ?></span>
                         <?php endif; ?>
                     </nav>
                     <div class="dept-hero-content">

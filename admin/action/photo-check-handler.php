@@ -62,13 +62,15 @@ if ((int)$file['size'] > 5 * 1024 * 1024) {
 
 $name = $_POST['person_name'] ?? '';
 $key = $_POST['profile_key'] ?? '';
+$section = $_POST['section_key'] ?? '';
+if (!is_string($section) || strlen($section) > 255) photoCheckFail('Invalid page.', 422);
 if (!is_string($name) || mb_strlen($name) > 255 || !is_string($key)
     || ($key !== '' && !preg_match('/\A(person|office|dean|president):[0-9]+\z/', $key))) photoCheckFail('Invalid profile.', 422);
 $info = @getimagesize($file['tmp_name']);
 if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)
     || $info[0]*$info[1] > 40000000) photoCheckFail('Please choose a JPG, PNG or WebP portrait up to 40 megapixels.', 422);
 // Both optional photo checks honor the shared setting after file validation.
-$r = personPhotoCheck($file['tmp_name'], $name, $key);
+$r = personPhotoCheck($file['tmp_name'], $name, $key, null, $section);
 if (($_POST['review_duplicate'] ?? '') === '1') {
     if (!rbacIsSuper()) photoCheckFail('Only Super Admin can review a possible duplicate.', 403);
     if (($r['reason'] ?? '') !== 'disabled') {

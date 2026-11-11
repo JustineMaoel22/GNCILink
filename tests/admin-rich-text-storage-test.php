@@ -16,15 +16,17 @@ foreach ([
     $db->exec("CREATE TEMPORARY TABLE $table ($columns) ENGINE=InnoDB");
 }
 $html = '<h1>Heading</h1><p class="ql-align-center"><strong>Bold</strong> <em>Italic</em> <u>Underline</u> <s>Strike</s></p><ol><li>Ordered</li></ol><ul><li>Bullet</li></ul><blockquote>Quote</blockquote><p><a href="https://example.com">Link</a></p>';
+$html .= '<p><a href="youtube.com">Video</a></p>';
+$expectedHtml = str_replace('href="youtube.com"','href="https://youtube.com"',$html);
 foreach ([['createNews', 'updateNews', 'getNewsById'], ['createAnnouncement', 'updateAnnouncement', 'getAnnouncementById']] as [$create, $update, $read]) {
-    $data = ['title' => 'Rich text regression', 'content' => $html, 'status' => 'draft', 'author' => 'Test editor', 'category_ids' => []];
+    $data = ['title' => 'Rich text regression', 'content' => $html, 'status' => 'draft', 'author' => 'Test editor', 'category'=>'Campus Events', 'category_ids' => []];
     $id = $create($data);
-    if (!$id || $read($id)['content'] !== $html) throw new RuntimeException($create . ' did not retain formatting.');
+    if (!$id || $read($id)['content'] !== $expectedHtml) throw new RuntimeException($create . ' did not retain formatting.');
     foreach (['draft', 'published', 'archived'] as $status) {
         $data['status'] = $status;
         if (!$update($id, $data)) throw new RuntimeException($update . ' failed.');
         $record = $read($id);
-        if ($record['content'] !== $html || $record['status'] !== $status) throw new RuntimeException('Formatting changed during ' . $status . '.');
+        if ($record['content'] !== $expectedHtml || $record['status'] !== $status) throw new RuntimeException('Formatting changed during ' . $status . '.');
         $safe = sectionToEditorHtml($record['content']);
         if (!str_contains($safe, '<h1>') || !str_contains($safe, '<s>') || !str_contains($safe, 'text-align:center')) throw new RuntimeException('Reopening or previewing lost formatting.');
     }

@@ -2,6 +2,7 @@
 require_once __DIR__.'/calendar-docx.php';
 require_once __DIR__.'/calendar-import-workspace.php';
 require_once __DIR__.'/event-audience.php';
+require_once __DIR__.'/event-categories.php';
 
 /** Reuse the normal Events audience rules, including department/program membership. */
 function calendarImportAudience(array $row, array $previous = []): array {
@@ -405,7 +406,7 @@ function calendarImportReady(PDO $db): bool {
     catch (PDOException $e) { return false; }
 }
 function calendarImportCategories(PDO $db): array {
-    return $db->query("SELECT category_id, category_name FROM categories WHERE category_name NOT IN ('Reminder','Job Opportunities','Scholarship') ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
+    return eventCategoryChoices($db);
 }
 function calendarEventSignature(array $event): string {
     $fields=[];
@@ -502,7 +503,7 @@ function calendarImportValidate(array $edits, array $preview, array $existing, a
         if($end!==null&&$end<$start)throw new InvalidArgumentException('An activity ends before it starts. Correct the date or time.');
         $row['start_date']=$start;$row['end_date']=$end;
         $cat=$edit['category_id']??'';
-        if($cat!==''&&$cat!==null&&(!is_scalar($cat)||!ctype_digit((string)$cat)||!in_array((int)$cat,$catIds,true)))throw new InvalidArgumentException('Choose an existing event category.');
+        if($cat!==''&&$cat!==null&&(!is_scalar($cat)||!ctype_digit((string)$cat)||(!in_array((int)$cat,$catIds,true)&&!($id&&(int)$cat===(int)($existingById[$id]['category_id']??0)))))throw new InvalidArgumentException('Choose an existing event category.');
         $row['category_id']=$cat!==''&&$cat!==null?(int)$cat:null;
         if($row['category_id']===null)throw new InvalidArgumentException('Choose a category for every selected activity. Exclude uncertain activities until they can be categorized.');
         $row += calendarImportAudience($edit, $id ? $existingById[$id] : []);
@@ -526,7 +527,6 @@ function calendarImportApply(PDO $db, array $batch, array $rows, string $status,
         $calendarAction=$batch['calendar_action']??null;
         if($calendarAction==='delete'&&!hasPermission('delete_event'))throw new InvalidArgumentException('You do not have permission to delete calendar events.');
         if(!$calendarAction&&$series['status']!=='active')throw new InvalidArgumentException('This calendar is archived. Create a new calendar for future imports.');
-        $cats=array_map('intval',array_column(calendarImportCategories($db),'category_id'));
         // Lock all events to serialize duplicate checks with other imports and manual updates.
         $all=$db->query('SELECT * FROM events FOR UPDATE')->fetchAll(PDO::FETCH_ASSOC);
         $existing=array_column(calendarImportExisting($db,(int)$batch['series_id']),null,'event_id');
@@ -551,7 +551,7 @@ function calendarImportApply(PDO $db, array $batch, array $rows, string $status,
                 $db->prepare("UPDATE events SET status='archived' WHERE event_id=?")->execute([$id]);
                 logActivity($actor,'UPDATE','events',$id,'Archived event explicitly removed during calendar import.');continue;
             }
-            if(!in_array((int)$row['category_id'],$cats,true))throw new InvalidArgumentException('An event category changed. Preview the document again.');
+            validateEventCategory($db, (int)$row['category_id'], $id ? (int)($existing[$id]['category_id'] ?? 0) : null);
             foreach($all as $event) if((int)$event['event_id']!==$id&&calendarTitleKey($event['title'])===calendarTitleKey($row['title'])&&$event['start_date']===$row['start_date'])throw new InvalidArgumentException('An identical event already exists: '.$row['title'].'. Exclude it or update its imported record.');
             $audience=calendarImportAudience($row,$id?$existing[$id]:[]);
             $values=[$row['title'],$row['start_date'],$row['end_date'],$row['category_id'],$row['description'],$status,$row['location']??($id?($existing[$id]['location']??''):''),$audience['program']];
