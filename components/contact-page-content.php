@@ -9,6 +9,9 @@ function contactPageDefaults(): array {
     'email'    => 'justinemaoel.gnc@gmail.com',
     'hours'    => 'Monday - Friday, 8:00 AM - 5:00 PM',
     'facebook' => 'https://www.facebook.com/gnc.edu.ph',
+    'instagram' => 'https://www.instagram.com/gnci1918/',
+    'linkedin' => 'https://www.linkedin.com/school/guagua-national-colleges/',
+    'tiktok' => 'https://www.tiktok.com/@gnci1918',
 ];
     $directDirectory = [
     ['900-4473', "President's Office"],
@@ -82,9 +85,21 @@ function contactPageValidate(string $key, string $value, ?string $previous = nul
     if ($value === '' && contentPublishAllowsIncomplete()) return '';
     if ($key === 'contact_email' && (!filter_var($value, FILTER_VALIDATE_EMAIL) || preg_match('/[\r\n]/', $value))) throw new InvalidArgumentException('Enter a valid contact email address.');
     if ($key === 'contact_facebook' && !preg_match('~^https?://(?:www\.)?facebook\.com/[^\s]*$~iD', $value)) throw new InvalidArgumentException('Use a Facebook page URL starting with https://www.facebook.com/.');
+    foreach (['instagram', 'linkedin', 'tiktok'] as $network) {
+        if ($key === 'contact_' . $network && !contactPageSocialUrlValid($network, $value)) throw new InvalidArgumentException('Enter a valid ' . ucfirst($network) . ' profile URL starting with https:// or http://.');
+    }
     if ($key === 'contact_phone' || preg_match('/^direct_[0-9]+_number$/D', $key)) return contactNumberSave($value, $previous);
     if (preg_match('/^local_[0-9]+_number$/D', $key)) return contactExtensionSave($value, $previous);
     return $value;
+}
+function contactPageSocialUrlValid(string $network, string $value): bool {
+    if (!in_array($network, ['facebook', 'instagram', 'linkedin', 'tiktok'], true)) return false;
+    if (!filter_var($value, FILTER_VALIDATE_URL) || preg_match('/[\s\x00-\x1f\x7f]/', $value)) return false;
+    $parts = parse_url($value);
+    return is_array($parts) && in_array(strtolower($parts['scheme'] ?? ''), ['https', 'http'], true)
+        && in_array(strtolower($parts['host'] ?? ''), [$network . '.com', 'www.' . $network . '.com'], true)
+        && !isset($parts['user']) && !isset($parts['pass']) && !isset($parts['port'])
+        && !empty($parts['path']);
 }
 function contactPageContent(bool $preview): array {
     $fields = contactPageDefaults();

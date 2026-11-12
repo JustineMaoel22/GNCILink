@@ -247,7 +247,12 @@ $showOpen = ($success === '' && !$errors);
                                 <i class="bi bi-facebook"></i> <span<?= $contactMark('facebook_label') ?>><?= e($contactText('facebook_label')) ?></span>
                             </a>
                         </div>
-                        <?php if ($contactPreview): ?><p class="small mt-3 mb-0">Facebook page URL: <span<?= $contactMark('contact_facebook') ?>><?= e($contactText('contact_facebook')) ?></span></p><?php endif; ?>
+                        <?php if ($contactPreview): ?>
+                            <p class="small mt-3 mb-0">Social media links below also update the site footer after publishing.</p>
+                            <?php foreach (['facebook', 'instagram', 'linkedin', 'tiktok'] as $network): ?>
+                                <p class="small mt-3 mb-0"><?= e(ucfirst($network)) ?> page URL: <span<?= $contactMark('contact_' . $network) ?>><?= e($contactText('contact_' . $network)) ?></span></p>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
 

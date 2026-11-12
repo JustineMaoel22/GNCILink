@@ -1357,6 +1357,7 @@ a.gnc-programs-count:hover {
    ============================================================= */
 .gnc-campus-map {
     background: #F9F6F1;
+    padding-bottom: clamp(9rem, 15vw, 15rem) !important;
 }
 /* center the map section header (this section only) */
 .gnc-campus-map .gnc-programs-header {
@@ -1381,7 +1382,7 @@ a.gnc-programs-count:hover {
     aspect-ratio: auto;
 }
 @media (max-width: 767px) {
-    .gnc-campus-map { padding-top: 2rem !important; padding-bottom: 2rem !important; }
+    .gnc-campus-map { padding-top: 2rem !important; }
     .gnc-campus-map .container { padding-left: 8px; padding-right: 8px; }
     .gnc-campus-map .text-center { padding: 0 8px; }
     .gnc-map-frame { border-radius: 14px; }

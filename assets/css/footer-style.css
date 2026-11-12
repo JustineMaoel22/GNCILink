@@ -2,8 +2,6 @@
 FOOTER
 ============================================= */
 .gnc-footer {
-    --gf-fade-color: var(--gnc-cream, #f9f6f1);
-    --gf-fade-height: clamp(160px, 12vw, 220px);
     --gf-green:      var(--gnc-green, #094024);
     --gf-green-deep: var(--gnc-green-dark, #062018);
     --gf-gold:       var(--gnc-gold, #EABA3B);
@@ -16,31 +14,12 @@ FOOTER
 
     position: relative;
     color: var(--gf-text);
+    border-top: 4px solid var(--gf-gold);
     background:
-        linear-gradient(180deg,
-            var(--gf-fade-color) 0%,
-            color-mix(in srgb, var(--gf-fade-color) 98%, transparent) 10%,
-            color-mix(in srgb, var(--gf-fade-color) 90%, transparent) 20%,
-            color-mix(in srgb, var(--gf-fade-color) 78%, transparent) 30%,
-            color-mix(in srgb, var(--gf-fade-color) 64%, transparent) 40%,
-            color-mix(in srgb, var(--gf-fade-color) 50%, transparent) 50%,
-            color-mix(in srgb, var(--gf-fade-color) 36%, transparent) 60%,
-            color-mix(in srgb, var(--gf-fade-color) 22%, transparent) 70%,
-            color-mix(in srgb, var(--gf-fade-color) 10%, transparent) 80%,
-            color-mix(in srgb, var(--gf-fade-color) 2%, transparent) 90%,
-            transparent 100%) top / 100% var(--gf-fade-height) no-repeat,
         radial-gradient(50% 40% at 100% 0%, rgba(234, 186, 59, 0.08), transparent 70%),
         radial-gradient(45% 40% at 0% 100%, rgba(40, 120, 56, 0.22), transparent 70%),
         linear-gradient(180deg, var(--gf-green) 0%, var(--gf-green-deep) 100%);
     overflow-x: clip;
-}
-
-/* Reserve space for the fade; painting it on the footer avoids clipped blur edges. */
-.gnc-footer::before {
-    content: "";
-    display: block;
-    height: var(--gf-fade-height);
-    pointer-events: none;
 }
 
 .gnc-footer *,

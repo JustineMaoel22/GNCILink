@@ -1,5 +1,6 @@
 <?php require_once __DIR__ . '/../includes/privacy.php';
 require_once __DIR__ . '/../includes/contact-number.php'; ?>
+<?php require_once __DIR__ . '/contact-page-content.php'; ?>
 <?php include_once __DIR__ . '/image-framing-assets.php'; ?>
 <link rel="stylesheet" href="/assets/css/content-rich-text.css?v=<?= filemtime(__DIR__.'/../assets/css/content-rich-text.css') ?>">
 <?php include_once __DIR__ . '/office-map-modal.php'; ?>
@@ -7,17 +8,42 @@ require_once __DIR__ . '/../includes/contact-number.php'; ?>
 // Visitor counter: read current numbers (recording happens via api/track-visit.php)
 $gncVisitorStats = ['today' => 0, 'total' => 0];
 $gncFooterPhone = '045-123-4567';
+$gncFooterSocials = [];
+foreach (['facebook', 'instagram', 'linkedin', 'tiktok'] as $gncFooterNetwork) {
+    $gncFooterSocials[$gncFooterNetwork] = contactPageDefaults()['contact_' . $gncFooterNetwork]['content'];
+}
+$gncFooterContact = [
+    'contact_address' => 'Rep. Eligio Lagman St, Sta. Filomena Rd, Guagua, Pampanga',
+    'contact_email' => 'info@gnc.edu.ph',
+    'contact_hours' => "Monday - Friday\n8:00AM - 5:00PM",
+    'contact_phone' => $gncFooterPhone,
+];
 try {
     if (!function_exists('getDB')) {
         require_once __DIR__ . '/../config/config.php';
     }
     require_once __DIR__ . '/visitor-counter.php';
     $gncVisitorStats = gncVisitorStats(getDB());
-    $gncFooterPhoneValue = getDB()->query("SELECT ps.content FROM page_sections ps JOIN pages p ON p.page_id=ps.page_id WHERE p.slug='contact-us' AND ps.section_key='contact_phone' AND ps.status='published' LIMIT 1")->fetchColumn();
-    if (is_string($gncFooterPhoneValue)) $gncFooterPhone = contactNumberDisplay(trim(html_entity_decode(strip_tags($gncFooterPhoneValue), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
 } catch (Throwable $e) {
     // Footer still renders with zeros if the database is unavailable.
 }
+try {
+    // Share the Contact Us editor's published fields; never expose private drafts.
+    $gncFooterContactRows = getDB()->query("SELECT ps.section_key, ps.content FROM page_sections ps JOIN pages p ON p.page_id=ps.page_id WHERE p.slug='contact-us' AND ps.status='published' AND ps.section_key IN ('contact_address','contact_phone','contact_email','contact_hours','contact_facebook','contact_instagram','contact_linkedin','contact_tiktok')")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($gncFooterContactRows as $gncFooterContactRow) {
+        $gncFooterContactValue = trim(html_entity_decode(strip_tags((string)$gncFooterContactRow['content']), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $gncFooterNetwork = substr($gncFooterContactRow['section_key'], strlen('contact_'));
+        if (array_key_exists($gncFooterNetwork, $gncFooterSocials)) {
+            if ($gncFooterContactValue === '' || contactPageSocialUrlValid($gncFooterNetwork, $gncFooterContactValue)) $gncFooterSocials[$gncFooterNetwork] = $gncFooterContactValue;
+            continue;
+        }
+        if ($gncFooterContactRow['section_key'] === 'contact_email' && $gncFooterContactValue !== '' && !filter_var($gncFooterContactValue, FILTER_VALIDATE_EMAIL)) continue;
+        $gncFooterContact[$gncFooterContactRow['section_key']] = $gncFooterContactValue;
+    }
+} catch (Throwable $e) {
+    // Keep the existing contact details available if the database is unavailable.
+}
+$gncFooterPhone = contactNumberDisplay($gncFooterContact['contact_phone']);
 
 /**
  * Turn a stored page_url into a link that actually exists on this server.
@@ -96,7 +122,7 @@ if (!function_exists('gncResolvePopularUrl')) {
                         <li>
                             <span class="gnc-footer-contact-icon" aria-hidden="true"><i class="bi bi-geo-alt-fill"></i></span>
                             <span class="gnc-footer-contact-text">
-                                <a href="https://www.google.com/maps/search/?api=1&amp;query=Guagua+National+Colleges,+Pampanga" target="_blank" rel="noopener noreferrer">Rep. Eligio Lagman St, Sta. Filomena Rd, Guagua, Pampanga</a>
+                                <a href="https://www.google.com/maps/search/?api=1&amp;query=<?= rawurlencode('Guagua National Colleges, ' . $gncFooterContact['contact_address']) ?>" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars($gncFooterContact['contact_address'], ENT_QUOTES, 'UTF-8') ?></a>
                             </span>
                         </li>
                         <li>
@@ -105,19 +131,19 @@ if (!function_exists('gncResolvePopularUrl')) {
                         </li>
                         <li>
                             <span class="gnc-footer-contact-icon" aria-hidden="true"><i class="bi bi-envelope-fill"></i></span>
-                            <span class="gnc-footer-contact-text"><a href="mailto:info@gnc.edu.ph">info@gnc.edu.ph</a></span>
+                            <span class="gnc-footer-contact-text"><a href="mailto:<?= htmlspecialchars($gncFooterContact['contact_email'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($gncFooterContact['contact_email'], ENT_QUOTES, 'UTF-8') ?></a></span>
                         </li>
                         <li>
                             <span class="gnc-footer-contact-icon" aria-hidden="true"><i class="bi bi-clock-fill"></i></span>
-                            <span class="gnc-footer-contact-text">Monday - Friday<br>8:00AM - 5:00PM</span>
+                            <span class="gnc-footer-contact-text"><?= nl2br(htmlspecialchars($gncFooterContact['contact_hours'], ENT_QUOTES, 'UTF-8')) ?></span>
                         </li>
                     </ul>
 
                     <div class="gnc-footer-socials">
-                        <a href="https://www.facebook.com/gnc.edu.ph" aria-label="Facebook" target="_blank" rel="noopener noreferrer"><i class="bi bi-facebook"></i></a>
-                        <a href="https://www.instagram.com/gnci1918/" aria-label="Instagram" target="_blank" rel="noopener noreferrer"><i class="bi bi-instagram"></i></a>
-                        <a href="https://www.linkedin.com/school/guagua-national-colleges/" aria-label="LinkedIn" target="_blank" rel="noopener noreferrer"><i class="bi bi-linkedin"></i></a>
-                        <a href="https://www.tiktok.com/@gnci1918" aria-label="TikTok" target="_blank" rel="noopener noreferrer"><i class="bi bi-tiktok"></i></a>
+                        <?php foreach (['facebook' => 'Facebook', 'instagram' => 'Instagram', 'linkedin' => 'LinkedIn', 'tiktok' => 'TikTok'] as $gncFooterNetwork => $gncFooterNetworkLabel): ?>
+                            <?php if ($gncFooterSocials[$gncFooterNetwork] === '') continue; ?>
+                            <a href="<?= htmlspecialchars($gncFooterSocials[$gncFooterNetwork], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= $gncFooterNetworkLabel ?>" target="_blank" rel="noopener noreferrer"><i class="bi bi-<?= $gncFooterNetwork ?>"></i></a>
+                        <?php endforeach; ?>
                     </div>
                 </div>
 

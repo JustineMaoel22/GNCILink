@@ -25,7 +25,8 @@
         // Context affects recommendations without recording a visit when consent is off.
         const interests=Object.assign({},saved.history);
         if(current)interests[current.id]={...interests[current.id],visits:Math.max(3,Number(interests[current.id]?.visits)||0),last:Date.now()};
-        const ranked=engine.rank(items,interests,current?.id,saved.shown,Date.now(),Math.min(items.length,100));
+        const ranked=engine.rank(items,interests,current?.id,saved.shown,Date.now(),items.length)
+            .filter(item=>item.category!=='Events');
         let previous=null;
         try{if(allowed())previous=JSON.parse(sessionStorage.getItem(rotationKey));else sessionStorage.removeItem(rotationKey);}catch(_){}
         if(previous&&(!Array.isArray(previous.ids)||typeof previous.route!=='string'))previous=null;
