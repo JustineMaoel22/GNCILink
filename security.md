@@ -16,7 +16,7 @@ Security controls apply to the public website, admin/content editor, visual edit
 
 ## Admin accounts and roles
 
-The Default Admin login `gnciweb.admin@gmail.com` is protected from deletion by the shared user-deletion helper and has no Delete action in Users. This identity rule does not depend on its display name, role or deployment-specific user ID. Existing password confirmation, CSRF, permission checks and self-deletion protection still apply to other accounts.
+The Default Admin login `gnciweb.admin@gmail.com` is protected from deletion and role changes through the shared identity helper in `includes/protected-admin.php`. Users shows its role as fixed text and has no Delete action; both server-side handlers reject direct protected-account requests. This identity rule does not depend on its display name, role or deployment-specific user ID. Existing password confirmation, CSRF, permission checks and self-deletion protection still apply to other accounts.
 - Enforce least privilege based on actual roles in code; do not assume every logged-in user is a super admin.
 - If admins create accounts, issue short-lived one-time setup tokens instead of emailing/storing a reusable plaintext password where feasible.
 - Require reauthentication for high-impact actions where appropriate.

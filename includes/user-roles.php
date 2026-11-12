@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/protected-admin.php';
 /** Role changes require the acting Super Admin's current password on every save. */
 function changeAdminUserRole(int $targetId,string $role,string $password): bool {
     if(!rbacIsSuper()||!hasPermission('assign_roles'))throw new RuntimeException('Only Super Admin can change user roles.');
@@ -19,8 +20,9 @@ function changeAdminUserRole(int $targetId,string $role,string $password): bool 
             $db->commit(); // Retain the failure audit; no role has been changed.
             throw new InvalidArgumentException('Your current password is incorrect. The role was not changed.');
         }
-        $q=$db->prepare('SELECT role,status FROM users WHERE user_id=? FOR UPDATE');$q->execute([$targetId]);$target=$q->fetch(PDO::FETCH_ASSOC);
+        $q=$db->prepare('SELECT email,role,status FROM users WHERE user_id=? FOR UPDATE');$q->execute([$targetId]);$target=$q->fetch(PDO::FETCH_ASSOC);
         if(!$target)throw new InvalidArgumentException('Account not found.');
+        if(isProtectedDefaultAdminUser($target))throw new RuntimeException('The Default Admin role is protected and cannot be changed.');
         if($target['role']==='Super Admin'&&$target['status']==='active'&&$role!=='Super Admin'&&count($admins)<=1)throw new RuntimeException('Keep at least one active Super Admin.');
         $changed=rbacRole($target['role'])!==$role;
         if($changed){
