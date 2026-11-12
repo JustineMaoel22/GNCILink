@@ -391,11 +391,13 @@
 
         bindDepartments(departmentSelect) {
             const allItems = this.config.items.slice();
+            const unrestrictedLabel = this.config.allLabel;
             this.config.restrictToItems = true;
             const previousOnChange = departmentSelect.config.onChange;
             let previousDepartments = departmentSelect.getSelected();
             const refresh = (selectNewDepartments = false) => {
                 const ids = departmentSelect.getSelected();
+                this.config.allLabel = ids.length ? 'Whole selected departments' : unrestrictedLabel;
                 this.config.hideAllOption = ids.length > 0;
                 this.config.items = allItems.filter(item => !ids.length || ids.includes(String(item.departmentId)));
                 const values = new Set(this.getSelected());

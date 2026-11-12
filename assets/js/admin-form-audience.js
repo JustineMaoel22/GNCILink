@@ -1,6 +1,17 @@
 (function () {
     'use strict';
     window.GncAdminFormAudience = {
+        summary: function (departments, programs) {
+            const ids = departments.getSelected(), codes = programs.getSelected();
+            if (!ids.length) return codes.length ? 'Only selected programs (' + codes.length + ').' : 'School-wide audience (existing default).';
+            return ids.map(id => {
+                const department = departments.config.items.find(item => String(item.value) === id);
+                const available = programs.config.items.filter(item => String(item.departmentId) === id);
+                const selected = available.filter(item => codes.includes(String(item.value)));
+                return (department?.label || id) + ': ' + (!selected.length || selected.length === available.length
+                    ? 'whole department' : selected.map(item => item.badge || item.label).join(', '));
+            }).join('; ') + '. Other departments are excluded.';
+        },
         enhance: function (pairs) {
             const el = id => document.getElementById(id);
             pairs.forEach(([id, label, placeholder]) => {

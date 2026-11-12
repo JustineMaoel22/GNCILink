@@ -47,6 +47,11 @@ $statusFilter=$listFilters['status'];$categoryFilter=$listFilters['category'];$s
 try{$result=newsListResults(getDB(),$listFilters,rbacRole(),(int)$_SESSION['user_id']);$newsList=$result['rows'];$listTotal=$result['total'];$listPages=$result['pages'];$listGalleries=$result['galleries'];}
 catch(Throwable $e){$listError='News articles could not be loaded. Please try again.';error_log('News management list unavailable.');}
 $newsCategories = getNewsCategories();
+$newsAudienceEnabled = newsAudienceReady(getDB());
+$newsAudiences = getNewsAudiencesBatch(getDB(), $newsList);
+$newsAudienceDepartments = getDB()->query('SELECT dept_id,dept_name FROM departments ORDER BY dept_name')->fetchAll(PDO::FETCH_ASSOC);
+$newsAudiencePrograms = getAnnouncementProgramCategories();
+$newsProgramDepartments = getProgramDepartmentMap();
 $newsCreateCategories = $newsCategories;
 $pinnedCount    = countPinnedItems();
 
@@ -68,6 +73,9 @@ if (!empty($flashOld)) {
         if(!empty($flashOld['news_id'])){$savedNews=getNewsById((int)$flashOld['news_id']);if($savedNews)$modalEditing=array_merge($savedNews,$flashOld);$modalGallery=getNewsImages((int)$flashOld['news_id']);}
     }
 }
+$modalAudience = $modalEditing && !empty($modalEditing['news_id'])
+    ? (getNewsAudiencesBatch(getDB(), [$modalEditing])[(int)$modalEditing['news_id']] ?? []) : [];
+if (isset($flashOld['audience_present'])) $modalAudience = ['dept_ids' => $flashOld['dept_ids'] ?? [], 'programs' => $flashOld['programs'] ?? []];
 $revisionFeedback='';
 if(isset($_GET['revise'])&&!empty($flashOld)){$revision=rbacGetSubmission((int)$_GET['revise']);$revisionFeedback=$revision['reason']??'';}
 
@@ -207,7 +215,7 @@ include __DIR__ . '/../components/header-admin.php';
                         <span class="ann-pinned content-homepage-pin"><i class="bi bi-pin-angle-fill" aria-hidden="true"></i> On homepage slideshow</span>
                         <?php endif; ?>
                     </td>
-                    <td data-label="Category"><span class="program-badge"><?= htmlspecialchars($catLabel) ?></span></td>
+                    <td data-label="Category"><span class="program-badge"><?= htmlspecialchars($catLabel) ?></span><small class="d-block text-muted"><?= $ne(contentAudienceDescription($newsAudiences[(int)$n['news_id']] ?? [])) ?></small></td>
                     <td data-label="Status"><span class="status-badge <?= htmlspecialchars($n['status']) ?>"><?= htmlspecialchars($statusLabels[$n['status']] ?? ucfirst($n['status'])) ?></span><div class="ann-sub"><?= $ne(['draft'=>'Continue editing when ready.','pending'=>'Awaiting Super Admin review.','published'=>'Visible on the website.','archived'=>'Hidden; restore when ready.'][$n['status']]??'') ?></div></td>
                     <td class="ann-actions-cell">
                         <?php if ($canPublish): ?>
@@ -247,6 +255,7 @@ include __DIR__ . '/../components/header-admin.php';
                         <?php $rowGallery=$listGalleries[$n['news_id']]??[]; ?>
                         <button type="button" class="btn btn-sm btn-outline-secondary btn-edit-news" title="Edit this article"
                                 data-id="<?= $n['news_id'] ?>"
+                                data-audience="<?= $ne(json_encode($newsAudiences[(int)$n['news_id']] ?? ['dept_ids'=>[], 'programs'=>[]])) ?>"
                                 data-title="<?= htmlspecialchars($n['title'], ENT_QUOTES) ?>"
                                 data-author="<?= htmlspecialchars($n['author'] ?? '', ENT_QUOTES) ?>"
                                 data-category="<?= htmlspecialchars($n['category'] ?? 'Others', ENT_QUOTES) ?>"
@@ -382,6 +391,23 @@ include __DIR__ . '/../components/header-admin.php';
             </div>
           </div>
 
+          </section>
+          <section class="evt-form-section" aria-labelledby="news-audience-heading">
+          <h6 id="news-audience-heading">Audience</h6>
+          <?php if ($newsAudienceEnabled): ?>
+          <input type="hidden" name="audience_present" value="1">
+          <div class="row g-3">
+            <div class="col-12 col-md-6"><label class="form-label" id="news-dept-label">Departments</label><div id="news-dept-multiselect"></div></div>
+            <div class="col-12 col-md-6"><label class="form-label" id="news-program-label">Academic programs</label><div id="news-program-multiselect"></div></div>
+            <div class="col-12"><div class="form-text">For each selected department, choose specific programs or clear its programs to target the whole department.</div><div class="evt-audience-summary" id="news-audience-help" role="status"></div></div>
+          </div>
+          <script type="application/json" id="news-audience-config"><?= $newsJson([
+              'departments' => array_map(static fn($d) => ['value'=>(string)$d['dept_id'], 'label'=>$d['dept_name']], $newsAudienceDepartments),
+              'programs' => array_values(array_map(static fn($code) => ['value'=>$code, 'badge'=>$code, 'label'=>$newsAudiencePrograms[$code], 'departmentId'=>(string)($newsProgramDepartments[$code] ?? '')], array_keys(array_diff_key($newsAudiencePrograms, ['ALL'=>'']))))
+          ]) ?></script>
+          <?php else: ?>
+          <p class="form-text">News audience selection needs the News audience database migration. Existing article visibility is preserved.</p>
+          <?php endif; ?>
           </section>
           <section class="evt-form-section" aria-labelledby="news-visibility-heading">
           <h6 id="news-visibility-heading">Visibility</h6>
@@ -617,6 +643,10 @@ include __DIR__ . '/../components/header-admin.php';
 </div>
 
 <?php ob_start(); ?>
+<link rel="stylesheet" href="/assets/css/multi-audience-select.css?v=<?= filemtime(__DIR__.'/../assets/css/multi-audience-select.css') ?>">
+<script src="/assets/js/multi-audience-select.js?v=<?= filemtime(__DIR__.'/../assets/js/multi-audience-select.js') ?>"></script>
+<script src="/assets/js/admin-form-audience.js?v=<?= filemtime(__DIR__.'/../assets/js/admin-form-audience.js') ?>"></script>
+<script src="/assets/js/admin-news-audience.js?v=<?= filemtime(__DIR__.'/../assets/js/admin-news-audience.js') ?>"></script>
 <script>
 // NOTE: this runs via $extraScripts (echoed in footer-admin.php), AFTER
 // quill.min.js and bootstrap.bundle.min.js have loaded — same reasoning
@@ -701,6 +731,7 @@ function selectNewsCategory(code = 'Others', preserveExisting = false) {
 
 function resetModalForm() {
     document.getElementById('news-form').reset();
+    window.GncNewsAudience?.set();
     document.querySelector('#news-form [name="allow_incomplete"]')?.remove();
     modalQuill.setContents([]);
     modalActionInput.value = 'create';
@@ -792,6 +823,7 @@ function toggleGalleryRemoval(wrap, imageId) {
 
 function openEditModal(btn) {
     resetModalForm();
+    window.GncNewsAudience?.set(JSON.parse(btn.dataset.audience || '{}'));
     modalActionInput.value = 'update';
     modalIdInput.value = btn.dataset.id;
     modalLabel.textContent = 'Edit Article';
@@ -908,11 +940,12 @@ window.GncAnnouncementForm.init({quill: modalQuill, kind: 'news'});
 // Auto-reopen the modal on load: validation error, or ?modal=create / ?modal=edit&id=N
 <?php if ($modalMode === 'create'): ?>
 openCreateModal();
-<?php if (!empty($flashErrors)): ?>
+<?php if (!empty($flashOld)): ?>
 modalTitleInput.value = <?= $newsJson($flashOld['title'] ?? '') ?>;
 modalQuill.loadHtml(<?= $newsJson(sectionToEditorHtml($flashOld['content'] ?? '')) ?>);
 modalAuthorInput.value = <?= $newsJson($flashOld['author'] ?? '') ?>;
 selectNewsCategory(<?= $newsJson($flashOld['category'] ?? 'Others') ?>);
+window.GncNewsAudience?.set(<?= $newsJson($modalAudience) ?>);
 if (modalStatus) modalStatus.value = <?= $newsJson($flashOld['status'] ?? 'draft') ?>;
 updateStatusHelp();
 <?php endif; ?>
@@ -926,6 +959,7 @@ modalTitleInput.value = <?= $newsJson($modalEditing['title'] ?? '') ?>;
 modalQuill.loadHtml(<?= $newsJson(sectionToEditorHtml($modalEditing['content'] ?? '')) ?>);
 modalAuthorInput.value = <?= $newsJson($modalEditing['author'] ?? '') ?>;
 selectNewsCategory(<?= $newsJson($modalEditing['category'] ?? 'Others') ?>, true);
+window.GncNewsAudience?.set(<?= $newsJson($modalAudience) ?>);
 if (modalStatus) modalStatus.value = <?= $newsJson($modalEditing['status'] ?? 'draft') ?>;
 updateStatusHelp();
 <?php if (!empty($modalEditing['image_path'])): ?>

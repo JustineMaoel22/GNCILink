@@ -195,7 +195,9 @@ if ($db) {
             LEFT JOIN media_library m ON n.featured_image = m.media_id
             WHERE n.status = 'published'
         ");
-        foreach ($stmt->fetchAll() as $item) {
+        $newsRows = $stmt->fetchAll();
+        $publicNewsAudiences = getNewsAudiencesBatch($db, $newsRows);
+        foreach ($newsRows as $item) {
             $excerpt = strip_tags($item['content']);
             $excerpt = mb_strlen($excerpt) > 140 ? mb_substr($excerpt, 0, 140) . '…' : $excerpt;
             $feedItems[] = [
@@ -211,7 +213,9 @@ if ($db) {
                 'category_id'   => $item['category_id'],
                 'category_name' => $newsCategoryLabels[$item['news_category']] ?? $item['news_category'],
                 'news_category' => $item['news_category'],
-                'program'       => null, // news isn't tagged to a specific program
+                'program'       => null,
+                'dept_ids'      => $publicNewsAudiences[$item['news_id']]['dept_ids'] ?? [],
+                'programs'      => $publicNewsAudiences[$item['news_id']]['programs'] ?? [],
                 'author'        => $item['author'] ?? null,
             ];
         }
@@ -384,19 +388,13 @@ $matchesFilters = function ($item, $skipCategory = false, $skipType = false) use
         $itemCategory = is_string($selectedCategory) ? ($item['news_category'] ?? null) : (int)($item['category_id'] ?? 0);
         if ($itemCategory !== $selectedCategory && !(is_int($selectedCategory) && in_array($selectedCategory, $item['category_ids'] ?? [], true))) return false;
     }
-    if ($selectedDepartment !== null) {
-        if (!empty($item['dept_id']) && (int)$item['dept_id'] !== (int)$calendarDepartments[$selectedDepartment]['dept_id']) return false;
-        $itemProgram = $item['program'] ?? null;
-        if ($itemProgram !== 'ALL' && !in_array($itemProgram, $departmentPrograms, true)) return false;
-    } elseif ($programFilter !== '' && $programFilter !== 'ALL') {
-        if (!empty($item['dept_id']) && (int)$item['dept_id'] !== (int)($programDepartmentIds[$programFilter] ?? 0)) return false;
-        // Show items tagged with this exact program, or tagged 'ALL'
-        // (applies to every program). Items with no program (news,
-        // Facebook posts) are excluded once a specific program is chosen.
-        $itemProgram = $item['program'] ?? null;
-        if ($itemProgram !== $programFilter && $itemProgram !== 'ALL') {
-            return false;
-        }
+    if ($selectedDepartment !== null || ($programFilter !== '' && $programFilter !== 'ALL')) {
+        // Retain the existing filtered-feed default for untargeted News/Facebook posts.
+        if ($item['source'] === 'facebook' || ($item['source'] === 'news' && empty($item['dept_ids']) && empty($item['programs']))) return false;
+        if (!contentAudienceMatches($item,
+            $programFilter !== '' && $programFilter !== 'ALL' ? $programFilter : null,
+            $selectedDepartment !== null ? (int)$calendarDepartments[$selectedDepartment]['dept_id'] : null,
+            $programDepartmentIds)) return false;
     }
     foreach ($searchWords as $w) {
         // Every word typed must appear somewhere in the item's full text
@@ -408,6 +406,11 @@ $matchesFilters = function ($item, $skipCategory = false, $skipType = false) use
     return true;
 };
 $filteredItems = array_values(array_filter($feedItems, fn($it) => $matchesFilters($it)));
+if ($selectedDepartment !== null || ($programFilter !== '' && $programFilter !== 'ALL')) {
+    $visiblePinnedLinks = array_fill_keys(array_column($filteredItems, 'link'), true);
+    $pinnedFeedItems = array_values(array_filter($pinnedFeedItems, static fn($item) => isset($visiblePinnedLinks[$item['link']])));
+    $showPinned = $showPinned && !empty($pinnedFeedItems);
+}
 
 // Each group's counts match its destination type, keeping search/audience filters.
 $catCounts = [];
@@ -724,7 +727,7 @@ function na_url(array $overrides = []): string {
             </div>
             <?php endif; ?>
             <?php if ($calendarFilterLabel !== null): ?>
-            <div class="na-note"><i class="bi bi-info-circle"></i> Showing posts for <?= htmlspecialchars($calendarFilterLabel) ?> and posts for all programs. News articles and Facebook posts are not tied to a program, so they are hidden while a department or program is selected.</div>
+            <div class="na-note"><i class="bi bi-info-circle"></i> Showing announcements and targeted news for <?= htmlspecialchars($calendarFilterLabel) ?>. Department-wide announcements include all programs within their selected departments. Untargeted news and Facebook posts remain hidden while filtering.</div>
             <?php endif; ?>
 
             <?php if (empty($pageItems)): ?>

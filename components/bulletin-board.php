@@ -103,20 +103,34 @@ function gnc_get_global_announcements(string $program, int $limit): array
 {
     $pdo = gnc_bulletin_get_verified_pdo();
 
+    $programDepartments = array_column($pdo->query('SELECT program_code,dept_id FROM programs')->fetchAll(PDO::FETCH_ASSOC), 'dept_id', 'program_code');
+    $department = $programDepartments[$program] ?? null;
+    $scope = $department === null ? [] : array_keys(array_filter($programDepartments, static fn($id) => (int)$id === (int)$department));
+    $scopeParameters = [];
+    foreach ($scope as $index => $code) $scopeParameters[':scope_' . $index] = $code;
+    $scopeSql = $scopeParameters ? implode(',', array_keys($scopeParameters)) : 'NULL';
+
     $sql = "SELECT announcements.announcement_id, announcements.title, announcements.content, announcements.slug,
                    COALESCE(announcements.published_at, announcements.created_at) AS item_date
             FROM announcements
-            LEFT JOIN programs bulletin_program ON bulletin_program.program_code = :dept_program
+            LEFT JOIN (
+                SELECT announcement_id, COUNT(*) AS target_count, MAX(COALESCE(dept_id = :department, 0)) AS matches_department
+                FROM announcement_departments GROUP BY announcement_id
+            ) audience_department ON audience_department.announcement_id = announcements.announcement_id
+            LEFT JOIN (
+                SELECT announcement_id, MAX(program_code = :prog_check) AS matches_program,
+                    MAX(COALESCE(program_code IN ($scopeSql), 0)) AS has_scoped_programs
+                FROM announcement_programs GROUP BY announcement_id
+            ) audience_program ON audience_program.announcement_id = announcements.announcement_id
             WHERE announcements.status = 'published'
             AND COALESCE(
-                (SELECT MAX(ap.program_code = :prog_check) FROM announcement_programs ap
-                 WHERE ap.announcement_id = announcements.announcement_id),
+                audience_program.matches_program OR
+                    (COALESCE(audience_department.target_count, 0) > 0 AND audience_program.has_scoped_programs = 0),
                 announcements.program = :program OR announcements.program = 'ALL'
             )
             AND COALESCE(
-                (SELECT MAX(COALESCE(ad.dept_id = bulletin_program.dept_id, 0)) FROM announcement_departments ad
-                 WHERE ad.announcement_id = announcements.announcement_id),
-                announcements.dept_id IS NULL OR announcements.dept_id = bulletin_program.dept_id
+                audience_department.matches_department,
+                announcements.dept_id IS NULL OR announcements.dept_id = :legacy_department
             )
             ORDER BY COALESCE(announcements.published_at, announcements.created_at) DESC
             LIMIT :limit";
@@ -124,7 +138,9 @@ function gnc_get_global_announcements(string $program, int $limit): array
     $stmt = $pdo->prepare($sql);
     $stmt->bindValue(':program', $program, PDO::PARAM_STR);
     $stmt->bindValue(':prog_check', $program, PDO::PARAM_STR);
-    $stmt->bindValue(':dept_program', $program, PDO::PARAM_STR);
+    $stmt->bindValue(':department', $department, $department === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+    $stmt->bindValue(':legacy_department', $department, $department === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+    foreach ($scopeParameters as $parameter => $code) $stmt->bindValue($parameter, $code, PDO::PARAM_STR);
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
     $stmt->execute();
 

@@ -64,6 +64,8 @@ Each announcement creates at most one confirmed Facebook post through the UI, ac
 
 Request receipts prevent replayed forms from creating another announcement. Delivery primary keys and the MySQL named lock serialize sends. `sending` is persisted before the final feed call; success stores `published`, PageID_PostID and URL. Explicit rejection is `failed`; ambiguous timeouts/server/transient/malformed responses become `unknown`. A crash/database error can leave `sending`. Both uncertain states block repeat sends, with no automatic ambiguous-write retries.
 
+Audience-table compatibility setup runs before the announcement/request/delivery transaction. Inside an active transaction the shared audience helper only checks table availability, because MySQL table-creation statements implicitly commit even when the tables already exist. Audience-write failures propagate to the publishing handler so it can roll back the save before contacting Facebook.
+
 Retry ordinary failures by editing the saved announcement and explicitly choosing Facebook again. For `unknown`/`sending`, a Super Admin checks the original Page and records a verified existing full post ID, or explicitly confirms no matching post exists to unlock a manual retry. Recovery actions never publish. Incorrect absence confirmation can cause duplicates. An attempt for another Page cannot be retried to a new destination.
 
 ## Official Page and rollback
@@ -73,6 +75,8 @@ Until authorized, keep test mode and the test Page ID configured. When explicitl
 Disconnect before a code rollback. Retain delivery/request tables for audit and duplicate protection; never delete them to force retries. OAuth ciphertext cannot be read by the original manual-token version, so that version needs deliberate manual configuration if reverting. No destructive rollback SQL is necessary.
 
 ## Verification
+
+Run `php tests/announcement-publishing-transaction-test.php` and repeat with the `bootstrap` argument against local MySQL. Connection-local temporary tables verify commit, rollback and audience-failure propagation without changing announcements or contacting Facebook. The first mode also guards against table setup unexpectedly committing a caller's transaction; `bootstrap` checks setup before the transaction, as used by the publishing handler.
 
 - `docker compose exec -T web php tests/facebook-oauth-test.php`: encryption/tampering, OAuth state/expiry/replay/user binding, URL validation, server-only exchanges, pagination, test-only selection, authorization, failed-connection preservation, credential use, no reposts and disconnect. Simulated Meta; temporary tables.
 - `docker compose exec -T web php tests/facebook-publishing-test.php`: token validation, delivery states, duplicates, Page switching, photos/links and request uniqueness. Simulated Meta; temporary tables.

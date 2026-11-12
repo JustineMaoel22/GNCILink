@@ -175,7 +175,15 @@ if ($postAction === 'create' || $postAction === 'update') {
     }
 
     if (empty($errors)) {
+        $audienceTransaction = false;
         try {
+            $newsAudience = null;
+            if (isset($_POST['audience_present'])) {
+                $newsAudience = validatedContentAudience($_POST['dept_ids'] ?? [], $_POST['programs'] ?? []);
+                if (!newsAudienceReady(getDB())) throw new RuntimeException('Run the News audience migration before saving audience selections.');
+                getDB()->beginTransaction();
+                $audienceTransaction = true;
+            }
             $mediaId = null;
             if (!empty($_FILES['image']['name'] ?? '')) {
                 $mediaId = uploadNewsImage($_FILES['image']);
@@ -236,7 +244,16 @@ if ($postAction === 'create' || $postAction === 'update') {
                     addNewsImages($result, $newMediaIds);
                 }
             }
+            if ($audienceTransaction) {
+                if ($errors) getDB()->rollBack();
+                else {
+                    saveNewsAudience(getDB(), $isUpdate ? $id : (int)$result, $newsAudience);
+                    getDB()->commit();
+                }
+                $audienceTransaction = false;
+            }
         } catch (Exception $e) {
+            if ($audienceTransaction && getDB()->inTransaction()) getDB()->rollBack();
             $errors[] = $e instanceof PDOException ? 'The article could not be saved. Please try again.' : $e->getMessage();
         }
     }

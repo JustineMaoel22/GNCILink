@@ -89,10 +89,10 @@ if ($modalMode === 'edit') {
 if (!empty($flashOld)) {
     $modalEditing = array_merge($modalEditing ?? [], $flashOld);
     if (isset($flashOld['category_ids_present'])) $modalEditing['category_ids'] = $flashOld['category_ids'] ?? [];
-    if (isset($flashOld['dept_ids']) || isset($flashOld['programs'])) {
+    if (isset($flashOld['audience_present']) || isset($flashOld['dept_ids']) || isset($flashOld['programs'])) {
         $modalAudience = [
-            'dept_ids' => isset($flashOld['dept_ids']) ? (array)$flashOld['dept_ids'] : ($modalAudience['dept_ids'] ?? []),
-            'programs' => isset($flashOld['programs']) ? (array)$flashOld['programs'] : ($modalAudience['programs'] ?? []),
+            'dept_ids' => isset($flashOld['dept_ids']) ? (array)$flashOld['dept_ids'] : (isset($flashOld['audience_present']) ? [] : ($modalAudience['dept_ids'] ?? [])),
+            'programs' => isset($flashOld['programs']) ? (array)$flashOld['programs'] : (isset($flashOld['audience_present']) ? [] : ($modalAudience['programs'] ?? [])),
         ];
     }
 }
@@ -286,9 +286,7 @@ include __DIR__ . '/../components/header-admin.php';
 $aAud=$announcementAudiences[$a['announcement_id']]??['dept_ids'=>[],'programs'=>[]];
 $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]))$aDeptNames[]=$departmentNames[$did];
 ?>
-<?php foreach([[$aDeptNames,'department','All departments'],[array_map(fn($code)=>$programCategories[$code]??$code,$aAud['programs']),'program','All programs']] as [$names,$kind,$all]): ?>
-<?php if(count($names)>1): ?><details class="ann-audience-details"><summary><?= count($names) ?> <?= $kind ?>s</summary><ul><?php foreach($names as $name): ?><li><?= htmlspecialchars($name) ?></li><?php endforeach; ?></ul></details><?php else: ?><span class="ann-audience-single"><?= htmlspecialchars($names[0]??$all) ?></span><?php endif; ?>
-<?php endforeach; ?>
+<span class="ann-audience-single"><?= htmlspecialchars(contentAudienceDescription($aAud)) ?></span>
                         </div>
                     </td>
                     <td data-label="Status"><span class="status-badge <?= htmlspecialchars($a['status']) ?>"><?= htmlspecialchars($statusLabels[$a['status']] ?? ucfirst($a['status'])) ?></span>
@@ -519,6 +517,7 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
           </section>
           <section class="evt-form-section" aria-labelledby="ann-audience-heading">
           <h6 id="ann-audience-heading">Categories &amp; audience</h6>
+          <input type="hidden" name="audience_present" value="1">
           <div class="row g-3 mb-3">
             <div class="col-12">
               <label class="form-label fw-semibold" id="ann-category-label">Categories</label>
@@ -534,7 +533,7 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
             <div class="col-12 col-md-6">
               <label class="form-label fw-semibold" id="ann-program-label">Academic programs</label>
               <div id="modal-program-multiselect"></div>
-              <div class="form-text">Leave unrestricted for all programs.</div>
+              <div class="form-text">For each selected department, choose specific programs or clear its programs to target the whole department.</div>
             </div>
             <div class="col-12"><div class="evt-audience-summary" id="modal-audience-help" role="status"></div></div>
           </div>
@@ -944,14 +943,7 @@ function updateAudienceHelp() {
     const progs = annProgSelect ? annProgSelect.getSelected() : [];
     const help = document.getElementById('modal-audience-help');
     if (!help) return;
-    if (depts.length === 0 && progs.length === 0) {
-        help.innerHTML = '<i class="bi bi-info-circle me-1"></i>School-wide announcement (applies to all departments and all programs).';
-    } else {
-        help.innerHTML = '<i class="bi bi-info-circle me-1"></i>Targeted announcement: ' +
-            (depts.length ? depts.length + ' department(s) ' : 'all departments ') +
-            '&middot; ' +
-            (progs.length ? progs.length + ' program(s)' : 'all programs');
-    }
+    help.textContent = GncAdminFormAudience.summary(annDeptSelect, annProgSelect);
 }
 annDeptSelect.config.onChange = updateAudienceHelp;
 annProgSelect.config.onChange = updateAudienceHelp;
@@ -1351,7 +1343,7 @@ window.GncAnnouncementForm.init({quill: modalQuill});
 // Auto-reopen the modal on load: validation error, or ?modal=create / ?modal=edit&id=N
 <?php if ($modalMode === 'create'): ?>
 openCreateModal();
-<?php if (!empty($flashErrors)): ?>
+<?php if (!empty($flashOld)): ?>
 modalTitleInput.value = <?= json_encode($flashOld['title'] ?? '') ?>;
 modalQuill.loadHtml(<?= json_encode($flashOld['content'] ?? '') ?>);
 if (modalCategory) modalCategory.setSelected(<?= json_encode($flashOld['category_ids'] ?? (!empty($flashOld['category_id']) ? [$flashOld['category_id']] : [])) ?>);

@@ -394,6 +394,8 @@ if (!isset($sections[$section])) {
 
 $current        = $sections[$section];
 $photoFallback  = '/assets/images/logos/gnc-logo-v1.svg';
+// Page tabs suppress the opening wipe; navbar links omit this flag.
+$skipPageEntrance = ($_GET['navigation'] ?? '') === 'tab';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -435,7 +437,7 @@ $photoFallback  = '/assets/images/logos/gnc-logo-v1.svg';
         <div class="admin-tabs-inner">
             <nav class="admin-tabs" aria-label="Administration sections">
                 <?php foreach ($sections as $key => $tab): ?>
-                    <a href="?section=<?= urlencode($key); ?>"
+                    <a href="?section=<?= urlencode($key); ?>&amp;navigation=tab"
                        class="admin-tab <?= $section === $key ? 'active' : ''; ?>">
                         <?= htmlspecialchars($tab['title']); ?>
                     </a>

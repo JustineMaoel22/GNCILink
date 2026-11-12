@@ -65,6 +65,12 @@ async function until(fn, message) {
     assert.deepEqual(await evaluate('programs.getSelected()'),['A','C']);
     await evaluate('programs.deselectAllBtn.click()');
     assert.deepEqual(await evaluate('programs.getSelected()'),[]);
+    assert.equal(await evaluate("programs.tagsAreaEl.textContent.includes('Whole selected departments')"),true,'Empty programs must describe department-level targeting');
+    await evaluate("depts.setSelected(['1','2']);programs.setSelected(['B']);depts.setSelected(['1','2','3'])");
+    assert.deepEqual(await evaluate('programs.getSelected()'),['B'],'Adding another department must preserve a whole-department selection in the first');
+    await evaluate("depts.setSelected(['1','2']);programs.setSelected(['B'])");
+    assert.deepEqual(await evaluate("new FormData(document.querySelector('form')).getAll('dept_ids[]')"),['1','2']);
+    assert.deepEqual(await evaluate("new FormData(document.querySelector('form')).getAll('programs[]')"),['B'],'A cleared department must not erase another department program selection');
     await evaluate("programs.searchInput.value='another';programs.filterOptions('another');depts.setSelected(['2']);programs.deselectAll();programs.selectAllBtn.click()");
     assert.deepEqual(await evaluate('programs.getSelected()'),[]);
     assert.equal(await evaluate('changes > 0'),true);

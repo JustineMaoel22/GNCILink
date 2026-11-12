@@ -3,7 +3,6 @@
  * GNC Admin Panel - Content Editor
  *
  * One place to manage the website's content:
- *   - "All content" list: search, filter and sort everything you may edit
  *   - Review queue: approvers accept or send back what editors submitted
  *   - Homepage slideshow, section-based pages (rich-text editor + live preview),
  *     College Departments, Programs and Administration (existing managers)
@@ -67,7 +66,7 @@ $reviewReady    = pageReviewReady();   // false until sql/page-approval-migratio
 $roleName = (string)($currentUser['role'] ?? ($_SESSION['role'] ?? ''));
 
 // Departments that belong to Basic Education (they have their own page templates). Every other department is a college
-// department. Kept in ONE place so the pickers and the "All content" list always agree.
+// department. Shared by the department and program pickers.
 $basicEduSlugs = ['casa-gradeschool', 'jhs-regular', 'hs-monte', 'shs-regular'];
 
 // Pages that are NOT edited with the text editor (they have their own tools)
@@ -191,7 +190,7 @@ $textPages = array_values(array_filter($textPages, static fn($page) => !empty($s
 $pending = ($canApprove && $reviewReady) ? getPendingSections() : [];
 
 // ── Which panel is open? ──
-$validPanels = ['hub'];
+$validPanels = [];
 if ($canApprove) $validPanels[] = 'review';
 if ($canManagePages) { $validPanels[] = 'home'; $validPanels[] = 'basic-education'; $validPanels[] = 'student-organizations'; $validPanels[] = 'student-achievements'; $validPanels[] = 'athletics-sports'; $validPanels[] = 'tuition-fees'; $validPanels[] = 'online-payment-guide'; $validPanels[] = 'scholarships'; }
 if ($postModules && $canManagePages) $validPanels[] = 'updates';
@@ -200,19 +199,25 @@ if ($canManagePages) $validPanels[] = 'faqs';
 foreach ($textPages as $p)   $validPanels[] = $p['slug'];
 foreach ($customPages as $p) $validPanels[] = $p['slug'];
 $requestedPage = (string)($_GET['page'] ?? '');
+$defaultPage = $canManagePages ? 'home' : (string)($textPages[0]['slug'] ?? ($canApprove ? 'review' : ''));
+// Retired list bookmarks open the existing default visual editor instead.
+if ($requestedPage === 'hub' && in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true)) {
+    header('Location: ?page=' . rawurlencode($defaultPage), true, 302);
+    exit;
+}
 if ($requestedPage === '') {
     // Opening the Content Editor lands on the website itself (the homepage, or the first page you may edit).
-    $requestedPage = $canManagePages ? 'home' : (string)($textPages[0]['slug'] ?? 'hub');
+    $requestedPage = $defaultPage;
 }
-$activeSlug    = in_array($requestedPage, $validPanels, true) ? $requestedPage : 'hub';
+$activeSlug    = in_array($requestedPage, $validPanels, true) ? $requestedPage : $defaultPage;
 // Existing bookmarks now lead to the same queue as all other approvals.
 if($activeSlug==='review'&&rbacIsSuper()){
     header('Location: /admin/submissions.php?status=pending',true,302);exit;
 }
 
-// "All content" and the review queue are lists. Every other page opens as the visual editor:
+// The review queue is a list. Every editable page opens as the visual editor:
 // the real website page, edited in place.
-$editorMode = !in_array($activeSlug, ['hub', 'review'], true);
+$editorMode = $activeSlug !== '' && $activeSlug !== 'review';
 
 // Shared page navigation for the editor picker and the content sidebar.
 $pickerPages = [];
@@ -410,111 +415,6 @@ if ($editorMode) {
     ];
 }
 
-// ── The "All content" list ──
-$rank = ['pending' => 0, 'rejected' => 1, 'draft' => 2, 'live' => 3, 'hidden' => 4];
-$hub = [];
-if ($canManagePages) {
-    $homeStatus = 'live'; $homeTs = 0;
-    foreach ($slides as $s) {
-        if (($s['status'] ?? '') !== 'published') $homeStatus = 'draft';
-        $homeTs = max($homeTs, (int)strtotime((string)($s['updated_at'] ?? $s['created_at'] ?? '')));
-    }
-    if (!$slides) $homeStatus = 'draft';
-    $hub[] = ['title' => 'Homepage slideshow', 'type' => 'Homepage', 'status' => $homeStatus, 'ts' => $homeTs,
-              'note' => count($slides) . ' slide' . (count($slides) === 1 ? '' : 's'), 'open' => 'home', 'href' => '?page=home', 'where' => '/'];
-}
-foreach (getContentHubPages() as $row) {
-    $slug = $row['slug'];
-    if (in_array($slug, $customSlugs, true)) continue;
-    if (!in_array($slug, array_column($textPages, 'slug'), true)) continue;
-    $st = ((int)$row['pending'] > 0) ? 'pending' : (((int)$row['rejected'] > 0) ? 'rejected' : (((int)$row['drafts'] > 0) ? 'draft' : 'live'));
-    $ts = max((int)strtotime((string)$row['sections_updated']), (int)strtotime((string)$row['page_updated']));
-    $n  = (int)$row['section_count'];
-    $hub[] = ['title' => $row['title'], 'type' => 'Page', 'status' => $st, 'ts' => $ts,
-              'note' => $n . ' section' . ($n === 1 ? '' : 's'), 'open' => $slug, 'href' => '?page=' . rawurlencode($slug),
-              'where' => $publicUrls[$slug] ?? ''];
-}
-if ($canManagePages) {
-    $hub[] = ['title'=>'Scholarship Opportunities','type'=>'Admissions','status'=>'live','ts'=>0,'note'=>'Scholarship categories, titles and PDF documents','open'=>'scholarships','href'=>'?page=scholarships','where'=>$publicUrls['scholarships']];
-    $hub[] = ['title'=>'Online Payment Guide','type'=>'Admissions','status'=>'live','ts'=>0,'note'=>'Payment instructions, account details, links and illustrations','open'=>'online-payment-guide','href'=>'?page=online-payment-guide','where'=>$publicUrls['online-payment-guide']];
-    $hub[] = ['title'=>'Tuition and Fees','type'=>'Admissions','status'=>'live','ts'=>0,'note'=>'Tuition text, fee categories and PDF schedules','open'=>'tuition-fees','href'=>'?page=tuition-fees','where'=>$publicUrls['tuition-fees']];
-    foreach ($customPages as $cp) {
-        if ($cp['slug'] === 'home') continue;
-        $type = $cp['slug'] === 'administration' ? 'Administration' : 'Academics';
-        $hub[] = ['title' => $cp['title'], 'type' => $type, 'status' => 'live', 'ts' => 0,
-                  'note' => $cp['slug'] === 'administration' ? 'People and offices' : 'Departments and programs',
-                  'open' => $cp['slug'], 'href' => '?page=' . rawurlencode($cp['slug']), 'where' => $publicUrls[$cp['slug']] ?? ''];
-    }
-    $hub[] = ['title'=>'Student Organizations Management','type'=>'Student life','status'=>'live','ts'=>0,'note'=>'Organizations, categories, order and publication status','open'=>'student-organizations','href'=>'?page=student-organizations','where'=>studentOrganizationsUrl()];
-    $hub[] = ['title'=>'Student Achievements','type'=>'Student life','status'=>'live','ts'=>0,'note'=>'Achievements, uploaded pictures and academic years','open'=>'student-achievements','href'=>'?page=student-achievements','where'=>'/pages/student%20life/student-achievement.php'];
-    $hub[] = ['title'=>'Athletics and Sports','type'=>'Student life','status'=>'live','ts'=>0,'note'=>'Sports slideshow, program names and photos','open'=>'athletics-sports','href'=>'?page=athletics-sports','where'=>$publicUrls['athletics-sports']];
-    $hub[] = ['title'=>'Community Extension Activities','type'=>'Student life','status'=>'live','ts'=>0,'note'=>'Activities, categories, photos and display order','open'=>'community-activities','href'=>'?page=community-activities','where'=>$publicUrls['community-activities']];
-    $hub[] = ['title'=>'Frequently Asked Questions','type'=>'Student resources','status'=>'live','ts'=>0,'note'=>'Questions, answers and display order','open'=>'faqs','href'=>'?page=faqs','where'=>$publicUrls['faqs']];
-    foreach (studentOrganizations(true) as $organization) {
-        $hub[] = ['title'=>$organization['name'],'type'=>'Organization','status'=>!empty($organization['archived_at'])?'hidden':($organization['status']==='published'?'live':'draft'),'ts'=>strtotime($organization['updated_at']),'note'=>$organization['category_name']??'Uncategorized','open'=>'student-organizations','href'=>'?page=student-organizations&sub='.rawurlencode($organization['slug']),'where'=>studentOrganizationsUrl($organization['slug'])];
-    }
-    foreach (getContentHubDepartments() as $d) {
-        $isBasic = !empty($d['slug']) && in_array((string)$d['slug'], $basicEduSlugs, true);
-        $isGraduate = ($d['slug'] ?? '') === 'graduate-school';
-        $pageKey = $isGraduate ? 'graduate-school' : ($isBasic ? 'basic-education' : 'college-departments');
-        $hub[] = ['title' => $d['dept_name'], 'type' => 'Department', 'status' => $d['archived_at'] ? 'hidden' : 'live', 'ts' => 0,
-                  'note' => $isGraduate ? 'Graduate School' : ($isBasic ? 'Basic Education department' : 'College department'), 'open' => $pageKey, 'href' => '?page=' . $pageKey . (!empty($d['slug']) ? '&sub=' . rawurlencode($d['slug']) : ''),
-                  'where' => empty($d['slug']) ? '' : ($isGraduate ? '/pages/academics/graduate-school/graduate-school.php' : ($isBasic ? '/pages/academics/basic-edu/basic-edu-department/' . rawurlencode($d['slug']) . '.php' : '/pages/academics/college/college-department.php?slug=' . rawurlencode($d['slug'])))];
-    }
-    foreach (getContentHubPrograms() as $pr) {
-        $hub[] = ['title' => ($pr['program_code'] ? $pr['program_code'] . ' – ' : '') . $pr['program_name'], 'type' => 'Program',
-                  'status' => ((int)$pr['is_published'] === 1) ? 'live' : 'hidden', 'ts' => 0,
-                  'note' => (string)($pr['dept_name'] ?? ''), 'open' => 'programs',
-                  'href' => '?page=programs' . (!empty($pr['slug']) ? '&sub=' . rawurlencode($pr['slug']) : '') . '#program-' . (int)$pr['program_id'], 'where' => ''];
-    }
-}
-// News, announcements and events: listed here so everything is searchable in one place.
-// Each row links to that module's own editor (which keeps its approval workflow).
-$statusMap = ['published' => 'live', 'pending' => 'pending', 'draft' => 'draft', 'archived' => 'hidden'];
-$uid = (int)($_SESSION['user_id'] ?? 0);
-$mayEdit = function (string $manage, string $kind, $ownerId) use ($uid): bool {
-    return hasPermission($manage) || hasPermission("edit_{$kind}") || hasPermission("publish_{$kind}")
-        || (hasPermission("edit_own_{$kind}") && (int)$ownerId === $uid);
-};
-if (is_file(__DIR__ . '/announcement.php')) {
-    try {
-        foreach (getAnnouncements([], 200, 0) as $a) {
-            if (!$mayEdit('manage_announcements', 'announcement', $a['user_id'] ?? 0)) continue;
-            $by = trim(($a['first_name'] ?? '') . ' ' . ($a['last_name'] ?? ''));
-            $hub[] = ['title' => $a['title'], 'type' => 'Announcement', 'status' => $statusMap[$a['status']] ?? 'draft',
-                      'ts' => (int)strtotime((string)($a['updated_at'] ?? $a['created_at'] ?? '')),
-                      'note' => $by !== '' ? 'By ' . $by : '', 'open' => '', 'href' => $canManagePages ? ce_postUrl('announcement', ['modal' => 'edit', 'id' => (int)$a['announcement_id']]) : 'announcement.php?modal=edit&id=' . (int)$a['announcement_id'], 'where' => ''];
-        }
-    } catch (Throwable $e) { error_log('hub announcements: ' . $e->getMessage()); }
-}
-if (is_file(__DIR__ . '/news.php')) {
-    try {
-        foreach (getNews([], 200, 0) as $n) {
-            if (!$mayEdit('manage_news', 'news', $n['user_id'] ?? 0)) continue;
-            $by = trim((string)($n['author'] ?? '')) ?: trim(($n['first_name'] ?? '') . ' ' . ($n['last_name'] ?? ''));
-            $raw = (string)($n['updated_at'] ?? $n['created_at'] ?? '');
-            $hub[] = ['title' => $n['title'], 'type' => 'News', 'status' => $statusMap[$n['status']] ?? 'draft',
-                      'ts' => (int)strtotime($raw . ' UTC'),   // news dates are stored in UTC
-                      'note' => $by !== '' ? 'By ' . $by : '', 'open' => '', 'href' => $canManagePages ? ce_postUrl('news', ['modal' => 'edit', 'id' => (int)$n['news_id']]) : 'news.php?modal=edit&id=' . (int)$n['news_id'], 'where' => ''];
-        }
-    } catch (Throwable $e) { error_log('hub news: ' . $e->getMessage()); }
-}
-if (is_file(__DIR__ . '/events.php')) {
-    try {
-        foreach (getContentHubEvents() as $ev) {
-            if (!$mayEdit('manage_events', 'event', $ev['user_id'] ?? 0)) continue;
-            $hub[] = ['title' => $ev['title'], 'type' => 'Event', 'status' => $statusMap[$ev['status']] ?? 'draft',
-                      'ts' => (int)strtotime((string)$ev['start_date']),
-                      'note' => 'Starts ' . date('M j, Y', (int)strtotime((string)$ev['start_date'])), 'open' => '', 'href' => ($canManagePages ? ce_postUrl('event', ['month' => (int)date('n', (int)strtotime((string)$ev['start_date'])), 'year' => (int)date('Y', (int)strtotime((string)$ev['start_date']))]) : 'events.php?month=' . (int)date('n', (int)strtotime((string)$ev['start_date'])) . '&year=' . (int)date('Y', (int)strtotime((string)$ev['start_date']))), 'where' => ''];
-        }
-    } catch (Throwable $e) { error_log('hub events: ' . $e->getMessage()); }
-}
-$hubTypes = array_values(array_unique(array_column($hub, 'type')));
-$hubCount = ['all' => count($hub), 'live' => 0, 'draft' => 0, 'pending' => 0, 'rejected' => 0, 'hidden' => 0];
-foreach ($hub as $h) $hubCount[$h['status']]++;
-
-$statusLabel = ['live' => 'Live', 'draft' => 'Draft', 'pending' => 'Waiting for approval', 'rejected' => 'Changes requested', 'hidden' => 'Hidden'];
-
 // Other content modules (real files in /admin). Linked only when the person may use them.
 $otherModules = [];
 foreach ([
@@ -525,13 +425,8 @@ foreach ([
     if (!is_file(__DIR__ . '/' . $file)) continue;
     foreach ($perms as $pm) { if (hasPermission($pm)) { $otherModules[] = ['href' => ($canManagePages && isset($postModules[$pmk = ['announcement.php' => 'announcement', 'news.php' => 'news', 'events.php' => 'event'][$file]])) ? ce_postUrl($pmk) : $file, 'label' => $label, 'icon' => $icon]; break; } }
 }
-$createLinks = [];
-if (hasPermission('create_announcement') && is_file(__DIR__ . '/announcement.php')) $createLinks[] = [$canManagePages ? ce_postUrl('announcement', ['modal' => 'create']) : 'announcement.php?modal=create', 'Announcement', 'bi-megaphone'];
-if (hasPermission('create_news') && is_file(__DIR__ . '/news.php'))                 $createLinks[] = [$canManagePages ? ce_postUrl('news', ['modal' => 'create']) : 'news.php?modal=create', 'News article', 'bi-newspaper'];
-if (hasPermission('create_event') && is_file(__DIR__ . '/events.php'))              $createLinks[] = [$canManagePages ? ce_postUrl('event') : 'events.php', 'Event', 'bi-calendar-event'];
-
 // Nothing at all to show or do on this screen?
-$noAccess = !$canDraftPages && !$canApprove && !$hub && !$createLinks;
+$noAccess = !$canDraftPages && !$canApprove;
 
 include __DIR__ . '/../components/header-admin.php';
 ?>
@@ -549,7 +444,7 @@ include __DIR__ . '/../components/header-admin.php';
 
     <header class="ve-top">
         <div class="ve-navigation">
-        <a class="ve-back" href="?page=hub" data-ve-nav title="Back to the list of all content" aria-label="All content"><i class="bi bi-grid-1x2"></i><span>All content</span></a>
+        <a class="ve-tool" id="veBack" href="/admin/dashboard" data-ve-nav title="Back to dashboard" aria-label="Back to dashboard"><i class="bi bi-arrow-left" aria-hidden="true"></i><span>Back</span></a>
 
         <details class="ve-menu" id="vePageMenu">
             <summary title="Choose which page to edit">
@@ -564,9 +459,8 @@ include __DIR__ . '/../components/header-admin.php';
                     <i class="bi bi-<?= ce_e($pp['icon']) ?>"></i><span><?= ce_e($pp['title']) ?></span>
                 </a>
                 <?php endforeach; ?>
-                <div class="ve-menu-group">More</div>
-                <a role="menuitem" data-ve-nav class="ve-menu-item" href="?page=hub"><i class="bi bi-grid-1x2"></i><span>All content (list)</span></a>
                 <?php if ($canApprove): ?>
+                <div class="ve-menu-group">More</div>
                 <a role="menuitem" data-ve-nav class="ve-menu-item" href="?page=review"><i class="bi bi-inboxes"></i><span>Review queue</span>
                     <?php if ($pending): ?><em class="ve-badge"><?= count($pending) ?></em><?php endif; ?></a>
                 <?php endif; ?>
@@ -693,14 +587,13 @@ include __DIR__ . '/../components/header-admin.php';
     </button>
 
     <nav class="ce-nav" id="ceNav" aria-label="Content Editor">
+        <?php if ($canApprove): ?>
         <div class="ce-nav-group">
             <div class="ce-nav-label">Overview</div>
-            <a class="ce-nav-link" href="?page=hub" data-panel="hub"><i class="bi bi-grid-1x2"></i><span>All content</span></a>
-            <?php if ($canApprove): ?>
             <a class="ce-nav-link" href="?page=review" data-panel="review"><i class="bi bi-inboxes"></i><span>Review queue</span>
                 <span class="ce-nav-badge" id="cePendingBadge" <?= $pending ? '' : 'hidden' ?>><?= count($pending) ?></span></a>
-            <?php endif; ?>
         </div>
+        <?php endif; ?>
 
         <?php
         $sidebarPageGroups = [];
@@ -750,104 +643,6 @@ include __DIR__ . '/../components/header-admin.php';
             Your developer needs to run <code>sql/page-approval-migration.sql</code> once. Until then, editors cannot submit for approval; saving drafts and publishing still work.
         </div>
 <?php endif; ?>
-
-        <!-- ══════════════════ All content ══════════════════ -->
-        <div class="page-panel" id="page-panel-hub" style="<?= $activeSlug === 'hub' ? '' : 'display:none' ?>">
-            <div class="page-header">
-                <div>
-                    <h1>Content Editor</h1>
-                    <p>Everything you can edit on the website, in one list. Search, filter, then press <strong>Edit</strong>.</p>
-                </div>
-                <?php if ($createLinks): ?>
-                <div class="dropdown">
-                    <button class="btn-gnc-gold dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-plus-lg"></i> Create new</button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <?php foreach ($createLinks as $c): ?><li><a class="dropdown-item" href="<?= ce_e($c[0]) ?>"><i class="bi <?= ce_e($c[2]) ?> me-2"></i><?= ce_e($c[1]) ?></a></li><?php endforeach; ?>
-                    </ul>
-                </div>
-                <?php endif; ?>
-            </div>
-
-            <div class="ce-stats" role="group" aria-label="Filter by status">
-                <button type="button" class="ce-stat" data-status="" aria-pressed="true"><b id="ceStatAll"><?= $hubCount['all'] ?></b><span>All content</span></button>
-                <button type="button" class="ce-stat ce-stat-live" data-status="live" aria-pressed="false"><b><?= $hubCount['live'] ?></b><span>Live</span></button>
-                <button type="button" class="ce-stat ce-stat-draft" data-status="draft" aria-pressed="false"><b><?= $hubCount['draft'] ?></b><span>Drafts</span></button>
-                <button type="button" class="ce-stat ce-stat-pending" data-status="pending" aria-pressed="false"><b><?= $hubCount['pending'] ?></b><span>Waiting for approval</span></button>
-                <button type="button" class="ce-stat ce-stat-rejected" data-status="rejected" aria-pressed="false"><b><?= $hubCount['rejected'] ?></b><span>Changes requested</span></button>
-            </div>
-
-            <div class="data-card ce-list-card">
-                <div class="ce-toolbar">
-                    <div class="ce-search">
-                        <i class="bi bi-search" aria-hidden="true"></i>
-                        <input type="search" id="ceSearch" class="form-control" placeholder="Search by title…" aria-label="Search content">
-                    </div>
-                    <select id="ceType" class="form-select" aria-label="Filter by type">
-                        <option value="">All types</option>
-                        <?php foreach ($hubTypes as $t): ?><option value="<?= ce_e($t) ?>"><?= ce_e($t) ?></option><?php endforeach; ?>
-                    </select>
-                    <select id="ceStatus" class="form-select" aria-label="Filter by status">
-                        <option value="">Any status</option>
-                        <?php foreach ($statusLabel as $k => $v): ?><option value="<?= $k ?>"><?= ce_e($v) ?></option><?php endforeach; ?>
-                    </select>
-                    <select id="ceSort" class="form-select" aria-label="Sort by">
-                        <option value="attention">Needs attention first</option>
-                        <option value="modified">Recently modified</option>
-                        <option value="title">Title A–Z</option>
-                        <option value="type">Type</option>
-                    </select>
-                </div>
-
-                <div class="ce-table-wrap">
-                    <table class="ce-table" id="ceTable">
-                        <thead>
-                            <tr>
-                                <th scope="col"><button type="button" class="ce-th" data-sort="title">Title</button></th>
-                                <th scope="col"><button type="button" class="ce-th" data-sort="type">Type</button></th>
-                                <th scope="col"><button type="button" class="ce-th" data-sort="attention">Status</button></th>
-                                <th scope="col"><button type="button" class="ce-th" data-sort="modified">Last modified</button></th>
-                                <th scope="col" class="ce-th-act"><span class="visually-hidden">Actions</span></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        <?php foreach ($hub as $h): ?>
-                            <tr class="ce-row" data-title="<?= ce_e(mb_strtolower($h['title'] . ' ' . $h['note'])) ?>"
-                                data-name="<?= ce_e(mb_strtolower($h['title'])) ?>" data-type="<?= ce_e($h['type']) ?>"
-                                data-status="<?= ce_e($h['status']) ?>" data-rank="<?= $rank[$h['status']] ?>" data-ts="<?= (int)$h['ts'] ?>">
-                                <td data-label="Title">
-                                    <a class="ce-row-title" href="<?= ce_e($h['href']) ?>" data-open="<?= ce_e($h['open']) ?>"><?= ce_e($h['title']) ?></a>
-                                    <?php if ($h['note'] !== ''): ?><small><?= ce_e($h['note']) ?></small><?php endif; ?>
-                                </td>
-                                <td data-label="Type"><?= ce_e($h['type']) ?></td>
-                                <td data-label="Status"><span class="ce-badge ce-badge-<?= ce_e($h['status']) ?>"><?= ce_e($statusLabel[$h['status']]) ?></span></td>
-                                <td data-label="Last modified"><?= $h['ts'] ? ce_e(date('M j, Y', $h['ts'])) : '<span class="text-muted">—</span>' ?></td>
-                                <td class="ce-row-act">
-                                    <a class="btn btn-sm btn-outline-secondary" href="<?= ce_e($h['href']) ?>" data-open="<?= ce_e($h['open']) ?>"><i class="bi bi-pencil"></i> Edit</a>
-                                    <?php if ($h['where']): ?><a class="ce-ext" href="<?= ce_e($h['where']) ?>" target="_blank" rel="noopener" title="See it on the website" aria-label="View <?= ce_e($h['title']) ?> on the website"><i class="bi bi-box-arrow-up-right"></i></a><?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                    <div class="empty-state ce-none" id="ceNone" hidden>
-                        <i class="bi bi-search"></i>
-                        <p>Nothing matches. Try a different word, or <button type="button" class="btn btn-link p-0 align-baseline" id="ceReset">clear the filters</button>.</p>
-                    </div>
-                </div>
-                <div class="ce-count-line" id="ceShowing" aria-live="polite"></div>
-            </div>
-
-            <?php if ($otherModules): ?>
-            <div class="ce-others">
-                <h2>Also manage</h2>
-                <div class="ce-others-grid">
-                    <?php foreach ($otherModules as $m): ?>
-                    <a href="<?= ce_e($m['href']) ?>"><i class="bi <?= ce_e($m['icon']) ?>"></i><?= ce_e($m['label']) ?></a>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <?php endif; ?>
-        </div>
 
 <?php if ($canApprove): ?>
         <!-- ══════════════════ Review queue ══════════════════ -->
@@ -918,7 +713,7 @@ include __DIR__ . '/../components/header-admin.php';
 </script>
 
 <script>
-// ══════════════════ Content Editor: navigation, content list, rich-text editor, review ══════════════════
+// ══════════════════ Content Editor: navigation, rich-text editor, review ══════════════════
 (function () {
     'use strict';
     var CFG = window.CE_CONFIG || {};
@@ -1020,50 +815,9 @@ include __DIR__ . '/../components/header-admin.php';
         });
     });
     (function () {
-        var cur = (new URL(window.location.href)).searchParams.get('page') || 'hub';
-        if (!panelEl(cur)) cur = 'hub';
+        var cur = (new URL(window.location.href)).searchParams.get('page') || <?= json_encode($activeSlug) ?>;
+        if (!panelEl(cur)) cur = <?= json_encode($activeSlug) ?>;
         showPanel(cur, { scroll: false });
-    })();
-
-    // ══════════════════ Content list: search / filter / sort ══════════════════
-    (function () {
-        var table = $('#ceTable'); if (!table) return;
-        var tbody = table.tBodies[0];
-        var rows = $$('.ce-row', tbody);
-        var q = $('#ceSearch'), fType = $('#ceType'), fStatus = $('#ceStatus'), fSort = $('#ceSort');
-        var none = $('#ceNone'), showing = $('#ceShowing');
-        var stats = $$('.ce-stat');
-
-        function cmpName(a, b) { return a.dataset.name < b.dataset.name ? -1 : a.dataset.name > b.dataset.name ? 1 : 0; }
-        var sorters = {
-            attention: function (a, b) { return (a.dataset.rank - b.dataset.rank) || (b.dataset.ts - a.dataset.ts) || cmpName(a, b); },
-            modified:  function (a, b) { return (b.dataset.ts - a.dataset.ts) || cmpName(a, b); },
-            title:     cmpName,
-            type:      function (a, b) { return a.dataset.type < b.dataset.type ? -1 : a.dataset.type > b.dataset.type ? 1 : cmpName(a, b); }
-        };
-        function apply() {
-            var term = (q.value || '').trim().toLowerCase();
-            var shown = 0;
-            rows.sort(sorters[fSort.value] || sorters.attention).forEach(function (r) {
-                var ok = (!term || r.dataset.title.indexOf(term) !== -1) &&
-                         (!fType.value || r.dataset.type === fType.value) &&
-                         (!fStatus.value || r.dataset.status === fStatus.value);
-                r.hidden = !ok;
-                if (ok) shown++;
-                tbody.appendChild(r);
-            });
-            table.hidden = shown === 0;
-            if (none) none.hidden = shown !== 0;
-            if (showing) showing.textContent = 'Showing ' + shown + ' of ' + rows.length;
-            stats.forEach(function (s) { s.setAttribute('aria-pressed', (s.getAttribute('data-status') || '') === fStatus.value ? 'true' : 'false'); });
-            $$('.ce-th', table).forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-sort') === fSort.value); });
-        }
-        [q, fType, fStatus, fSort].forEach(function (el) { el.addEventListener(el === q ? 'input' : 'change', apply); });
-        stats.forEach(function (s) { s.addEventListener('click', function () { fStatus.value = s.getAttribute('data-status') || ''; apply(); }); });
-        $$('.ce-th', table).forEach(function (b) { b.addEventListener('click', function () { fSort.value = b.getAttribute('data-sort'); apply(); }); });
-        var reset = $('#ceReset');
-        if (reset) reset.addEventListener('click', function () { q.value = ''; fType.value = ''; fStatus.value = ''; apply(); q.focus(); });
-        apply();
     })();
 
     function post(action, fields) {

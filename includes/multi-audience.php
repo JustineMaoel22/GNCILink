@@ -6,10 +6,21 @@
  * targeted to one, multiple, or all departments and academic programs.
  */
 
+require_once __DIR__ . '/content-audience.php';
+
 if (!function_exists('ensureMultiAudienceTables')) {
     function ensureMultiAudienceTables(PDO $db): void {
         static $ensured = false;
         if ($ensured) return;
+        // MySQL CREATE TABLE implicitly commits even when the table exists.
+        // Inside a content save, verify schema without ending the caller's transaction.
+        if ($db->inTransaction()) {
+            foreach (['announcement_departments', 'announcement_programs', 'event_departments', 'event_programs'] as $table) {
+                $db->query("SELECT 1 FROM `$table` LIMIT 0");
+            }
+            $ensured = true;
+            return;
+        }
         try {
             $db->exec("
                 CREATE TABLE IF NOT EXISTS `announcement_departments` (
@@ -142,6 +153,7 @@ if (!function_exists('saveAnnouncementAudience')) {
             }
         } catch (Throwable $e) {
             error_log('saveAnnouncementAudience error: ' . $e->getMessage());
+            if ($db->inTransaction()) throw $e;
         }
     }
 }

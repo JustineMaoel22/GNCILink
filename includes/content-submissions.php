@@ -153,6 +153,10 @@ function rbacQueueCurrentRequest(string $route): void {
             $post['category_id']=$post['category_ids'][0]??null;
         }
         if(in_array($route,['/admin/action/create-news.php','/admin/action/create-announcement.php'],true)&&isset($post['content']))$post['content']=richTextNormalize((string)$post['content']);
+        if(in_array($route,['/admin/action/create-news.php','/admin/action/create-announcement.php'],true)&&isset($post['audience_present'])){
+            $audience=validatedContentAudience($post['dept_ids']??[],$post['programs']??[]);
+            $post['dept_ids']=$audience['dept_ids'];$post['programs']=$audience['programs'];
+        }
         // Approval never implicitly publishes to Facebook.
         if(isset($post['publish_destination']))$post['publish_destination']='website';
         $target=rbacValidatePostOwnership($route,$post);

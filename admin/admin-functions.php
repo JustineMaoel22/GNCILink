@@ -2519,63 +2519,6 @@ function getPendingSections(): array {
     }
 }
 
-/** Pages + their combined status, for the Content Editor's content list. */
-function getContentHubPages(): array {
-    try {
-        $ready = pageReviewReady();
-        return getDB()->query("
-            SELECT p.page_id, p.slug, p.title, p.page_type, p.description, p.updated_at AS page_updated,
-                   MAX(ps.updated_at) AS sections_updated,
-                   COUNT(ps.section_id) AS section_count,
-                   SUM(CASE WHEN ps.draft_content IS NOT NULL THEN 1 ELSE 0 END) AS drafts"
-                   . ($ready ? ",
-                   SUM(CASE WHEN ps.review_status = 'pending'  THEN 1 ELSE 0 END) AS pending,
-                   SUM(CASE WHEN ps.review_status = 'rejected' THEN 1 ELSE 0 END) AS rejected" : ",
-                   0 AS pending, 0 AS rejected") . "
-            FROM pages p
-            LEFT JOIN page_sections ps ON ps.page_id = p.page_id
-            WHERE p.status = 'active'
-            GROUP BY p.page_id, p.slug, p.title, p.page_type, p.description, p.updated_at, p.display_order
-            ORDER BY p.display_order ASC, p.title ASC
-        ")->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) {
-        error_log('Get content hub pages error: ' . $e->getMessage());
-        return [];
-    }
-}
-
-function getContentHubPrograms(): array {
-    try {
-        return getDB()->query("
-            SELECT p.program_id, p.program_code, p.program_name, p.is_published, d.dept_name
-            FROM programs p LEFT JOIN departments d ON d.dept_id = p.dept_id
-            ORDER BY p.dept_id IS NULL, p.dept_id ASC, p.program_id ASC
-        ")->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) {
-        error_log('Get content hub programs error: ' . $e->getMessage());
-        return [];
-    }
-}
-
-function getContentHubEvents(): array {
-    try {
-        return getDB()->query("SELECT event_id, title, status, start_date, user_id FROM events ORDER BY start_date DESC LIMIT 200")->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) {
-        error_log('Get content hub events error: ' . $e->getMessage());
-        return [];
-    }
-}
-
-function getContentHubDepartments(): array {
-    try {
-        return getDB()->query("SELECT dept_id, dept_name, slug, archived_at FROM departments ORDER BY dept_id ASC")->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) {
-        error_log('Get content hub departments error: ' . $e->getMessage());
-        return [];
-    }
-}
-
-
 // ============================================================
 // COLLEGE DEPARTMENTS — CENTRALIZED LOGO + DEAN
 // ============================================================

@@ -246,6 +246,8 @@ if ($postAction === 'create' || $postAction === 'update') {
     if (empty($errors)) {
         try {
             if ($sendFacebook) {
+                // Compatibility schema setup must finish before the atomic publishing save.
+                ensureMultiAudienceTables(getDB());
                 getDB()->beginTransaction();
                 $facebookTransaction = true;
                 // Unique request key is reserved in the same transaction as the saved announcement.
@@ -253,7 +255,7 @@ if ($postAction === 'create' || $postAction === 'update') {
             }
             $categoryIds = normalizeAnnouncementCategoryIds(getDB(), isset($_POST['category_ids_present']) || array_key_exists('category_ids', $_POST)
                 ? ($_POST['category_ids'] ?? []) : (!empty($_POST['category_id']) ? [$_POST['category_id']] : []));
-            $audience = normalizeMultiAudienceInput(
+            $audience = isset($_POST['audience_present']) ? validatedContentAudience($_POST['dept_ids'] ?? [], $_POST['programs'] ?? []) : normalizeMultiAudienceInput(
                 $_POST['dept_ids'] ?? ($_POST['dept_id'] ?? null),
                 $_POST['programs'] ?? ($_POST['program'] ?? null)
             );

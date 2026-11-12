@@ -1,4 +1,9 @@
 <?php
+/** The default site's administrator is identified by its login, not its editable name/role. */
+function isDeletionProtectedAdminUser(array $user): bool {
+    return strcasecmp(trim((string)($user['email'] ?? '')), 'gnciweb.admin@gmail.com') === 0;
+}
+
 /** Delete an account only after reauthenticating the acting Super Admin. */
 function deleteAdminUser(int $targetId, string $password): void {
     if (!hasPermission('delete_user') || !rbacIsSuper()) throw new RuntimeException('Only Super Admin can delete users.');
@@ -20,8 +25,9 @@ function deleteAdminUser(int $targetId, string $password): void {
             $db->commit();
             throw new InvalidArgumentException('Your current password is incorrect. The user was not deleted.');
         }
-        $q = $db->prepare('SELECT user_id,role,status FROM users WHERE user_id=? FOR UPDATE');$q->execute([$targetId]);$target = $q->fetch();
+        $q = $db->prepare('SELECT user_id,email,role,status FROM users WHERE user_id=? FOR UPDATE');$q->execute([$targetId]);$target = $q->fetch();
         if (!$target) throw new InvalidArgumentException('User not found.');
+        if (isDeletionProtectedAdminUser($target)) throw new RuntimeException('The Default Admin account is protected and cannot be deleted.');
         if ($target['role'] === 'Super Admin' && $target['status'] === 'active' && count($admins) <= 1) throw new RuntimeException('Keep at least one active Super Admin.');
         // Do not allow hosting schema differences to cascade-delete authored content.
         $refs = $db->query("SELECT k.TABLE_NAME,k.COLUMN_NAME,c.IS_NULLABLE,r.DELETE_RULE
