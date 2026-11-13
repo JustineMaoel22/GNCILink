@@ -19,7 +19,7 @@ function rbacRouteAllowed(string $role, string $route): bool {
     $role=rbacRole($role);
     if ($role==='Super Admin' || $role==='Content Editor') return true;
     if ($role!=='The Mirror') return false;
-    return in_array($route, ['/admin/admin-dash.php','/admin/settings.php','/admin/account-password.php','/admin/announcement.php','/admin/news.php','/admin/submissions.php','/admin/facebook-posts.php',
+    return in_array($route, ['/admin/admin-dash.php','/admin/settings.php','/admin/account-password.php','/admin/announcement.php','/admin/news.php','/admin/submissions.php',
         '/admin/action/create-announcement.php','/admin/action/create-news.php','/admin/auth/logout.php',
         '/admin/action/content-completeness-handler.php','/admin/change-password.php',
         '/admin/help.php','/admin/action/onboarding-handler.php','/admin/action/profile-picture-handler.php'],true);

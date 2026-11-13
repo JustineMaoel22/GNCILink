@@ -15,6 +15,8 @@ foreach(['Super Admin','Content Editor','The Mirror','Content Admin','Office Sta
     checkHelp(in_array('users',$ids,true)===rbacIsSuper(),'User management visibility');
     checkHelp(in_array('activity-logs',$ids,true)===rbacIsSuper(),'Log visibility');
     checkHelp(in_array('events',$ids,true)===(rbacRole()!=='The Mirror'),'Event visibility');
+    checkHelp(in_array('facebook',$ids,true)===(rbacRole()!=='The Mirror'),'Facebook help visibility');
+    checkHelp(rbacRouteAllowed($role,'/admin/facebook-posts.php')===(rbacRole()!=='The Mirror'),'Facebook page access');
     checkHelp(in_array('content-editor',$ids,true)===(rbacRole()!=='The Mirror'),'Content editor visibility');
     foreach($topics as $topic){
         checkHelp(!empty($topic['steps'])&&!empty($topic['faqs'])&&!empty($topic['summary']),'Complete guide content');

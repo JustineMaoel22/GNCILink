@@ -4,7 +4,7 @@ function adminOnboardingGuides(): array {
     $super = rbacIsSuper();
     $items = [];
     $add = static function ($permission, $route, $title, $text) use (&$items) {
-        if ($permission === null || hasPermission($permission)) $items[] = compact('route', 'title', 'text');
+        if (rbacRouteAllowed(rbacRole(), $route) && ($permission === null || hasPermission($permission))) $items[] = compact('route', 'title', 'text');
     };
     $add(null, '/admin/admin-dash.php', 'Dashboard', (rbacRole() === 'The Mirror' ? 'Start here for your own news and announcement counts, recent posts and submission status.' : 'Start here for content counts, recent updates and website activity available to your role.') . ' Use the shortcuts or sidebar to open a feature; on a phone, use the menu button at the top.');
     $add('create_announcement', '/admin/announcement.php', 'Announcements', 'Open Announcements and choose New Announcement. Enter a clear title and message, review the available fields and check your work before saving. ' . ($super ? 'Choose the appropriate status before saving. Publishing makes the announcement visible to visitors.' : 'Submit your changes for approval. They do not become public until a Super Admin approves them.') . (rbacRole() === 'The Mirror' ? ' You can edit only your own content.' : ''));

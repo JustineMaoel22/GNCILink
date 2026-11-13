@@ -92,11 +92,11 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
                 <i class="bi bi-megaphone-fill"></i> Announcements
             </a>
         </li>
-        <li>
+        <?php if (rbacRouteAllowed(rbacRole(), '/admin/facebook-posts.php')): ?><li>
             <a href="/admin/facebook-posts.php" class="sidebar-link <?= $currentPage === 'facebook-posts' ? 'active' : '' ?>">
                 <i class="bi bi-facebook"></i> Facebook Posts
             </a>
-        </li>
+        </li><?php endif; ?>
         <li>
             <a href="/admin/news.php" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/news') !== false ? 'active' : '' ?>">
                 <i class="bi bi-newspaper"></i> News
