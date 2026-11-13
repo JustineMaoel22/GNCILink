@@ -25,10 +25,10 @@ function roleDashboardData(?PDO $db=null): array {
     }
     if(count($contentCounts)===count($types))$stats['published_content']=array_sum(array_column($contentCounts,'published'));
     try{
-        $scope=$super?'':' WHERE user_id=?';$params=$super?[]:[$id];
-        $q=$db->prepare('SELECT status,COUNT(*) AS total FROM rbac_submissions'.$scope.' GROUP BY status');$q->execute($params);$submissionCounts=array_map('intval',$q->fetchAll(PDO::FETCH_KEY_PAIR));
+        $scope=" WHERE status<>'draft'".($super?'':' AND user_id=?');$params=$super?[]:[$id];
+        $q=$db->prepare('SELECT CASE status WHEN \'pending_approval\' THEN \'pending\' ELSE status END AS queue_status,COUNT(*) AS total FROM rbac_submissions'.$scope.' GROUP BY queue_status');$q->execute($params);$submissionCounts=array_map('intval',$q->fetchAll(PDO::FETCH_KEY_PAIR));
         $stats['pending_approvals']=$submissionCounts['pending']??0;
-        $q=$db->prepare('SELECT submission_id,title,status,revision,created_at,updated_at FROM rbac_submissions'.$scope.' ORDER BY updated_at DESC,submission_id DESC LIMIT 6');$q->execute($params);$submissions=$q->fetchAll(PDO::FETCH_ASSOC);
+        $q=$db->prepare('SELECT submission_id,title,CASE status WHEN \'pending_approval\' THEN \'pending\' ELSE status END AS status,revision,created_at,updated_at FROM rbac_submissions'.$scope.' ORDER BY updated_at DESC,submission_id DESC LIMIT 6');$q->execute($params);$submissions=$q->fetchAll(PDO::FETCH_ASSOC);
     }catch(PDOException $e){$errors['submissions']='Submission status is temporarily unavailable.';error_log('Dashboard submissions unavailable.');}
     if($super){
         try{$pagePending=(int)$db->query("SELECT COUNT(*) FROM page_sections WHERE review_status='pending'")->fetchColumn();if($stats['pending_approvals']!==null)$stats['pending_approvals']+=$pagePending;}

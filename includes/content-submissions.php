@@ -52,6 +52,10 @@ function rbacShouldQueue(string $route,array $post): bool {
     // These are read-only lookups; all other POSTs to content handlers are proposals.
     return !in_array($action,['list','get','fetch_one','load','upload_environment','categories','get_content'],true);
 }
+function rbacSubmissionVisible(array $row,bool $super,int $userId,bool $drafts=false): bool {
+    if($row['status']==='draft')return $drafts&&(int)$row['user_id']===$userId;
+    return !$drafts&&($super||(int)$row['user_id']===$userId);
+}
 function rbacGetSubmission(int $id): ?array {
     $q=getDB()->prepare('SELECT * FROM rbac_submissions WHERE submission_id=?');$q->execute([$id]);return $q->fetch()?:null;
 }
@@ -78,16 +82,26 @@ function rbacRevisionFormData(string $route): array {
     $id=(int)($_GET['revise']??0);if(!$id)return [];
     $row=rbacGetSubmission($id);
     if(!$row||(int)$row['user_id']!==(int)$_SESSION['user_id']||$row['route']!==$route||!in_array($row['status'],['draft','rejected','needs_revision','failed'],true))rbacFail('You cannot revise this submission.');
-    return rbacReadPayload($id)['post']??[];
+    return array_merge(rbacReadPayload($id)['post']??[],['_review_revision'=>(int)$row['revision']]);
 }
-function rbacSaveSubmission(string $kind,string $route,string $title,array $payload,int $target=0,int $resubmit=0,string $status='pending'): int {
+function rbacArticleRoute(string $route): bool {
+    return in_array($route,['/admin/action/create-news.php','/admin/action/create-announcement.php'],true);
+}
+function rbacRequestSaveStatus(string $route,array $post): string {
+    if (!rbacArticleRoute($route) || !in_array($post['action']??'', ['create','update'],true)) return ($post['status']??'')==='draft'?'draft':'pending';
+    $status=$post['status']??'draft';
+    if (!is_string($status) || !in_array($status,['draft','pending','pending_approval'],true)) throw new InvalidArgumentException('Choose Save as draft or Submit for approval.');
+    return $status==='draft'?'draft':'pending_approval';
+}
+function rbacSaveSubmission(string $kind,string $route,string $title,array $payload,int $target=0,int $resubmit=0,string $status='pending',?int $expectedRevision=null): int {
     if(!rbacSubmissionsReady())throw new RuntimeException('Approval storage is not set up. Ask the developer to import sql/rbac-migration.sql.');
-    if(!in_array($status,['draft','pending'],true))throw new InvalidArgumentException('Invalid submission status.');
+    if(!in_array($status,['draft','pending','pending_approval'],true))throw new InvalidArgumentException('Invalid submission status.');
     $db=getDB();$db->beginTransaction();
     try {
         if($resubmit){
             $q=$db->prepare('SELECT * FROM rbac_submissions WHERE submission_id=? FOR UPDATE');$q->execute([$resubmit]);$old=$q->fetch();
             if(!$old||(int)$old['user_id']!==(int)$_SESSION['user_id']||$old['route']!==$route||(int)($old['target_id']??0)!==$target||!in_array($old['status'],['draft','rejected','needs_revision','failed'],true))throw new RuntimeException('This submission cannot be revised by your account.');
+            if($expectedRevision!==null&&(int)$old['revision']!==$expectedRevision)throw new RuntimeException('This draft changed in another tab. Reopen it before saving again.',409);
             $previous=rbacReadPayload($resubmit);
             $payload['_review_history']=rbacFeedbackHistory($old,$previous);
             $db->prepare('UPDATE rbac_submissions SET title=?,status=?,reason=NULL,reviewed_by=NULL,reviewed_at=NULL,revision=revision+1,updated_at=NOW() WHERE submission_id=?')->execute([mb_substr($title,0,500),$status,$resubmit]);$id=$resubmit;
@@ -167,18 +181,23 @@ function rbacQueueCurrentRequest(string $route): void {
         if(($post['action']??$post['ajax_action']??'')==='bulk_delete')$post['ids']=bulkContentIds($post['ids']??null);
         $resubmit=(int)($post['_review_id']??0);unset($post['_review_id']);
         $uploads=rbacCollectUploads($_FILES,$route==='/admin/enrollment-steps.php');
-        if($resubmit){$old=rbacGetSubmission($resubmit);if(!$old||(int)$old['user_id']!==(int)$_SESSION['user_id'])throw new RuntimeException('Submission not found.');$previous=rbacReadPayload($resubmit);$uploads=array_replace($previous['files']??[],$uploads);}
-        $status=($post['status']??'')==='draft'?'draft':'pending';
+        if($resubmit){$old=rbacGetSubmission($resubmit);if(!$old||(int)$old['user_id']!==(int)$_SESSION['user_id'])throw new RuntimeException('Submission not found.');
+            $previous=rbacReadPayload($resubmit);$uploads=array_replace($previous['files']??[],$uploads);}
+        $status=rbacRequestSaveStatus($route,$post);
+        if(rbacArticleRoute($route))$post['status']=$status;
+        $expectedRevision=$resubmit&&rbacArticleRoute($route)?filter_var($post['_review_revision']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]):null;
+        if($resubmit&&rbacArticleRoute($route)&&$expectedRevision===false)throw new RuntimeException('Reopen the saved draft before saving again.');
+        unset($post['_review_revision']);
         $title=(string)($post['title']??$post['page']??$post['section_key']??($post['action']??'Website content change'));
         $proposal=['post'=>$post,'files'=>$uploads];
         if(!empty($_SERVER['HTTP_X_GNCI_EDITOR_PEER'])) {
             require_once __DIR__.'/editor-presence.php';
             $proposal['editor_version']=editorPresenceDraftVersion(getDB(),$_SERVER['HTTP_X_GNCI_EDITOR_PEER']);
         }
-        $id=rbacSaveSubmission('request',$route,$title,$proposal,$target,$resubmit,$status);
+        $id=rbacSaveSubmission('request',$route,$title,$proposal,$target,$resubmit,$status,$expectedRevision);
         $message=$status==='draft'?'Draft saved. It is not live.':'Submitted for Super Admin approval. Published content is unchanged.';
-        if(str_starts_with($route,'/admin/action/create-')||$route==='/admin/settings.php'){$_SESSION['flash_success']=$message;header('Location: /admin/submissions.php?id='.$id);exit;}
-        header('Content-Type: application/json');http_response_code(202);echo json_encode(['success'=>true,'submitted'=>true,'submission_id'=>$id,'message'=>$message]);exit;
+        if(str_starts_with($route,'/admin/action/create-')||$route==='/admin/settings.php'){$_SESSION['flash_success']=$message;header('Location: /admin/submissions.php?'.($status==='draft'?'view=drafts&':'').'id='.$id);exit;}
+        header('Content-Type: application/json');http_response_code(202);echo json_encode(['success'=>true,'submitted'=>$status!=='draft','submission_id'=>$id,'message'=>$message]);exit;
     }catch(Throwable $e){rbacFail($e instanceof PDOException?'Submission could not be stored. No live content was changed.':$e->getMessage(),422);}
 }
 function rbacRejectSubmission(int $id,int $revision,string $reason): void {
@@ -197,7 +216,7 @@ function rbacReviewDecision(int $id,int $revision,string $reason,string $state):
     $db=getDB();$db->beginTransaction();
     try{
         $q=$db->prepare('SELECT status,revision FROM rbac_submissions WHERE submission_id=? FOR UPDATE');$q->execute([$id]);$row=$q->fetch();
-        if(!$row||$row['status']!=='pending'||(int)$row['revision']!==$revision)throw new RuntimeException('The submission changed or has already been reviewed. Reload before reviewing.');
+        if(!$row||!in_array($row['status'],['pending','pending_approval'],true)||(int)$row['revision']!==$revision)throw new RuntimeException('The submission changed or has already been reviewed. Reload before reviewing.');
         $payload=rbacReadPayload($id);
         $payload['_review_history']=rbacFeedbackHistory($row,$payload);
         $payload['_review_history'][]=['status'=>$state,'revision'=>$revision,'feedback'=>$reason,'at'=>date('Y-m-d H:i:s')];
@@ -212,8 +231,11 @@ function rbacSubmitSaved(int $id,int $revision): void {
     try{
         $q=$db->prepare('SELECT * FROM rbac_submissions WHERE submission_id=? FOR UPDATE');$q->execute([$id]);$row=$q->fetch();
         if(!$row||(int)$row['user_id']!==(int)$_SESSION['user_id']||(int)$row['revision']!==$revision||!in_array($row['status'],['draft','rejected','needs_revision','failed'],true))throw new RuntimeException('This submission cannot be submitted again. Reload and check its status.');
-        $payload=rbacReadPayload($id);$payload['_review_history']=rbacFeedbackHistory($row,$payload);rbacWritePayload($id,$payload);
-        $db->prepare("UPDATE rbac_submissions SET status='pending',reason=NULL,reviewed_by=NULL,reviewed_at=NULL,revision=revision+1,updated_at=NOW() WHERE submission_id=?")->execute([$id]);
+        $payload=rbacReadPayload($id);$payload['_review_history']=rbacFeedbackHistory($row,$payload);
+        $next=rbacArticleRoute($row['route'])?'pending_approval':'pending';
+        if(rbacArticleRoute($row['route']))$payload['post']['status']=$next;
+        rbacWritePayload($id,$payload);
+        $db->prepare("UPDATE rbac_submissions SET status=?,reason=NULL,reviewed_by=NULL,reviewed_at=NULL,revision=revision+1,updated_at=NOW() WHERE submission_id=?")->execute([$next,$id]);
         if(!logActivity((int)$_SESSION['user_id'],'RESUBMIT','rbac_submissions',$id,'Sent saved proposal for approval.'))throw new RuntimeException('The submission could not be recorded. Please try again.');
         $db->commit();
     }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
@@ -315,7 +337,7 @@ function rbacExecuteRequest(array $submission,array $payload): array {
 function rbacApproveRequest(int $id,int $revision,?callable $executor=null): string {
     if(!rbacIsSuper())throw new RuntimeException('Only Super Admin can approve submissions.');
     $submission=rbacGetSubmission($id);if(!$submission||$submission['kind']!=='request')throw new RuntimeException('This submission must be reviewed in the visual editor.');
-    $q=getDB()->prepare("UPDATE rbac_submissions SET status='processing',reviewed_by=?,reviewed_at=NOW(),updated_at=NOW() WHERE submission_id=? AND revision=? AND status='pending'");$q->execute([(int)$_SESSION['user_id'],$id,$revision]);
+    $q=getDB()->prepare("UPDATE rbac_submissions SET status='processing',reviewed_by=?,reviewed_at=NOW(),updated_at=NOW() WHERE submission_id=? AND revision=? AND status IN ('pending','pending_approval')");$q->execute([(int)$_SESSION['user_id'],$id,$revision]);
     if($q->rowCount()!==1)throw new RuntimeException('The submission changed or has already been reviewed. Reload before approving.');
     try{$result=($executor??'rbacExecuteRequest')($submission,rbacReadPayload($id));}
     catch(Throwable $e){$result=['state'=>'uncertain','message'=>'Approval could not confirm completion. Check the server setup and actual content before another attempt.'];}

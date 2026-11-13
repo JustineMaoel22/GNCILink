@@ -52,7 +52,7 @@ function deleteAdminUser(int $targetId, string $password): void {
             catch (PDOException $e) {if ($e->getCode() !== '42S02') throw $e;}
         }
         try {
-            $db->prepare("UPDATE rbac_submissions SET status='rejected',reason='Account deleted by a Super Admin.',reviewed_by=?,reviewed_at=NOW(),updated_at=NOW() WHERE user_id=? AND status IN ('pending','draft','failed')")->execute([$actorId,$targetId]);
+            $db->prepare("UPDATE rbac_submissions SET status='rejected',reason='Account deleted by a Super Admin.',reviewed_by=?,reviewed_at=NOW(),updated_at=NOW() WHERE user_id=? AND status IN ('pending','pending_approval','draft','failed')")->execute([$actorId,$targetId]);
         } catch (PDOException $e) {if ($e->getCode() !== '42S02') throw $e;}
         if (!logActivity($actorId,'DELETE_USER','users',$targetId,'Deleted user account #'.$targetId.'; authored content retained and pending submissions closed.')) throw new RuntimeException('Could not record the deletion. No account was deleted.');
         $db->prepare('DELETE FROM users WHERE user_id=?')->execute([$targetId]);

@@ -46,6 +46,16 @@ boundaries.
 - Warn about incomplete required or recommended content before publishing; allow the admin to continue editing or explicitly publish where policy permits.
 - Apply identical authorization and input validation to visual-editor and conventional admin endpoints.
 
+Mirror and Content Editor News and Announcement drafts remain private checkpoints in the existing
+`rbac_submissions` / `rbac_submission_chunks` tables. The owner-only Drafts view
+(`/admin/submissions.php?view=drafts`) supports editing and explicit submission;
+submission lists, dashboard proposal summaries and direct review/media access
+exclude private drafts. Article submission changes `draft` to `pending_approval`;
+queue presentation also accepts legacy `pending` requests. Revision checks reject
+stale draft saves. Content Editor edits of published articles default to a private
+draft; only approved proposals update the published record. Existing VARCHAR
+status storage needs no migration.
+
 ## Data and database changes
 
 Administration additions use the existing private Content Editor snapshot tables, including photo bytes and crop settings. Canvas and settings-modal additions share the same draft action; the four section tabs share a draft route. Preview-only card templates reuse the public card markup, including empty sections. Only explicit publication writes `admin_people`/`admin_offices`; returned IDs reconcile successful inserts before publication retries. Content Editors submit the existing snapshot approval workflow. No schema migration is required.

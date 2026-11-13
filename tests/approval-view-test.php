@@ -54,7 +54,7 @@ approvalRefused(fn()=>rbacApproveRequest(1,1),'Editor cannot approve');
 $_SESSION['user_id']=2;
 approvalRefused(fn()=>rbacSubmitSaved(1,1),'Other author cannot resubmit');
 $_SESSION['user_id']=1;
-rbacSubmitSaved(1,1);$row=rbacGetSubmission(1);approvalCheck($row['status']==='pending'&&(int)$row['revision']===2,'Resubmit increments revision');
+rbacSubmitSaved(1,1);$row=rbacGetSubmission(1);approvalCheck($row['status']==='pending_approval'&&(int)$row['revision']===2,'Resubmit increments revision');
 approvalCheck(count(rbacReadPayload(1)['_review_history'])===1,'Resubmit retains feedback');
 approvalRefused(fn()=>rbacSubmitSaved(1,1),'Duplicate resubmit refused');
 $id=rbacSaveSubmission('request','/admin/action/create-news.php','Edited proposal',['post'=>['title'=>'Revised title'],'files'=>[]]);
@@ -106,4 +106,97 @@ $db->exec("UPDATE page_sections SET review_status='none',draft_content=NULL WHER
 approvalCheck($r['total']===1,'Discarded page text is not labelled approved');
 $actions=$db->query('SELECT action FROM activity_logs')->fetchAll(PDO::FETCH_COLUMN);
 approvalCheck(!array_diff(['REQUEST_REVISION','REJECT','RESUBMIT','APPROVE','PUBLISH'],$actions),'Review and publish audit events');
+// Private article drafts share storage but never enter submission lists or review access.
+foreach(['The Mirror','Content Editor'] as $role){
+foreach(['/admin/action/create-news.php','/admin/action/create-announcement.php'] as $route){
+    $_SESSION=['user_id'=>1,'user_role'=>$role];
+    approvalCheck(rbacRequestSaveStatus($route,['action'=>'create'])==='draft','Missing article intent defaults to private draft');
+    approvalCheck(rbacRequestSaveStatus($route,['action'=>'create','status'=>'draft'])==='draft','Explicit draft intent');
+    approvalCheck(rbacRequestSaveStatus($route,['action'=>'update','status'=>'pending'])==='pending_approval','Explicit submission uses pending_approval');
+    approvalRefused(fn()=>rbacRequestSaveStatus($route,['action'=>'create','status'=>'published']),'Non-publisher cannot publish by forging intent');
+    $payload=['post'=>['action'=>'create','status'=>'draft','title'=>'Private fixture','content'=>'Draft body'],'files'=>['image'=>['name'=>'draft.png','mime'=>'image/png','data'=>base64_encode('fixture')]]];
+    $draft=rbacSaveSubmission('request',$route,'Private fixture',$payload,0,0,'draft');
+    for($rev=1;$rev<=3;$rev++){
+        $payload['post']['content']='Edit '.$rev;
+        rbacSaveSubmission('request',$route,'Private fixture',$payload,0,$draft,'draft',$rev);
+        approvalCheck(rbacGetSubmission($draft)['status']==='draft','Repeated save stays private');
+    }
+    approvalRefused(fn()=>rbacSaveSubmission('request',$route,'Stale',$payload,0,$draft,'draft',1),'Stale draft update refused');
+    approvalCheck(rbacReadPayload($draft)['post']['content']==='Edit 3'&&isset(rbacReadPayload($draft)['files']['image']),'Latest content and attachment retained');
+    foreach([true,false] as $super){
+        [$r]=$run(['q'=>'Private fixture'],$super,1);
+        approvalCheck($r['total']===0&&!isset($r['counts']['draft']),'Drafts excluded from submissions, counts and approvals');
+        [$r]=$run(['status'=>'draft'],$super,1);
+        approvalCheck($r['total']===0,'Status filter cannot leak drafts');
+        [$r]=$run(['q'=>'Private fixture','view'=>'drafts'],$super,2);
+        approvalCheck($r['total']===0,'Drafts private even from another Super Admin');
+    }
+    [$r]=$run(['q'=>'Private fixture','view'=>'drafts'],false,1);
+    approvalCheck($r['total']===1,'Owner can find saved draft in Drafts');
+    $row=rbacGetSubmission($draft);
+    approvalCheck(!rbacSubmissionVisible($row,true,2,true)&&!rbacSubmissionVisible($row,true,1)&&rbacSubmissionVisible($row,false,1,true),'Direct review and media access respect private draft scope');
+    $_SESSION['user_role']='Super Admin';
+    approvalRefused(fn()=>rbacApproveRequest($draft,4,fn()=>['state'=>'approved','message'=>'Unexpected']),'Private draft cannot be approved');
+    $_SESSION=['user_id'=>2,'user_role'=>$role];
+    approvalRefused(fn()=>rbacSubmitSaved($draft,4),'Other owner cannot submit draft');
+    approvalRefused(fn()=>rbacSaveSubmission('request',$route,'Stolen',$payload,0,$draft,'draft',4),'Other owner cannot update draft');
+    $_SESSION['user_id']=1;
+    rbacSubmitSaved($draft,4);
+    approvalCheck(rbacGetSubmission($draft)['status']==='pending_approval'&&rbacReadPayload($draft)['post']['status']==='pending_approval','Only explicit submission transitions status');
+    approvalRefused(fn()=>rbacSubmitSaved($draft,4),'Duplicate submission refused');
+    [$r]=$run(['q'=>'Private fixture','view'=>'drafts'],false,1);
+    approvalCheck($r['total']===0,'Submitted article leaves Drafts');
+    [$r]=$run(['q'=>'Private fixture'],true,2);
+    approvalCheck($r['total']===1&&$r['rows'][0]['status']==='pending','Submitted article enters compatible approval queue');
+    $_SESSION=['user_id'=>2,'user_role'=>'Super Admin'];
+    rbacApproveRequest($draft,5,fn()=>['state'=>'approved','message'=>'Approved article fixture']);
+    approvalCheck(rbacGetSubmission($draft)['status']==='approved','New pending_approval state can be approved');
+    $db->prepare('DELETE FROM rbac_submissions WHERE submission_id=?')->execute([$draft]);
+}
+}
+
+// Published records are shadowed only on this test connection; no live data is edited.
+require_once __DIR__.'/../includes/admin-notifications.php';
+foreach(['news'=>'news_id','announcements'=>'announcement_id'] as $table=>$key){
+    $db->exec("CREATE TEMPORARY TABLE $table ($key INT PRIMARY KEY,user_id INT,title VARCHAR(500),content TEXT,status VARCHAR(20)) ENGINE=InnoDB");
+}
+foreach(['The Mirror','Content Editor'] as $role){
+    foreach(['news'=>'news','announcements'=>'announcement'] as $table=>$kind){
+        $key=$kind.'_id';$route='/admin/action/create-'.$kind.'.php';
+        $_SESSION=['user_id'=>1,'user_role'=>$role];
+        $db->exec("DELETE FROM $table");
+        // Editors may propose changes to other authors' published content; Mirror remains owner-only.
+        $owner=$role==='Content Editor'?2:1;
+        $db->prepare("INSERT INTO $table VALUES(1,?,'Published fixture','Original published text','published')")->execute([$owner]);
+        $readOriginal=fn()=>$db->query("SELECT * FROM $table WHERE $key=1")->fetch(PDO::FETCH_ASSOC);
+        $original=$readOriginal();
+        $post=['action'=>'update',$key=>1,'title'=>'Private published edit','content'=>'Proposed edit','status'=>'draft'];
+        approvalCheck(rbacValidatePostOwnership($route,$post)===1,'Published edit respects role permissions');
+        $draft=rbacSaveSubmission('request',$route,$post['title'],['post'=>$post,'files'=>[]],1,0,rbacRequestSaveStatus($route,$post));
+        approvalCheck($readOriginal()===$original,'Saving edit as draft preserves published original');
+        $post['content']='Revised proposed edit';
+        rbacSaveSubmission('request',$route,$post['title'],['post'=>$post,'files'=>[]],1,$draft,'draft',1);
+        approvalCheck($readOriginal()===$original,'Repeated edit saves preserve published original');
+        $_SESSION['user_role']='Super Admin';
+        $notices=adminNotifications();
+        approvalCheck(!$notices['unavailable'],'Notification reads remain available');
+        approvalCheck(!in_array('/admin/submissions.php?id='.$draft,array_column($notices['items'],'url'),true),'Saving private edits generates no approval notification');
+        $_SESSION['user_role']=$role;
+        rbacSubmitSaved($draft,2);
+        approvalCheck(rbacGetSubmission($draft)['status']==='pending_approval'&&$readOriginal()===$original,'Explicit submission queues edited version without changing original');
+        $_SESSION=['user_id'=>2,'user_role'=>'Super Admin'];
+        approvalCheck(in_array('/admin/submissions.php?id='.$draft,array_column(adminNotifications()['items'],'url'),true),'Only explicit submission generates approval notification');
+        approvalRefused(fn()=>rbacApproveRequest($draft,2),'Stale review cannot publish proposed edit');
+        approvalCheck($readOriginal()===$original,'Refused review leaves original unchanged');
+        // The real approval boundary must authorize the executor before it can write.
+        rbacApproveRequest($draft,3,function($row,$payload)use($db,$table,$key){
+            approvalCheck($row['status']==='pending_approval'&&$payload['post']['status']==='pending_approval','Executor receives explicitly submitted edit');
+            $db->prepare("UPDATE $table SET content=? WHERE $key=?")->execute([$payload['post']['content'],$row['target_id']]);
+            return ['state'=>'approved','message'=>'Approved temporary published-edit fixture'];
+        });
+        approvalCheck($readOriginal()['content']==='Revised proposed edit'&&$readOriginal()['status']==='published','Approved edit replaces only temporary published content');
+        $db->prepare('DELETE FROM rbac_submissions WHERE submission_id=?')->execute([$draft]);
+    }
+}
+
 echo "$checks approval checks passed. No persistent data changed.\n";

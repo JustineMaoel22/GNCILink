@@ -16,7 +16,7 @@ function approvalSectionEligibilitySql(): string {
     return "(ps.review_status IN ('pending','rejected') OR (ps.submitted_at IS NOT NULL AND ps.review_status='none' AND ps.reviewed_at IS NOT NULL AND ps.draft_content IS NULL AND (SELECT l.action FROM activity_logs l WHERE l.table_name='page_sections' AND l.record_id=ps.section_id AND l.created_at>=ps.submitted_at AND l.action IN ('APPROVE','REJECT','REQUEST_REVISION') ORDER BY l.log_id DESC LIMIT 1)='APPROVE'))";
 }
 function approvalQueueSource(PDO $db): string {
-    $base = "SELECT submission_id,user_id,CONVERT(kind USING utf8mb4) COLLATE utf8mb4_unicode_ci AS kind,CONVERT(route USING utf8mb4) COLLATE utf8mb4_unicode_ci AS route,target_id,CONVERT(title USING utf8mb4) COLLATE utf8mb4_unicode_ci AS title,CONVERT(status USING utf8mb4) COLLATE utf8mb4_unicode_ci AS status,revision,CONVERT(reason USING utf8mb4) COLLATE utf8mb4_unicode_ci AS reason,reviewed_by,reviewed_at,created_at,updated_at,'proposal' AS record_source FROM rbac_submissions";
+    $base = "SELECT submission_id,user_id,CONVERT(kind USING utf8mb4) COLLATE utf8mb4_unicode_ci AS kind,CONVERT(route USING utf8mb4) COLLATE utf8mb4_unicode_ci AS route,target_id,CONVERT(title USING utf8mb4) COLLATE utf8mb4_unicode_ci AS title,CONVERT(CASE status WHEN 'pending_approval' THEN 'pending' ELSE status END USING utf8mb4) COLLATE utf8mb4_unicode_ci AS status,revision,CONVERT(reason USING utf8mb4) COLLATE utf8mb4_unicode_ci AS reason,reviewed_by,reviewed_at,created_at,updated_at,'proposal' AS record_source FROM rbac_submissions";
     try {
         $db->query('SELECT ps.section_id,ps.title,ps.submitted_by,ps.submitted_at,ps.review_status,ps.reviewed_by,ps.reviewed_at,ps.review_note,ps.updated_at,ps.draft_content,p.title FROM page_sections ps JOIN pages p ON p.page_id=ps.page_id LIMIT 0');
     } catch (PDOException $e) {
@@ -51,7 +51,8 @@ function approvalSectionDecision(PDO $db,int $id,string $version,string $action,
 }
 function approvalFilters(array $input): array {
     $string=static fn($key)=>is_string($input[$key]??null)?trim($input[$key]):'';
-    $f=['q'=>mb_substr($string('q'),0,200),'status'=>'','type'=>'','author'=>'','from'=>'','to'=>'','sort'=>'newest','page'=>1,'size'=>25];
+    $f=['q'=>mb_substr($string('q'),0,200),'status'=>'','type'=>'','author'=>'','from'=>'','to'=>'','sort'=>'newest','page'=>1,'size'=>25,'view'=>$string('view')==='drafts'?'drafts':'submissions'];
+    if($string('status')==='pending_approval')$f['status']='pending';
     if(isset(approvalStatuses()[$string('status')]))$f['status']=$string('status');
     if(isset(approvalTypes()[$string('type')]))$f['type']=$string('type');
     if(preg_match('/^[1-9]\d{0,9}$/',$string('author')))$f['author']=$string('author');
@@ -68,7 +69,9 @@ function approvalFilters(array $input): array {
     return $f;
 }
 function approvalQueue(PDO $db,array &$filters,bool $super,int $userId): array {
-    $scope=$super?'1=1':'s.user_id=?';$scopeParams=$super?[]:[$userId];
+    $drafts=($filters['view']??'submissions')==='drafts';
+    $scope=$drafts?"s.status='draft' AND s.user_id=?":("s.status<>'draft'".($super?'':' AND s.user_id=?'));
+    $scopeParams=$drafts||!$super?[$userId]:[];
     $source=approvalQueueSource($db);
     $from=' FROM ('.$source.') s LEFT JOIN users u ON u.user_id=s.user_id';
     $q=$db->prepare('SELECT s.status,COUNT(*) AS total FROM ('.$source.') s WHERE '.$scope.' GROUP BY s.status');$q->execute($scopeParams);$counts=$q->fetchAll(PDO::FETCH_KEY_PAIR);

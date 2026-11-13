@@ -317,6 +317,7 @@ include __DIR__ . '/../components/header-admin.php';
           <input type="hidden" name="return_query" value="<?= $ne($returnQuery) ?>">
           <input type="hidden" name="news_id" id="modal-news-id" value="">
           <input type="hidden" name="_review_id" value="<?= (int)($_GET['revise'] ?? 0) ?>">
+          <input type="hidden" name="_review_revision" value="<?= (int)($flashOld['_review_revision']??0) ?>">
           <?php if($revisionFeedback): ?><div class="alert alert-warning" role="note"><strong>Revision feedback</strong><p class="mb-0"><?= nl2br($ne($revisionFeedback)) ?></p></div><?php endif; ?>
           <div id="announcement-form-alert" class="alert alert-danger d-none" role="alert" tabindex="-1"></div>
           <p class="evt-required-note">Fields marked <span class="text-danger">*</span> are required. Pictures and the author name are optional.</p>
@@ -424,10 +425,10 @@ include __DIR__ . '/../components/header-admin.php';
           <div class="ann-status-help" id="modal-status-help" aria-live="polite"></div>
           <?php else: ?>
           <label class="form-label" for="modal-status">What should happen when you save?</label>
-          <select name="status" id="modal-status" class="form-select mb-2"><option value="draft">Save as draft</option><option value="pending" selected>Submit for approval</option></select>
+          <select name="status" id="modal-status" class="form-select mb-2"><option value="draft">Save as draft</option><option value="pending">Submit for approval</option></select>
           <div class="alert alert-secondary mb-0 d-flex gap-2" style="font-size:.88rem">
             <i class="bi bi-info-circle mt-1"></i>
-            <span>This will be sent for approval first. It appears on the public website once it is approved.</span>
+            <span>Drafts stay private. Choose Submit for approval when ready; the content becomes public after approval.</span>
           </div>
           <?php endif; ?>
           </section>
@@ -675,6 +676,8 @@ const modalTitleInput   = document.getElementById('modal-title');
 const modalAuthorInput  = document.getElementById('modal-author');
 const modalCategory     = document.getElementById('modal-category');
 const modalStatus       = document.getElementById('modal-status');
+// Content Editors keep edits private until they explicitly choose submission.
+const editorSaveStatus = <?= json_encode(rbacRole()==='Content Editor'?'draft':'pending') ?>;
 const modalActionInput  = document.getElementById('modal-action');
 const modalIdInput      = document.getElementById('modal-news-id');
 const modalLabel        = document.getElementById('newsModalLabel');
@@ -748,6 +751,8 @@ function selectNewsCategory(code = 'Others', preserveExisting = false) {
 
 function resetModalForm() {
     document.getElementById('news-form').reset();
+    document.querySelector('#news-form [name="_review_id"]').value = '0';
+    document.querySelector('#news-form [name="_review_revision"]').value = '0';
     window.GncNewsAudience?.set();
     document.querySelector('#news-form [name="allow_incomplete"]')?.remove();
     modalQuill.setContents([]);
@@ -863,7 +868,7 @@ function openEditModal(btn) {
     modalTitleInput.value = btn.dataset.title || '';
     modalAuthorInput.value = btn.dataset.author || '';
     selectNewsCategory(btn.dataset.category || 'Others', true);
-    if (modalStatus) modalStatus.value = <?= $canPublish?'true':'false' ?> ? (btn.dataset.status || 'draft') : (btn.dataset.status === 'draft' ? 'draft' : 'pending');
+    if (modalStatus) modalStatus.value = <?= $canPublish?'true':'false' ?> ? (btn.dataset.status || 'draft') : (btn.dataset.status === 'draft' ? 'draft' : editorSaveStatus);
     updateStatusHelp();
 
     const contentTpl = document.getElementById(btn.dataset.contentId);
@@ -989,7 +994,7 @@ modalQuill.loadHtml(<?= $newsJson(sectionToEditorHtml($flashOld['content'] ?? ''
 modalAuthorInput.value = <?= $newsJson($flashOld['author'] ?? '') ?>;
 selectNewsCategory(<?= $newsJson($flashOld['category'] ?? 'Others') ?>);
 window.GncNewsAudience?.set(<?= $newsJson($modalAudience) ?>);
-if (modalStatus) { const status = <?= $newsJson($flashOld['status'] ?? 'draft') ?>; modalStatus.value = <?= $canPublish?'true':'false' ?> ? status : (status === 'draft' ? 'draft' : 'pending'); }
+if (modalStatus) { const status = <?= $newsJson($flashOld['status'] ?? 'draft') ?>; modalStatus.value = <?= $canPublish?'true':'false' ?> ? status : (status === 'draft' ? 'draft' : editorSaveStatus); }
 updateStatusHelp();
 <?php endif; ?>
 <?php elseif ($modalMode === 'edit' && !empty($modalEditing)): ?>
@@ -1003,7 +1008,7 @@ modalQuill.loadHtml(<?= $newsJson(sectionToEditorHtml($modalEditing['content'] ?
 modalAuthorInput.value = <?= $newsJson($modalEditing['author'] ?? '') ?>;
 selectNewsCategory(<?= $newsJson($modalEditing['category'] ?? 'Others') ?>, true);
 window.GncNewsAudience?.set(<?= $newsJson($modalAudience) ?>);
-if (modalStatus) { const status = <?= $newsJson($modalEditing['status'] ?? 'draft') ?>; modalStatus.value = <?= $canPublish?'true':'false' ?> ? status : (status === 'draft' ? 'draft' : 'pending'); }
+if (modalStatus) { const status = <?= $newsJson($modalEditing['status'] ?? 'draft') ?>; modalStatus.value = <?= $canPublish?'true':'false' ?> ? status : (status === 'draft' ? 'draft' : editorSaveStatus); }
 updateStatusHelp();
 <?php if (!empty($modalEditing['image_path'])): ?>
 modalImagePreview.src = <?= $newsJson($modalEditing['image_path']) ?>;
@@ -1012,6 +1017,10 @@ modalRemoveWrap.style.display = 'block';
 <?php endif; ?>
 renderExistingGallery(<?= $newsJson($modalGallery) ?>);
 newsModal.show();
+<?php endif; ?>
+<?php if(isset($_GET['revise'])&&!empty($flashOld)): ?>
+document.querySelector('#news-form [name="_review_id"]').value = <?= (int)$_GET['revise'] ?>;
+document.querySelector('#news-form [name="_review_revision"]').value = <?= (int)($flashOld['_review_revision']??0) ?>;
 <?php endif; ?>
 </script>
 <script src="/assets/js/admin-content-search.js?v=<?= filemtime(__DIR__.'/../assets/js/admin-content-search.js') ?>"></script>

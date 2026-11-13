@@ -127,13 +127,13 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
     <div class="sidebar-section-label">Workflow</div>
     <ul class="sidebar-nav">
         <li>
-            <a href="/admin/submissions.php" class="sidebar-link <?= $currentPage === 'submissions' ? 'active' : '' ?>">
+            <a href="/admin/submissions.php" class="sidebar-link <?= $currentPage === 'submissions' && ($_GET['view']??'')!=='drafts' ? 'active' : '' ?>">
                 <i class="bi bi-check2-circle"></i> <?= rbacIsSuper() ? 'Approvals' : 'My Submissions' ?>
                 <?php
                 // Pending count badge
                 try {
                     $db = getDB();
-                    $pendingCount = rbacIsSuper() && function_exists('rbacSubmissionsReady') && rbacSubmissionsReady() ? $db->query("SELECT COUNT(*) FROM rbac_submissions WHERE status='pending'")->fetchColumn() : 0;
+                    $pendingCount = rbacIsSuper() && function_exists('rbacSubmissionsReady') && rbacSubmissionsReady() ? $db->query("SELECT COUNT(*) FROM rbac_submissions WHERE status IN ('pending','pending_approval')")->fetchColumn() : 0;
                     $pendingCount += $cePending ?? 0;
                     /* Legacy content remains in the existing review panels.
                     $pendingCount = $db->query("
@@ -149,6 +149,10 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
             </a>
         </li>
     </ul>
+    <?php endif; ?>
+
+    <?php if (hasPermission('view_own_submissions')): ?>
+    <ul class="sidebar-nav"><li><a href="/admin/submissions.php?view=drafts" class="sidebar-link <?= $currentPage==='submissions'&&($_GET['view']??'')==='drafts'?'active':'' ?>"><i class="bi bi-file-earmark-text"></i> Drafts</a></li></ul>
     <?php endif; ?>
 
     <!-- Administration -->

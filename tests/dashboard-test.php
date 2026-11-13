@@ -18,7 +18,7 @@ $db->exec("INSERT INTO announcements VALUES(1,1,'My notice','published',NOW(),NO
 $db->exec("INSERT INTO news VALUES(1,1,'Newest news','published',NOW(),DATE_ADD(NOW(),INTERVAL 1 DAY)),(2,2,'Other news','published',NOW(),NOW()),(3,2,'Other draft','draft',NOW(),NOW())");
 $db->exec("INSERT INTO events VALUES(1,1,'Future event','published',NOW(),NOW(),DATE_ADD(NOW(),INTERVAL 2 DAY)),(2,1,'Past event','published',NOW(),NOW(),DATE_SUB(NOW(),INTERVAL 2 DAY)),(3,1,'Draft event','draft',NOW(),NOW(),DATE_ADD(NOW(),INTERVAL 2 DAY)),(4,2,'Other event','published',NOW(),NOW(),DATE_ADD(NOW(),INTERVAL 2 DAY))");
 $db->exec('CREATE TEMPORARY TABLE rbac_submissions(submission_id INT PRIMARY KEY,user_id INT,title VARCHAR(500),status VARCHAR(20),revision INT,created_at DATETIME,updated_at DATETIME)');
-$db->exec("INSERT INTO rbac_submissions VALUES(1,1,'My pending','pending',1,NOW(),NOW()),(2,2,'Other pending','pending',1,NOW(),NOW()),(3,2,'Another pending','pending',1,NOW(),NOW()),(4,1,'My revision','needs_revision',2,NOW(),NOW()),(5,2,'Other revision','needs_revision',3,NOW(),NOW()),(6,1,'Rejected proposal','rejected',1,NOW(),NOW()),(7,1,'Draft proposal','draft',1,NOW(),NOW())");
+$db->exec("INSERT INTO rbac_submissions VALUES(1,1,'My pending','pending',1,NOW(),NOW()),(2,2,'Other pending','pending_approval',1,NOW(),NOW()),(3,2,'Another pending','pending',1,NOW(),NOW()),(4,1,'My revision','needs_revision',2,NOW(),NOW()),(5,2,'Other revision','needs_revision',3,NOW(),NOW()),(6,1,'Rejected proposal','rejected',1,NOW(),NOW()),(7,1,'Draft proposal','draft',1,NOW(),NOW())");
 $db->exec('CREATE TEMPORARY TABLE page_sections(section_id INT PRIMARY KEY,review_status VARCHAR(20))');
 $db->exec("INSERT INTO page_sections VALUES(1,'pending'),(2,'pending'),(3,'none')");
 $db->exec('CREATE TEMPORARY TABLE pages(slug VARCHAR(100),title VARCHAR(255),page_type VARCHAR(30))');
@@ -34,6 +34,7 @@ foreach(['Super Admin','Content Editor','The Mirror','Content Admin','Office Sta
     dashCheck(($d['submission_counts']['needs_revision']??0)===($super?2:1),'Revision state count');
     dashCheck($d['recent'][0]['title']==='Newest news','News is included and ordered by last update even with announcements');
     dashCheck(count($d['recent'])<=6&&count($d['submissions'])<=6,'Bounded recent lists');
+    dashCheck(!in_array(7,array_column($d['submissions'],'submission_id'))&&!isset($d['submission_counts']['draft']),'Private drafts excluded from dashboard submissions');
     dashCheck($d['stats']['upcoming_events']===($own?null:2),'Upcoming excludes past and draft events');
     dashCheck($d['stats']['total_events']===($own?null:4),'Event module visibility');
     dashCheck($d['stats']['total_users']===($super?2:null),'User statistics stay restricted');

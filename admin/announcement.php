@@ -90,6 +90,7 @@ if ($modalMode === 'edit') {
     }
 }
 if (!empty($flashOld)) {
+    if(isset($_GET['revise']))$modalMode=($flashOld['action']??'')==='update'?'edit':'create';
     $modalEditing = array_merge($modalEditing ?? [], $flashOld);
     if (isset($flashOld['category_ids_present'])) $modalEditing['category_ids'] = $flashOld['category_ids'] ?? [];
     if (isset($flashOld['audience_present']) || isset($flashOld['dept_ids']) || isset($flashOld['programs'])) {
@@ -467,6 +468,7 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
           <input type="hidden" name="edit_version" id="modal-edit-version" value="">
           <input type="hidden" name="announcement_id" id="modal-announcement-id" value="">
           <input type="hidden" name="_review_id" value="<?= (int)($_GET['revise'] ?? 0) ?>">
+          <input type="hidden" name="_review_revision" value="<?= (int)($flashOld['_review_revision']??0) ?>">
           <div id="announcement-form-alert" class="alert alert-danger d-none" role="alert" tabindex="-1"></div>
           <p class="evt-required-note">Fields marked <span class="text-danger">*</span> are required. Pictures and audience restrictions are optional.</p>
           <section class="evt-form-section" aria-labelledby="ann-message-heading">
@@ -575,7 +577,7 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
           <select name="status" id="modal-status" class="form-select"><option value="draft">Save as draft</option><option value="pending">Submit for Super Admin approval</option></select>
           <div class="alert alert-secondary mb-0 d-flex gap-2" style="font-size:.88rem">
             <i class="bi bi-info-circle mt-1"></i>
-            <span>This will be sent for approval first. It appears on the public website once it is approved.</span>
+            <span>Drafts stay private. Choose Submit for approval when ready; the content becomes public after approval.</span>
           </div>
           <?php endif; ?>
           </section>
@@ -948,6 +950,8 @@ annDeptSelect.config.onChange = updateAudienceHelp;
 annProgSelect.config.onChange = updateAudienceHelp;
 annProgSelect.bindDepartments(annDeptSelect);
 const modalStatus       = document.getElementById('modal-status');
+// Content Editors keep edits private until they explicitly choose submission.
+const editorSaveStatus = <?= json_encode(rbacRole()==='Content Editor'?'draft':'pending') ?>;
 const modalActionInput  = document.getElementById('modal-action');
 const modalIdInput      = document.getElementById('modal-announcement-id');
 const modalLabel        = document.getElementById('announcementModalLabel');
@@ -1044,6 +1048,8 @@ function resetGalleryUI() {
 
 function resetModalForm() {
     document.getElementById('announcement-form').reset();
+    document.querySelector('#announcement-form [name="_review_id"]').value = '0';
+    document.querySelector('#announcement-form [name="_review_revision"]').value = '0';
     document.querySelector('#announcement-form [name="allow_incomplete"]')?.remove();
     const facebookConfirmed = document.getElementById('facebook-confirmed');
     if (facebookConfirmed) facebookConfirmed.value = '0';
@@ -1180,7 +1186,7 @@ function openEditModal(btn) {
     if (annDeptSelect) annDeptSelect.setSelected(depts);
     if (annProgSelect) annProgSelect.setSelected(progs);
     updateAudienceHelp();
-    if (modalStatus) modalStatus.value = <?= $canPublish?'true':'false' ?> ? (btn.dataset.status || 'draft') : (btn.dataset.status === 'draft' ? 'draft' : 'pending');
+    if (modalStatus) modalStatus.value = <?= $canPublish?'true':'false' ?> ? (btn.dataset.status || 'draft') : (btn.dataset.status === 'draft' ? 'draft' : editorSaveStatus);
     updateStatusHelp();
 
     const contentTpl = document.getElementById(btn.dataset.contentId);
@@ -1351,7 +1357,7 @@ modalQuill.loadHtml(<?= json_encode($flashOld['content'] ?? '', JSON_HEX_TAG) ?>
 if (modalCategory) modalCategory.setSelected(<?= json_encode($flashOld['category_ids'] ?? (!empty($flashOld['category_id']) ? [$flashOld['category_id']] : []), JSON_HEX_TAG) ?>);
 if (annDeptSelect) annDeptSelect.setSelected(<?= json_encode($modalAudience['dept_ids'] ?? [], JSON_HEX_TAG) ?>);
 if (annProgSelect) annProgSelect.setSelected(<?= json_encode($modalAudience['programs'] ?? [], JSON_HEX_TAG) ?>);
-if (modalStatus) { const status = <?= json_encode($flashOld['status'] ?? 'draft', JSON_HEX_TAG) ?>; modalStatus.value = <?= $canPublish?'true':'false' ?> ? status : (status === 'draft' ? 'draft' : 'pending'); }
+if (modalStatus) { const status = <?= json_encode($flashOld['status'] ?? 'draft', JSON_HEX_TAG) ?>; modalStatus.value = <?= $canPublish?'true':'false' ?> ? status : (status === 'draft' ? 'draft' : editorSaveStatus); }
 updateStatusHelp();
 <?php endif; ?>
 <?php elseif ($modalMode === 'edit' && !empty($modalEditing)): ?>
@@ -1366,7 +1372,7 @@ modalQuill.loadHtml(<?= json_encode($modalEditing['content'] ?? '', JSON_HEX_TAG
 if (modalCategory) modalCategory.setSelected(<?= json_encode($modalEditing['category_ids'] ?? (!empty($modalEditing['category_id']) ? [$modalEditing['category_id']] : []), JSON_HEX_TAG) ?>);
 if (annDeptSelect) annDeptSelect.setSelected(<?= json_encode($modalAudience['dept_ids'] ?? [], JSON_HEX_TAG) ?>);
 if (annProgSelect) annProgSelect.setSelected(<?= json_encode($modalAudience['programs'] ?? [], JSON_HEX_TAG) ?>);
-if (modalStatus) { const status = <?= json_encode($modalEditing['status'] ?? 'draft', JSON_HEX_TAG) ?>; modalStatus.value = <?= $canPublish?'true':'false' ?> ? status : (status === 'draft' ? 'draft' : 'pending'); }
+if (modalStatus) { const status = <?= json_encode($modalEditing['status'] ?? 'draft', JSON_HEX_TAG) ?>; modalStatus.value = <?= $canPublish?'true':'false' ?> ? status : (status === 'draft' ? 'draft' : editorSaveStatus); }
 updateStatusHelp();
 <?php if (!empty($modalEditing['image_path'])): ?>
 modalImagePreview.src = <?= json_encode($modalEditing['image_path'], JSON_HEX_TAG) ?>;
@@ -1379,6 +1385,10 @@ renderExistingGallery(<?= json_encode($modalGallery, JSON_HEX_TAG) ?>);
 announcementModal.show();
 <?php endif; ?>
 updateAudienceHelp();
+<?php if(isset($_GET['revise'])&&!empty($flashOld)): ?>
+document.querySelector('#announcement-form [name="_review_id"]').value = <?= (int)$_GET['revise'] ?>;
+document.querySelector('#announcement-form [name="_review_revision"]').value = <?= (int)($flashOld['_review_revision']??0) ?>;
+<?php endif; ?>
 </script>
 <?php $extraScripts = ob_get_clean(); ?>
 

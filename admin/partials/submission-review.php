@@ -41,7 +41,7 @@ $hiddenFields=static function(string $action)use($row,$csrfToken,$e,$filters){ ?
 <?php if($hasBefore): ?><div class="approval-comparison"><div><h5>Current content</h5><p><?= $e($before!==''?$before:'Empty') ?></p></div><div><h5>Proposed content</h5><p><?= $e($value!==''?$value:'Empty — this value will be cleared') ?></p></div></div><?php else: ?><p><?= $e($value!==''?$value:'Empty') ?></p><?php endif; ?></section>
 <?php endforeach; ?>
 <?php if($row['route']==='/admin/events.php'&&($post['ajax_action']??'')==='import_confirm')include __DIR__.'/calendar-import-review.php'; ?>
-<?php foreach($payload['files']??[] as $field=>$file): $media='/admin/submissions.php?'.http_build_query(['media'=>$id,'field'=>$field]); ?>
+<?php foreach($payload['files']??[] as $field=>$file): $media='/admin/submissions.php?'.http_build_query(['media'=>$id,'field'=>$field,'view'=>$state==='draft'?'drafts':'submissions']); ?>
 <div class="approval-attachment"><?php if(str_starts_with($file['mime'],'image/')): ?><img src="<?= $e($media) ?>" alt="Submitted image" loading="lazy"><?php else: ?><i class="bi bi-paperclip" aria-hidden="true"></i><?php endif; ?><a href="<?= $e($media) ?>" target="_blank" rel="noopener"><?= $e($file['name']) ?><span class="visually-hidden"> (opens in a new tab)</span></a></div>
 <?php endforeach; endif; ?>
 </div>
@@ -64,7 +64,7 @@ $hiddenFields=static function(string $action)use($row,$csrfToken,$e,$filters){ ?
 <?php if((int)$row['user_id']===$userId&&in_array($state,['draft','rejected','needs_revision','failed'],true)): ?>
 <?php if($row['kind']==='request'&&in_array($row['route'],['/admin/action/create-news.php','/admin/action/create-announcement.php'],true)):
     $kind=str_contains($row['route'],'create-news')?'news':'announcement';$post=$payload['post'];$editUrl='/admin/'.$kind.'.php?'.http_build_query(['modal'=>($post['action']??'')==='update'?'edit':'create','id'=>$row['target_id'],'revise'=>$id]); ?>
-<a class="btn btn-outline-secondary" href="<?= $e($editUrl) ?>">Revise submission</a><?php endif; ?>
+<a class="btn btn-outline-secondary" href="<?= $e($editUrl) ?>"><?= $state==='draft'?'Edit draft':'Revise submission' ?></a><?php endif; ?>
 <form method="post" action="/admin/submissions.php" data-review-confirm="Submit this saved proposal for Super Admin approval?" data-review-label="Submit for approval"><?php $hiddenFields('submit'); ?><button class="btn btn-gnc" type="submit">Submit for approval</button></form>
 <?php endif; ?>
 <?php if(((int)$row['user_id']===$userId||$super)&&$state!=='processing'): ?>
