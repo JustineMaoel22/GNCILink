@@ -52,7 +52,7 @@ require __DIR__ . '/../../components/auth-page-start.php';
 <?php if ($success): ?><div class="alert alert-success" role="status"><?= $e($success) ?></div><?php endif; ?>
 <?php if ($error): ?><div class="alert alert-danger" role="alert"><?= $e($error) ?></div><?php endif; ?>
 <p class="otp-meta">Code sent to <strong><?= $e($maskedEmail) ?></strong>. Check your spam folder if it has not arrived.</p>
-<form id="otpForm" method="post" action="/admin/auth/verify-otp.php" data-expires-in="<?= $otpSecondsRemaining ?>" novalidate>
+<form id="otpForm" method="post" action="<?= $e(gncBrowserUrl('/admin/auth/verify-otp.php')) ?>" data-expires-in="<?= $otpSecondsRemaining ?>" novalidate>
     <input type="hidden" name="csrf_token" value="<?= $e(generateCSRFToken()) ?>">
     <label class="form-label" for="otp1">Verification code</label>
     <div class="otp-inputs" role="group" aria-label="Six-digit verification code">

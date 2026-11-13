@@ -101,7 +101,7 @@
                 }
             }
             const data = await response.json();
-            if (response.ok && typeof data.redirect === 'string' && data.redirect.startsWith('/admin/')) {
+            if (response.ok && typeof data.redirect === 'string' && (data.redirect.startsWith('/admin/') || data.redirect === '/verify-login')) {
                 redirecting = true;
                 window.location.assign(data.redirect);
                 return;

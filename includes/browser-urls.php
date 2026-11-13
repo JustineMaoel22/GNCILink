@@ -23,7 +23,8 @@ function gncBrowserUrl(string $url): string {
             $admin = str_starts_with($file, '/admin/');
             if ($path === $file || $path === substr($file, 0, -4)
                 || ($admin && (rtrim($path,'/') === $alias || rtrim($path,'/') === '/admin'.$alias))) {
-                $clean = $admin ? '/admin'.$alias : $alias; break;
+                // The pre-login verification page has a directory-free address.
+                $clean = $admin && $file !== '/admin/auth/verify-otp.php' ? '/admin'.$alias : $alias; break;
             }
         }
     }

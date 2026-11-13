@@ -15,8 +15,9 @@ try {
     }
     putenv('ADMIN_PWA_ORIGIN=https://admin.gncipampanga.com');
     foreach(gncBrowserRoutes() as $alias=>$file)if(str_starts_with($file,'/admin/')){
-        originCheck(gncAdminOriginRedirect($file.'?page=home','GET')==='https://admin.gncipampanga.com/admin'.$alias.'?page=home','Old admin file redirects to isolated origin');
-        originCheck(gncAdminOriginRedirect($alias,'HEAD')==='https://admin.gncipampanga.com/admin'.$alias,'Old bookmarks move to isolated origin');
+        $canonical=$file==='/admin/auth/verify-otp.php'?$alias:'/admin'.$alias;
+        originCheck(gncAdminOriginRedirect($file.'?page=home','GET')==='https://admin.gncipampanga.com'.$canonical.'?page=home','Old admin file redirects to isolated origin');
+        originCheck(gncAdminOriginRedirect($alias,'HEAD')==='https://admin.gncipampanga.com'.$canonical,'Old bookmarks move to isolated origin');
         originCheck(gncAdminOriginRedirect($file,'POST')===null,'Do not redirect submissions between origins');
     }
     foreach(['/admin/service-worker.js','/admin/action/page-content-handler.php','/admin/auth/auth_handler.php','/manifest.json','/programs/bsed','/'] as $path){

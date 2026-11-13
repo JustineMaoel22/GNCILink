@@ -39,7 +39,7 @@ function handleLogin(): void {
     session_regenerate_id(true);
     $_SESSION['temp_user_id']=$user['user_id'];$_SESSION['temp_email']=$user['email'];$_SESSION['temp_name']=$user['first_name'];$_SESSION['temp_credential_version']=(int)$user['credential_version'];$_SESSION['remember_me']=$remember;
     authAudit((int)$user['user_id'],'OTP_SENT','Login verification code sent.');
-    echo json_encode(['success'=>true,'message'=>'OTP sent to your email','redirect'=>'/admin/auth/verify-otp.php']);
+    echo json_encode(['success'=>true,'message'=>'OTP sent to your email','redirect'=>gncBrowserUrl('/admin/auth/verify-otp.php')]);
 }
 function handleOTPVerification(): void {
     $otp=is_string($_POST['otp']??null)?trim($_POST['otp']):'';$user=authConsumeOtp($otp);
