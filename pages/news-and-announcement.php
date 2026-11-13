@@ -740,9 +740,6 @@ function na_url(array $overrides = []): string {
                 <?php endif; ?>
             </div>
             <?php endif; ?>
-            <?php if ($calendarFilterLabel !== null): ?>
-            <div class="na-note"><i class="bi bi-info-circle"></i> Showing announcements and targeted news for <?= htmlspecialchars($calendarFilterLabel) ?>. Department-wide announcements include all programs within their selected departments. Untargeted news and Facebook posts remain hidden while filtering.</div>
-            <?php endif; ?>
 
             <?php if (empty($pageItems)): ?>
                 <div class="na-empty">
