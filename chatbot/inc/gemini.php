@@ -7,6 +7,16 @@
  */
 declare(strict_types=1);
 
+/** Chat can select a responsive model independently of image validation. */
+function gncbot_gemini_model(): string
+{
+    $default = 'gemini-3.1-flash-lite';
+    $model = function_exists('env')
+        ? (string)env('CHATBOT_MODEL', env('GEMINI_MODEL', $default))
+        : (string)(getenv('CHATBOT_MODEL') ?: getenv('GEMINI_MODEL') ?: $default);
+    return preg_match('/^[a-z0-9.\-]{3,60}$/i', $model) ? $model : $default;
+}
+
 /**
  * @param array $contents  Gemini "contents" array (role user|model, parts[text])
  * @return array{ok:bool,text?:string,error?:string}
@@ -22,8 +32,7 @@ function gncbot_gemini_generate(string $systemInstruction, array $contents): arr
         return ['ok' => false, 'error' => 'not_configured'];
     }
     $key   = trim($key);
-    $model = function_exists('env') ? (string)env('GEMINI_MODEL', 'gemini-2.5-flash') : 'gemini-3.6-flash';
-    if (!preg_match('/^[a-z0-9.\-]{3,60}$/i', $model)) { $model = 'gemini-3.6-flash'; }
+    $model = gncbot_gemini_model();
     $base    = rtrim((string)(function_exists('env') ? env('GEMINI_API_BASE', 'https://generativelanguage.googleapis.com/v1beta') : 'https://generativelanguage.googleapis.com/v1beta'), '/');
     $timeout = (int)(function_exists('env') ? env('GEMINI_TIMEOUT', 20) : 20);
 

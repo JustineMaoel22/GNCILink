@@ -15,7 +15,9 @@ when correcting ownership; do not reset or loosen limits to work around it.
    CHATBOT_API_KEY=your_chatbot_key_from_aistudio.google.com
    PHOTO_CHECK_API_KEY=your_separate_image_validation_key
    # optional:
-   # GEMINI_MODEL=gemini-3.6-flash   (default; run tests/list_models.php to see what YOUR key can use)
+   CHATBOT_MODEL=gemini-3.1-flash-lite
+   # Chatbot-only model; falls back to GEMINI_MODEL when omitted.
+   # Run tests/list_models.php to see what the chatbot key can use.
    # GEMINI_TIMEOUT=20
    # GNCBOT_IP_LIMIT=20        (requests per IP per 10 min)
    # GNCBOT_DAILY_LIMIT=3000   (requests per day, whole site)
@@ -94,4 +96,8 @@ document and Gemini response; local automated checks do not prove model accuracy
 
 ## If the chat says "trouble responding"
 Look for `[gncbot]` lines in the PHP/container log. `http 404 NOT_FOUND model=...` means that model name is retired or unavailable:
-`php chatbot/tests/list_models.php` lists valid names; set one as `GEMINI_MODEL` in `.env` and restart the container.
+`php chatbot/tests/list_models.php` lists valid names using the dedicated chatbot key;
+set one as `CHATBOT_MODEL` in `.env`. This overrides `GEMINI_MODEL` for chat only.
+If logs show `gemini curl error #28`, the provider request timed out. A listed model
+can still be slow or unavailable for generation; verify a candidate with a live
+test before selecting it. Keep the existing request deadlines and quota controls.

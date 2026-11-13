@@ -1,15 +1,15 @@
 <?php
 /**
- * Lists the Gemini models your GEMINI_API_KEY can actually use for chat (generateContent).
+ * Lists the Gemini models your CHATBOT_API_KEY can actually use for chat (generateContent).
  *   docker exec -it -w /var/www/html <container> php chatbot/tests/list_models.php
- * Put one of the printed names in .env as GEMINI_MODEL=...   The key is never printed.
+ * Put one of the printed names in .env as CHATBOT_MODEL=...   The key is never printed.
  */
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/../../config/config.php';
 
-$key  = trim((string)env('GEMINI_API_KEY', ''));
+$key  = trim((string)CHATBOT_API_KEY);
 $base = rtrim((string)env('GEMINI_API_BASE', 'https://generativelanguage.googleapis.com/v1beta'), '/');
-if ($key === '') { fwrite(STDERR, "GEMINI_API_KEY is not set in .env (or the container cannot see it).\n"); exit(1); }
+if ($key === '') { fwrite(STDERR, "CHATBOT_API_KEY is not configured (or the container cannot see it).\n"); exit(1); }
 
 $names = []; $token = '';
 do {
@@ -30,4 +30,4 @@ $chat = array_values(array_filter($names, fn($n) => str_starts_with($n, 'gemini-
 natsort($chat); $chat = array_reverse($chat);
 echo "Models available to your key for chat:\n";
 foreach ($chat as $n) { echo "  $n\n"; }
-echo "\nSuggested: GEMINI_MODEL=" . ($chat ? (preg_grep('/^gemini-[\d.]+-flash$/', $chat) ?: $chat)[array_key_first(preg_grep('/^gemini-[\d.]+-flash$/', $chat) ?: $chat)] : '(none found)') . "\n";
+echo "\nSuggested: CHATBOT_MODEL=" . ($chat ? (preg_grep('/^gemini-[\d.]+-flash$/', $chat) ?: $chat)[array_key_first(preg_grep('/^gemini-[\d.]+-flash$/', $chat) ?: $chat)] : '(none found)') . "\n";
