@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/event-time.php';
 /**
  * GNC Admin Panel – Events / Calendar
  * Lets admins view a month calendar, click a date to add an event,
@@ -10,6 +11,7 @@ require_once __DIR__ . '/../includes/multi-audience.php';
 require_once __DIR__ . '/../includes/event-audience.php';
 require_once __DIR__ . '/../includes/calendar-import.php';
 require_once __DIR__ . '/../includes/event-categories.php';
+require_once __DIR__ . '/../includes/event-edit-state.php';
 
 initSession();
 requireLogin();
@@ -46,8 +48,10 @@ $db = getDB();
 $calendarImportReady = calendarImportReady($db);
 $eventDepartmentsReady = eventDepartmentsReady();
 $eventAudienceGroupsReady = eventAudienceGroupsReady();
-$eventDepartments = $db->query('SELECT dept_id, dept_name FROM departments ORDER BY dept_name')->fetchAll(PDO::FETCH_ASSOC);
+$eventAllDayReady = eventAllDayStorageReady($db);
+$eventDepartments = $db->query('SELECT dept_id, dept_name, department_type, slug FROM departments ORDER BY dept_name')->fetchAll(PDO::FETCH_ASSOC);
 $eventDepartmentNames = array_column($eventDepartments, 'dept_name', 'dept_id');
+$eventDepartmentGroups = [];foreach ($eventDepartments as $department) $eventDepartmentGroups[(int)$department['dept_id']] = eventDepartmentGroup($department);
 $programCategories = getProgramCategories();
 
 // ---------------------------------------------------------------
@@ -55,7 +59,7 @@ $programCategories = getProgramCategories();
 // Holiday = yellow, School Event = green, Emergency = red
 // ---------------------------------------------------------------
 function evt_categoryColor(?string $categoryColor, ?string $categoryName = null): string {
-    if (!empty($categoryColor)) return $categoryColor;
+    if (is_string($categoryColor) && preg_match('/^#(?:[a-f0-9]{3}|[a-f0-9]{6})$/iD', $categoryColor)) return htmlspecialchars($categoryColor, ENT_QUOTES, 'UTF-8');
     $name = strtolower(trim($categoryName ?? ''));
     if (strpos($name, 'holiday') !== false)   return '#EABA3B';
     if (strpos($name, 'emergency') !== false || strpos($name, 'suspension') !== false) return '#B3312D';
@@ -77,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
         exit;
     }
 
+    $eventEditTransaction = false;
     try {
         if($action==='bulk_delete'){
             require_once __DIR__.'/../includes/content-bulk-delete.php';
@@ -169,16 +174,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             if ($endD !== '') {
                 $endDate = $endD . ' ' . ($endT !== '' ? date('H:i:s', strtotime('1970-01-01 ' . $endT)) : '00:00:00');
             }
+            $isAllDay = $startT === '' && $endT === '' ? 1 : 0;
+            if ($action === 'update') {
+                ensureMultiAudienceTables($db);
+                $db->beginTransaction();$eventEditTransaction = true;
+                $snapshot = eventEditState($db,(int)$_POST['event_id']);
+                $expected = $_POST['edit_version'] ?? null;
+                if (!is_string($expected) || !hash_equals($snapshot['version'],$expected)) {
+                    http_response_code(409);
+                    throw new InvalidArgumentException('This event changed in another tab or its editor needs reopening. Your pending fields are kept here. Copy your changes, reopen the latest event, and review them before saving.');
+                }
+            }
 
             if ($action === 'create') {
+                $db->beginTransaction();$eventEditTransaction = true;
                 $stmt = $db->prepare("
-                    INSERT INTO events (category_id, program, user_id, title, location, start_date, end_date, status" . ($calendarImportReady ? ', description' : '') . ($eventDepartmentsReady ? ', dept_id' : '') . ($eventAudienceGroupsReady?', audience_group':'') . ")
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?" . ($calendarImportReady ? ', ?' : '') . ($eventDepartmentsReady ? ', ?' : '') . ($eventAudienceGroupsReady?', ?':'') . ")
+                    INSERT INTO events (category_id, program, user_id, title, location, start_date, end_date, status" . ($calendarImportReady ? ', description' : '') . ($eventDepartmentsReady ? ', dept_id' : '') . ($eventAudienceGroupsReady?', audience_group':'') . ($eventAllDayReady?', is_all_day':'') . ")
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?" . ($calendarImportReady ? ', ?' : '') . ($eventDepartmentsReady ? ', ?' : '') . ($eventAudienceGroupsReady?', ?':'') . ($eventAllDayReady?', ?':'') . ")
                 ");
                 $values = [$categoryId, $program, $userId, $title, $location, $startDate, $endDate, $status];
                 if ($calendarImportReady) $values[] = $description;
                 if ($eventDepartmentsReady) $values[] = $department;
                 if ($eventAudienceGroupsReady) $values[] = $audience['audience_group'];
+                if ($eventAllDayReady) $values[] = $isAllDay;
                 $stmt->execute($values);
                 $newId = $db->lastInsertId();
                 saveEventAudience($db, (int)$newId, $multiAudience['dept_ids'], $multiAudience['programs']);
@@ -186,9 +204,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 if (rbacContentOwnerId() !== (int)$userId) $db->prepare('UPDATE events SET user_id=? WHERE event_id=?')->execute([rbacContentOwnerId(),$newId]);
 
                 if (function_exists('logActivity')) {
-                    logActivity($userId, 'CREATE', 'events', (int)$newId, "Created event: {$title}");
-                    if($status==='published')logActivity((int)$userId,'PUBLISH','events',(int)$newId,'Published event.');
+                    if (!logActivity($userId, 'CREATE', 'events', (int)$newId, "Created event: {$title}")) throw new RuntimeException('Could not record event creation.');
+                    if($status==='published' && !logActivity((int)$userId,'PUBLISH','events',(int)$newId,'Published event.')) throw new RuntimeException('Could not record event publication.');
                 }
+                $db->commit();$eventEditTransaction = false;
                 echo json_encode(['success' => true, 'message' => 'Event created.', 'event_id' => $newId]);
             } else {
                 $eventId = (int)($_POST['event_id'] ?? 0);
@@ -199,13 +218,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 $stmt = $db->prepare("
                     UPDATE events
                     SET category_id = ?, program = ?, title = ?, location = ?,
-                        start_date = ?, end_date = ?, status = ?" . ($calendarImportReady ? ', description = ?' : '') . ($eventDepartmentsReady ? ', dept_id = ?' : '') . ($eventAudienceGroupsReady?', audience_group = ?':'') . "
+                        start_date = ?, end_date = ?, status = ?" . ($calendarImportReady ? ', description = ?' : '') . ($eventDepartmentsReady ? ', dept_id = ?' : '') . ($eventAudienceGroupsReady?', audience_group = ?':'') . ($eventAllDayReady?', is_all_day = ?':'') . "
                     WHERE event_id = ?
                 ");
                 $values = [$categoryId, $program, $title, $location, $startDate, $endDate, $status];
                 if ($calendarImportReady) $values[] = $description;
                 if ($eventDepartmentsReady) $values[] = $department;
                 if ($eventAudienceGroupsReady) $values[] = $audience['audience_group'];
+                if ($eventAllDayReady) $values[] = $isAllDay;
                 $values[] = $eventId;
                 $stmt->execute($values);
                 saveEventAudience($db, $eventId, $multiAudience['dept_ids'], $multiAudience['programs']);
@@ -217,6 +237,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                         logActivity((int)$userId,'PUBLISH','events',$eventId,'Published event changes.');
                     }
                 }
+                $db->commit();$eventEditTransaction = false;
                 echo json_encode(['success' => true, 'message' => 'Event updated.']);
             }
             exit;
@@ -238,8 +259,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 echo json_encode(['success' => false, 'message' => 'Event not found.']);
                 exit;
             }
-            $evAudience = getEventAudience($db, (int)$ev['event_id'], $ev['dept_id'] ?? null, $ev['program'] ?? null);
-            $ev['dept_ids'] = $evAudience['dept_ids'];
+            ensureMultiAudienceTables($db);
+            $db->beginTransaction();$eventEditTransaction = true;
+            $snapshot = eventEditState($db,(int)$ev['event_id']);
+            $ev = $snapshot['record'];$ev['edit_version'] = $snapshot['version'];
+            $evAudience = $snapshot['audience'];
+            $db->commit();$eventEditTransaction = false;
+            $ev['dept_ids'] = array_map('intval',$evAudience['dept_ids']);
             $ev['programs'] = $evAudience['programs'];
             echo json_encode(['success' => true, 'event' => $ev]);
             exit;
@@ -269,6 +295,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
         exit;
 
     } catch (Throwable $e) {
+        if ($eventEditTransaction && $db->inTransaction()) $db->rollBack();
         error_log('Events AJAX error: ' . $e->getMessage());
         echo json_encode(['success' => false, 'message' => $e instanceof InvalidArgumentException ? $e->getMessage() : 'A server error occurred. Please try again.']);
         exit;
@@ -279,7 +306,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
 // GET: render the page
 // ---------------------------------------------------------------
 $month = isset($_GET['month']) ? max(1, min(12, (int)$_GET['month'])) : (int)date('n');
-$year  = isset($_GET['year'])  ? (int)$_GET['year']                  : (int)date('Y');
+$year = max(1970, min(2100, is_string($_GET['year'] ?? null) ? (int)$_GET['year'] : (int)date('Y')));
 
 $firstOfMonth = mktime(0, 0, 0, $month, 1, $year);
 $daysInMonth  = (int)date('t', $firstOfMonth);
@@ -334,7 +361,7 @@ foreach ($monthEvents as $ev) {
 // All events list (most recent first) for the management table below
 try {
     $allEvents = $db->query("
-        SELECT e.event_id, e.user_id, e.title, e.start_date, e.end_date, e.status, e.category_id, e.program," . ($eventDepartmentsReady ? 'e.dept_id,' : 'NULL AS dept_id,') . ($eventAudienceGroupsReady?'e.audience_group,':"'all' AS audience_group,") . "
+        SELECT " . eventAllDaySql($db) . ", e.event_id, e.user_id, e.title, e.start_date, e.end_date, e.status, e.category_id, e.program," . ($eventDepartmentsReady ? 'e.dept_id,' : 'NULL AS dept_id,') . ($eventAudienceGroupsReady?'e.audience_group,':"'all' AS audience_group,") . "
                c.category_name, c.category_color,
                CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,'')) AS author
         FROM events e
@@ -582,6 +609,7 @@ include __DIR__ . '/../components/header-admin.php';
                             data-category="<?= (int)($ev['category_id'] ?? 0) ?>"
                             data-dept="<?= htmlspecialchars(($ev['audience_group'] ?? 'all') !== 'all' ? 'group:' . $ev['audience_group'] : (string)($ev['dept_id'] ?? '')) ?>"
                             data-depts='<?= json_encode($evAud['dept_ids']) ?>'
+                            data-groups='<?= json_encode(array_values(array_unique(array_map(static fn($id) => $eventDepartmentGroups[(int)$id] ?? '', $evAud['dept_ids']))), JSON_HEX_TAG|JSON_HEX_APOS) ?>'
                             data-programs='<?= json_encode($evAud['programs']) ?>'
                             class="evt-row<?= $isPast ? ' evt-past' : '' ?>">
                             <td class="evt-title-cell" data-label="Event">
@@ -614,7 +642,7 @@ include __DIR__ . '/../components/header-admin.php';
                             <td data-label="For" style="font-size:.82rem">
                                 <div class="audience-tag-list mb-1">
                                     <?php if (empty($evDeptNames)): ?>
-                                        <span class="audience-tag">All departments</span>
+                                        <span class="audience-tag"><?= htmlspecialchars(match($ev['audience_group'] ?? 'all') {'basic-education'=>'All Basic Education','college'=>'All College',default=>'All departments'}) ?></span>
                                     <?php else: foreach ($evDeptNames as $dName): ?>
                                         <span class="audience-tag audience-tag-dept" title="<?= htmlspecialchars($dName) ?>"><?= htmlspecialchars(mb_strlen($dName) > 26 ? mb_substr($dName, 0, 24) . '…' : $dName) ?></span>
                                     <?php endforeach; endif; ?>
@@ -656,6 +684,7 @@ include __DIR__ . '/../components/header-admin.php';
         <div class="modal-content">
             <form data-content-publish data-custom-publish-label id="eventForm" novalidate>
                 <input type="hidden" name="ajax_action" id="eventFormAction" value="create">
+                <input type="hidden" name="edit_version" id="eventEditVersion" value="">
                 <input type="hidden" name="event_id" id="eventId" value="">
                 <input type="hidden" name="csrf_token" id="csrfToken" value="<?= htmlspecialchars($evtCsrfToken) ?>">
 
@@ -1193,6 +1222,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function resetForm() {
         form.reset();
         document.getElementById('eventId').value = '';
+        document.getElementById('eventEditVersion').value = '';
         document.getElementById('eventFormAction').value = 'create';
         document.getElementById('eventStatus').value = DEFAULT_STATUS;
         if (evtDeptSelect) evtDeptSelect.deselectAll();
@@ -1319,15 +1349,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 modalLabel.textContent = 'Edit Event';
                 document.getElementById('eventFormAction').value = 'update';
                 document.getElementById('eventId').value = ev.event_id;
+                document.getElementById('eventEditVersion').value = ev.edit_version || '';
                 document.getElementById('eventTitle').value = ev.title || '';
                 document.getElementById('eventLocation').value = ev.location || '';
                 const descriptionEl = document.getElementById('eventDescription');
                 if (descriptionEl) descriptionEl.value = ev.description || '';
-                // 00:00 means "no time set" -> leave the time inputs blank
+                // Legacy rows use midnight as an all-day sentinel. New rows store
+                // the distinction explicitly, so real midnight times survive editing.
+                const isAllDay = ev.is_all_day != null ? Number(ev.is_all_day) === 1
+                    : ![ev.start_date, ev.end_date].some(value => value && value.slice(11,16) !== '00:00');
                 const splitDT = (v) => {
                     if (!v) return ['', ''];
                     const t = v.slice(11, 16);
-                    return [v.slice(0, 10), t === '00:00' ? '' : t];
+                    return [v.slice(0, 10), isAllDay ? '' : t];
                 };
                 const [sd, st] = splitDT(ev.start_date);
                 const [ed, et] = splitDT(ev.end_date);
@@ -1344,7 +1378,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const statusEl = document.getElementById('eventStatus');
                 statusEl.value = ev.status || DEFAULT_STATUS;
                 if (statusEl.value === '') statusEl.value = DEFAULT_STATUS;
-                allDayCb.checked = !(st || et);
+                allDayCb.checked = isAllDay;
                 syncAllDay();
                 endDateEl.min = sd || '';
                 updateStatusHelp();
@@ -1385,7 +1419,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const okText   = !q || (row.dataset.title || '').toLowerCase().indexOf(q) !== -1;
             let rowDepts = [];
             try { rowDepts = JSON.parse(row.dataset.depts || '[]'); } catch (e) {}
-            const okDept   = !dept || rowDepts.length === 0 || rowDepts.includes(parseInt(dept, 10));
+            let groups=[];try{groups=JSON.parse(row.dataset.groups||'[]');}catch(e){}
+            const group=(row.dataset.dept||'').startsWith('group:')?row.dataset.dept.slice(6):'all';
+            const schoolWide=group==='all'&&rowDepts.length===0;
+            const selected=dept.startsWith('group:')?dept.slice(6):null;
+            const departmentGroups=<?= json_encode($eventDepartmentGroups, JSON_HEX_TAG) ?>;
+            const okDept=!dept||schoolWide||(selected ? group===selected||(group==='all'&&groups.includes(selected)) : rowDepts.includes(parseInt(dept,10))||(group!=='all'&&departmentGroups[dept]===group));
             const okCat    = !cat || row.dataset.category === cat;
             const show = okStatus && okText && okDept && okCat;
             row.style.display = show ? '' : 'none';

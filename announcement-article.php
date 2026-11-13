@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/includes/facebook-post-url.php';
 /**
  * GNC Public Site - Individual Announcement
  *
@@ -56,7 +57,7 @@ function announcementSanitizeHtml(string $html): string {
     libxml_use_internal_errors($prev);
 
     $safeUrl = function (string $u, bool $img = false): bool {
-        $u = trim($u);
+        $u = preg_replace('/[\x00-\x20\x7F]/', '', $u);
         if ($u === '') return false;
         if (preg_match('#^(https?:)?//#i', $u) || preg_match('#^/(?!/)#', $u)) return true;
         if (!$img && preg_match('#^(mailto:|tel:)#i', $u)) return true;
@@ -220,7 +221,7 @@ if ($article) {
                 'title'    => $label !== '' ? $label : 'Facebook post',
                 'date'     => $row['created_time'],
                 'image'    => $row['image_path'],
-                'url'      => $row['permalink_url'] ?: 'https://www.facebook.com/' . rawurlencode($row['fb_post_id']),
+                'url'      => $row['permalink_url'] ?: gncFacebookPostUrl($row['permalink_url'] ?? null, $row['fb_post_id'] ?? null),
                 'external' => true,
             ];
         }
@@ -235,7 +236,7 @@ $title     = $article['title'] ?? 'Announcement not found';
 $bodyHtml  = $article ? announcementSanitizeHtml((string)$article['content']) : '';
 $dateRaw   = $article['published_at'] ?? $article['created_at'] ?? null;
 $dateText  = $dateRaw ? announcementLocalTime($dateRaw, 'F j, Y') : '';
-$article = attachAnnouncementCategories(getDB(), [$article])[0];
+if ($article) $article = attachAnnouncementCategories(getDB(), [$article])[0];
 $category  = trim((string)($article['category_name'] ?? ''));
 if ($category === '' && !empty($article['dept_name'])) $category = $article['dept_name'];
 if ($category === '' && !empty($article['program']) && $article['program'] !== 'ALL') $category = $article['program'];

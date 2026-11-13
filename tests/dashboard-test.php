@@ -49,6 +49,19 @@ dashCheck(dashTimeAgo('2026-11-04 12:00:00',strtotime('2026-11-04 12:01:00'))===
 dashCheck(dashTimeAgo('2026-11-04 12:00:00',strtotime('2026-11-04 11:00:00'))!=='Just now','Future dates are not labelled just now');
 // Analytics use existing normalization and historical URL grouping.
 $_SESSION=['user_id'=>1,'user_role'=>'Super Admin'];
+// School-local event times must give the same count under UTC and Manila DB clocks.
+$eventNow=dashNow();
+$db->prepare('UPDATE events SET start_date=? WHERE event_id=1')->execute([$eventNow->modify('+1 hour')->format('Y-m-d H:i:s')]);
+$db->prepare('UPDATE events SET start_date=? WHERE event_id=2')->execute([$eventNow->modify('-1 hour')->format('Y-m-d H:i:s')]);
+$db->prepare('UPDATE events SET start_date=? WHERE event_id=4')->execute([$eventNow->modify('+2 hours')->format('Y-m-d H:i:s')]);
+$originalTimezone=$db->query('SELECT @@session.time_zone')->fetchColumn();
+try{
+    foreach(['+00:00','+08:00'] as $timezone){
+        $db->prepare('SET time_zone = ?')->execute([$timezone]);
+        $eventData=roleDashboardData($db);
+        dashCheck($eventData['stats']['upcoming_events']===2,'Upcoming excludes an event started one hour ago in Manila regardless of DB timezone.');
+    }
+}finally{$db->prepare('SET time_zone = ?')->execute([$originalTimezone]);}
 $db->exec("INSERT INTO pages VALUES('history','History','sections'),('programs','Programs','sections')");
 recordWebsitePublication($db,['page'=>'history','sub'=>'','title'=>'History','route'=>'/pages/about/gnc-history.php?ce_preview=1&token=not-retained']);
 $db->exec("UPDATE activity_logs SET created_at='2100-01-01 10:00:00' WHERE table_name='website_pages'");

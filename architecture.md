@@ -27,6 +27,13 @@ Do not mix SQL, permission logic, and markup unnecessarily. Refactor in small ba
 
 ## Visual editor and CMS
 
+Manual Events edits use a fingerprint of the event row and audience under a
+transactional row lock to reject stale tabs. The additive nullable
+`events.is_all_day` flag distinguishes new timed midnight events from all-day
+events while preserving legacy NULL inference. Calendar imports clear that flag
+when replacing a schedule and include it in their conflict signature. See
+`docs/event-edit-protection.md` for deployment and verification.
+
 The Content Editor uses page-scoped heartbeat presence and server-side version
 checks through `includes/editor-presence.php`. MySQL named locks serialize guarded
 writes; short leases protect multi-request publishing. Private drafts and approval
@@ -78,6 +85,13 @@ retains the primary tag. Announcement saves synchronize both atomically, and
 admin/public category filters and the Campus/Alumni galleries match any selected
 tag without duplicating the announcement. See `docs/announcement-categories.md`
 for the additive migration and verification commands.
+
+Facebook post manual categories use `fb_post_categories` through
+`includes/facebook-post-categories.php`, retaining `fb_posts_cache.category_id`
+as the primary compatibility tag. Automatic mode retains the existing caption
+classifier. Manual primary/child saves are atomic; admin/public category filters
+and Campus/Alumni galleries match any tag without duplicate posts. See
+`docs/facebook-post-categories.md` for the additive migration and deployment.
 
 Shared raster uploads are preprocessed in `includes/image-upload.php`: with PHP Imagick enabled, large images fit within 1920 × 1080 without cropping, retaining format, transparency, animation and photo-check metadata. Without Imagick, GD provides a memory-checked fallback for static JPG/PNG/WebP, retaining transparency and embedded provenance metadata; animations requiring resizing are refused rather than flattened. Existing Administration images can be optimized using either processor through the CLI-only `scripts/optimize-administration-images.php`, with verified original backups and unchanged URLs. See `docs/image-optimization.md` for setup and recovery.
 

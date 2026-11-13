@@ -3,7 +3,7 @@ require_once __DIR__.'/../admin-functions.php';
 require_once __DIR__.'/../../includes/community-activities.php';
 initSession();header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store, private');
 if(!isLoggedIn()||!hasPermission('manage_page_content')){http_response_code(403);echo json_encode(['error'=>'You cannot manage community activities.']);exit;}
-if(($_SERVER['REQUEST_METHOD']??'')!=='POST'||!verifyCSRFToken($_POST['csrf_token']??'')){http_response_code(403);echo json_encode(['error'=>'Refresh the editor and try again.']);exit;}
+if(($_SERVER['REQUEST_METHOD']??'')!=='POST'||!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))){http_response_code(403);echo json_encode(['error'=>'Refresh the editor and try again.']);exit;}
 try{
     $raw=$_POST['content']??'';
     if(!is_string($raw)||strlen($raw)>2000000)throw new InvalidArgumentException('The page content is too large.');

@@ -1,5 +1,5 @@
 <?php
-define('CURRENT_PROGRAM', 'BSBAFM');
+define('CURRENT_PROGRAM', 'GS-PHD');
 require_once __DIR__ . '/../../../../components/bulletin-board.php';
 
 /* ---------------------------------------------------------------
@@ -109,12 +109,7 @@ $ctaIcon     = 'material:volunteer_activism';
                         </div>
                         <div>
                             <h5 class="template-vm-card-title">Our Mission</h5>
-                            <p class="template-vm-card-text">
-                                To develop competent, ethical, and globally minded finance professionals
-                                equipped with strong technical, analytical, communication, and problem-solving
-                                skills, committed to professional excellence, responsible citizenship, and
-                                ethical service to organizations and society.
-                            </p>
+                            <p class="template-vm-card-text">To develop ethical educational leaders and researchers who advance educational management, improve institutions, and serve their communities through evidence-based practice.</p>
                         </div>
                     </div>
                 </div>
@@ -212,10 +207,7 @@ $ctaIcon     = 'material:volunteer_activism';
     <section class="template-career py-5" id="careers">
         <div class="container">
             <h2 class="template-section-title template-section-title--gold">Career Opportunities</h2>
-            <p class="whychoose-subtitle">
-                Graduates of the Bachelor of Elementary Education program are equipped with strong pedagogical knowledge, teaching skills,
-                and professional competence to pursue meaningful careers in education, child development, and related fields.
-            </p>
+            <p class="whychoose-subtitle">Graduates of the Doctor of Philosophy in Educational Management program are prepared for leadership, administration, research, and policy roles in educational institutions.</p>
 
             <div class="career-grid">
                 <div class="career-card">

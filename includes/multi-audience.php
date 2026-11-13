@@ -191,6 +191,7 @@ if (!function_exists('saveEventAudience')) {
             }
         } catch (Throwable $e) {
             error_log('saveEventAudience error: ' . $e->getMessage());
+            if ($db->inTransaction()) throw new RuntimeException('Could not save the event audience.', 0, $e);
         }
     }
 }

@@ -7,6 +7,13 @@
     let categoryId = '';
     const query = root.querySelector('#fb-query');
     let searchController;
+    const categoryMode = document.getElementById('fb-category-choice');
+    const categoryPicker = document.getElementById('fb-category-picker');
+    const categories = categoryMode ? new GncMultiSelect(document.getElementById('fb-category-multiselect'), {
+        name: 'category_ids[]', allLabel: 'Uncategorized', placeholder: 'Select categories...',
+        items: (data.categories || []).map(category => ({value:String(category.category_id),label:category.category_name}))
+    }) : null;
+    categoryMode?.addEventListener('change', () => { categoryPicker.hidden = categoryMode.value !== 'manual'; categories.closeDropdown(); });
     root.addEventListener('content-list:updated', event => {
         data.posts = event.detail.records.posts; data.pinned = event.detail.records.pinned;
         data.limit = event.detail.records.limit; data.canManage = event.detail.records.canManage; renderPins();
@@ -22,6 +29,7 @@
     }
     root.querySelectorAll('dialog').forEach(dialog => {
         dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
+        dialog.addEventListener('close', () => { if (dialog.id === 'fb-category-dialog') categories?.closeDropdown(); });
         dialog.addEventListener('close', () => {
             if (dialog._trigger?.isConnected) dialog._trigger.focus({preventScroll: true});
             else { const heading = root.querySelector('.fb-results h2'); heading.tabIndex = -1; heading.focus({preventScroll: true}); }
@@ -91,7 +99,7 @@
         try {
             const response = await fetch('/admin/action/facebook-posts-handler.php', {
                 method: 'POST', headers: {'Accept': 'application/json'},
-                body: new URLSearchParams({...values, csrf_token: document.querySelector('meta[name="cms-csrf"]').content})
+                body: (() => { const body = new URLSearchParams({...values, csrf_token: document.querySelector('meta[name="cms-csrf"]').content}); body.delete('category_ids'); (values.category_ids || []).forEach(id => body.append('category_ids[]', id)); return body; })()
             });
             let result;
             try { result = await response.json(); } catch { throw new Error('Your session may have expired. Reload the page and try again.'); }
@@ -142,7 +150,9 @@
             categoryId = button.dataset.editCategory;
             const post = data.posts[categoryId];
             document.getElementById('fb-category-post').textContent = post.title;
-            document.getElementById('fb-category-choice').value = post.category_id || 'none';
+            categoryMode.value = Number(post.category_locked) ? 'manual' : 'auto';
+            categories.setSelected((post.category_ids || (post.category_id ? [post.category_id] : [])).map(String));
+            categoryPicker.hidden = categoryMode.value !== 'manual';
             document.querySelector('.fb-form-error').hidden = true;
             show(document.getElementById('fb-category-dialog'), button);
         } else if (button.dataset.pin) {
@@ -155,7 +165,7 @@
     searchController = GNCContentSearch.init({page: root, form: query, tableId: 'fb-results', dataId: 'fb-page-data', kind: 'facebook'});
     document.getElementById('fb-category-form')?.addEventListener('submit', async event => {
         event.preventDefault();
-        const ok = await update({action: 'category', source: 'facebook', item_id: categoryId, category_choice: document.getElementById('fb-category-choice').value}, event.submitter || event.currentTarget.querySelector('button[type="submit"]'));
+        const ok = await update({action: 'category', source: 'facebook', item_id: categoryId, category_mode: categoryMode.value, category_ids: categoryMode.value === 'manual' ? categories.getSelected() : []}, event.submitter || event.currentTarget.querySelector('button[type="submit"]'));
         if (ok) document.getElementById('fb-category-dialog').close();
     });
 })();

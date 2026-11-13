@@ -35,7 +35,7 @@ function pr_fail(string $message, int $status = 400): void {
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') pr_fail('Invalid request.', 405);
 if (!isLoggedIn()) pr_fail('Your session has ended. Please log in again.', 401);
-if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) pr_fail('Your session has expired. Please reload the page and try again.', 403);
+if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) pr_fail('Your session has expired. Please reload the page and try again.', 403);
 
 $action     = (string)($_POST['action'] ?? '');
 $pageSlug   = trim((string)($_POST['page'] ?? ''));

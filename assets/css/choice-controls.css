@@ -5,7 +5,7 @@
 }
 
 body :is(.req-tab, .enrollment-tabs .nav-link, .scholarship-tabs .nav-link,
-    .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a, .chip) {
+    .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a:not(.org-canvas-control), .chip) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -27,7 +27,7 @@ body :is(.req-tab, .enrollment-tabs .nav-link, .scholarship-tabs .nav-link,
 }
 
 body :is(.req-tab, .enrollment-tabs .nav-link, .scholarship-tabs .nav-link,
-    .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a, .chip):hover {
+    .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a:not(.org-canvas-control), .chip):hover {
     background: #eaf0ec;
     border-color: var(--gnc-choice-green);
     color: var(--gnc-choice-green);
@@ -36,7 +36,7 @@ body :is(.req-tab, .enrollment-tabs .nav-link, .scholarship-tabs .nav-link,
 }
 
 body :is(.req-tab, .enrollment-tabs .nav-link, .scholarship-tabs .nav-link,
-    .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a, .chip):is(.active, .is-active, .on) {
+    .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a:not(.org-canvas-control), .chip):is(.active, .is-active, .on) {
     background: var(--gnc-choice-green);
     border-color: var(--gnc-choice-green);
     color: #fff;
@@ -46,7 +46,7 @@ body :is(.req-tab, .enrollment-tabs .nav-link, .scholarship-tabs .nav-link,
 }
 
 body :is(.req-tab, .enrollment-tabs .nav-link, .scholarship-tabs .nav-link,
-    .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a, .chip):focus-visible {
+    .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a:not(.org-canvas-control), .chip):focus-visible {
     outline: 3px solid #d3a63a;
     outline-offset: 3px;
 }
@@ -91,7 +91,7 @@ body .ve-previewing .ve-admission-category .req-tab {
 
 @media (prefers-reduced-motion: reduce) {
     body :is(.req-tab, .enrollment-tabs .nav-link, .scholarship-tabs .nav-link,
-        .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a, .chip) {
+        .admin-tabs .admin-tab, .na-tabs .na-tab, .student-org-filters a:not(.org-canvas-control), .chip) {
         transition: none;
     }
 }

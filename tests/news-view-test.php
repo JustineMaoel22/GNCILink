@@ -22,18 +22,24 @@ $mode=$argv[1]??'list';
 if($mode!=='list'){
     session_start();$_SESSION=['user_id'=>1,'user_role'=>'Super Admin','csrf_token'=>str_repeat('a',64),'_initiated'=>true,'last_activity'=>time()];
     $_SERVER['REQUEST_METHOD']='POST';$_POST=['csrf_token'=>$_SESSION['csrf_token'],'news_id'=>'136','action'=>$mode,'title'=>'Changed article','content'=>'<p>Changed story</p>','author'=>'School editor','category'=>'Achievements','status'=>'draft','return_query'=>'search=Changed&sort=updated&page=2'];
+    if($mode==='scalar-gallery'){$_POST['action']='update';$_FILES['gallery_images']=['name'=>'test.png','error'=>UPLOAD_ERR_NO_FILE];}
     if($mode==='csrf'){$_POST['action']='delete';$_POST['csrf_token']='invalid';}
     if($mode==='invalid-id'){$_POST['action']='delete';$_POST['news_id']=['136'];}
     if($mode==='invalid-fields'){$_POST['action']='update';$_POST['title']=['Bad headline'];$_POST['status']='invalid';}
+    if($mode==='update-legacy-category'){$_POST['action']='update';$_POST['category']='Others';$db->exec("UPDATE news SET category='Others' WHERE news_id=136");}
+    if($mode==='missing-category'){$_POST['action']='update';$_POST['category']='';}
+    if($mode==='invalid-category'){$_POST['action']='update';$_POST['category']='Not a category';}
+    if($mode==='create-retired-category'){$_POST['action']='create';$_POST['category']='Others';}
     if($mode==='pin-full'){$_POST['action']='pin';$db->exec('UPDATE news SET is_pinned=0;INSERT INTO announcements VALUES(1),(1),(1),(1),(1)');}
     if($mode==='pin-draft'){$_POST['action']='pin';$db->exec("UPDATE news SET is_pinned=0,status='draft' WHERE news_id=136");}
     if($mode==='unarchive')$db->exec("UPDATE news SET status='archived',is_pinned=0 WHERE news_id=136");
     register_shutdown_function(function()use($db,$mode){
         $row=$db->query('SELECT * FROM news WHERE news_id=136')->fetch(PDO::FETCH_ASSOC);
-        if(in_array($mode,['csrf','invalid-id','invalid-fields'],true))newsCheck((bool)$row&&$row['title']==='Special 100%_complete!'&&!empty($_SESSION['flash_errors']),'Invalid input blocked');
+        if(in_array($mode,['csrf','invalid-id','invalid-fields','missing-category','invalid-category','create-retired-category'],true))newsCheck((bool)$row&&$row['title']==='Special 100%_complete!'&&!empty($_SESSION['flash_errors'])&&(int)$db->query('SELECT COUNT(*) FROM news')->fetchColumn()===136,'Invalid input blocked');
         elseif(in_array($mode,['pin-full','pin-draft'],true))newsCheck(!(int)$row['is_pinned']&&!empty($_SESSION['flash_errors']),'Invalid pin rejected');
         elseif($mode==='create')newsCheck((int)$db->query('SELECT COUNT(*) FROM news')->fetchColumn()===137&&!empty($_SESSION['flash_success']),'Create draft');
-        elseif($mode==='update')newsCheck($row['title']==='Changed article'&&$row['status']==='draft','Update article');
+        elseif(in_array($mode,['update','scalar-gallery'],true))newsCheck($row['title']==='Changed article'&&$row['status']==='draft','Update article');
+        elseif($mode==='update-legacy-category')newsCheck($row['title']==='Changed article'&&$row['status']==='draft'&&$row['category']==='Others'&&!empty($_SESSION['flash_success']),'Existing retired category preserved');
         elseif($mode==='archive')newsCheck($row['status']==='archived'&&!(int)$row['is_pinned'],'Archive unpins');
         elseif($mode==='unarchive')newsCheck($row['status']==='draft','Restore as draft');
         elseif($mode==='delete')newsCheck(!$row&&!empty($_SESSION['flash_success']),'Delete article');

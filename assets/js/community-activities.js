@@ -25,11 +25,11 @@
         list.querySelectorAll('[data-gnc-text]').forEach(el=>markers[el.getAttribute('data-ve-field')+':'+el.getAttribute('data-ve-key')]=el.getAttribute('data-gnc-text'));
         list.replaceChildren();
         content.activities.forEach((row,index)=>{
-            const li=node('li','community-activity-item');li.dataset.communityId=row.id;if(data.preview)li.setAttribute('data-ve-community-card',row.id);
+            const li=node('li','community-activity-item');if(!data.preview)li.tabIndex=0;li.dataset.communityId=row.id;if(data.preview)li.setAttribute('data-ve-community-card',row.id);
             const number=node('span','community-activity-number',String(index+1).padStart(2,'0'));number.setAttribute('aria-hidden','true');li.appendChild(number);
             const copy=node('div','community-activity-copy');
             copy.appendChild(textField('h4','',row,'title','Activity title',255));copy.appendChild(textField('span','community-activity-category',row,'category','Category',100));
-            if(data.preview)copy.appendChild(textField('p','community-activity-description',row,'description','Activity description',12000));
+            copy.appendChild(textField('p','community-activity-description',row,'description','Activity description',12000));
             li.appendChild(copy);list.appendChild(li);
         });
         list.querySelectorAll('[data-ve-field]').forEach(el=>{const key=el.getAttribute('data-ve-field')+':'+el.getAttribute('data-ve-key');if(markers[key])el.setAttribute('data-gnc-text',markers[key]);});
@@ -38,6 +38,10 @@
         if(!content.activities.some(row=>row.id===active))active=content.activities[0]?.id||null;
         if(active)select(active);
         paintImage();
+    }
+    if(!data.preview){
+        list.addEventListener('click',event=>{const item=event.target.closest('[data-community-id]');if(item)select(item.dataset.communityId);});
+        list.addEventListener('keydown',event=>{if(event.key!=='Enter'&&event.key!==' ')return;const item=event.target.closest('[data-community-id]');if(item){event.preventDefault();select(item.dataset.communityId);}});
     }
     window.GNCCommunityActivities={render,select,active:()=>active};if(active)select(active);paintImage();
 })();

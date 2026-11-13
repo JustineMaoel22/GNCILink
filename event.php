@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/includes/event-time.php';
 require_once __DIR__.'/config/config.php';
 $id = max(0, (int)($_GET['id'] ?? 0));
 $stmt = getDB()->prepare("SELECT e.*,m.file_path AS image FROM events e LEFT JOIN media_library m ON m.media_id=e.media_id WHERE e.event_id=? AND e.status='published'");

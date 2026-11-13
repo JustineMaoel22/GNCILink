@@ -114,8 +114,6 @@ nav:is(.template-breadcrumb, .nursing-breadcrumb, .pharmacy-breadcrumb, .finan-b
     ) :is(h1, h2)::after {
         margin-left: auto !important;
         margin-right: auto !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
     }
 
     :is(

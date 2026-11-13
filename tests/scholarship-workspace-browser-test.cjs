@@ -54,8 +54,10 @@ async function until(fn, message) { for (let end=Date.now()+30000;Date.now()<end
     await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:points.tx,y:points.ty,button:'left',buttons:1});
     await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:points.tx,y:points.ty,button:'left',clickCount:1});
     assert.equal(await evaluate('VE.adapter().draftState().categories.at(-1).label'),'Browser Partners','Pointer drag reorders categories');
-    await evaluate(`document.querySelector('[aria-label="Actions for category Browser Partners"]').click();Array.from(document.querySelectorAll('.sm-menu:popover-open button')).find(b=>b.textContent==='Rename category').click();document.getElementById('sm-category-name').value='Renamed Partners';document.querySelector('.sm-form button[type=submit]').click();`);
+    await evaluate(`document.querySelector('[aria-label="Actions for category Browser Partners"]').click();Array.from(document.querySelectorAll('.sm-menu:popover-open button')).find(b=>b.textContent==='Edit category').click();document.getElementById('sm-category-name').value='Renamed Partners';document.getElementById('sm-category-icon').value='bank';document.querySelector('.sm-form button[type=submit]').click();`);
     assert.equal(await evaluate('VE.adapter().draftState().categories.some(c=>c.label==="Renamed Partners")'),true);
+    assert.equal(await evaluate('VE.adapter().draftState().categories.find(c=>c.label==="Renamed Partners").icon'),'bank','Edited category icon staged');
+    assert.equal(await evaluate(`Array.from(VE.state.doc.querySelectorAll("[data-sch-category] summary i")).some(e=>e.className==="bi bi-bank")`),true,"Icon preview updates");
     await evaluate(`document.querySelector('[aria-label="Search categories or scholarships"]').value='Renamed Partners';document.querySelector('[aria-label="Search categories or scholarships"]').dispatchEvent(new Event('input'));`);
     assert.equal(await evaluate('document.querySelectorAll(".sm-category").length'),1,'Manager search');
     assert.equal(await evaluate('document.querySelector(".sm-empty").textContent.includes("No scholarships")'),true,'Empty category guidance');

@@ -33,8 +33,17 @@
         margin-inline: auto;
     }
 
-    body :is([class$="-hero"], [class*="-hero "], .hero-page) h1::after {
+    body :is([class$="-hero"], [class*="-hero "], .hero-page, .faq-heading) h1::after {
         margin-inline: auto;
+    }
+
+    /* Admission headings use an absolutely positioned, animated gold line. */
+    body .admission-hero h1 { padding-bottom: 0; }
+    body .admission-hero h1::after {
+        position: static;
+        display: block;
+        margin-top: 7px;
+        transform-origin: center;
     }
 
     body .dept-intro-program .dept-hero-inner { max-width: 100%; }

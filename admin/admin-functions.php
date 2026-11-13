@@ -11,6 +11,7 @@
 require_once __DIR__ . '/settings-functions.php';
 require_once __DIR__ . '/../includes/content-publish-policy.php';
 require_once __DIR__ . '/../includes/announcement-categories.php';
+require_once __DIR__ . '/../includes/facebook-post-categories.php';
 require_once __DIR__ . '/photo-check.php';
 require_once __DIR__ . '/../includes/person-photo-check.php';
 require_once __DIR__ . '/../includes/contact-number.php';
@@ -1496,6 +1497,7 @@ function getFacebookPostsAdminList(int $limit = 50, string $search = ''): array 
         $stmt->execute();
         $rows = $stmt->fetchAll();
 
+        $rows = attachFacebookPostCategories($db,$rows);
         if ($searching) {
             $needle = normalizeForSearch($search);
             $rows = array_values(array_filter($rows, function ($r) use ($needle) {
@@ -1567,33 +1569,7 @@ function unpinFacebookPost(string $fbPostId): bool {
  */
 function setFacebookPostCategory(string $fbPostId, string $choice): bool {
     try {
-        $db = getDB();
-
-        $stmt = $db->prepare("SELECT message FROM fb_posts_cache WHERE fb_post_id = ?");
-        $stmt->execute([$fbPostId]);
-        $message = $stmt->fetchColumn();
-        if ($message === false) return false;
-
-        if ($choice === 'auto') {
-            require_once __DIR__ . '/../config/fb-categorizer.php';
-            $catId  = gncCategoryIdForMessage((string)$message, gncLoadCategoryMap($db));
-            $locked = 0;
-        } elseif ($choice === 'none') {
-            $catId  = null;
-            $locked = 1;
-        } else {
-            $catId = (int)$choice;
-            $chk = $db->prepare("SELECT COUNT(*) FROM categories WHERE category_id = ?");
-            $chk->execute([$catId]);
-            if ($catId <= 0 || (int)$chk->fetchColumn() === 0) return false;
-            $locked = 1;
-        }
-
-        $upd = $db->prepare("UPDATE fb_posts_cache SET category_id = ?, category_locked = ? WHERE fb_post_id = ?");
-        $upd->execute([$catId, $locked, $fbPostId]);
-        logActivity($_SESSION['user_id'], 'UPDATE', 'fb_posts_cache', null,
-            'Set Facebook post category (' . $choice . '): ' . $fbPostId);
-        return true;
+        return setFacebookPostCategories($fbPostId,$choice==='auto'?'auto':'manual',in_array($choice,['auto','none'],true)?[]:[$choice]);
     } catch (Exception $e) {
         error_log('Set Facebook post category error: ' . $e->getMessage());
         return false;

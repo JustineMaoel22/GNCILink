@@ -145,7 +145,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Post/Redirect/Get: remember the result, then reload the page with a normal GET
     // so refreshing the browser never re-submits the form (or re-sends the email).
     $_SESSION['contact_flash'] = ['success' => $success, 'errors' => $errors, 'old' => $old];
-    header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?') . '#contact-form');
+    $redirectPath = strtok($_SERVER['REQUEST_URI'] ?? '', '?');
+    if (!is_string($redirectPath) || !preg_match('#^/(?!/)#', $redirectPath) || preg_match('/[\x00-\x20\x7F\\\\]/', $redirectPath)) $redirectPath = '/contact-us';
+    header('Location: ' . $redirectPath . '#contact-form');
     exit;
 }
 

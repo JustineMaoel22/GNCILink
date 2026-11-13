@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/event-time.php';
 $eventsReady = isset($alumni['events_title']);
 $alumniEvents = alumniUpcomingEvents(getDB(), (new DateTimeImmutable('today', new DateTimeZone('Asia/Manila')))->format('Y-m-d'));
 $eventsImage = responsiveBackgroundPath(trim(strip_tags($alumni['events_image'] ?? '')));
@@ -20,8 +21,7 @@ if ($eventsReady):
         <?php foreach ($alumniEvents as $event):
             $start = new DateTimeImmutable($event['start_date'], new DateTimeZone('Asia/Manila'));
             $end = !empty($event['end_date']) ? new DateTimeImmutable($event['end_date'], new DateTimeZone('Asia/Manila')) : null;
-            $allDay = $start->format('H:i:s') === '00:00:00' && (!$end || $end->format('H:i:s') === '00:00:00');
-            $time = $allDay ? 'All Day' : $start->format('g:i A') . ($end && $end->format('H:i:s') !== '00:00:00' ? ' – ' . $end->format('g:i A') : '');
+            $time = eventTimeRange($event);
             $dateLabel = $start->format('M j, Y') . ($end && $end->format('Y-m-d') !== $start->format('Y-m-d') ? ' – ' . $end->format('M j, Y') : '');
         ?>
         <article class="alumni-event"<?= ceManageMark('data-ve-post="event" data-ve-id="' . (int)$event['event_id'] . '" data-ve-date="' . $start->format('Y-m') . '" data-ve-label="' . ceAttr($event['title']) . '"') ?>>

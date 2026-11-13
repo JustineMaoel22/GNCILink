@@ -134,6 +134,10 @@
                 if(!dirty())return;
                 const uploads={};for(const id of Object.keys(files))uploads['voice_'+id]=files[id];
                 const result=await ctx.send('/admin/action/alumni-voices-handler.php',{items:JSON.stringify(data.items),revision:data.revision},uploads);
+                if(result.submitted||result.queued){ctx.notify(result.message||'Submitted for Super Admin approval.','ok');return;}
+                // AdminPublish retries 428 with the confirmed publish token;
+                // a cancelled password prompt leaves the private edits intact.
+                if(result.reauth_required)throw Error('Publication was not confirmed. Your edits are kept.');
                 if(!result.ok)throw Error(result.error||'Could not publish alumni voices.');
                 // The upload now has a permanent URL. Keep both editor instances in
                 // sync with the framing saved by the upload handler before repainting.

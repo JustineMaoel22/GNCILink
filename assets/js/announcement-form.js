@@ -11,8 +11,28 @@
             const status = el('modal-status'), destination = el('publish-destination');
             const save = el('modal-save-btn'), label = el('modal-save-label'), alert = el('announcement-form-alert');
             const image = el('modal-image-input'), gallery = el('modal-gallery-input'), link = el('facebook-link');
+            let savedCover = '';
+            const acceptedPictures = new Map();
+            function rememberPictures() {
+                [image, gallery].forEach(field => acceptedPictures.set(field, Array.from(field.files || [])));
+            }
+            // Bubble after the gallery's merge/remove handlers and image preprocessing.
+            form.addEventListener('change', rememberPictures);
+            form.addEventListener('click', rememberPictures);
+            form.addEventListener('reset', () => acceptedPictures.clear());
+            el('modal-remove-picture').addEventListener('click', function () {
+                image.value = '';
+                image._gncFramingCancelled = false;
+                acceptedPictures.set(image, []);
+                savedCover = '';
+                el('modal-remove-image').checked = true;
+                el('modal-image-preview').removeAttribute('src');
+                el('modal-image-preview-wrap').style.display = 'none';
+                image.dispatchEvent(new Event('input', {bubbles: true}));
+                image.dispatchEvent(new Event('change', {bubbles: true}));
+            });
             let baseline = '', opened = false, submitting = false, allowClose = false, confirming = false;
-            const fields = [title, image, gallery, link, news ? el('modal-author') : null].filter(Boolean);
+            const fields = [title, image, gallery, link, news ? el('modal-author') : null, news ? el('modal-category') : null].filter(Boolean);
             const audienceIds = news ? [] : ['modal-category-multiselect', 'modal-dept-multiselect', 'modal-program-multiselect'];
             editor.setAttribute('aria-labelledby', 'ann-message-label');
             editor.setAttribute('aria-describedby', 'ann-message-help ann-message-error');
@@ -43,6 +63,51 @@
                     .map(field => [field.name, field.type === 'file' ? Array.from(field.files || []).map(file => [file.name, file.size, file.lastModified]) : field.type === 'checkbox' ? field.checked : field.value])]);
             }
             function dirty() { return opened && snapshot() !== baseline; }
+            function invalidPicture(files) {
+                return files.some(file => !/\.(jpe?g|png|gif|webp)$/i.test(file.name) ||
+                    (file.type && !/^image\/(jpeg|png|gif|webp)$/i.test(file.type)));
+            }
+            // File inputs can receive dropped files despite their accept attribute.
+            // Reject these before the main-picture/gallery handlers try to render them.
+            window.addEventListener('change', function (event) {
+                const field = event.target;
+                if (field !== image && field !== gallery) return;
+                if (field === image && field._gncFramingCancelled) {
+                    field._gncFramingCancelled = false;
+                    const restored = new DataTransfer();
+                    (acceptedPictures.get(field) || []).forEach(file => restored.items.add(file));
+                    field.files = restored.files;
+                    // The old preview and framing still belong to this selection.
+                    // Do not reopen framing or replace the preview on cancellation.
+                    event.stopImmediatePropagation();
+                    return;
+                }
+                if (!invalidPicture(Array.from(field.files || []))) return;
+                event.stopImmediatePropagation();
+                const previous = acceptedPictures.get(field) || [];
+                field.value = '';
+                if (previous.length) {
+                    const restored = new DataTransfer();
+                    previous.forEach(file => restored.items.add(file));
+                    field.files = restored.files;
+                } else if (field === image) {
+                    const preview = el('modal-image-preview');
+                    if (savedCover) preview.src = savedCover; else preview.removeAttribute('src');
+                    el('modal-image-preview-wrap').style.display = savedCover ? 'block' : 'none';
+                } else {
+                    // Let each gallery clear its staged files and thumbnails together.
+                    const cleared = new Event('change', {bubbles: true});
+                    cleared._gncRejectedSelection = true;
+                    cleared._gncValidatedSelection = true;
+                    field.dispatchEvent(cleared);
+                }
+                const message = 'File rejected. Choose JPG, PNG, GIF, or WEBP pictures only.' +
+                    (previous.length ? ' Your previous picture selection was kept.' : '');
+                field.setCustomValidity(previous.length ? '' : message);
+                field.classList.add('is-invalid');
+                field.setAttribute('aria-invalid', 'true');
+                el(field.id + '-error').textContent = message;
+            }, true);
             function validate(showErrors) {
                 content.value = editor.innerHTML;
                 fields.forEach(field => field.setCustomValidity(''));
@@ -57,7 +122,7 @@
                 }
                 [image, gallery].forEach(field => {
                     const files = Array.from(field.files || []);
-                    if (files.some(file => !/\.(jpe?g|png|gif|webp)$/i.test(file.name))) field.setCustomValidity('Choose JPG, PNG, GIF, or WEBP pictures.');
+                    if (invalidPicture(files)) field.setCustomValidity('Choose JPG, PNG, GIF, or WEBP pictures. PDF files cannot be used as pictures.');
                     if (files.some(file => file.size > 5 * 1024 * 1024)) field.setCustomValidity('Each picture must be 5 MB or smaller.');
                 });
                 const savedCount = el('modal-gallery-existing').querySelectorAll('.gallery-thumb-wrap:not(.marked-remove)').length;
@@ -96,6 +161,9 @@
             form.addEventListener(kind + '-form:submitting', function () { submitting = true; });
             modal.addEventListener('show.bs.modal', function () {
                 allowClose = false; submitting = false;
+                rememberPictures();
+                savedCover = !image.files.length && el('modal-remove-image-wrap').style.display !== 'none'
+                    ? el('modal-image-preview').getAttribute('src') || '' : '';
                 fields.forEach(field => { field.setCustomValidity(''); field.classList.remove('is-invalid'); field.removeAttribute('aria-invalid'); el(field.id + '-error').textContent = ''; });
                 editor.removeAttribute('aria-invalid'); el('modal-content-editor').classList.remove('ann-message-invalid'); el('ann-message-error').textContent = '';
                 alert.classList.add('d-none');

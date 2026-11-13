@@ -1,6 +1,7 @@
 <?php
 /** Cached management queries. No Facebook API requests. */
 require_once __DIR__.'/announcement-view.php';
+require_once __DIR__.'/../includes/facebook-post-categories.php';
 function facebookPostFilters(array $input): array {
     $f=announcementFilters($input);
     $f['category']=($input['category']??'')==='none'?'none':$f['category'];
@@ -9,8 +10,8 @@ function facebookPostFilters(array $input): array {
 }
 function facebookPostList(PDO $db,array &$filters): array {
     $where=[];$params=[];
-    if($filters['category']==='none')$where[]='f.category_id IS NULL';
-    elseif($filters['category']!==''){$where[]='f.category_id=?';$params[]=$filters['category'];}
+    if($filters['category']==='none')$where[]='f.category_id IS NULL'.(facebookPostCategoriesReady($db)?' AND (f.category_locked=0 OR NOT EXISTS(SELECT 1 FROM fb_post_categories fc WHERE fc.fb_post_id=f.fb_post_id))':'');
+    elseif($filters['category']!==''){$where[]=facebookPostCategoryCondition($db);$params[]=$filters['category'];}
     if($filters['pinned']!==''){$where[]='f.is_pinned=?';$params[]=$filters['pinned'];}
     if($filters['from']){$where[]='f.created_time>=?';$params[]=$filters['from'].' 00:00:00';}
     if($filters['to']){$where[]='f.created_time<=?';$params[]=$filters['to'].' 23:59:59';}
@@ -27,7 +28,8 @@ function facebookPostList(PDO $db,array &$filters): array {
     $q=$db->prepare('SELECT f.fb_post_id,f.message,f.permalink_url,f.created_time,f.is_pinned,f.category_id,f.category_locked,c.category_name,m.file_path AS image_path'.$sql.' ORDER BY f.created_time DESC,f.fb_post_id DESC LIMIT ? OFFSET ?');
     foreach($params as $i=>$v)$q->bindValue($i+1,$v,PDO::PARAM_STR);
     $q->bindValue(count($params)+1,$filters['size'],PDO::PARAM_INT);$q->bindValue(count($params)+2,$ids!==null?0:$offset,PDO::PARAM_INT);$q->execute();$rows=$q->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($rows as &$row) $row['category_name'] = facebookPostCategoryLabel($row['category_name']);
+    $rows=attachFacebookPostCategories($db,$rows);
+    foreach ($rows as &$row) $row['category_name'] = implode(', ',array_map('facebookPostCategoryLabel',$row['category_names']));
     unset($row);
     return compact('rows','total','pages');
 }

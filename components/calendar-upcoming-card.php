@@ -21,8 +21,8 @@
         <?php foreach ($upcomingEvents as $ev):
             $evStartTs = strtotime($ev['start_date']);
             $evEndTs   = !empty($ev['end_date']) ? strtotime($ev['end_date']) : null;
-            $stLabel   = evt_timeLabel($ev['start_date']);
-            $enLabel   = evt_timeLabel($ev['end_date'] ?? null);
+            $stLabel   = evt_timeLabel($ev['start_date'], $ev['is_all_day'] ?? null);
+            $enLabel   = evt_timeLabel($ev['end_date'] ?? null, $ev['is_all_day'] ?? null);
             $multiDay  = $evEndTs !== null && date('Y-m-d', $evEndTs) !== date('Y-m-d', $evStartTs);
 
             $dateLabel = date('M j, Y', $evStartTs);

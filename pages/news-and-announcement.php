@@ -228,17 +228,22 @@ if ($db) {
     // -----------------------------------------------------------
     try {
         $rows = $db->query("
-            SELECT f.fb_post_id, f.message, f.permalink_url, f.created_time, f.category_id, c.category_name, m.file_path
+            SELECT f.fb_post_id, f.message, f.permalink_url, f.created_time, f.category_id, f.category_locked, c.category_name, m.file_path
             FROM fb_posts_cache f
             LEFT JOIN media_library m ON f.image_media_id = m.media_id
             LEFT JOIN categories c ON f.category_id = c.category_id
         ")->fetchAll();
 
+        require_once __DIR__.'/../includes/facebook-post-categories.php';
+        $rows = attachFacebookPostCategories($db,$rows);
         foreach ($rows as $row) {
+            $facebookNewsCategories = facebookPostNewsCategoryKeys($row['category_names'], $newsCategoryLabels);
             $excerpt = mb_strlen($row['message']) > 140 ? mb_substr($row['message'], 0, 140) . '…' : $row['message'];
             $feedItems[] = [
                 'source'        => 'facebook',
                 'type_key'      => 'announcement',
+                'type_keys'     => $facebookNewsCategories ? ['announcement', 'news'] : ['announcement'],
+                'news_categories' => $facebookNewsCategories,
                 'type_label'    => 'Announcement',
                 'title'         => null,
                 'excerpt'       => $excerpt,
@@ -247,6 +252,8 @@ if ($db) {
                 'date'          => $row['created_time'],
                 'link'          => gncFacebookPostUrl($row['permalink_url'], $row['fb_post_id'], FB_PAGE_ID),
                 'category_id'   => $row['category_id'],
+                'category_ids'  => $row['category_ids'],
+                'category_names'=> $row['category_names'],
                 'category_name' => $row['category_name'],
                 'program'       => null, // Facebook posts aren't tagged to a specific program
                 'author'        => null,
@@ -381,12 +388,14 @@ usort($feedItems, function ($a, $b) use ($sortOrder) {
 // ---------------------------------------------------------------
 $searchWords = $searchTerm === '' ? [] : array_values(array_filter(preg_split('/\s+/u', gncNormalizeForSearch($searchTerm)), 'strlen'));
 $matchesFilters = function ($item, $skipCategory = false, $skipType = false) use ($activeType, $searchWords, $programFilter, $selectedCategory, $selectedDepartment, $departmentPrograms, $calendarDepartments, $programDepartmentIds) {
-    if (!$skipType && $activeType !== 'all' && $item['type_key'] !== $activeType) {
+    if (!$skipType && $activeType !== 'all' && !in_array($activeType, $item['type_keys'] ?? [$item['type_key']], true)) {
         return false;
     }
     if (!$skipCategory && $selectedCategory !== null) {
         $itemCategory = is_string($selectedCategory) ? ($item['news_category'] ?? null) : (int)($item['category_id'] ?? 0);
-        if ($itemCategory !== $selectedCategory && !(is_int($selectedCategory) && in_array($selectedCategory, $item['category_ids'] ?? [], true))) return false;
+        if ($itemCategory !== $selectedCategory
+            && !(is_int($selectedCategory) && in_array($selectedCategory, $item['category_ids'] ?? [], true))
+            && !(is_string($selectedCategory) && in_array($selectedCategory, $item['news_categories'] ?? [], true))) return false;
     }
     if ($selectedDepartment !== null || ($programFilter !== '' && $programFilter !== 'ALL')) {
         // Retain the existing filtered-feed default for untargeted News/Facebook posts.
@@ -416,6 +425,11 @@ if ($selectedDepartment !== null || ($programFilter !== '' && $programFilter !==
 $catCounts = [];
 foreach ($feedItems as $fi) {
     if (!$matchesFilters($fi, true, true)) continue;
+    if ($fi['source'] === 'facebook') {
+        foreach ($fi['category_ids'] ?? [] as $categoryId) $catCounts['announcement'][$categoryId] = ($catCounts['announcement'][$categoryId] ?? 0) + 1;
+        foreach ($fi['news_categories'] ?? [] as $code) $catCounts['news'][$code] = ($catCounts['news'][$code] ?? 0) + 1;
+        continue;
+    }
     $group = $fi['type_key'];
     $cid = $group === 'news' ? ($fi['news_category'] ?? '') : (string)($fi['category_id'] ?? '');
     foreach ($fi['category_ids'] ?? ($cid !== '' ? [$cid] : []) as $categoryId) $catCounts[$group][$categoryId] = ($catCounts[$group][$categoryId] ?? 0) + 1;

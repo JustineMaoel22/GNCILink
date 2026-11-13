@@ -10,6 +10,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/facebook-post-url.php';
 require_once __DIR__ . '/admin-functions.php';
+require_once __DIR__ . '/../includes/announcement-edit-version.php';
 require_once __DIR__ . '/../includes/multi-audience.php';
 require_once __DIR__ . '/../includes/facebook-publishing.php';
 
@@ -79,11 +80,13 @@ $modalMode = !$facebookPostsPage&&is_string($_GET['modal']??null)&&in_array($_GE
 $modalEditing = null;
 $modalGallery = [];
 $modalAudience = ['dept_ids' => [], 'programs' => []];
+$modalEditVersion = '';
 if ($modalMode === 'edit') {
     $modalEditing = getAnnouncementById(is_string($_GET['id']??null)?(int)$_GET['id']:0);
     if ($modalEditing && !empty($modalEditing['announcement_id'])) {
         $modalGallery = getAnnouncementImages((int)$modalEditing['announcement_id']);
         $modalAudience = getAnnouncementAudience(getDB(), (int)$modalEditing['announcement_id'], $modalEditing['dept_id'] ?? null, $modalEditing['program'] ?? null);
+        $modalEditVersion = announcementEditVersion($modalEditing, $modalGallery, $modalAudience);
     }
 }
 if (!empty($flashOld)) {
@@ -334,6 +337,7 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
                         <?php $rowGallery=$listGalleries[$a['announcement_id']]??[]; ?>
                         <button type="button" class="btn btn-sm btn-outline-secondary btn-edit-announcement" title="Edit this announcement"
                                 data-id="<?= $a['announcement_id'] ?>"
+                                data-edit-version="<?= announcementEditVersion($a, $rowGallery, $aAud) ?>"
                                 data-title="<?= htmlspecialchars($a['title'], ENT_QUOTES) ?>"
                                 data-category="<?= (int)($a['category_id'] ?? 0) ?>"
                                 data-categories='<?= json_encode($a['category_ids'] ?? []) ?>'
@@ -460,6 +464,7 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
 
           <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
           <input type="hidden" name="action" id="modal-action" value="create">
+          <input type="hidden" name="edit_version" id="modal-edit-version" value="">
           <input type="hidden" name="announcement_id" id="modal-announcement-id" value="">
           <input type="hidden" name="_review_id" value="<?= (int)($_GET['revise'] ?? 0) ?>">
           <div id="announcement-form-alert" class="alert alert-danger d-none" role="alert" tabindex="-1"></div>
@@ -486,9 +491,9 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
           <div class="ann-image-box mb-3">
             <div id="modal-image-preview-wrap" style="display:none">
               <img id="modal-image-preview" src="" alt="Selected picture preview">
-              <div class="form-check mt-2" id="modal-remove-image-wrap" style="display:none">
-                <input type="checkbox" class="form-check-input" id="modal-remove-image" name="remove_image" value="1">
-                <label class="form-check-label" for="modal-remove-image">Remove the current picture</label>
+              <button type="button" class="gallery-thumb-remove" id="modal-remove-picture" title="Remove picture" aria-label="Remove picture">&times;</button>
+              <div id="modal-remove-image-wrap" style="display:none" hidden>
+                <input type="checkbox" id="modal-remove-image" name="remove_image" value="1" hidden>
               </div>
             </div>
             <div class="flex-grow-1">
@@ -562,18 +567,12 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
               <option value="both" <?= !$facebookConnection || !$facebookConnection['enabled'] ? 'disabled' : '' ?>>Publish to Both Website and Facebook</option>
             </select>
             <div class="form-text">Facebook is sent only with Publish now and your confirmation. Facebook Only hides this record from the website. Editing a delivered announcement does not update or duplicate its Facebook post.</div>
-            <div class="form-text">Facebook destination: <?= htmlspecialchars($facebookConnection && $facebookConnection['enabled'] ? $facebookConnection['page_name'] . ' · ' . $facebookConnection['page_id'] . ' (' . $facebookConnection['environment'] . ')' : 'No Page connected. Ask a Super Admin to open Settings → Facebook Integration.') ?></div>
-          </div>
-          <div class="mb-3">
-            <label for="facebook-link" class="form-label">Facebook attachment link (optional)</label>
-            <input type="url" class="form-control" id="facebook-link" name="facebook_link" maxlength="2000" placeholder="e.g. https://example.com/announcement">
-            <div class="form-text">With photos, the link is added to the message. Otherwise Facebook receives a link attachment. Main picture and gallery photos are included, up to 10 total.</div>
           </div>
           <input type="hidden" name="facebook_request_key" id="facebook-request-key" value="<?= bin2hex(random_bytes(32)) ?>">
           <input type="hidden" name="facebook_confirmed" id="facebook-confirmed" value="0">
           <input type="hidden" name="facebook_page_id" value="<?= htmlspecialchars($facebookConnection['page_id'] ?? '') ?>">
           <?php else: ?>
-          <input type="hidden" name="status" value="pending">
+          <select name="status" id="modal-status" class="form-select"><option value="draft">Save as draft</option><option value="pending">Submit for Super Admin approval</option></select>
           <div class="alert alert-secondary mb-0 d-flex gap-2" style="font-size:.88rem">
             <i class="bi bi-info-circle mt-1"></i>
             <span>This will be sent for approval first. It appears on the public website once it is approved.</span>
@@ -584,7 +583,6 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
         <div class="modal-footer">
           <span id="ann-save-intent" class="evt-save-intent" aria-live="polite"></span>
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <?php if(!$facebookPostsPage): ?><button type="button" class="btn btn-outline-secondary" id="ann-draft-preview">Preview content</button><?php endif; ?>
           <button type="submit" class="btn btn-gnc-gold" id="modal-save-btn">
             <i class="bi bi-check-lg"></i> <span id="modal-save-label">Create Announcement</span>
           </button>
@@ -741,6 +739,7 @@ $aDeptNames=[];foreach($aAud['dept_ids'] as $did)if(isset($departmentNames[$did]
 #modal-content-editor .ql-editor { min-height: 180px; max-height: min(260px, 40vh); overflow-y: auto; }
 #modal-content-editor .ql-toolbar { flex-wrap: wrap; }
 .ann-image-box { display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
+#modal-image-preview-wrap { position: relative; align-self: flex-start; }
 #modal-image-preview { width: 140px; height: 100px; object-fit: cover; border-radius: 8px; display: block; }
 .ann-status-help { font-size: .8rem; color: #8a8f8c; margin-top: .4rem; }
 .ann-del-icon {
@@ -1168,6 +1167,7 @@ function openEditModal(btn) {
     resetModalForm();
     modalActionInput.value = 'update';
     modalIdInput.value = btn.dataset.id;
+    document.getElementById('modal-edit-version').value = btn.dataset.editVersion || '';
     modalLabel.textContent = 'Edit Announcement';
     modalSaveLabel.textContent = 'Save Changes';
 
@@ -1180,7 +1180,7 @@ function openEditModal(btn) {
     if (annDeptSelect) annDeptSelect.setSelected(depts);
     if (annProgSelect) annProgSelect.setSelected(progs);
     updateAudienceHelp();
-    if (modalStatus) modalStatus.value = btn.dataset.status || 'draft';
+    if (modalStatus) modalStatus.value = <?= $canPublish?'true':'false' ?> ? (btn.dataset.status || 'draft') : (btn.dataset.status === 'draft' ? 'draft' : 'pending');
     updateStatusHelp();
 
     const contentTpl = document.getElementById(btn.dataset.contentId);
@@ -1258,6 +1258,7 @@ modalImageInput?.addEventListener('change', () => {
     }
     const reader = new FileReader();
     reader.onload = e => {
+        if (modalImageInput.files[0] !== file) return;
         modalImagePreview.src = e.target.result;
         modalImagePreviewWrap.style.display = 'block';
         if (modalRemoveCheck) modalRemoveCheck.checked = false;
@@ -1265,7 +1266,8 @@ modalImageInput?.addEventListener('change', () => {
     reader.readAsDataURL(file);
 });
 
-modalGalleryInput?.addEventListener('change', () => {
+modalGalleryInput?.addEventListener('change', event => {
+    if (event._gncRejectedSelection) stagedGalleryFiles = [];
     if (modalGalleryInput._gncFramingCancelled) {
         modalGalleryInput._gncFramingCancelled = false;
         syncGalleryInputFiles(stagedGalleryFiles);
@@ -1344,34 +1346,35 @@ window.GncAnnouncementForm.init({quill: modalQuill});
 <?php if ($modalMode === 'create'): ?>
 openCreateModal();
 <?php if (!empty($flashOld)): ?>
-modalTitleInput.value = <?= json_encode($flashOld['title'] ?? '') ?>;
-modalQuill.loadHtml(<?= json_encode($flashOld['content'] ?? '') ?>);
-if (modalCategory) modalCategory.setSelected(<?= json_encode($flashOld['category_ids'] ?? (!empty($flashOld['category_id']) ? [$flashOld['category_id']] : [])) ?>);
-if (annDeptSelect) annDeptSelect.setSelected(<?= json_encode($modalAudience['dept_ids'] ?? []) ?>);
-if (annProgSelect) annProgSelect.setSelected(<?= json_encode($modalAudience['programs'] ?? []) ?>);
-if (modalStatus) modalStatus.value = <?= json_encode($flashOld['status'] ?? 'draft') ?>;
+modalTitleInput.value = <?= json_encode($flashOld['title'] ?? '', JSON_HEX_TAG) ?>;
+modalQuill.loadHtml(<?= json_encode($flashOld['content'] ?? '', JSON_HEX_TAG) ?>);
+if (modalCategory) modalCategory.setSelected(<?= json_encode($flashOld['category_ids'] ?? (!empty($flashOld['category_id']) ? [$flashOld['category_id']] : []), JSON_HEX_TAG) ?>);
+if (annDeptSelect) annDeptSelect.setSelected(<?= json_encode($modalAudience['dept_ids'] ?? [], JSON_HEX_TAG) ?>);
+if (annProgSelect) annProgSelect.setSelected(<?= json_encode($modalAudience['programs'] ?? [], JSON_HEX_TAG) ?>);
+if (modalStatus) { const status = <?= json_encode($flashOld['status'] ?? 'draft', JSON_HEX_TAG) ?>; modalStatus.value = <?= $canPublish?'true':'false' ?> ? status : (status === 'draft' ? 'draft' : 'pending'); }
 updateStatusHelp();
 <?php endif; ?>
 <?php elseif ($modalMode === 'edit' && !empty($modalEditing)): ?>
 resetModalForm();
 modalActionInput.value = 'update';
-modalIdInput.value = <?= json_encode($modalEditing['announcement_id'] ?? ($_GET['id'] ?? '')) ?>;
+modalIdInput.value = <?= json_encode($modalEditing['announcement_id'] ?? ($_GET['id'] ?? ''), JSON_HEX_TAG) ?>;
+document.getElementById('modal-edit-version').value = <?= json_encode($flashOld['edit_version'] ?? $modalEditVersion, JSON_HEX_TAG) ?>;
 modalLabel.textContent = 'Edit Announcement';
 modalSaveLabel.textContent = 'Save Changes';
-modalTitleInput.value = <?= json_encode($modalEditing['title'] ?? '') ?>;
-modalQuill.loadHtml(<?= json_encode($modalEditing['content'] ?? '') ?>);
-if (modalCategory) modalCategory.setSelected(<?= json_encode($modalEditing['category_ids'] ?? (!empty($modalEditing['category_id']) ? [$modalEditing['category_id']] : [])) ?>);
-if (annDeptSelect) annDeptSelect.setSelected(<?= json_encode($modalAudience['dept_ids'] ?? []) ?>);
-if (annProgSelect) annProgSelect.setSelected(<?= json_encode($modalAudience['programs'] ?? []) ?>);
-if (modalStatus) modalStatus.value = <?= json_encode($modalEditing['status'] ?? 'draft') ?>;
+modalTitleInput.value = <?= json_encode($modalEditing['title'] ?? '', JSON_HEX_TAG) ?>;
+modalQuill.loadHtml(<?= json_encode($modalEditing['content'] ?? '', JSON_HEX_TAG) ?>);
+if (modalCategory) modalCategory.setSelected(<?= json_encode($modalEditing['category_ids'] ?? (!empty($modalEditing['category_id']) ? [$modalEditing['category_id']] : []), JSON_HEX_TAG) ?>);
+if (annDeptSelect) annDeptSelect.setSelected(<?= json_encode($modalAudience['dept_ids'] ?? [], JSON_HEX_TAG) ?>);
+if (annProgSelect) annProgSelect.setSelected(<?= json_encode($modalAudience['programs'] ?? [], JSON_HEX_TAG) ?>);
+if (modalStatus) { const status = <?= json_encode($modalEditing['status'] ?? 'draft', JSON_HEX_TAG) ?>; modalStatus.value = <?= $canPublish?'true':'false' ?> ? status : (status === 'draft' ? 'draft' : 'pending'); }
 updateStatusHelp();
 <?php if (!empty($modalEditing['image_path'])): ?>
-modalImagePreview.src = <?= json_encode($modalEditing['image_path']) ?>;
+modalImagePreview.src = <?= json_encode($modalEditing['image_path'], JSON_HEX_TAG) ?>;
 modalImagePreviewWrap.style.display = 'block';
 modalRemoveWrap.style.display = 'block';
 <?php endif; ?>
 <?php if (!empty($modalGallery)): ?>
-renderExistingGallery(<?= json_encode($modalGallery) ?>);
+renderExistingGallery(<?= json_encode($modalGallery, JSON_HEX_TAG) ?>);
 <?php endif; ?>
 announcementModal.show();
 <?php endif; ?>

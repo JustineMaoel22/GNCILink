@@ -1,5 +1,5 @@
 <?php
-define('CURRENT_PROGRAM', 'BSBAFM');
+define('CURRENT_PROGRAM', 'GS-MPA');
 require_once __DIR__ . '/../../../../components/bulletin-board.php';
 
 /* ---------------------------------------------------------------
@@ -129,10 +129,7 @@ $ctaIcon     = 'material:volunteer_activism';
     <section class="template-why py-5" id="why-choose">
         <div class="container">
             <h2 class="template-section-title template-section-title--gold">Why Choose MPA at GNCI?</h2>
-            <p class="whychoose-subtitle">
-                Our program develops knowledgeable, reflective, and research-oriented educators who are committed to teaching excellence, 
-                professional growth, and the continuous improvement of educational practice through advanced knowledge and inquiry.
-            </p>
+            <p class="whychoose-subtitle">Our program develops ethical public leaders through advanced study in governance, policy, research, and public management.</p>
 
             <div class="whychoose-grid">
                 <div class="whychoose-card">

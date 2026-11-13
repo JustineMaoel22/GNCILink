@@ -35,6 +35,43 @@ let socket,session;
     await visit('/admin/facebook-posts.php','#fb-query');
     await evaluate("window.__searchPageMarker='retained';window.__requestCount=0;const realFetch=window.fetch;window.fetch=(url,options)=>{if(options?.headers?.Accept==='text/html')__requestCount++;return realFetch(url,options);}");
     const first=await evaluate("document.querySelector('.fb-preview-open').textContent.trim()");assert.ok(first);
+    const modes=await evaluate(`(() => {
+        const root=document.querySelector('.facebook-management'),original=JSON.parse(document.getElementById('fb-page-data').textContent),button=document.querySelector('[data-edit-category]'),id=button.dataset.editCategory;
+        const category=String(original.categories[0].category_id);
+        const choices=[];
+        for(const [locked,value] of [[0,category],[0,null],[1,category],[1,null]]){
+            const records=structuredClone(original);records.posts[id].category_locked=locked;records.posts[id].category_id=value;records.posts[id].category_ids=value?[Number(value)]:[];
+            root.dispatchEvent(new CustomEvent('content-list:updated',{detail:{records}}));button.click();choices.push(document.getElementById('fb-category-choice').value);document.getElementById('fb-category-dialog').close();
+        }
+        root.dispatchEvent(new CustomEvent('content-list:updated',{detail:{records:original}}));return {choices,category};
+    })()`);
+    assert.deepEqual(modes.choices,['auto','auto','manual','manual'],'Category editing preserves automatic and manual modes');
+    const selectedTags=await evaluate(`(() => {
+        const original=JSON.parse(document.getElementById('fb-page-data').textContent),button=document.querySelector('[data-edit-category]'),id=button.dataset.editCategory,ids=original.categories.slice(0,2).map(category=>String(category.category_id));
+        window.__beforeTagsFetch=window.fetch;window.__sentTags=null;
+        window.fetch=(url,options)=>{
+            if(String(url).includes('facebook-posts-handler.php')){
+                __sentTags=options.body.getAll('category_ids[]');
+                return Promise.resolve(Response.json({success:true,message:'Categories updated.',pinned:original.pinned,post:{...original.posts[id],category_id:Number(ids[0]),category_ids:ids.map(Number),category_locked:1,category_name:original.categories.slice(0,2).map(category=>category.category_name).join(', ')}}));
+            }
+            return __beforeTagsFetch(url,options);
+        };
+        button.click();const mode=document.getElementById('fb-category-choice');mode.value='manual';mode.dispatchEvent(new Event('change',{bubbles:true}));
+        document.getElementById('fb-category-multiselect')._gncMsInstance.setSelected(ids);
+        document.getElementById('fb-category-form').requestSubmit();return ids;
+    })()`);
+    await until(()=>evaluate("!document.getElementById('fb-category-dialog').open"),'Multiple categories did not save');
+    assert.deepEqual(await evaluate('__sentTags'),selectedTags,'Multiple selections must be sent as category_ids[]');
+    await evaluate("window.fetch=__beforeTagsFetch;document.querySelector('[data-edit-category]').click()");
+    assert.deepEqual(await evaluate("document.getElementById('fb-category-multiselect')._gncMsInstance.getSelected()"),selectedTags,'Reopening must retain every selected category');
+    assert.equal(await evaluate("document.getElementById('fb-category-picker').hidden"),false);
+    await evaluate("document.getElementById('fb-category-dialog').close()");
+    await evaluate(`document.querySelector('#fb-query [name=from]').value='2026-12-31';document.querySelector('#fb-query [name=to]').value='2020-01-01';document.getElementById('fb-query').requestSubmit();`);
+    await until(()=>evaluate("new URL(location.href).searchParams.get('from')==='2020-01-01'&&!document.getElementById('fb-query').hasAttribute('aria-busy')"),'Reversed dates were not normalized');
+    assert.deepEqual(await evaluate(`['from','to'].map(name=>document.querySelector('#fb-query [name='+name+']').value)`),['2020-01-01','2026-12-31'],'Date inputs match normalized server results');
+    assert.match(await evaluate("document.querySelector('.fb-active-filters').textContent"),/From: 2020-01-01Through: 2026-12-31/);
+    await evaluate("document.querySelector('.fb-active-filters a').click()");
+    await until(()=>evaluate("!new URL(location.href).searchParams.has('from')&&!document.getElementById('fb-query').hasAttribute('aria-busy')"),'Date filters did not clear');
     const apply=async value=>{
         const count=await evaluate('__requestCount');
         await evaluate(`(()=>{const input=document.querySelector('#fb-query [name=search]');input.focus();input.value=${JSON.stringify(value)};input.dispatchEvent(new Event('input',{bubbles:true}));})()`);

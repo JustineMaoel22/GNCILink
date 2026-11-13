@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/event-time.php';
 /** Alumni content uses the existing page_sections draft/publish workflow. */
 require_once __DIR__ . '/../includes/responsive-backgrounds.php';
 require_once __DIR__ . '/../includes/event-categories.php';
@@ -19,7 +20,7 @@ function alumniPageValidate(string $key, string $value): string {
 
 /** Published upcoming/ongoing Alumni events only; never exposes drafts or pending entries. */
 function alumniUpcomingEvents(PDO $db, string $today): array {
-    $query = $db->prepare("SELECT e.event_id,e.title,e.location,e.start_date,e.end_date
+    $query = $db->prepare("SELECT " . eventAllDaySql($db) . ", e.event_id,e.title,e.location,e.start_date,e.end_date
         FROM events e JOIN " . eventCategoryTable($db) . " c ON c.category_id=e.category_id
         WHERE c.category_name=? AND e.status='published'
           AND COALESCE(e.end_date,e.start_date)>=?

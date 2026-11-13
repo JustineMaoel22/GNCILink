@@ -145,7 +145,7 @@
             supported:function(){return !!options.adapter().draftState;},
             available:function(){return available && !loading;},
             saved:saved,
-            unsaved:function(){return !saved() && options.pending()>0;},
+            unsaved:function(){return checkpoint ? !saved() : options.pending()>0;},
             hasDraft:function(){return revision>0;},
             load:async function(url){
                 if(!options.adapter().draftState)return;

@@ -2,7 +2,7 @@
     'use strict';
     window.GNCScholarshipManager = {open};
     let active = null;
-    function node(tag, attrs = {}, children = []) {
+    function createNode(tag, attrs = {}, children = []) {
         const el = document.createElement(tag);
         Object.entries(attrs).forEach(([key, value]) => {
             if (value === false || value == null) return;
@@ -12,6 +12,7 @@
         });
         el.append(...children); return el;
     }
+    const node=createNode;
     function glyph(name) {return node('i', {class:'bi bi-'+name, 'aria-hidden':'true'});}
     function button(label, action, className = 'sm-button', attrs = {}) {
         const el = node('button', {type:'button', class:className, ...attrs}, [label]);
@@ -19,10 +20,15 @@
     }
     function open(api) {
         if(active){active.dialog.focus();return active;}
+        const feeMode=api.kind==='fees';
+        const copy=text=>feeMode&&typeof text==='string'?text.replace(/scholarships/g,'PDF documents').replace(/Scholarships/g,'PDF documents').replace(/scholarship/g,'PDF document').replace(/Scholarship/g,'PDF document'):text;
+        function node(tag,attrs={},children=[]){const translated={...attrs};['text','aria-label','placeholder','title'].forEach(key=>{if(typeof translated[key]==='string')translated[key]=copy(translated[key]);});return createNode(tag,translated,children.map(copy));}
+        function button(label,action,className='sm-button',attrs={}){const el=node('button',{type:'button',class:className,...attrs},[label]);el.addEventListener('click',action);return el;}
         const previousFocus=document.activeElement;
         const dialog=node('dialog',{class:'sm-dialog','aria-labelledby':'sm-title',tabindex:'-1'});
-        const title=node('h2',{id:'sm-title',text:'Manage scholarships'});
-        const subtitle=node('p',{text:'Organize categories, scholarship titles and PDF documents.'});
+        const title=node('h2',{id:'sm-title',text:feeMode?'Manage fee categories':'Manage scholarships'});
+        const caption=feeMode?'Organize fee categories and PDF documents.':'Organize categories, scholarship titles and PDF documents.';
+        const subtitle=node('p',{text:caption});
         const body=node('div',{class:'sm-body'});
         const live=node('p',{class:'sm-feedback',role:'status','aria-live':'polite'});
         const header=node('header',{class:'sm-header'},[node('div',{},[title,subtitle]),button(glyph('x-lg'),()=>dialog.close(),'sm-icon',{'aria-label':'Close scholarship manager'})]);
@@ -32,9 +38,9 @@
         let search='',view='list',drag=null,menus=[],focusAfter=null;
         const expanded=new Set([api.selection().category]);
         const data=()=>api.read();
-        function announce(message){live.textContent=message;}
+        function announce(message){live.textContent=copy(message);}
         function changed(message){api.changed();announce(message);render();}
-        function back(){view='list';title.textContent='Manage scholarships';subtitle.textContent='Organize categories, scholarship titles and PDF documents.';render();body.querySelector('input')?.focus();}
+        function back(){view='list';title.textContent=feeMode?'Manage fee categories':'Manage scholarships';subtitle.textContent=caption;render();body.querySelector('input')?.focus();}
         function reset(heading,caption){menus.forEach(menu=>menu.remove());menus=[];view='form';body.replaceChildren();footer.querySelector('button').hidden=true;title.textContent=heading;subtitle.textContent=caption;announce('');}
         function menu(label,items){
             const panel=node('div',{class:'sm-menu',popover:'auto','aria-label':label});
@@ -70,23 +76,27 @@
             body.append(node('div',{class:'sm-form-actions'},[button(blocked?'Back to scholarships':'Keep '+kind,back),...blocked?[]:[button('Delete '+kind,()=>{
                 const state=data(),list=kind==='category'?state.categories:state.entries;
                 list.splice(list.indexOf(item),1);if(kind==='scholarship')api.forgetFile(item.id);
-                view='list';title.textContent='Manage scholarships';subtitle.textContent='Organize categories, scholarship titles and PDF documents.';changed((kind==='category'?'Category':'Scholarship')+' removed from the editor.');
+                view='list';title.textContent=feeMode?'Manage fee categories':'Manage scholarships';subtitle.textContent=caption;changed((kind==='category'?'Category':'Scholarship')+' removed from the editor.');
             },'sm-button sm-danger')]]));
         }
         function categoryForm(current){
-            reset(current?'Rename category':'Add category','Use a clear name administrators and visitors will recognize.');
+            reset(current?'Edit category':'Add category','Choose a name and icon administrators and visitors will recognize.');
             const input=node('input',{id:'sm-category-name',class:'sm-input',type:'text',maxlength:'100',required:true,value:current?.label||''});
+            const icon=node('select',{id:'sm-category-icon',class:'sm-input'});
+            Object.entries(api.icons||{mortarboard:'Graduation cap'}).forEach(([value,label])=>icon.append(node('option',{value,text:label,selected:value===(current?.icon||'mortarboard')})));
             const error=node('p',{class:'sm-error',role:'alert'});
             const form=node('form',{class:'sm-form'},[node('label',{for:input.id,text:'Category name'}),input,error,node('div',{class:'sm-form-actions'},[button('Cancel',back),node('button',{type:'submit',class:'sm-button sm-primary',text:current?'Save category':'Add category'})])]);
+            form.insertBefore(node('label',{for:icon.id,text:'Category icon'}),error);form.insertBefore(icon,error);
             form.addEventListener('submit',event=>{
                 event.preventDefault();const label=input.value.trim(),state=data();
                 if(!label||label.length>100||/[<>]/.test(label)||state.categories.some(c=>c!==current&&c.label.toLocaleLowerCase()===label.toLocaleLowerCase())){error.textContent='Enter a unique category name of up to 100 characters.';input.focus();return;}
                 if(!current&&state.categories.length>=50){error.textContent='Use up to 50 categories.';return;}
                 const item=current||{id:'category-'+crypto.randomUUID().replaceAll('-','').slice(0,16)};
-                item.label=label;if(!current)state.categories.push(item);expanded.add(item.id);search='';back();focusAfter={kind:'toggle',id:item.id};changed(current?'Category renamed.':'Category added.');
+                item.label=label;item.icon=icon.value;if(!current)state.categories.push(item);expanded.add(item.id);search='';back();focusAfter={kind:'toggle',id:item.id};changed(current?'Category updated.':'Category added.');
             });body.append(form);input.focus();
         }
         function scholarshipForm(category,current){
+            if(feeMode){dialog.close();api.manageDocuments(category,current);return;}
             reset(current?'Edit scholarship':'Add scholarship','Choose a category, enter a title and attach the scholarship PDF.');
             const state=data();
             const name=node('input',{id:'sm-scholarship-title',class:'sm-input',type:'text',maxlength:'255',required:true,value:current?.title||'','aria-label':'Scholarship title'});
@@ -131,10 +141,14 @@
                 const list=node('div',{class:'sm-items',id:'sm-items-'+category.id,hidden:!isOpen});
                 const toggle=button(node('span',{},[node('strong',{text:category.label}),node('span',{class:'sm-count',text:String(group.length),'aria-label':group.length+' scholarships'})]),()=>{if(expanded.has(category.id))expanded.delete(category.id);else expanded.add(category.id);focusAfter={kind:'toggle',id:category.id};render();},'sm-category-toggle',{'aria-expanded':String(isOpen),'aria-controls':list.id});
                 toggle.append(glyph(isOpen?'chevron-up':'chevron-down'));
-                const actions=menu('Actions for category '+category.label,[{label:'Rename category',action:()=>categoryForm(category)},{label:'Move up',aria:'Move category '+category.label+' up',disabled:index===0,action:()=>move('category',category.id,-1)},{label:'Move down',aria:'Move category '+category.label+' down',disabled:index===state.categories.length-1,action:()=>move('category',category.id,1)},{label:'Delete category',danger:true,action:()=>confirmDelete('category',category)}]);
+                const actions=menu('Actions for category '+category.label,[{label:'Edit category',action:()=>categoryForm(category)},{label:'Move up',aria:'Move category '+category.label+' up',disabled:index===0,action:()=>move('category',category.id,-1)},{label:'Move down',aria:'Move category '+category.label+' down',disabled:index===state.categories.length-1,action:()=>move('category',category.id,1)},{label:'Delete category',danger:true,action:()=>confirmDelete('category',category)}]);
                 card.append(node('div',{class:'sm-category-header'},[handle('category',category),toggle,actions]));
                 if(!group.length)list.append(node('p',{class:'sm-empty',text:'No scholarships in this category. Add a title and PDF to get started.'}));
                 visible.forEach(item=>{
+                    if(feeMode){
+                        const edit=button(node('span',{},[node('strong',{text:item.title}),node('small',{text:'PDF attached'})]),()=>scholarshipForm(category.id,item),'sm-scholarship-edit',{'aria-label':'Manage PDF '+item.title});
+                        list.append(node('div',{class:'sm-item'},[glyph('file-earmark-pdf'),edit]));return;
+                    }
                     const at=group.indexOf(item),attached=api.hasPdf(item);
                     const edit=button(node('span',{},[node('strong',{text:item.title}),node('small',{text:attached?'PDF attached':'No PDF yet'})]),()=>scholarshipForm(category.id,item),'sm-scholarship-edit',{'aria-label':'Edit scholarship '+item.title,title:'Edit scholarship'});
                     list.append(node('div',{class:'sm-item','data-order-kind':'scholarship','data-order-id':item.id,'data-order-category':category.id},[handle('scholarship',item,category.id),edit,menu('Actions for scholarship '+item.title,[{label:'Edit title or category',action:()=>scholarshipForm(category.id,item)},{label:attached?'Replace PDF':'Upload PDF',action:()=>upload(item)},{label:'Move up',aria:'Move scholarship '+item.title+' up',disabled:at===0,action:()=>move('scholarship',item.id,-1)},{label:'Move down',aria:'Move scholarship '+item.title+' down',disabled:at===group.length-1,action:()=>move('scholarship',item.id,1)},{label:'Delete scholarship',danger:true,action:()=>confirmDelete('scholarship',item)}])]));

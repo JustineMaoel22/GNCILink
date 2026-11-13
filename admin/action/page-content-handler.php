@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
 // the existing Slideshow editor JS is expected to behave.
 $heroStateChanging = ['save', 'delete', 'reorder'];
 if (in_array($action, $heroStateChanging, true)) {
-    $heroToken = $_POST['csrf_token'] ?? '';
+    $heroToken = (is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : '');
     if (!verifyCSRFToken($heroToken)) {
         http_response_code(403);
         echo json_encode(['error' => 'Invalid or expired session token. Please refresh the page and try again.']);
@@ -54,7 +54,7 @@ try {
             echo json_encode(['success'=>true,'environment'=>imageUploadEnvironment()],JSON_PRETTY_PRINT);
             break;
         case 'save_department_order':
-            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) {
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Please refresh the editor and try again.']);
                 break;
@@ -71,7 +71,7 @@ try {
             }
             break;
         case 'save_department_page_text':
-            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) {
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Please refresh the editor and try again.']);
                 break;
@@ -82,7 +82,7 @@ try {
             echo json_encode(['success' => true, 'fields' => $fields]);
             break;
         case 'save_department_office_location':
-            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((string)($_POST['csrf_token'] ?? '')) || ($_SESSION['user_role'] ?? '') !== 'Super Admin') {
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : '')) || ($_SESSION['user_role'] ?? '') !== 'Super Admin') {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Only Super Admin with a valid session can update office locations.']);
                 break;
@@ -102,7 +102,7 @@ try {
             }
             break;
         case 'save_basic_education_content':
-            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) {
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Please refresh the page and try again.']);
                 break;
@@ -261,8 +261,8 @@ try {
 
         // ── Save edits as a draft (does not touch the live site) ──
         case 'save_section_image':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -282,14 +282,20 @@ try {
 
         // ── Save edits as a draft (does not touch the live site) ──
         case 'save_draft':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
             $slug       = trim($_POST['page'] ?? '');
             $sectionKey = trim($_POST['section_key'] ?? '');
-            $content    = $_POST['content'] ?? '';
+            $content = $_POST['content'] ?? '';
+            if (!is_string($content)) {
+                http_response_code(400);
+                echo json_encode(['success'=>false,'error'=>'Invalid section content.']);
+                break;
+            }
+            $content = richTextToStorage($content);
 
             if ($slug === '' || $sectionKey === '') {
                 http_response_code(400);
@@ -305,8 +311,8 @@ try {
 
         // ── Publish a section's draft to the live public site ──
         case 'publish':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -327,8 +333,8 @@ try {
 
         // ── Discard the pending draft, revert to published text ──
         case 'discard_draft':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -342,7 +348,7 @@ try {
         // Multipart POST: dept_id, optional logo file, optional remove_logo
         // flag ('1').
         case 'save_department_banner':
-            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((string)($_POST['csrf_token'] ?? ''))) {
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Please refresh the editor and try again.']);
                 break;
@@ -357,8 +363,8 @@ try {
             break;
 
         case 'save_department_media':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -392,8 +398,8 @@ try {
         // POST: dept_id, name. Only the display name changes; the slug (page
         // filename / links) stays the same.
         case 'save_department_name':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -423,8 +429,8 @@ try {
         // Multipart POST: program_id, optional pdf file, optional remove_pdf
         // flag ('1').
         case 'save_program_pdf':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -459,8 +465,8 @@ try {
         // dean_email, dean_office, dean_hours, optional photo file, optional
         // remove_photo flag ('1'). Everything is applied at once.
         case 'save_department_dean':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -501,8 +507,8 @@ try {
         // Multipart POST: name, title, org, eyebrow, heading, greeting,
         // message, optional photo file, optional remove_photo flag ('1').
         case 'save_homepage_president':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -536,8 +542,8 @@ try {
         // Multipart POST: texts = JSON {key: new text} (only what changed); optional picture files named
         // img_<key>; reset_images = JSON list of keys whose picture goes back to the original.
         case 'save_home_content':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -577,8 +583,8 @@ try {
         case 'admin_archive_office':
         // ── Drag-and-drop order for the cards of one section ──
         case 'admin_reorder':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -663,8 +669,8 @@ try {
         // POST: dept_id (0 = create), dept_name, description, hero_text,
         // about_text, facebook_url, office_label, theme_color.
         case 'save_department_details':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -700,8 +706,8 @@ try {
         // Programs/announcements that belong to it are detached (their
         // dept_id becomes NULL), not deleted.
         case 'delete_department':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -727,8 +733,8 @@ try {
         // ── College Departments: hide from / restore to the public website ──
         // archived = '1' archives (default), '0' restores.
         case 'archive_department':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -759,8 +765,8 @@ try {
         // Multipart POST: program_id (0 = create), program_code, dept_id, description,
         // optional image file, optional remove_image flag ('1').
         case 'save_program':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }
@@ -788,8 +794,8 @@ try {
 
         // ── College Programs: permanently delete one ──
         case 'delete_program':
-            if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-                http_response_code(419);
+            if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Your session has expired. Please refresh and try again.']);
                 break;
             }

@@ -60,7 +60,7 @@ function gncRecCatalog(PDO $db): array {
     }
     foreach (['news'=>'news_id','announcements'=>'announcement_id'] as $table=>$pk) {
         $route = $table === 'news' ? '/news-article.php' : '/announcement-article.php';
-        $add('feed:'.$table, $table === 'news' ? '/news.php' : '/announcement.php',
+        $add('feed:'.$table, $table === 'news' ? '/news-and-announcement?type=news' : '/news-and-announcement?type=announcement',
             $table === 'news' ? 'School News' : 'School Announcements', ucfirst($table), 'Browse the latest updates from GNC.', null, ['updates']);
         $rows = $db->query("SELECT a.*, m.file_path AS image FROM $table a LEFT JOIN media_library m ON m.media_id=a.featured_image
             WHERE a.status='published' AND (a.published_at IS NULL OR a.published_at<=NOW()) ORDER BY COALESCE(a.published_at,a.created_at) DESC LIMIT 300")->fetchAll(PDO::FETCH_ASSOC);

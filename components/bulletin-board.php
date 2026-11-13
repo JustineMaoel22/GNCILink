@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/event-time.php';
 /**
  * =====================================================================
  * BULLETIN BOARD COMPONENT
@@ -170,7 +171,7 @@ function gnc_get_global_events(string $program, int $limit): array
     )" : '';
     $groupScope=eventAudienceGroupsReady()?" AND (audience_group='all' OR EXISTS (SELECT 1 FROM departments gd WHERE gd.dept_id=bulletin_program.dept_id AND gd.department_type=events.audience_group AND (events.audience_group<>'college' OR (COALESCE(gd.slug,'')<>'graduate-school' AND gd.dept_name<>'Graduate School'))))":'';
 
-    $sql = "SELECT event_id, title, location, start_date, end_date
+    $sql = "SELECT " . eventAllDaySql($pdo, 'events') . ", event_id, title, location, start_date, end_date
             FROM events
             LEFT JOIN programs bulletin_program ON bulletin_program.program_code=:department_program
             WHERE status = 'published'
@@ -228,19 +229,9 @@ function bulletin_format_event_badge(?string $rawDate): array
 /**
  * Formats a start/end time range for an event card.
  */
-function bulletin_format_time_range(?string $start, ?string $end): string
+function bulletin_format_time_range(?string $start, ?string $end, $allDay = null): string
 {
-    if (!$start) {
-        return '';
-    }
-    $startTs = strtotime($start);
-    $startStr = $startTs ? date('g:i A', $startTs) : '';
-    if (!$end) {
-        return $startStr;
-    }
-    $endTs = strtotime($end);
-    $endStr = $endTs ? date('g:i A', $endTs) : '';
-    return $endStr ? "{$startStr} - {$endStr}" : $startStr;
+    return eventTimeRange(['start_date'=>$start,'end_date'=>$end,'is_all_day'=>$allDay]);
 }
 
 /**
@@ -342,7 +333,7 @@ function render_bulletin_board(): void
                                 <?php foreach ($events as $i => $event):
                                     $badge = bulletin_format_event_badge($event['start_date']);
                                     $colorClass = $eventBadgeColors[$i % count($eventBadgeColors)];
-                                    $timeRange = bulletin_format_time_range($event['start_date'] ?? null, $event['end_date'] ?? null);
+                                    $timeRange = bulletin_format_time_range($event['start_date'] ?? null, $event['end_date'] ?? null, $event['is_all_day'] ?? null);
                                     ?>
                                     <a class="bulletin-item bulletin-event-item" href="<?= $eventsUrl ?>">
                                         <div class="bulletin-event-badge <?= $colorClass ?>">

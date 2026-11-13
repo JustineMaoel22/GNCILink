@@ -8,6 +8,7 @@
  */
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../admin-functions.php';
+require_once __DIR__ . '/../../includes/announcement-edit-version.php';
 require_once __DIR__ . '/../../includes/facebook-publishing.php';
 
 initSession();
@@ -21,7 +22,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $postAction = $_POST['action'] ?? '';
 $facebookAction = in_array($postAction, ['pin_facebook', 'unpin_facebook', 'set_fb_category'], true);
 
-if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
+if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) {
+    if (isset($_POST['csrf_token']) && !is_string($_POST['csrf_token'])) {
+        http_response_code(403);
+        echo 'Invalid or expired request token. Please refresh and try again.';
+        exit;
+    }
     $_SESSION['flash_errors'] = ['Invalid or expired request token. Please try again.'];
     header('Location: ' . ($facebookAction ? '/admin/facebook-posts.php' : '/admin/announcement.php'));
     exit;
@@ -187,6 +193,7 @@ if ($postAction === 'create' || $postAction === 'update') {
     $destination = $_POST['publish_destination'] ?? 'website';
     $sendFacebook = in_array($destination, ['facebook', 'both'], true);
     $facebookTransaction = false;
+    $editTransaction = false;
     $savedId = 0;
     if (!in_array($destination, ['website', 'facebook', 'both'], true)) $errors[] = 'Invalid publishing destination.';
     if ($sendFacebook) {
@@ -260,6 +267,11 @@ if ($postAction === 'create' || $postAction === 'update') {
                 $_POST['programs'] ?? ($_POST['program'] ?? null)
             );
             validateMultiAudienceProgramDepartments($audience);
+            if ($isUpdate) {
+                ensureMultiAudienceTables(getDB());
+                if (!getDB()->inTransaction()) { getDB()->beginTransaction(); $editTransaction = true; }
+                announcementCheckEditVersion(getDB(), $id, $_POST['edit_version'] ?? null);
+            }
             $program = $audience['primary_program'];
             $deptId  = $audience['primary_dept_id'];
 
@@ -357,9 +369,14 @@ if ($postAction === 'create' || $postAction === 'update') {
                 getDB()->rollBack();
                 $facebookTransaction = false;
             }
+            if ($editTransaction) {
+                if (empty($errors)) getDB()->commit(); else getDB()->rollBack();
+                $editTransaction = false;
+            }
         } catch (Exception $e) {
+            if ($editTransaction && getDB()->inTransaction()) getDB()->rollBack();
             if ($facebookTransaction && getDB()->inTransaction()) getDB()->rollBack();
-            $errors[] = $sendFacebook ? 'The announcement could not be saved for Facebook publishing. Reload and check the announcement list before retrying.' : $e->getMessage();
+            $errors[] = $sendFacebook && !($e instanceof AnnouncementEditConflict) ? 'The announcement could not be saved for Facebook publishing. Reload and check the announcement list before retrying.' : $e->getMessage();
         }
     }
 

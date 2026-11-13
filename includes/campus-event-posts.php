@@ -1,10 +1,12 @@
 <?php
 require_once __DIR__ . '/event-categories.php';
 require_once __DIR__ . '/announcement-categories.php';
+require_once __DIR__ . '/facebook-post-categories.php';
 
 function campusEventPosts(PDO $db, array $query, string $category = 'School Event', bool $includeEvents = false): array {
     // Keep categorized public posts in one dated feed, independent of the calendar month.
     $announcementCategory = announcementCategoryCondition($db, 'a', true);
+    $facebookCategory = facebookPostCategoryCondition($db, 'f', true);
     $feedSql = "SELECT a.announcement_id AS post_id, 'announcement' AS post_type,
             a.title, a.slug, COALESCE(a.published_at, a.created_at) AS post_date,
             m.file_path AS image_path, NULL AS permalink_url
@@ -24,9 +26,8 @@ function campusEventPosts(PDO $db, array $query, string $category = 'School Even
             f.message AS title, NULL AS slug, f.created_time AS post_date,
             m.file_path AS image_path, f.permalink_url
         FROM fb_posts_cache f
-        JOIN categories c ON c.category_id = f.category_id
         LEFT JOIN media_library m ON m.media_id = f.image_media_id
-        WHERE c.category_name = ?";
+        WHERE $facebookCategory";
     $newsCategory = $category === 'School Event' ? 'Campus Events' : $category;
     $params = [$category, $newsCategory, $category, $category];
     if ($includeEvents) {

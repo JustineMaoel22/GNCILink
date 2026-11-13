@@ -334,6 +334,7 @@
     width: 100%;
     height: 100%;
     text-align: left;
+    -webkit-transform-style: preserve-3d;
     transform-style: preserve-3d;
     transition: transform 0.3s ease;
 }
@@ -365,6 +366,14 @@
     background-color: #ffffff;
     border-color: #e6e1d8;
 }
+
+/* Safari can paint composited portrait/badge layers through a rotated face.
+   Switch visibility at the edge of the flip as well as hiding backfaces.
+   Both faces stay in the grid so the card keeps its height. */
+.hss-face-front { visibility: visible; }
+.hss-face-back { visibility: hidden; }
+.hss-flip-card.is-flipped .hss-face-front { visibility: hidden; }
+.hss-flip-card.is-flipped .hss-face-back { visibility: visible; }
 
 /* Background Watermark */
 .hss-watermark {
@@ -609,7 +618,7 @@
     background: #d3a63a;
 }
 
-.hss-face { transition: border-color .15s ease; }
+.hss-face { transition: border-color .15s ease, visibility 0s linear .15s; }
 @media (hover: hover) {
     .admin-photo-card, .hss-flip-card { transition: transform .2s ease; }
     .admin-card-wrap:hover .admin-photo-card,

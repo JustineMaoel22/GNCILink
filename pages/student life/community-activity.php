@@ -67,13 +67,12 @@ $impactUrl=static fn($page)=>'?'.http_build_query(array_merge($communityPreview?
                     <h3<?= $field('list_heading','Activity list heading') ?>><?= $escape($text('list_heading')) ?></h3>
                     <ol class="community-activity-list" data-community-list>
                         <?php foreach($activities as $index=>$activity): ?>
-                        <li class="community-activity-item<?= $index===0?' is-active':'' ?>" data-community-id="<?= $escape($activity['id']) ?>"<?= ceManageMark('data-ve-community-card="'.$escape($activity['id']).'"') ?>>
+                        <li tabindex="0" class="community-activity-item<?= $index===0?' is-active':'' ?>" data-community-id="<?= $escape($activity['id']) ?>"<?= ceManageMark('data-ve-community-card="'.$escape($activity['id']).'"') ?>>
                             <span class="community-activity-number" aria-hidden="true"><?= str_pad((string)($index+1),2,'0',STR_PAD_LEFT) ?></span>
                             <div class="community-activity-copy">
                                 <h4<?= ceField('community-activity-title',['key'=>$activity['id'],'label'=>'Activity title','max'=>255]) ?>><?= $escape($activity['title']) ?></h4>
                                 <span class="community-activity-category"<?= ceField('community-activity-category',['key'=>$activity['id'],'label'=>'Category','max'=>100]) ?>><?= $escape($activity['category']) ?></span>
-                                <?php if($communityPreview): ?><p class="community-activity-description"<?= ceField('community-activity-description',['key'=>$activity['id'],'label'=>'Activity description','max'=>12000,'multiline'=>true]) ?>><?= $escape($activity['description']) ?></p>
-                                <?php endif; ?>
+                                <p class="community-activity-description"<?= ceField('community-activity-description',['key'=>$activity['id'],'label'=>'Activity description','max'=>12000,'multiline'=>true]) ?>><?= $escape($activity['description']) ?></p>
                             </div>
                         </li>
                         <?php endforeach; ?>

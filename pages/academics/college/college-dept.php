@@ -22,7 +22,7 @@ $cePreview = cePreviewCanManage();
 function collegeDeptPublicUrl(array $dept): string {
     $slug = trim((string)($dept['slug'] ?? ''));
     if ($slug === '') {
-        return '/pages/academics/college/college-departments.php';
+        return '/college-dept';
     }
     return '/pages/academics/college/college-department/' . rawurlencode($slug);
 }

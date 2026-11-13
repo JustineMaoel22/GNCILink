@@ -96,8 +96,8 @@ function editorPresenceRelease(PDO $db,array $peer): void {
     $db->prepare('UPDATE content_editor_versions SET lease_owner=NULL,lease_until=0 WHERE lease_owner=?')->execute([$peer['peer_key']]);
 }
 function editorPresenceValidateTarget(array $peer,string $route,array $post): void {
-    $features=['athletics-sports'=>'athletics-sports','community-activities'=>'community-activities','enrollment-canvas'=>'enrollment-procedures','enrollment-illustrations'=>'enrollment-procedures','faqs'=>'faqs','payment-guide'=>'online-payment-guide','scholarship'=>'scholarships','student-achievements'=>'student-achievements','student-organizations'=>'student-organizations','tuition-fees'=>'tuition-fees'];
-    $target=null;
+    $features=['alumni-voices'=>'alumni','athletics-sports'=>'athletics-sports','community-activities'=>'community-activities','enrollment-canvas'=>'enrollment-procedures','enrollment-illustrations'=>'enrollment-procedures','faqs'=>'faqs','payment-guide'=>'online-payment-guide','scholarship'=>'scholarships','student-achievements'=>'student-achievements','student-organizations'=>'student-organizations','tuition-fees'=>'tuition-fees'];
+    $target=$route==='/admin/enrollment-steps.php'?'enrollment-procedures':null;
     foreach($features as $handler=>$scope)if($route==='/admin/action/'.$handler.'-handler.php')$target=$scope;
     if(in_array($route,['/admin/action/page-content-handler.php','/admin/action/program-page-handler.php'],true))$target='shared-academic-personnel';
     if($route==='/admin/action/page-content-handler.php'&&in_array($post['action']??'',['save_section_image','save_draft','publish','discard_draft'],true))$target=$post['page']??null;
@@ -138,7 +138,7 @@ function editorPresenceWriteBoundary(string $route): void {
             $leases=$q->fetchAll(PDO::FETCH_COLUMN);
             if (!$peer&&$leases) throw new RuntimeException('Another editor is publishing. Try again in a moment.',409);
             $global=in_array($route,['/admin/action/image-framing-handler.php','/admin/settings.php'],true);
-            $scope=$peer&&!$global?$peer['scope_key']:'external';
+            $scope=$peer&&!$global?$peer['scope_key']:($route==='/admin/enrollment-steps.php'?'enrollment-procedures':($route==='/admin/action/alumni-voices-handler.php'?'alumni':'external'));
             editorPresenceVersion($db,$scope);
             // Reserve the revision before executing. Invalid/failed writes may conservatively
             // invalidate other previews; fatal/partially committed requests can never look current.

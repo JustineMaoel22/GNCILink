@@ -30,6 +30,12 @@ publishCheck(!publishConfirmationValid($token), 'Credential change invalidates c
 $_SESSION['credential_version']=3;
 $_SESSION['publish_confirmations'][hash('sha256',$token)]['expires']=time()-1;
 publishCheck(!publishConfirmationValid($token), 'Expired token rejected.');
+foreach (['/admin/action/alumni-voices-handler.php','/admin/enrollment-steps.php'] as $route) {
+    foreach ([[],['action'=>'list'],['action'=>'save_draft'],['action'=>'delete'],['action'=>['list']]] as $post) {
+        publishCheck(rbacShouldQueue($route,$post), 'Always-writing endpoint cannot bypass approval with an action field.');
+        publishCheck(publishNeedsConfirmation($route,$post), 'Always-writing endpoint cannot bypass publish confirmation with an action field.');
+    }
+}
 foreach (['/admin/action/create-news.php','/admin/action/create-announcement.php','/admin/events.php'] as $route) {
     publishCheck(publishNeedsConfirmation($route,['action'=>'create','status'=>'published']), 'Published posts require password confirmation.');
     publishCheck(!publishNeedsConfirmation($route,['action'=>'create','status'=>'draft']), 'Post drafts need no password.');

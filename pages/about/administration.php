@@ -387,7 +387,7 @@ if (!$sections) {
     }
 }
 
-$section = $_GET['section'] ?? array_key_first($sections);
+$section = is_string($_GET['section'] ?? null) ? $_GET['section'] : array_key_first($sections);
 if (!isset($sections[$section])) {
     $section = array_key_first($sections);
 }

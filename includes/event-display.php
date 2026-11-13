@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/event-time.php';
 require_once __DIR__ . '/event-categories.php';
 function publicEventCategoryColor(?string $color, ?string $name = null): string {
     if($color && preg_match('/^#[0-9a-f]{6}$/iD',$color))return $color;
@@ -18,7 +19,7 @@ function publicEventsForDate(PDO $db,string $date,array $filters,?string $catego
     if($category!==null)$params[]=$category;
     $query->execute($params);$events=[];
     foreach($query->fetchAll(PDO::FETCH_ASSOC) as $row)$events[]=[
-        'id'=>(int)$row['event_id'],'title'=>$row['title'],'start_date'=>$row['start_date'],'end_date'=>$row['end_date'],
+        'is_all_day'=>$row['is_all_day']??null,'time_label'=>eventTimeRange($row),'id'=>(int)$row['event_id'],'title'=>$row['title'],'start_date'=>$row['start_date'],'end_date'=>$row['end_date'],
         'category'=>$row['category_name']?:'Uncategorized','color'=>publicEventCategoryColor($row['category_color'],$row['category_name']),
         'location'=>$row['location']??'','description'=>$row['description']??'',
     ];

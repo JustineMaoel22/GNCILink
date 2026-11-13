@@ -137,6 +137,7 @@ body {
 }
 
 .org-canvas-control {
+    text-decoration: none;
     background: #fff;
     border: 1px solid #b9cec0;
     color: #245b36;
@@ -204,7 +205,7 @@ body {
     margin: 20px 0 30px;
 }
 
-.student-org-filters a {
+.student-org-filters a:not(.org-canvas-control) {
     border: 1px solid #d3a63a;
     border-radius: 24px;
     color: #396744;
@@ -215,8 +216,8 @@ body {
         color 0.18s;
 }
 
-.student-org-filters a.is-active,
-.student-org-filters a:hover {
+.student-org-filters a:not(.org-canvas-control).is-active,
+.student-org-filters a:not(.org-canvas-control):hover {
     background: #1f5e2c;
     border-color: #1f5e2c;
     color: #fff;
@@ -249,7 +250,7 @@ body {
 }
 
 .student-org-card:focus-visible,
-.student-org-filters a:focus-visible {
+.student-org-filters a:not(.org-canvas-control):focus-visible {
     outline: 3px solid #d3a63a;
     outline-offset: 3px;
 }
@@ -415,7 +416,7 @@ body {
         gap: 8px;
     }
 
-    .student-org-filters a {
+    .student-org-filters a:not(.org-canvas-control) {
         padding: 5px 14px;
     }
 
@@ -787,7 +788,7 @@ body {
 }
 
 .org-filter-results h2::after,
-.org-filter-results .student-org-filters a,
+.org-filter-results .student-org-filters a:not(.org-canvas-control),
 .org-filter-results .student-org-grid { animation: none !important; }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -811,7 +812,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
 
     .student-org-card,
-    .student-org-filters a,
+    .student-org-filters a:not(.org-canvas-control),
     .org-canvas-control {
         transition: none;
     }
@@ -870,7 +871,7 @@ body { overflow-x: clip; }
 
 @media (max-width: 767px) {
     .student-org-filters { margin: 16px 0 24px; }
-    .student-org-filters a { font-size: 13px; }
+    .student-org-filters a:not(.org-canvas-control) { font-size: 13px; }
     .student-org-card-body { padding: 0 20px 20px; }
     .student-org-empty { padding: 44px 18px; }
 }
@@ -942,13 +943,13 @@ body { overflow-x: clip; }
 
 /* ---------- Touch devices ---------- */
 @media (pointer: coarse) {
-    .student-org-filters a { padding-top: 9px; padding-bottom: 9px; }
+    .student-org-filters a:not(.org-canvas-control) { padding-top: 9px; padding-bottom: 9px; }
     .student-org-pagination a { min-width: 44px; height: 44px; }
     .org-canvas-control { min-height: 36px; }
 }
 @media (hover: none) {
     .student-org-card:hover { transform: none; box-shadow: 0 3px 12px #17362412; }
-    .student-org-filters a:hover:not(.is-active) { background: transparent; color: #396744; border-color: #d3a63a; }
+    .student-org-filters a:not(.org-canvas-control):hover:not(.is-active) { background: transparent; color: #396744; border-color: #d3a63a; }
     .org-canvas-control:hover { transform: none; box-shadow: none; }
 }
 
@@ -1025,15 +1026,15 @@ body { overflow-x: clip; }
     }
 
     /* ---------- Filters ---------- */
-    .student-org-filters a { animation: org-pop 0.45s ease backwards; }
-    .student-org-filters a:nth-child(1) { animation-delay: 0.10s; }
-    .student-org-filters a:nth-child(2) { animation-delay: 0.16s; }
-    .student-org-filters a:nth-child(3) { animation-delay: 0.22s; }
-    .student-org-filters a:nth-child(4) { animation-delay: 0.28s; }
-    .student-org-filters a:nth-child(5) { animation-delay: 0.34s; }
-    .student-org-filters a:nth-child(n+6) { animation-delay: 0.40s; }
-    .student-org-filters a:hover { transform: translateY(-2px); }
-    .student-org-filters a { transition: background 0.18s, color 0.18s, transform 0.18s; }
+    .student-org-filters a:not(.org-canvas-control) { animation: org-pop 0.45s ease backwards; }
+    .student-org-filters a:not(.org-canvas-control):nth-child(1) { animation-delay: 0.10s; }
+    .student-org-filters a:not(.org-canvas-control):nth-child(2) { animation-delay: 0.16s; }
+    .student-org-filters a:not(.org-canvas-control):nth-child(3) { animation-delay: 0.22s; }
+    .student-org-filters a:not(.org-canvas-control):nth-child(4) { animation-delay: 0.28s; }
+    .student-org-filters a:not(.org-canvas-control):nth-child(5) { animation-delay: 0.34s; }
+    .student-org-filters a:not(.org-canvas-control):nth-child(n+6) { animation-delay: 0.40s; }
+    .student-org-filters a:not(.org-canvas-control):hover { transform: translateY(-2px); }
+    .student-org-filters a:not(.org-canvas-control) { transition: background 0.18s, color 0.18s, transform 0.18s; }
 
     /* ---------- Org cards: cover zoom, logo bounce, category slide ---------- */
     .student-org-card-cover { overflow: hidden; }

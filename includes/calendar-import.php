@@ -3,6 +3,7 @@ require_once __DIR__.'/calendar-docx.php';
 require_once __DIR__.'/calendar-import-workspace.php';
 require_once __DIR__.'/event-audience.php';
 require_once __DIR__.'/event-categories.php';
+require_once __DIR__.'/event-edit-state.php';
 
 /** Reuse the normal Events audience rules, including department/program membership. */
 function calendarImportAudience(array $row, array $previous = []): array {
@@ -410,7 +411,7 @@ function calendarImportCategories(PDO $db): array {
 }
 function calendarEventSignature(array $event): string {
     $fields=[];
-    foreach (['event_id','title','start_date','end_date','category_id','description','status','location','program','dept_id','audience_group','user_id','updated_at'] as $key) $fields[$key]=(string)($event[$key]??'');
+    foreach (['event_id','title','start_date','end_date','category_id','description','status','location','program','dept_id','audience_group','user_id','updated_at','is_all_day'] as $key) $fields[$key]=(string)($event[$key]??'');
     foreach(['dept_ids','programs'] as $key)if(isset($event[$key])){$values=$event[$key];sort($values);$fields[$key]=$values;}
     return hash('sha256',json_encode($fields,JSON_UNESCAPED_UNICODE));
 }
@@ -561,7 +562,7 @@ function calendarImportApply(PDO $db, array $batch, array $rows, string $status,
             if($hasGroups)$values[]=$audience['audience_group'];
             if($id) {
                 $values[]=$id;
-                $db->prepare('UPDATE events SET title=?, start_date=?, end_date=?, category_id=?, description=?, status=?, location=?, program=?'.($hasDepartments?', dept_id=?':'').($hasGroups?', audience_group=?':'').' WHERE event_id=?')->execute($values);
+                $db->prepare('UPDATE events SET title=?, start_date=?, end_date=?, category_id=?, description=?, status=?, location=?, program=?'.($hasDepartments?', dept_id=?':'').($hasGroups?', audience_group=?':'').(eventAllDayStorageReady($db)?', is_all_day=NULL':'').' WHERE event_id=?')->execute($values);
             } else {
                 $values[]=rbacContentOwnerId();
                 $db->prepare('INSERT INTO events(title,start_date,end_date,category_id,description,status,location,program'.($hasDepartments?',dept_id':'').($hasGroups?',audience_group':'').',user_id) VALUES(?,?,?,?,?,?,?,?,'.($hasDepartments?'?,':'').($hasGroups?'?,':'').'?)')->execute($values);

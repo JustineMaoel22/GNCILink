@@ -1,5 +1,5 @@
 <?php
-define('CURRENT_PROGRAM', 'BSBAFM');
+define('CURRENT_PROGRAM', 'GS-MBA');
 require_once __DIR__ . '/../../../../components/bulletin-board.php';
 
 /* ---------------------------------------------------------------
@@ -197,11 +197,7 @@ $ctaIcon     = 'material:volunteer_activism';
     <section class="template-career py-5" id="careers">
         <div class="container">
             <h2 class="template-section-title template-section-title--gold">Career Opportunities</h2>
-            <p class="whychoose-subtitle">
-                Graduates of the Master of Arts in Education program are equipped with advanced educational knowledge, 
-                teaching expertise, and research competencies to pursue rewarding careers in teaching, educational leadership, 
-                curriculum development, and academic research.
-            </p>
+            <p class="whychoose-subtitle">Graduates of the Master in Business Administration program are prepared for leadership, management, entrepreneurship, and consulting careers across business sectors.</p>
 
             <div class="career-grid">
                 <div class="career-card">

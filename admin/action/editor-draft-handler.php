@@ -14,7 +14,7 @@ function edReply(array $data, int $status = 200): void {
 }
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') edReply(['error' => 'Invalid request.'], 405);
 if (!isLoggedIn()) edReply(['error' => 'Please sign in again.'], 401);
-if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) edReply(['error' => 'Your session has expired. Reload the editor.'], 403);
+if (!verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) edReply(['error' => 'Your session has expired. Reload the editor.'], 403);
 $manager = hasPermission('manage_page_content');
 if (!$manager && !hasPermission('edit_page_content')) edReply(['error' => 'You cannot edit page content.'], 403);
 $page = $_POST['page'] ?? null;

@@ -56,7 +56,7 @@ function newsSanitizeHtml(string $html): string {
     libxml_use_internal_errors($prev);
 
     $safeUrl = function (string $u, bool $img = false): bool {
-        $u = trim($u);
+        $u = preg_replace('/[\x00-\x20\x7F]/', '', $u);
         if ($u === '') return false;
         if (preg_match('#^(https?:)?//#i', $u) || preg_match('#^/(?!/)#', $u)) return true;
         if (!$img && preg_match('#^(mailto:|tel:)#i', $u)) return true;

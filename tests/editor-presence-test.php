@@ -7,6 +7,11 @@ require_once __DIR__.'/../includes/editor-presence.php';
 $db=getDB();$checks=0;
 function epAssert(bool $value,string $message):void{global $checks;if(!$value)throw new RuntimeException($message);$checks++;}
 function epConflict(callable $fn,string $message):void{try{$fn();throw new LogicException($message);}catch(RuntimeException $e){epAssert($e->getCode()===409,$message);}}
+foreach (['/admin/action/alumni-voices-handler.php'=>'alumni','/admin/enrollment-steps.php'=>'enrollment-procedures'] as $route=>$scope) {
+    editorPresenceValidateTarget(['scope_key'=>$scope],$route,[]);
+    epAssert(true,'Matching editor target accepted.');
+    epConflict(static fn()=>editorPresenceValidateTarget(['scope_key'=>'home'],$route,[]),'Wrong editor target rejected.');
+}
 // Shadow metadata/users for this connection. No live content or presence is changed.
 foreach(['content_editor_presence','content_editor_versions'] as $table){$ddl=$db->query("SHOW CREATE TABLE `$table`")->fetch(PDO::FETCH_NUM)[1];$db->exec(preg_replace('/^CREATE TABLE/','CREATE TEMPORARY TABLE',$ddl));}
 $db->exec('CREATE TEMPORARY TABLE users(user_id INT PRIMARY KEY,first_name VARCHAR(100),last_name VARCHAR(100),status VARCHAR(20),credential_version INT)');

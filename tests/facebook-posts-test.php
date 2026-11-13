@@ -8,6 +8,7 @@ function fbCheck(bool $condition,string $message): void {global $checks;if(!$con
 $db->exec('CREATE TEMPORARY TABLE fb_posts_cache(fb_post_id VARCHAR(100) PRIMARY KEY,message TEXT,permalink_url TEXT,created_time DATETIME,is_pinned INT,category_id INT,category_locked INT,image_media_id INT)');
 $db->exec('CREATE TEMPORARY TABLE categories(category_id INT PRIMARY KEY,category_name VARCHAR(100))');
 $db->exec('CREATE TEMPORARY TABLE media_library(media_id INT PRIMARY KEY,file_path VARCHAR(500))');
+$db->exec('CREATE TEMPORARY TABLE fb_post_categories(fb_post_id VARCHAR(100),category_id INT,PRIMARY KEY(fb_post_id,category_id))');
 $db->exec("INSERT INTO categories VALUES(1,'School update');INSERT INTO media_library VALUES(1,'uploads/facebook/example.jpg')");
 $insert=$db->prepare('INSERT INTO fb_posts_cache VALUES(?,?,?,?,?,?,?,?)');
 for($i=1;$i<=135;$i++)$insert->execute([(string)$i,'Caption '.$i,'','2026-10-01 12:00:00',$i%2,$i%2?1:null,0,1]);

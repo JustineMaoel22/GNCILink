@@ -15,6 +15,9 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/knowledge.php';
+require_once __DIR__ . '/../../includes/content-audience.php';
+require_once __DIR__ . '/../../includes/event-categories.php';
+require_once __DIR__ . '/../../includes/event-audience.php';
 require_once __DIR__ . '/tuition.php';
 require_once __DIR__ . '/../../includes/website-developers.php';
 require_once __DIR__ . '/../../includes/normalized-content-lists.php';
@@ -147,7 +150,7 @@ final class GncbotRetriever
         if (isset($i['programs']) && $program === null) { $this->programList($dept); }
         if (isset($i['departments']))       { $this->departmentBlock($dept); }
         if (isset($i['announcements']))     { $this->announcements($program, $dept, $inferredFrom !== null && $explicit === null); }
-        if (isset($i['events']))            { $this->events($program, $inferredFrom !== null && $explicit === null, $q); }
+        if (isset($i['events']))            { $this->events($program, $dept, $inferredFrom !== null && $explicit === null, $q); }
         if (isset($i['news']))              { $this->news(); }
         if (isset($i['vision_mission']))    { $this->pageSections(['vision-mission'], 'Vision and Mission'); }
         if (isset($i['about']))             { $this->pageSections(['about-us', 'history'], 'About GNC / History'); }
@@ -451,6 +454,31 @@ final class GncbotRetriever
         if ($lines) { $this->addBlock('College departments', implode("\n", $lines)); $this->link('college_departments'); }
     }
 
+    /** Read-only audience predicate; child lists take precedence over legacy mirrors. */
+    private function audienceCondition(string $kind, string $alias, ?string $program, ?int $dept): array {
+        if($program===null&&$dept===null)return ['',[]];
+        $programDepartments=array_map(static fn($row)=>(int)$row['dept_id'],$this->programRows);
+        if($program!==null)$dept=$programDepartments[$program]??null;
+        $id=$kind.'_id';$deps=$kind.'_departments';$progs=$kind.'_programs';$args=[];
+        $hasLists=true;try{$this->db->query("SELECT 1 FROM $deps LIMIT 0");$this->db->query("SELECT 1 FROM $progs LIMIT 0");}catch(PDOException $e){$hasLists=false;}
+        $legacyDept="$alias.dept_id IS NULL OR $alias.dept_id=?";
+        $department=$hasLists?"COALESCE((SELECT MAX(COALESCE(d.dept_id=?,0)) FROM $deps d WHERE d.$id=$alias.$id),$legacyDept)":$legacyDept;
+        if($hasLists)$args[]=$dept;$args[]=$dept;
+        if($program!==null){
+            $programSql=$hasLists?"COALESCE((SELECT MAX(p.program_code=?) FROM $progs p WHERE p.$id=$alias.$id),$alias.program=? OR $alias.program='ALL')":"($alias.program=? OR $alias.program='ALL')";
+            if($hasLists)$args[]=$program;$args[]=$program;
+            if($kind==='announcement'&&$hasLists){$programSql="($programSql OR (EXISTS(SELECT 1 FROM $deps d WHERE d.$id=$alias.$id) AND NOT EXISTS(SELECT 1 FROM $progs p JOIN programs sp ON sp.program_code=p.program_code WHERE p.$id=$alias.$id AND sp.dept_id=?)))";$args[]=$dept;}
+        }else{
+            $programSql=$hasLists?"COALESCE((SELECT MAX(EXISTS(SELECT 1 FROM programs sp WHERE sp.program_code=p.program_code AND sp.dept_id=?)) FROM $progs p WHERE p.$id=$alias.$id),$alias.program='ALL' OR EXISTS(SELECT 1 FROM programs sp WHERE sp.program_code=$alias.program AND sp.dept_id=?))":"($alias.program='ALL' OR EXISTS(SELECT 1 FROM programs sp WHERE sp.program_code=$alias.program AND sp.dept_id=?))";
+            if($hasLists)$args[]=$dept;$args[]=$dept;
+        }
+        $condition=" AND ($department) AND ($programSql)";
+        if($kind==='event'){
+            try{$this->db->query('SELECT audience_group FROM events LIMIT 0');$group=isset($this->departments[$dept])?eventDepartmentGroup($this->departments[$dept]):'';$condition.=" AND ($alias.audience_group='all' OR $alias.audience_group=?)";$args[]=$group;}catch(PDOException $e){}
+        }
+        return [$condition,$args];
+    }
+
     private function announcements(?string $program, ?int $dept, bool $inferred): void
     {
         $limit = 5; $rows = []; $label = 'Latest published announcements';
@@ -471,7 +499,7 @@ final class GncbotRetriever
                 $st = $this->db->prepare("SELECT a.title, a.slug, a.content, a.program, a.is_pinned, c.category_name,
                         COALESCE(a.published_at, a.created_at) AS posted
                       FROM announcements a LEFT JOIN categories c ON c.category_id = a.category_id
-                     WHERE a.status = 'published' ORDER BY posted DESC LIMIT $limit");
+                     WHERE a.status = 'published' AND a.program='ALL' AND a.dept_id IS NULL AND NOT EXISTS(SELECT 1 FROM announcement_departments d WHERE d.announcement_id=a.announcement_id) AND NOT EXISTS(SELECT 1 FROM announcement_programs p WHERE p.announcement_id=a.announcement_id) ORDER BY posted DESC LIMIT $limit");
                 $st->execute();
                 $rows = $st->fetchAll(PDO::FETCH_ASSOC);
                 $label = "No announcements are tagged for $program; these are the latest school-wide/other announcements";
@@ -520,27 +548,27 @@ final class GncbotRetriever
         } catch (Throwable $e) { $this->dbFail($e); }
     }
 
-    private function events(?string $program, bool $inferred, string $q): void
+    private function events(?string $program, ?int $dept, bool $inferred, string $q): void
     {
         $today = date('Y-m-d 00:00:00');
         $base = "SELECT e.title, e.location, e.start_date, e.end_date, e.program, c.category_name
-                   FROM events e LEFT JOIN categories c ON c.category_id = e.category_id
+                   FROM events e LEFT JOIN " . eventCategoryTable($this->db) . " c ON c.category_id = e.category_id
                   WHERE e.status = 'published'";
         $up = []; $past = [];
         try {
             $filter = $program !== null ? ' AND e.program = ?' : '';
             $args   = $program !== null ? [$today, $program] : [$today];
             // upcoming OR still running (multi-day) - the homepage calendar uses the same overlap idea
-            $st = $this->db->prepare($base . " AND COALESCE(e.end_date, e.start_date) >= ?" . ($program !== null ? ' AND e.program = ?' : '') . ' ORDER BY e.start_date ASC LIMIT 6');
+            $st = $this->db->prepare($base . " AND COALESCE(e.end_date, e.start_date) >= ?" . $filter . ' ORDER BY e.start_date ASC LIMIT 6');
             $st->execute($args); $up = $st->fetchAll(PDO::FETCH_ASSOC);
 
             if (!$up || preg_match('/\b(latest|recent|past|previous|last)\b/u', $q)) {
-                $st = $this->db->prepare($base . " AND COALESCE(e.end_date, e.start_date) < ?" . ($program !== null ? ' AND e.program = ?' : '') . ' ORDER BY e.start_date DESC LIMIT 3');
+                $st = $this->db->prepare($base . " AND COALESCE(e.end_date, e.start_date) < ?" . $filter . ' ORDER BY e.start_date DESC LIMIT 3');
                 $st->execute($args); $past = $st->fetchAll(PDO::FETCH_ASSOC);
             }
             // page-inferred program with nothing at all: show school-wide instead, labelled
             if ($program !== null && $inferred && !$up && !$past) {
-                $st = $this->db->prepare($base . " AND COALESCE(e.end_date, e.start_date) >= ? ORDER BY e.start_date ASC LIMIT 6");
+                $st = $this->db->prepare($base . " AND COALESCE(e.end_date, e.start_date) >= ? AND e.program='ALL' AND e.dept_id IS NULL AND NOT EXISTS(SELECT 1 FROM event_departments d WHERE d.event_id=e.event_id) AND NOT EXISTS(SELECT 1 FROM event_programs p WHERE p.event_id=e.event_id) ORDER BY e.start_date ASC LIMIT 6");
                 $st->execute([$today]); $up = $st->fetchAll(PDO::FETCH_ASSOC);
                 $note = "No events are tagged for $program; showing school-wide/other upcoming events";
             }

@@ -1,6 +1,7 @@
 <?php
 /** Isolated file-throttle checks; no database or AI requests. */
 declare(strict_types=1);
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/../inc/ratelimit.php';
 
 function env(string $key, mixed $default = null): mixed { return $key === 'GNCBOT_IP_LIMIT' ? 2 : $default; }

@@ -66,14 +66,5 @@
     });
     const filters = document.getElementById('ann-query');
     if (location.hash === '#pinned-content') document.getElementById('pinned-content')?.setAttribute('open', '');
-    document.getElementById('ann-draft-preview')?.addEventListener('click', event => {
-        trigger = event.currentTarget;
-        document.getElementById('ann-preview-title').textContent = document.getElementById('modal-title').value.trim() || 'Untitled announcement';
-        document.getElementById('ann-preview-meta').textContent = 'Unsaved content preview';
-        document.getElementById('ann-preview-message').innerHTML = GncRichText.previewHtml(document.querySelector('#modal-content-editor .ql-editor')?.innerHTML || '<p>No message entered yet.</p>');
-        document.getElementById('ann-preview-images').replaceChildren();
-        document.getElementById('announcementModal').append(dialog);
-        dialog.showModal();dialog.querySelector('[data-ann-preview-close]').focus();
-    });
     GNCContentSearch.init({page, form: filters, tableId: 'announcements-table', dataId: 'ann-preview-data'});
 })();

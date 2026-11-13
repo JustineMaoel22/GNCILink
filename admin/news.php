@@ -343,9 +343,9 @@ include __DIR__ . '/../components/header-admin.php';
           <div class="ann-image-box mb-3">
             <div id="modal-image-preview-wrap" style="display:none">
               <img id="modal-image-preview" src="" alt="Selected picture preview">
-              <div class="form-check mt-2" id="modal-remove-image-wrap" style="display:none">
-                <input type="checkbox" class="form-check-input" id="modal-remove-image" name="remove_image" value="1">
-                <label class="form-check-label" for="modal-remove-image">Remove the current picture</label>
+              <button type="button" class="gallery-thumb-remove" id="modal-remove-picture" title="Remove picture" aria-label="Remove picture">&times;</button>
+              <div id="modal-remove-image-wrap" style="display:none" hidden>
+                <input type="checkbox" id="modal-remove-image" name="remove_image" value="1" hidden>
               </div>
             </div>
             <div class="flex-grow-1">
@@ -376,8 +376,8 @@ include __DIR__ . '/../components/header-admin.php';
           <h6 id="news-details-heading">Article details</h6>
           <div class="row g-3 mb-3">
             <div class="col-12 col-sm-6">
-              <label class="form-label" for="modal-category">News category</label>
-              <select name="category" id="modal-category" class="form-select">
+              <label class="form-label" for="modal-category">News category <span class="text-danger">*</span></label>
+              <select name="category" id="modal-category" class="form-select" required>
                 <option value="">Choose a category</option>
                 <?php foreach ($newsCreateCategories as $code => $label): ?>
                 <option value="<?= htmlspecialchars($code) ?>"><?= htmlspecialchars($label) ?></option>
@@ -434,7 +434,6 @@ include __DIR__ . '/../components/header-admin.php';
         </div>
         <div class="modal-footer">
           <span id="ann-save-intent" class="evt-save-intent" aria-live="polite"></span>
-          <button type="button" class="btn btn-outline-secondary" id="news-draft-preview">Preview article</button>
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-gnc-gold" id="modal-save-btn">
             <i class="bi bi-check-lg"></i> <span id="modal-save-label">Create Article</span>
@@ -541,6 +540,7 @@ include __DIR__ . '/../components/header-admin.php';
 #modal-content-editor { background: #fff; color: #222; }
 #modal-content-editor .ql-editor { min-height: 180px; max-height: 260px; overflow-y: auto; }
 .ann-image-box { display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
+#modal-image-preview-wrap { position: relative; align-self: flex-start; }
 #modal-image-preview { width: 140px; height: 100px; object-fit: cover; border-radius: 8px; display: block; }
 .ann-status-help { font-size: .8rem; color: #8a8f8c; margin-top: .4rem; }
 .ann-del-icon {
@@ -693,6 +693,21 @@ const modalGalleryExistWrap  = document.getElementById('modal-gallery-existing-w
 const modalGalleryExist      = document.getElementById('modal-gallery-existing');
 
 const MAX_GALLERY_IMAGES = 10;
+let stagedGalleryFiles = [], galleryPreviewVersion = 0;
+function syncGalleryInputFiles(files) {
+    const transfer = new DataTransfer();
+    files.forEach(file => transfer.items.add(file));
+    modalGalleryInput.files = transfer.files;
+}
+modalGalleryInput._gncBeforeProcessFiles = function (files) {
+    const alreadySynced = files.length === stagedGalleryFiles.length && files.every((file, index) => file === stagedGalleryFiles[index]);
+    if (!files.length || (!alreadySynced && stagedGalleryFiles.length + files.length > MAX_GALLERY_IMAGES)) {
+        syncGalleryInputFiles(stagedGalleryFiles);
+        if (files.length) annToast('You can upload up to ' + MAX_GALLERY_IMAGES + ' pictures at a time.', 'error');
+        return false;
+    }
+    return true;
+};
 
 // Plain-language hint under the Visibility dropdown
 const statusHelpText = <?= $newsJson($statusHelp) ?>;
@@ -706,6 +721,8 @@ function updateStatusHelp() {
 modalStatus?.addEventListener('change', updateStatusHelp);
 
 function resetGalleryUI() {
+    stagedGalleryFiles = [];
+    galleryPreviewVersion++;
     modalGalleryInput.value = '';
     modalGalleryNew.innerHTML = '';
     modalGalleryNewWrap.style.display = 'none';
@@ -720,8 +737,8 @@ const savedNewsCategoryLabels = <?= $newsJson($newsCategories, JSON_HEX_TAG | JS
 function selectNewsCategory(code = 'Others', preserveExisting = false) {
     if (!modalCategory) return;
     modalCategory.querySelectorAll('[data-existing-category]').forEach(option => option.remove());
-    if (preserveExisting && savedNewsCategoryLabels[code] && !Array.from(modalCategory.options).some(option => option.value === code)) {
-        const option = new Option(savedNewsCategoryLabels[code] + ' (existing selection)', code);
+    if (preserveExisting && code && !Array.from(modalCategory.options).some(option => option.value === code)) {
+        const option = new Option((savedNewsCategoryLabels[code] || code) + ' (existing selection)', code);
         option.dataset.existingCategory = '1';
         modalCategory.add(option);
     }
@@ -754,6 +771,7 @@ function openCreateModal() {
 
 // Preview of the new pictures picked in this session
 function renderNewGalleryPreview() {
+    const version = ++galleryPreviewVersion;
     modalGalleryNew.innerHTML = '';
     const files = Array.from(modalGalleryInput.files || []);
     if (!files.length) {
@@ -764,12 +782,25 @@ function renderNewGalleryPreview() {
     files.forEach(file => {
         const reader = new FileReader();
         reader.onload = e => {
+            if (version !== galleryPreviewVersion || !Array.from(modalGalleryInput.files || []).includes(file)) return;
             const wrap = document.createElement('div');
             wrap.className = 'gallery-thumb-wrap';
             const img = document.createElement('img');
             img.src = e.target.result;
             img.alt = '';
             wrap.appendChild(img);
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'gallery-thumb-remove';
+            remove.title = 'Remove this picture';
+            remove.setAttribute('aria-label', 'Remove ' + file.name);
+            remove.textContent = '\u00d7';
+            remove.addEventListener('click', () => {
+                stagedGalleryFiles = stagedGalleryFiles.filter(selected => selected !== file);
+                syncGalleryInputFiles(stagedGalleryFiles);
+                renderNewGalleryPreview();
+            });
+            wrap.appendChild(remove);
             modalGalleryNew.appendChild(wrap);
         };
         reader.readAsDataURL(file);
@@ -832,7 +863,7 @@ function openEditModal(btn) {
     modalTitleInput.value = btn.dataset.title || '';
     modalAuthorInput.value = btn.dataset.author || '';
     selectNewsCategory(btn.dataset.category || 'Others', true);
-    if (modalStatus) modalStatus.value = <?= $canPublish?'true':'false' ?> ? (btn.dataset.status || 'draft') : 'pending';
+    if (modalStatus) modalStatus.value = <?= $canPublish?'true':'false' ?> ? (btn.dataset.status || 'draft') : (btn.dataset.status === 'draft' ? 'draft' : 'pending');
     updateStatusHelp();
 
     const contentTpl = document.getElementById(btn.dataset.contentId);
@@ -896,6 +927,7 @@ modalImageInput?.addEventListener('change', () => {
     }
     const reader = new FileReader();
     reader.onload = e => {
+        if (modalImageInput.files[0] !== file) return;
         modalImagePreview.src = e.target.result;
         modalImagePreviewWrap.style.display = 'block';
         if (modalRemoveCheck) modalRemoveCheck.checked = false;
@@ -903,20 +935,31 @@ modalImageInput?.addEventListener('change', () => {
     reader.readAsDataURL(file);
 });
 
-modalGalleryInput?.addEventListener('change', () => {
+modalGalleryInput?.addEventListener('change', event => {
+    if (event._gncRejectedSelection) stagedGalleryFiles = [];
+    if (modalGalleryInput._gncFramingCancelled) {
+        modalGalleryInput._gncFramingCancelled = false;
+        syncGalleryInputFiles(stagedGalleryFiles);
+        renderNewGalleryPreview();
+        return;
+    }
     const files = Array.from(modalGalleryInput.files || []);
-    if (files.length > MAX_GALLERY_IMAGES) {
+    const alreadySynced = files.length === stagedGalleryFiles.length && files.every((file, index) => file === stagedGalleryFiles[index]);
+    const combined = alreadySynced ? stagedGalleryFiles : stagedGalleryFiles.concat(files);
+    if (combined.length > MAX_GALLERY_IMAGES) {
         annToast('You can upload up to ' + MAX_GALLERY_IMAGES + ' pictures at a time.', 'error');
-        modalGalleryInput.value = '';
+        syncGalleryInputFiles(stagedGalleryFiles);
         renderNewGalleryPreview();
         return;
     }
     if (files.some(f => f.size > 5 * 1024 * 1024)) {
         annToast('One of the pictures is larger than 5 MB. Please choose smaller ones.', 'error');
-        modalGalleryInput.value = '';
+        syncGalleryInputFiles(stagedGalleryFiles);
         renderNewGalleryPreview();
         return;
     }
+    stagedGalleryFiles = combined;
+    syncGalleryInputFiles(stagedGalleryFiles);
     renderNewGalleryPreview();
 });
 
@@ -946,7 +989,7 @@ modalQuill.loadHtml(<?= $newsJson(sectionToEditorHtml($flashOld['content'] ?? ''
 modalAuthorInput.value = <?= $newsJson($flashOld['author'] ?? '') ?>;
 selectNewsCategory(<?= $newsJson($flashOld['category'] ?? 'Others') ?>);
 window.GncNewsAudience?.set(<?= $newsJson($modalAudience) ?>);
-if (modalStatus) modalStatus.value = <?= $newsJson($flashOld['status'] ?? 'draft') ?>;
+if (modalStatus) { const status = <?= $newsJson($flashOld['status'] ?? 'draft') ?>; modalStatus.value = <?= $canPublish?'true':'false' ?> ? status : (status === 'draft' ? 'draft' : 'pending'); }
 updateStatusHelp();
 <?php endif; ?>
 <?php elseif ($modalMode === 'edit' && !empty($modalEditing)): ?>
@@ -960,7 +1003,7 @@ modalQuill.loadHtml(<?= $newsJson(sectionToEditorHtml($modalEditing['content'] ?
 modalAuthorInput.value = <?= $newsJson($modalEditing['author'] ?? '') ?>;
 selectNewsCategory(<?= $newsJson($modalEditing['category'] ?? 'Others') ?>, true);
 window.GncNewsAudience?.set(<?= $newsJson($modalAudience) ?>);
-if (modalStatus) modalStatus.value = <?= $newsJson($modalEditing['status'] ?? 'draft') ?>;
+if (modalStatus) { const status = <?= $newsJson($modalEditing['status'] ?? 'draft') ?>; modalStatus.value = <?= $canPublish?'true':'false' ?> ? status : (status === 'draft' ? 'draft' : 'pending'); }
 updateStatusHelp();
 <?php if (!empty($modalEditing['image_path'])): ?>
 modalImagePreview.src = <?= $newsJson($modalEditing['image_path']) ?>;

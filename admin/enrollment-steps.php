@@ -37,7 +37,7 @@ require __DIR__ . '/../components/header-admin.php';
         <p id="enrollment-empty" class="text-muted">No steps yet. Add the approved enrollment steps when they are available.</p>
         <div class="d-flex flex-wrap gap-2 mt-3">
             <button type="button" id="enrollment-add-step" class="btn btn-outline-secondary"><i class="bi bi-plus-lg" aria-hidden="true"></i> Add step</button>
-            <button type="submit" id="enrollment-publish" class="btn-gnc-primary" disabled>Publish steps</button>
+            <button type="submit" id="enrollment-publish" class="btn-gnc-primary" disabled><?= rbacIsSuper()?'Publish steps':'Submit for approval' ?></button>
             <a class="btn btn-outline-secondary" href="/pages/admission/enrollment-procedures.php#basic-education-pane" target="_blank" rel="noopener">View live</a>
         </div>
         <p class="small text-muted mt-2" id="enrollment-save-status" role="status">Everything here is live.</p>
@@ -60,6 +60,6 @@ require __DIR__ . '/../components/header-admin.php';
         </div>
     </fieldset>
 </template>
-<script id="enrollment-steps-config" type="application/json"><?= json_encode(['steps'=>$steps, 'revision'=>basicEnrollmentRevision($steps), 'illustrations'=>basicEnrollmentIllustrations(), 'csrf'=>$csrfToken], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
+<script id="enrollment-steps-config" type="application/json"><?= json_encode(['steps'=>$steps, 'revision'=>basicEnrollmentRevision($steps), 'illustrations'=>basicEnrollmentIllustrations(), 'csrf'=>$csrfToken,'canPublish'=>rbacIsSuper()], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
 <script src="/assets/js/enrollment-steps-editor.js?v=<?= filemtime(__DIR__ . '/../assets/js/enrollment-steps-editor.js') ?>"></script>
 <?php require __DIR__ . '/../components/footer-admin.php'; ?>

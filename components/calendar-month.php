@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/event-time.php';
 require_once __DIR__ . '/../includes/event-categories.php';
 require_once __DIR__.'/../includes/event-display.php';
 // The caller supplies an optional category and department/program scope.
@@ -33,7 +34,7 @@ try {
     // last month but run into this one still show up.
     $evtCategorySql = isset($calendarCategory) ? ' AND c.category_name = ?' : '';
     $stmt = ($db ?? getDB())->prepare("
-        SELECT e.event_id, e.title, e.start_date, e.end_date, e.status, c.category_name, c.category_color
+        SELECT " . eventAllDaySql($db ?? getDB()) . ", e.event_id, e.title, e.start_date, e.end_date, e.status, c.category_name, c.category_color
         FROM events e
         LEFT JOIN " . eventCategoryTable($db ?? getDB()) . " c ON e.category_id = c.category_id
         WHERE e.status = 'published'
@@ -78,9 +79,5 @@ foreach ($publicMonthEvents as $ev) {
 // Shared optional event time label
 // ---------------------------------------------------------------
 // Time is optional on events; 00:00:00 means "no time set".
-function evt_timeLabel($dt) {
-    if (empty($dt)) return '';
-    $ts = strtotime($dt);
-    return date('H:i:s', $ts) !== '00:00:00' ? date('g:i A', $ts) : '';
-}
+function evt_timeLabel($dt, $allDay = null) { return eventTimeLabel($dt, $allDay); }
 

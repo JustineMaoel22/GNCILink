@@ -175,7 +175,7 @@ function publicProgramPageUrl(array $program): string {
         return '/pages/academics/college/program/' . rawurlencode($program['slug']);
     }
     $code = preg_replace('/[^a-z0-9-]/', '', strtolower((string)($program['program_code'] ?? '')));
-    return '/pages/academics/college/programs/' . ($code !== '' ? $code : 'index') . '.php';
+    return $code !== '' ? '/programs/' . rawurlencode($code) : '/college-dept';
 }
 
 /**

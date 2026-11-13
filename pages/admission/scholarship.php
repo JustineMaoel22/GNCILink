@@ -42,7 +42,7 @@ if(!$selected)foreach($schEntries as $entry)if($entry['category']===$category){$
         <nav id="scholarshipNavigation" aria-label="Scholarship categories">
         <?php foreach($schCategories as $key=>$group): ?>
             <details class="sch-category-group" data-sch-category="<?= ceAttr($key) ?>"<?= $key===$category?' open':'' ?>>
-                <summary class="fee-category<?= $key===$category?' is-active':'' ?>"><i class="bi bi-mortarboard" aria-hidden="true"></i><span><?= ceAttr($group['label']) ?></span><i class="bi bi-chevron-down" aria-hidden="true"></i></summary>
+                <summary class="fee-category<?= $key===$category?' is-active':'' ?>"><i class="bi bi-<?= ceAttr($group['icon']??'mortarboard') ?>" aria-hidden="true"></i><span><?= ceAttr($group['label']) ?></span><i class="bi bi-chevron-down" aria-hidden="true"></i></summary>
                 <div class="fee-document-list">
                 <?php foreach($schEntries as $entry): if($entry['category']!==$key)continue; ?>
                     <a class="fee-document-choice" data-sch-select="<?= ceAttr($entry['id']) ?>" href="?category=<?= ceAttr($key) ?>&amp;scholarship=<?= ceAttr($entry['id']) ?>"<?= $entry['id']===($selected['id']??'')?' aria-current="true"':'' ?>><?= ceAttr($entry['title']) ?></a>
@@ -63,7 +63,7 @@ if(!$selected)foreach($schEntries as $entry)if($entry['category']===$category){$
     </section>
 </main>
 <script type="application/json" id="scholarshipCatalogData"><?= json_encode(['categories'=>array_values($schCategories),'entries'=>$schEntries,'category'=>$category,'selected'=>$selected['id']??null],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_SLASHES) ?></script>
-<?= ceData('veScholarshipData',['fields'=>$schFields,'images'=>new stdClass(),'entries'=>$schEntries,'categories'=>array_values($schCategories)]) ?>
+<?= ceData('veScholarshipData',['fields'=>$schFields,'categoryIcons'=>tuitionFeeCategoryIcons(),'images'=>new stdClass(),'entries'=>$schEntries,'categories'=>array_values($schCategories)]) ?>
 <script src="/assets/js/scholarship-workspace.js?v=<?= filemtime(__DIR__.'/../../assets/js/scholarship-workspace.js') ?>" defer></script>
 <?php include_once __DIR__.'/../../components/footer.php'; ?>
 </body>

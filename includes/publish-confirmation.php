@@ -1,6 +1,8 @@
 <?php
 /** A short-lived confirmation covers one multi-request publishing operation. */
 function publishNeedsConfirmation(string $route, array $post): bool {
+    // These handlers publish unconditionally, regardless of an action field.
+    if (in_array($route,['/admin/action/alumni-voices-handler.php','/admin/enrollment-steps.php'],true)) return true;
     $action = $route==='/admin/events.php'?($post['ajax_action']??$post['action']??''):($post['action']??$post['ajax_action']??'');
     if (!is_string($action)) return false;
     if ($route === '/admin/personnel.php') return $action === 'publish';

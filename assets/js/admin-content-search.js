@@ -49,6 +49,16 @@ window.GNCContentSearch = {
                 if (doc.querySelector('[data-list-error]')) throw Error('Results are temporarily unavailable. Please try again.');
                 const records = JSON.parse(freshSource.textContent);
                 if (facebook ? (!records || typeof records.posts !== 'object' || !Array.isArray(records.pinned)) : !Array.isArray(records)) throw Error('Results could not be read. Please try again.');
+                // The server normalizes reversed/invalid date ranges. Keep the controls
+                // and browser history consistent with the results it actually returned.
+                for (const name of ['from', 'to']) {
+                    const current = form.elements.namedItem(name), normalized = freshForm.elements.namedItem(name);
+                    if (!current || !normalized) continue;
+                    const requested = url.searchParams.get(name) || '';
+                    if (current.value === requested) current.value = normalized.value;
+                    if (normalized.value) url.searchParams.set(name, normalized.value);
+                    else url.searchParams.delete(name);
+                }
                 // Existing bulk-selection listeners observe this same table node.
                 table.querySelectorAll('button,.content-action-wrap,a').forEach(node => window.bootstrap?.Tooltip?.getInstance(node)?.dispose());
                 const freshRows = facebook ? freshTable : freshTable.querySelector('tbody');

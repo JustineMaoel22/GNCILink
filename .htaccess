@@ -206,46 +206,46 @@ ErrorDocument 500 /errors/500.html
     RewriteRule ^the-devs/?$ "pages/about/gnci-developers-corner-2/the-devs.php" [END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^bstm/?$ "pages/academics/college/programs/bstm.php" [END]
+    RewriteRule ^bstm/?$ "pages/academics/college/program.php?slug=bstm" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^bsph/?$ "pages/academics/college/programs/bsph.php" [END]
+    RewriteRule ^bsph/?$ "pages/academics/college/program.php?slug=bsph" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^bsn/?$ "pages/academics/college/programs/bsn.php" [END]
+    RewriteRule ^bsn/?$ "pages/academics/college/program.php?slug=bsn" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^bsmls/?$ "pages/academics/college/programs/bsmls.php" [END]
+    RewriteRule ^bsmls/?$ "pages/academics/college/program.php?slug=bsmls" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^bsit/?$ "pages/academics/college/programs/bsit.php" [END]
+    RewriteRule ^bsit/?$ "pages/academics/college/program.php?slug=bsit" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^bshm/?$ "pages/academics/college/programs/bshm.php" [END]
+    RewriteRule ^bshm/?$ "pages/academics/college/program.php?slug=bshm" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^bsed/?$ "pages/academics/college/programs/bsed.php" [END]
+    RewriteRule ^bsed/?$ "pages/academics/college/program.php?slug=bsed" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^bscs/?$ "pages/academics/college/programs/bscs.php" [END]
+    RewriteRule ^bscs/?$ "pages/academics/college/program.php?slug=bscs" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^bsce/?$ "pages/academics/college/programs/bsce.php" [END]
+    RewriteRule ^bsce/?$ "pages/academics/college/program.php?slug=bsce" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^bsba-fm/?$ "pages/academics/college/programs/bsba-fm.php" [END]
+    RewriteRule ^bsba-fm/?$ "pages/academics/college/program.php?slug=bsba-fm" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^bsais/?$ "pages/academics/college/programs/bsais.php" [END]
+    RewriteRule ^bsais/?$ "pages/academics/college/program.php?slug=bsais" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^bsa/?$ "pages/academics/college/programs/bsa.php" [END]
+    RewriteRule ^bsa/?$ "pages/academics/college/program.php?slug=bsa" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^beed/?$ "pages/academics/college/programs/beed.php" [END]
+    RewriteRule ^beed/?$ "pages/academics/college/program.php?slug=beed" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^bael/?$ "pages/academics/college/programs/bael.php" [END]
+    RewriteRule ^bael/?$ "pages/academics/college/program.php?slug=bael" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
     RewriteRule ^program/?$ "pages/academics/college/program.php" [END]
@@ -260,22 +260,22 @@ ErrorDocument 500 /errors/500.html
     RewriteRule ^department/?$ "pages/academics/college/department.php" [END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^cased/?$ "pages/academics/college/departments/cased.php" [END]
+    RewriteRule ^cased/?$ "pages/academics/college/college-department.php?slug=cased" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^cba/?$ "pages/academics/college/departments/cba.php" [END]
+    RewriteRule ^cba/?$ "pages/academics/college/college-department.php?slug=cba" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^conursing/?$ "pages/academics/college/departments/conursing.php" [END]
+    RewriteRule ^conursing/?$ "pages/academics/college/college-department.php?slug=conursing" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^comlsp/?$ "pages/academics/college/departments/comlsp.php" [END]
+    RewriteRule ^comlsp/?$ "pages/academics/college/college-department.php?slug=comlsp" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^coe/?$ "pages/academics/college/departments/coe.php" [END]
+    RewriteRule ^coe/?$ "pages/academics/college/college-department.php?slug=coe" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
-    RewriteRule ^coa/?$ "pages/academics/college/departments/coa.php" [END]
+    RewriteRule ^coa/?$ "pages/academics/college/college-department.php?slug=coa" [QSA,END]
 
     RewriteCond %{HTTP_HOST} ^(?:(?:www\.)?gncipampanga\.com|admin\.gncipampanga\.com|admin\.localhost|localhost|127\.0\.0\.1)(?::[0-9]+)?$ [NC]
     RewriteRule ^dashboard/?$ "admin/admin-dash.php" [END]

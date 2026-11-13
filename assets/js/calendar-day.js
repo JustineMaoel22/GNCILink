@@ -7,7 +7,7 @@
     function when(event){
         const start=event.start_date,end=event.end_date;
         let label=dateLabel(start);if(end&&end.slice(0,10)!==start.slice(0,10))label+=' – '+dateLabel(end);
-        const clock=value=>value&&value.slice(11,19)!=='00:00:00'?new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit'}).format(new Date(value.replace(' ','T'))):'';
+        const clock=value=>value&&Number(event.is_all_day)!==1&&(event.is_all_day===0||event.is_all_day==='0'||value.slice(11,19)!=='00:00:00')?new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit'}).format(new Date(value.replace(' ','T'))):'';
         const from=clock(start),to=clock(end);
         return label+' · '+(from||to?[from,to].filter(Boolean).join(' – '):'All day');
     }

@@ -10,6 +10,8 @@ function rbacSubmissionLabel(array $submission,array $payload): string {
         '/admin/events.php'=>'event',
         default=>null,
     };
+    if(($submission['route']??'')==='/admin/action/alumni-voices-handler.php')return 'Alumni voices changes';
+    if(($submission['route']??'')==='/admin/enrollment-steps.php')return 'Enrollment steps changes';
     if($type===null)return ($submission['route']??'')==='/admin/settings.php'?'Website settings changes':'Website content changes';
     $action=$payload['post']['action']??$payload['post']['ajax_action']??'';
     if($action==='bulk_delete')return 'Delete '.count($payload['post']['ids']??[]).' selected '.$type.'s';
@@ -28,7 +30,7 @@ function rbacSubmissionsReady(): bool {
     catch (PDOException $e) { return false; }
 }
 function rbacContentRoutes(): array {
-    return ['/admin/action/create-announcement.php','/admin/action/create-news.php','/admin/events.php',
+    return ['/admin/action/alumni-voices-handler.php','/admin/enrollment-steps.php','/admin/action/create-announcement.php','/admin/action/create-news.php','/admin/events.php',
         '/admin/action/page-content-handler.php','/admin/action/page-review-handler.php',
         '/admin/action/program-page-handler.php','/admin/action/admission-category-handler.php',
         '/admin/action/athletics-sports-handler.php','/admin/action/community-activities-handler.php',
@@ -41,6 +43,8 @@ function rbacContentRoutes(): array {
 }
 function rbacShouldQueue(string $route,array $post): bool {
     if (!in_array($route,rbacContentRoutes(),true)) return false;
+    // These endpoints always write; they do not dispatch read-only actions.
+    if (in_array($route,['/admin/action/alumni-voices-handler.php','/admin/enrollment-steps.php'],true)) return true;
     $action=$route==='/admin/events.php'?($post['ajax_action']??$post['action']??''):($post['action']??$post['ajax_action']??'');
     // Calendar imports validate and store a canonical batch before explicitly
     // submitting it to this same approval queue. Uploads never enter the queue.
@@ -95,16 +99,16 @@ function rbacSaveSubmission(string $kind,string $route,string $title,array $payl
         $db->commit();return $id;
     }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
 }
-function rbacCollectUploads(array $files): array {
+function rbacCollectUploads(array $files, bool $allowSvg = false): array {
     $out=[];$total=0;
-    $walk=function($name,$type,$tmp,$error,$size,$field)use(&$walk,&$out,&$total){
+    $walk=function($name,$type,$tmp,$error,$size,$field)use(&$walk,&$out,&$total,$allowSvg){
         if(is_array($name)){foreach($name as $key=>$value)$walk($value,$type[$key]??'',$tmp[$key]??'',$error[$key]??UPLOAD_ERR_NO_FILE,$size[$key]??0,$field.'['.$key.']');return;}
         if($error===UPLOAD_ERR_NO_FILE)return;
         if($error!==UPLOAD_ERR_OK||!is_uploaded_file($tmp))throw new InvalidArgumentException('An uploaded file was not received correctly.');
         $total+=filesize($tmp);if($total>60*1024*1024)throw new LengthException('Submit at most 60 MB of files at a time.');
         // Shared helper falls back to byte inspection when the host lacks the Fileinfo extension.
         $mime=imageUploadMime($tmp);
-        if(!in_array($mime,['image/jpeg','image/png','image/gif','image/webp','application/pdf','video/mp4','video/webm'],true))throw new InvalidArgumentException('This file type cannot be submitted for approval.');
+        if(!($allowSvg&&$mime==='image/svg+xml')&&!in_array($mime,['image/jpeg','image/png','image/gif','image/webp','application/pdf','video/mp4','video/webm'],true))throw new InvalidArgumentException('This file type cannot be submitted for approval.');
         $out[$field]=['name'=>basename($name),'mime'=>$mime,'data'=>base64_encode(file_get_contents($tmp))];
     };
     foreach($files as $field=>$file)$walk($file['name'],$file['type'],$file['tmp_name'],$file['error'],$file['size'],$field);
@@ -162,7 +166,7 @@ function rbacQueueCurrentRequest(string $route): void {
         $target=rbacValidatePostOwnership($route,$post);
         if(($post['action']??$post['ajax_action']??'')==='bulk_delete')$post['ids']=bulkContentIds($post['ids']??null);
         $resubmit=(int)($post['_review_id']??0);unset($post['_review_id']);
-        $uploads=rbacCollectUploads($_FILES);
+        $uploads=rbacCollectUploads($_FILES,$route==='/admin/enrollment-steps.php');
         if($resubmit){$old=rbacGetSubmission($resubmit);if(!$old||(int)$old['user_id']!==(int)$_SESSION['user_id'])throw new RuntimeException('Submission not found.');$previous=rbacReadPayload($resubmit);$uploads=array_replace($previous['files']??[],$uploads);}
         $status=($post['status']??'')==='draft'?'draft':'pending';
         $title=(string)($post['title']??$post['page']??$post['section_key']??($post['action']??'Website content change'));

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../admin/admin-functions.php';
+require_once __DIR__ . '/tuition-fee-documents.php';
 
 function scholarshipDefaultCards(): array {
     $incomingGrade7 = [
@@ -151,6 +152,10 @@ function scholarshipValidateCategories(array $categories): array {
         $label=trim($label);$name=function_exists('mb_strtolower')?mb_strtolower($label):strtolower($label);
         if(isset($names[$name]))throw new InvalidArgumentException('Use unique scholarship category names.');
         $result[$category['id']]=['id'=>$category['id'],'label'=>$label];$names[$name]=true;
+        if (isset($category['icon'])) {
+            if (!is_string($category['icon']) || !isset(tuitionFeeCategoryIcons()[$category['icon']])) throw new InvalidArgumentException('Choose a category icon from the list.');
+            $result[$category['id']]['icon']=$category['icon'];
+        }
     }
     return $result;
 }
@@ -175,6 +180,16 @@ function scholarshipCategories(?PDO $db = null): array {
     $db = $db ?? getDB();
     if (!scholarshipCategoriesEnabled($db)) return scholarshipLegacyCategories($db);
     $rows = $db->query('SELECT category_id AS id,category_name AS label FROM scholarship_categories ORDER BY display_order,category_id')->fetchAll(PDO::FETCH_ASSOC);
+    // Names/order stay authoritative in normalized storage; optional icons use
+    // the existing compatibility record, so no schema migration is required.
+    $values=scholarshipStoredValues('scholarship_categories',$db);
+    $stored=json_decode($values['scholarship_categories']??'[]',true);
+    $icons=[];
+    foreach (is_array($stored)?$stored:[] as $category) {
+        if (is_array($category) && is_string($category['id']??null) && is_string($category['icon']??null) && isset(tuitionFeeCategoryIcons()[$category['icon']])) $icons[$category['id']]=$category['icon'];
+    }
+    foreach ($rows as &$row) if (isset($icons[$row['id']])) $row['icon']=$icons[$row['id']];
+    unset($row);
     return scholarshipValidateCategories($rows);
 }
 

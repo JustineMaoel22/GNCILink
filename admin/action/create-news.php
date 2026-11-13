@@ -160,6 +160,8 @@ if ($postAction === 'create' || $postAction === 'update') {
     $title=is_string($_POST['title']??null)?trim($_POST['title']):'';
     $content=is_string($_POST['content']??null)?trim($_POST['content']):'';
     $author=is_string($_POST['author']??null)?trim($_POST['author']):'';
+    $category=is_string($_POST['category']??null)?$_POST['category']:'';
+    if($category===''||(!isset(getNewsCategories()[$category])&&(!$isUpdate||$category!==($existing['category']??null))))$errors[]='Choose a valid News category. Existing articles may keep their saved category.';
     if(mb_strlen($title)>500)$errors[]='Keep the headline within 500 characters.';
     if(mb_strlen($author)>255)$errors[]='Keep the author name within 255 characters.';
     if(!in_array($_POST['status']??'draft',['draft','pending','published','archived'],true))$errors[]='Choose a valid publication status.';
@@ -192,7 +194,7 @@ if ($postAction === 'create' || $postAction === 'update') {
             // Gallery: validate count up front so a bad batch never partially uploads.
             $galleryFiles = $_FILES['gallery_images'] ?? null;
             $galleryCount = 0;
-            if (!empty($galleryFiles['name'])) {
+            if (!empty($galleryFiles['name']) && is_array($galleryFiles['error'] ?? null)) {
                 foreach ($galleryFiles['error'] as $err) {
                     if ($err !== UPLOAD_ERR_NO_FILE) $galleryCount++;
                 }
@@ -206,7 +208,7 @@ if ($postAction === 'create' || $postAction === 'update') {
                 'content'  => $content,
                 'allow_incomplete' => ($_POST['allow_incomplete'] ?? '') === '1',
                 'author'   => $author,
-                'category' => $_POST['category'] ?? null,
+                'category' => $category,
             ];
 
             if ($isUpdate) {

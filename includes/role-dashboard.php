@@ -9,8 +9,10 @@ function roleDashboardData(?PDO $db=null): array {
     foreach($types as $table=>[$type,$key,$counter]){
         try{
             $where=$own?' WHERE c.user_id=?':'';$params=$own?[$id]:[];
-            $upcoming=$table==='events'?",COALESCE(SUM(c.status='published' AND c.start_date>=NOW()),0) AS upcoming":'';
-            $q=$db->prepare("SELECT COUNT(*) AS total,COALESCE(SUM(c.status='published'),0) AS published,COALESCE(SUM(c.status='draft'),0) AS draft,COALESCE(SUM(c.status='pending'),0) AS pending $upcoming FROM `$table` c$where");$q->execute($params);
+            // Event dates are school-local wall times, independent of the DB timezone.
+            $upcoming=$table==='events'?",COALESCE(SUM(c.status='published' AND c.start_date>=?),0) AS upcoming":'';
+            $countParams=$table==='events'?array_merge([dashNow()->format('Y-m-d H:i:s')],$params):$params;
+            $q=$db->prepare("SELECT COUNT(*) AS total,COALESCE(SUM(c.status='published'),0) AS published,COALESCE(SUM(c.status='draft'),0) AS draft,COALESCE(SUM(c.status='pending'),0) AS pending $upcoming FROM `$table` c$where");$q->execute($countParams);
             $counts=array_map('intval',$q->fetch(PDO::FETCH_ASSOC));$stats[$counter]=$counts['total'];$contentCounts[$type]=$counts;
             if($table==='events')$stats['upcoming_events']=$counts['upcoming'];
             $q=$db->prepare("SELECT ? AS type,c.`$key` AS id,u.user_id AS author_id,c.title,c.status,c.created_at,c.updated_at,CONCAT_WS(' ',u.first_name,u.last_name) AS author FROM `$table` c LEFT JOIN users u ON u.user_id=c.user_id$where ORDER BY c.updated_at DESC,c.`$key` DESC LIMIT 6");

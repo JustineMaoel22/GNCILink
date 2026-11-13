@@ -5,7 +5,7 @@ initSession();
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, private');
 if (($_SERVER['REQUEST_METHOD']??'')!=='POST') { http_response_code(405);echo json_encode(['error'=>'Use POST.']);exit; }
-if (!isLoggedIn() || !hasPermission('manage_page_content') || !verifyCSRFToken($_POST['csrf_token']??'')) { http_response_code(403);echo json_encode(['error'=>'You cannot publish text placement. Refresh the editor and sign in.']);exit; }
+if (!isLoggedIn() || !hasPermission('manage_page_content') || !verifyCSRFToken((is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : ''))) { http_response_code(403);echo json_encode(['error'=>'You cannot publish text placement. Refresh the editor and sign in.']);exit; }
 try {
     $raw=$_POST['changes']??'';
     if (!is_string($raw) || strlen($raw)>200000) throw new InvalidArgumentException('Invalid layout request.');

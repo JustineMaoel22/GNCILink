@@ -7,7 +7,7 @@
     const add = document.getElementById('enrollment-add-step');
     const status = document.getElementById('enrollment-save-status');
     let dirty = false, saving = false;
-    function changed() { dirty = true; publish.disabled = false; status.textContent = 'Unpublished changes. Publish steps to show them on the website.'; }
+    function changed() { dirty = true; publish.disabled = false; status.textContent = config.canPublish ? 'Unpublished changes. Publish steps to show them on the website.' : 'Unpublished changes. Submit steps for Super Admin approval.'; }
     function renumber() {
         const rows = Array.from(list.children);
         rows.forEach((row, index) => {
@@ -60,7 +60,7 @@
     form.addEventListener('submit', async event => {
         event.preventDefault();
         if (saving || !dirty || !form.reportValidity()) return;
-        if (!await AdminDialogs.confirm('Publish Basic Education enrollment steps? These changes will be visible on the website.', {confirmText:'Publish steps'})) return;
+        if (!await AdminDialogs.confirm(config.canPublish ? 'Publish Basic Education enrollment steps? These changes will be visible on the website.' : 'Submit Basic Education enrollment steps for Super Admin approval?', {confirmText:config.canPublish ? 'Publish steps' : 'Submit for approval'})) return;
         const body = new FormData(), steps = [];
         for (const row of list.children) {
             const step = {step_id:row.dataset.id, illustration:row.querySelector('[data-illustration]').value};
@@ -73,11 +73,19 @@
         saving = true; publish.disabled = true;
         // Prevent edits while a published snapshot is in flight.
         Array.from(form.elements).forEach(control => { control.disabled = true; });
-        status.textContent = 'Publishing steps...';
+        status.textContent = config.canPublish ? 'Publishing steps...' : 'Submitting steps for approval...';
         try {
             const response = await fetch('/admin/enrollment-steps.php', {method:'POST', body});
             const result = await response.json();
-            if (!response.ok || !result.success) throw Error(result.error || 'Could not publish the steps.');
+            // The shared AdminPublish fetch wrapper confirms 428 responses and
+            // retries with X-GNCI-Publish-Token. Cancellation keeps these edits.
+            if (response.status === 428 && result.reauth_required) throw Error('Publication was not confirmed. Your edits are kept.');
+            if (!response.ok) throw Error(result.error || 'Could not save the steps.');
+            if(result.submitted||result.queued){
+                dirty=false;saving=false;Array.from(form.elements).forEach(control=>{control.disabled=false;});renumber();publish.disabled=true;
+                status.textContent=result.message||'Submitted for Super Admin approval.';return;
+            }
+            if (!result.success) throw Error(result.error || 'Could not publish the steps.');
             dirty = false; location.reload();
         } catch (error) {
             Array.from(form.elements).forEach(control => { control.disabled = false; });

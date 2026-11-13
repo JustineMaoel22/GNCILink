@@ -65,7 +65,7 @@
         categories.forEach(record=>{
             const group=document.createElement('details');group.className='sch-category-group';group.dataset.schCategory=record.id;
             const summary=document.createElement('summary');summary.className='fee-category';
-            const icon=document.createElement('i');icon.className='bi bi-mortarboard';icon.setAttribute('aria-hidden','true');
+            const icon=document.createElement('i');icon.className='bi bi-'+(record.icon||'mortarboard');icon.setAttribute('aria-hidden','true');
             const label=document.createElement('span');label.textContent=record.label;
             const arrow=document.createElement('i');arrow.className='bi bi-chevron-down';arrow.setAttribute('aria-hidden','true');summary.append(icon,label,arrow);
             const list=document.createElement('div');list.className='fee-document-list';

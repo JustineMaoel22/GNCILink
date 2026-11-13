@@ -1,5 +1,5 @@
 <?php
-define('CURRENT_PROGRAM', 'BSBAFM');
+define('CURRENT_PROGRAM', 'GS-MAED');
 require_once __DIR__ . '/../../../../components/bulletin-board.php';
 
 /* ---------------------------------------------------------------

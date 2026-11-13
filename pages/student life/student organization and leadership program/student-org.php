@@ -65,7 +65,7 @@ $pageLink = static fn($number, $filter) => studentOrganizationsUrl() . '?' . htt
             <a href="<?= $orgH($pageLink(1,0)) ?>" class="<?= !$category?'is-active':'' ?>"<?= !$category?' aria-current="true"':'' ?>>All</a>
             <?php foreach ($categories as $cat): ?><a href="<?= $orgH($pageLink(1,(int)$cat['category_id'])) ?>" class="<?= $category===(int)$cat['category_id']?'is-active':'' ?>"<?= $category===(int)$cat['category_id']?' aria-current="true"':'' ?>><?= $orgH($cat['name']) ?></a><?php endforeach; ?>
             <?php if ($orgPreview): ?><button type="button" class="org-canvas-control" data-ve-org-categories>Manage categories</button><?php endif; ?>
-            <?php if ($orgPreview): ?><a href="<?= $orgH(studentOrganizationsUrl().'?ce_preview=1'.($archived?'':'&archived=1')) ?>" data-ve-org-archive-view><?= $archived?'Active organizations':'Archived' ?></a><?php endif; ?>
+            <?php if ($orgPreview): ?><a class="org-canvas-control" href="<?= $orgH(studentOrganizationsUrl().'?ce_preview=1'.($archived?'':'&archived=1')) ?>" data-ve-org-archive-view><?= $archived?'Active organizations':'Archived' ?></a><?php endif; ?>
         </nav>
         <?php if (!$visible): ?>
         <div class="student-org-empty"><i class="bi bi-people" aria-hidden="true"></i><h3><?= $archived?'No archived organizations':($category?'No organizations in this category':'No student organizations are published yet') ?></h3><p><?= $archived?'Organizations you archive will appear here after Publish.':($orgPreview?'Use Add organization below, then click its text and pictures to edit.':'Check back soon to discover ways to get involved on campus.') ?></p></div>

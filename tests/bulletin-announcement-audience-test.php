@@ -45,4 +45,20 @@ foreach ([
     $checks++;
 }
 if (count(gnc_get_global_announcements('BAEL', 2)) !== 2) throw new RuntimeException('Limit regression');
+
+// Graduate audiences retain their own codes and never inherit undergraduate targeting.
+$db->exec("INSERT INTO programs (program_code,dept_id) VALUES ('BSBA-FM',5),('GS-MBA',4),('GS-MAED',4),('GS-MPA',4),('GS-PHD',4)");
+$graduateFiles=['GS-MBA'=>'ma-business-admin.php','GS-MAED'=>'ma-educ.php','GS-MPA'=>'ma-public-admin.php','GS-PHD'=>'phd-educ-mgt.php'];
+$id=20;
+foreach (array_merge(['BSBA-FM'=>''], $graduateFiles) as $code=>$file) {
+    $insert->execute([$id,'Program notice','notice-'.$id,'published',$code,$code==='BSBA-FM'?5:4]);
+    if ($file!=='') {
+        $source=file_get_contents(__DIR__.'/../pages/academics/graduate-school/programs/'.$file);
+        if (!str_contains($source,"define('CURRENT_PROGRAM', '".$code."')")) throw new RuntimeException('Wrong graduate program code: '.$file);
+        $actual=array_map('intval',array_column(gnc_get_global_announcements($code,50),'announcement_id'));sort($actual);
+        if ($actual!==[1,$id]) throw new RuntimeException('Graduate bulletin inherited another program: '.$code);
+        $checks++;
+    }
+    $id++;
+}
 echo ($checks + 1) . " bulletin audience checks passed. No persistent data changed.\n";

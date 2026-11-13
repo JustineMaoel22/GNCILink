@@ -100,7 +100,7 @@ if ($rawAppUrl !== '' && !preg_match('#^https?://#i', $rawAppUrl)) {
     $rawAppUrl = $rawScheme . ltrim($rawAppUrl, '/');
 }
 define('APP_URL', $rawAppUrl ?: 'http://localhost:8080/admin');
-define('SESSION_TIMEOUT', max(60,(int)env('SESSION_TIMEOUT',1800))); // 30 minutes
+define('SESSION_TIMEOUT', max(60,(int)env('SESSION_TIMEOUT',3600))); // 1 hour
 // Validate before casting: casting a missing value first turns the fallback into 0.
 define('OTP_EXPIRY', filter_var($_ENV['OTP_EXPIRY'] ?? 300, FILTER_VALIDATE_INT,
     ['options' => ['min_range' => 1]]) ?: 300);                  // 5 minutes
@@ -142,8 +142,8 @@ if (!defined('PHOTO_CHECK_API_KEY')) define('PHOTO_CHECK_API_KEY', env('PHOTO_CH
 define('GEMINI_MODEL', $_ENV['GEMINI_MODEL'] ?? 'gemini-3.6-flash');
 define('GEMINI_FALLBACK_MODELS', $_ENV['GEMINI_FALLBACK_MODELS'] ?? 'gemini-2.5-flash,gemini-2.5-flash-lite');
 define('GEMINI_TIMEOUT', (int) env('GEMINI_TIMEOUT', 20));
-define('GNCBOT_IP_LIMIT', (int) $_ENV['GNCBOT_IP_LIMIT'] ?? 20);
-define('GNCBOT_DAILY_LIMIT', (int) $_ENV['GNCBOT_DAILY_LIMIT'] ?? 3000);
+define('GNCBOT_IP_LIMIT', (int) ($_ENV['GNCBOT_IP_LIMIT'] ?? 20));
+define('GNCBOT_DAILY_LIMIT', (int) ($_ENV['GNCBOT_DAILY_LIMIT'] ?? 3000));
 
 /**
  * Get database connection (PDO)

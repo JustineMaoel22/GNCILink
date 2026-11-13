@@ -45,17 +45,6 @@
         const button = page.querySelector(`.btn-edit-news[data-id="${selectedId}"]`);
         if (button) button.click();
     });
-    document.getElementById('news-draft-preview').addEventListener('click', event => {
-        const status = document.getElementById('modal-status');
-        const category = document.getElementById('modal-category');
-        const paths = [];
-        const cover = document.getElementById('modal-image-preview');
-        if (!document.getElementById('modal-remove-image').checked && cover.getAttribute('src')) paths.push(cover.src);
-        page.querySelectorAll('#modal-gallery-existing .gallery-thumb-wrap:not(.marked-remove) img,#modal-gallery-new img').forEach(image => paths.push(image.src));
-        openPreview({title: document.getElementById('modal-title').value, html: document.querySelector('#modal-content-editor .ql-editor').innerHTML,
-            author: document.getElementById('modal-author').value || 'School editor', category: category.selectedOptions[0]?.textContent || 'Others',
-            status: {draft:'Draft',pending:'Waiting for approval',published:'Published',archived:'Archived'}[status.value], created:'Not saved yet', images: paths}, event.currentTarget, true);
-    });
     const query = page.querySelector('#news-query');
     const returnQuery = new URLSearchParams(new FormData(query));
     // The server's normalized filters include the current page.

@@ -69,6 +69,16 @@ $response=$publish(['categories'=>json_encode(array_slice($categories,0,2)),'ent
 scholarshipCheck(!empty($response['success'])&&scholarshipCatalog()===[],'Deleted legacy opportunities stay deleted');
 scholarshipCheck(scholarshipFields()['requirement_0']['value']==='Existing eligibility requirement','Deleting an opportunity does not destroy stored legacy fields');
 
+$iconCategories=array_values(scholarshipCategories($db));
+$iconCategories[0]['icon']='bank';
+$response=$publish(['categories'=>json_encode($iconCategories),'entries'=>'[]']);
+scholarshipCheck(!empty($response['success'])&&scholarshipCategories($db)[$iconCategories[0]['id']]['icon']==='bank','Category icon persists through publishing and reading');
+$invalidIcons=$iconCategories;$invalidIcons[0]['icon']='invalid-icon';
+$response=$publish(['categories'=>json_encode($invalidIcons),'entries'=>'[]']);
+scholarshipCheck(isset($response['error'])&&scholarshipCategories($db)[$iconCategories[0]['id']]['icon']==='bank','Invalid icon rejected without losing saved icon');
+unset($iconCategories[0]['icon']);
+$publish(['categories'=>json_encode($iconCategories),'entries'=>'[]']);
+
 if (scholarshipCategoriesEnabled($db)) {
     $expected=scholarshipCategories($db);
     $rows=$db->query('SELECT category_id AS id,category_name AS label FROM scholarship_categories ORDER BY display_order,category_id')->fetchAll(PDO::FETCH_ASSOC);

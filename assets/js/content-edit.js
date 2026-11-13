@@ -1201,10 +1201,14 @@
         var saveDraft = $('#veSaveDraft'), discardDraft = $('#veDiscardDraft');
         if (drafts && drafts.supported()) {
             if (a.secondary && a.secondary.label === 'Save draft') btnSecondary.hidden = true;
-            saveDraft.hidden = false; saveDraft.disabled = S.busy || !drafts.available() || !S.adapter.dirtyCount() || drafts.saved();
+            saveDraft.hidden = false; saveDraft.disabled = S.busy || !drafts.available() || !drafts.unsaved();
             discardDraft.hidden = !drafts.hasDraft(); discardDraft.disabled = S.busy;
         } else { if (saveDraft) saveDraft.hidden = true; if (discardDraft) discardDraft.hidden = true; }
-        if (!S.busy) { var st = S.adapter.status(); setStatus(drafts && drafts.hasDraft() && drafts.saved() ? 'Draft saved · not live yet' : st.text, st.tone); }
+        if (!S.busy) { var st = S.adapter.status();
+            if(drafts && drafts.hasDraft() && drafts.saved()) setStatus('Draft saved · not live yet','warn');
+            else if(drafts && drafts.unsaved() && !S.adapter.dirtyCount()) setStatus('Unsaved draft changes','warn');
+            else setStatus(st.text,st.tone);
+        }
         var o = $('#veOutlineBtn'); if (o) { o.hidden = false; o.disabled = !S.doc || !loader.hidden; }
         if (btnCancel) btnCancel.hidden = !unsavedPageChanges() || S.preview;
         if (btnPageOpts) btnPageOpts.hidden = !(S.adapter.hasPageOptions && S.adapter.hasPageOptions()) || S.preview;
@@ -1399,8 +1403,8 @@
     /** Cancel: throw away what is not saved yet by loading everything fresh from the server. */
     if (btnCancel) btnCancel.addEventListener('click', async function () {
         var n = S.adapter ? S.adapter.dirtyCount() : 0;
-        if (!n) return;
-        if (!await window.AdminDialogs.confirm('Throw away ' + plural(n, 'unsaved change') + '?\n\nThe page goes back to what is saved now.')) return;
+        if (!unsavedPageChanges()) return;
+        if (!await window.AdminDialogs.confirm('Throw away ' + (n ? plural(n, 'unsaved change') : 'the unsaved draft changes') + '?\n\nThe page goes back to what is saved now.')) return;
         reloadEditor('Unsaved changes were discarded.');
     });
 
@@ -3446,7 +3450,11 @@
 
         var A = {
             consumeClick: function(){return Date.now()<suppressClickUntil;},
-            draftState: function(value){if(!value)return {edits:edits,additions:additions,nextId:nextId};edits=value.edits;additions=value.additions||{};nextId=value.nextId||-1;
+            draftState: function(value){if(!value)return {edits:edits,additions:additions,nextId:nextId};
+                // PHP checkpoints can return empty maps as arrays. Named section keys
+                // and negative draft IDs must survive JSON encoding and undo snapshots.
+                edits={};['sec','person','office','order'].forEach(function(key){edits[key]=Object.assign({},value.edits&&value.edits[key]);});
+                additions=Object.assign({},value.additions);nextId=value.nextId||-1;
                 $$('[data-ve-person],[data-ve-office]',S.doc).forEach(function(card){var id=+(card.getAttribute('data-ve-person')||card.getAttribute('data-ve-office'));if(id<0&&!additions[id])card.remove();});
                 paintDraft();announceDraft();
                 Object.keys(edits.office).forEach(function(id){var el=S.doc.querySelector('[data-ve-office="'+cssEsc(id)+'"]');if(el&&edits.office[id].details)paintOfficeDetails({el:el,id:+id},edits.office[id].details);});
@@ -6409,6 +6417,7 @@
         function manageScholarships() {
             closePop();
             return window.GNCScholarshipManager.open({
+                icons:data.categoryIcons,
                 read:function(){return {categories:categories,entries:entries};},
                 selection:function(){return S.doc.defaultView.GNCScholarships.selection();},
                 hasPdf:function(entry){return !!(entry.pdf||entryFiles[entry.id]);},
@@ -6558,49 +6567,30 @@
                 if (!data.fields['category_'+key]) data.fields['category_'+key]={value:api.categories[key].label,label:'Category name',max:100};
             });
         }
-        function manageCategories(x,y) {
-            if (!api) return;
-            if(typeof x!=='number'||typeof y!=='number'){var rect=btnSecondary.getBoundingClientRect();x=rect.left;y=rect.bottom+8;}
-            var keys=Object.keys(api.categories);
-            var box=h('div',{class:'ve-pop-form ve-tuition-pdfs'},[
-                h('strong',{text:'Fee categories'}),
-                h('p',{class:'small text-muted',text:'Add categories and use the arrows to change their order. Changes go live when you publish.'})
-            ]);
-            keys.forEach(function(key,index){
-                var category=api.categories[key];
-                var controls=h('div',{style:'display:flex;gap:8px;align-items:center;margin-bottom:10px'},[
-                    h('span',{style:'flex:1',text:category.label})
-                ]);
-                [-1,1].forEach(function(step){controls.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:step<0?'↑':'↓','aria-label':'Move '+category.label+(step<0?' up':' down'),disabled:index+step<0||index+step>=keys.length,on:{click:function(){
-                    var entries=Object.keys(api.categories).map(function(k){return [k,api.categories[k]];});
-                    var swap=entries[index];entries[index]=entries[index+step];entries[index+step]=swap;
-                    api.replaceCategories(entries);bindFields();chrome();manageCategories(x,y);
-                }}}));});
-                controls.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-danger',text:'Delete','aria-label':'Delete '+category.label,disabled:keys.length===1,title:keys.length===1?'Keep at least one fee category':'Delete category',on:{click:async function(){
-                    if(!await window.AdminDialogs.confirm('Delete '+category.label+' when you publish? Its PDFs will remain stored, but will no longer appear in the fee categories.'))return;
-                    Object.keys(changes).forEach(function(id){if(changes[id].category===key)delete changes[id];});
-                    delete texts['category_'+key];
-                    var entries=Object.keys(api.categories).filter(function(k){return k!==key;}).map(function(k){return [k,api.categories[k]];});
-                    api.replaceCategories(entries);bindFields();chrome();manageCategories(x,y);
-                }}}));
-                box.appendChild(controls);
+        function manageCategories() {
+            if(!api)return;
+            closePop();
+            var groups=Object.keys(api.categories).map(function(key){var category=api.categories[key];return {id:key,label:category.label,icon:category.icon};});
+            var documents=[];
+            groups.forEach(function(group){api.categories[group.id].documents.forEach(function(doc,index){documents.push({id:String(doc.id||doc._key||index),category:group.id,title:doc.title,document:doc});});});
+            return window.GNCScholarshipManager.open({
+                kind:'fees',icons:data.categoryIcons,
+                read:function(){return {categories:groups,entries:documents};},
+                selection:function(){return api.selection();},
+                manageDocuments:function(category){api.show(category);bindFields();manage();},
+                changed:function(){
+                    var retained={};groups.forEach(function(group){retained[group.id]=true;});
+                    Object.keys(texts).forEach(function(key){if(key.indexOf('category_')===0&&!retained[key.slice(9)])delete texts[key];});
+                    var entries=groups.map(function(group){
+                        var original=api.categories[group.id],field=data.fields['category_'+group.id];
+                        if(!field)data.fields['category_'+group.id]={value:group.label,label:'Category name',max:100};
+                        else if(group.label!==field.value)texts['category_'+group.id]=group.label;
+                        else delete texts['category_'+group.id];
+                        return [group.id,{label:group.label,icon:group.icon,documents:original?original.documents:[]}];
+                    });
+                    api.replaceCategories(entries);categoryFields();refresh();
+                }
             });
-            var name=h('input',{type:'text',class:'form-control form-control-sm',maxlength:'100',placeholder:'Category name','aria-label':'New category name'});
-            var choice=h('select',{id:'veFeeCategoryIcon',class:'form-select form-select-sm','aria-label':'New category icon'});
-            Object.keys(data.categoryIcons).forEach(function(key){choice.appendChild(h('option',{value:key,text:data.categoryIcons[key],selected:key==='folder'}));});
-            box.append(name,h('label',{for:'veFeeCategoryIcon',class:'form-label small',style:'margin:8px 0 0',text:'Category icon'}),choice,h('button',{type:'button',class:'btn btn-sm btn-success',style:'margin-top:8px',text:'Add category',disabled:keys.length>=50,on:{click:function(){
-                var label=name.value.trim();
-                if(!label||label.length>100||/[<>]/.test(label)){toast('Enter a category name of up to 100 characters.','error');name.focus();return;}
-                if(keys.some(function(key){return api.categories[key].label.trim().toLocaleLowerCase()===label.toLocaleLowerCase();})){toast('That category name already exists.','error');return;}
-                var base=label.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30).replace(/-+$/,'');
-                if(!/^[a-z]/.test(base))base='category-'+base;
-                var key=base,n=2;while(own(api.categories,key))key=base+'-'+(n++);
-                var entries=Object.keys(api.categories).map(function(k){return [k,api.categories[k]];});
-                entries.push([key,{label:label,icon:choice.value,documents:[]}]);
-                data.fields['category_'+key]={value:label,label:'Category name',max:100};
-                api.replaceCategories(entries);api.show(key);bindFields();chrome();manageCategories(x,y);
-            }}}));
-            openPop(box,x,y);
         }
         function chooseIcon(sel) {
             var field = data.fields[sel.key];

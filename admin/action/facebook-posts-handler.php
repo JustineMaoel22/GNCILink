@@ -25,10 +25,15 @@ try {
     $q=$db->prepare("SELECT is_pinned FROM $table WHERE $key=?");$q->execute([$id]);$existing=$q->fetch();
     if(!$existing)throw new InvalidArgumentException('This item is no longer available. Reload the page.');
     if($action==='category'){
-        $choice=$_POST['category_choice']??null;
-        if(!is_string($choice)||!preg_match('/^(?:auto|none|[1-9]\d{0,9})$/D',$choice))throw new InvalidArgumentException('Choose a valid category.');
-        if(!setFacebookPostCategory($id,$choice))throw new InvalidArgumentException('The category could not be saved. Check your selection and try again.');
-        $message='Category updated.';
+        if(isset($_POST['category_mode'])){
+            if(!is_string($_POST['category_mode']))throw new InvalidArgumentException('Choose a valid category mode.');
+            setFacebookPostCategories($id,$_POST['category_mode'],$_POST['category_ids']??[]);
+        }else{
+            $choice=$_POST['category_choice']??null;
+            if(!is_string($choice)||!preg_match('/^(?:auto|none|[1-9]\d{0,9})$/D',$choice))throw new InvalidArgumentException('Choose a valid category.');
+            if(!setFacebookPostCategory($id,$choice))throw new InvalidArgumentException('The category could not be saved. Check your selection and try again.');
+        }
+        $message='Categories updated.';
     }elseif($action==='pin'){
         if(!(int)$existing['is_pinned']&&countPinnedItems()>=MAX_PINNED_ITEMS)throw new InvalidArgumentException('All five slideshow slots are used. Unpin an item in Manage slideshow first.');
         if(!pinFacebookPost($id))throw new RuntimeException('Pin failed.');
@@ -40,9 +45,10 @@ try {
     }
     $post=null;
     if($source==='facebook'){
-        $q=$db->prepare('SELECT f.is_pinned,f.category_id,f.category_locked,c.category_name FROM fb_posts_cache f LEFT JOIN categories c ON c.category_id=f.category_id WHERE f.fb_post_id=?');$q->execute([$id]);$post=$q->fetch(PDO::FETCH_ASSOC);
+        $q=$db->prepare('SELECT f.fb_post_id,f.is_pinned,f.category_id,f.category_locked,c.category_name FROM fb_posts_cache f LEFT JOIN categories c ON c.category_id=f.category_id WHERE f.fb_post_id=?');$q->execute([$id]);$post=$q->fetch(PDO::FETCH_ASSOC);
+        if($post)$post=attachFacebookPostCategories($db,[$post])[0];
     }
-    if ($post) $post['category_name'] = facebookPostCategoryLabel($post['category_name']);
+    if ($post) $post['category_name'] = implode(', ',array_map('facebookPostCategoryLabel',$post['category_names']));
     $pinned=announcementPinnedItems($db);$db->commit();
     echo json_encode(['success'=>true,'message'=>$message,'post'=>$post,'pinned'=>$pinned],JSON_INVALID_UTF8_SUBSTITUTE);
 }catch(InvalidArgumentException $e){
