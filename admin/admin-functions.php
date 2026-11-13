@@ -1972,6 +1972,7 @@ function getHeroSlideById(int $id): ?array {
 function createHeroSlide(array $data, array $media, ?array $mobileMedia = null): int|false {
     try {
         $db = getDB();
+        $db->beginTransaction();
 
         $stmt = $db->query("SELECT COALESCE(MAX(display_order), 0) + 1 AS next_order FROM hero_slides");
         $nextOrder = (int)$stmt->fetch()['next_order'];
@@ -2000,10 +2001,13 @@ function createHeroSlide(array $data, array $media, ?array $mobileMedia = null):
         ]);
 
         $newId = (int)$db->lastInsertId();
-        logActivity($_SESSION['user_id'], 'CREATE', 'hero_slides', $newId, 'Added a new slideshow slide');
+        if (!logActivity($_SESSION['user_id'], 'CREATE', 'hero_slides', $newId, 'Added a new slideshow slide')) throw new RuntimeException('Could not audit slide creation.');
+        if (($data['status'] ?? 'published') === 'published' && !logActivity($_SESSION['user_id'], 'PUBLISH', 'hero_slides', $newId, 'Published slideshow slide')) throw new RuntimeException('Could not audit slide publication.');
+        $db->commit();
         return $newId;
     } catch (Exception $e) {
         error_log('Create hero slide error: ' . $e->getMessage());
+        if (isset($db) && $db->inTransaction()) $db->rollBack();
         return false;
     }
 }
@@ -2021,8 +2025,11 @@ function createHeroSlide(array $data, array $media, ?array $mobileMedia = null):
 function updateHeroSlide(int $id, array $data, ?array $media = null, ?array $mobileMedia = null, bool $removeMobileMedia = false): bool {
     try {
         $db = getDB();
-        $existing = getHeroSlideById($id);
-        if (!$existing) return false;
+        $db->beginTransaction();
+        $query = $db->prepare('SELECT * FROM hero_slides WHERE slide_id=? FOR UPDATE');$query->execute([$id]);$existing=$query->fetch();
+        if (!$existing) { $db->rollBack(); return false; }
+        // Recheck under the row lock: a draft may have been published since the request boundary.
+        if (PHP_SAPI !== 'cli' && rbacIsSuper() && empty($_SESSION['_rbac_worker']) && ($existing['status'] === 'published' || ($data['status'] ?? '') === 'published')) requirePublishConfirmation();
 
         $mediaType = $media['type'] ?? $existing['media_type'];
         $mediaPath = $media['path'] ?? $existing['media_path'];
@@ -2058,6 +2065,10 @@ function updateHeroSlide(int $id, array $data, ?array $media = null, ?array $mob
             $id,
         ]);
 
+        if (!logActivity($_SESSION['user_id'], 'UPDATE', 'hero_slides', $id, 'Updated slideshow slide')) throw new RuntimeException('Could not audit slide update.');
+        if (($data['status'] ?? 'published') === 'published' && !logActivity($_SESSION['user_id'], 'PUBLISH', 'hero_slides', $id, 'Published slideshow slide')) throw new RuntimeException('Could not audit slide publication.');
+        $db->commit();
+
         // Remove the old desktop file if it was replaced — independent of the mobile file below.
         if ($media !== null && $existing['media_path'] && $existing['media_path'] !== $mediaPath) {
             $oldFile = __DIR__ . '/..' . $existing['media_path'];
@@ -2071,10 +2082,10 @@ function updateHeroSlide(int $id, array $data, ?array $media = null, ?array $mob
             if (is_file($oldMobileFile)) @unlink($oldMobileFile);
         }
 
-        logActivity($_SESSION['user_id'], 'UPDATE', 'hero_slides', $id, 'Updated slideshow slide');
         return true;
     } catch (Exception $e) {
         error_log('Update hero slide error: ' . $e->getMessage());
+        if (isset($db) && $db->inTransaction()) $db->rollBack();
         return false;
     }
 }
@@ -2085,13 +2096,16 @@ function updateHeroSlide(int $id, array $data, ?array $media = null, ?array $mob
 function deleteHeroSlide(int $id): bool {
     try {
         $db = getDB();
-        $slide = getHeroSlideById($id);
-        if (!$slide) return false;
+        $db->beginTransaction();
+        $query = $db->prepare('SELECT * FROM hero_slides WHERE slide_id=? FOR UPDATE');$query->execute([$id]);$slide=$query->fetch();
+        if (!$slide) { $db->rollBack(); return false; }
 
         $stmt = $db->prepare("DELETE FROM hero_slides WHERE slide_id = ?");
         $result = $stmt->execute([$id]);
 
         if ($result) {
+            if (!logActivity($_SESSION['user_id'], 'DELETE', 'hero_slides', $id, 'Deleted slideshow slide')) throw new RuntimeException('Could not audit slide deletion.');
+            $db->commit();
             if (!empty($slide['media_path'])) {
                 $file = __DIR__ . '/..' . $slide['media_path'];
                 if (is_file($file)) @unlink($file);
@@ -2100,12 +2114,12 @@ function deleteHeroSlide(int $id): bool {
                 $mobileFile = __DIR__ . '/..' . $slide['media_path_mobile'];
                 if (is_file($mobileFile)) @unlink($mobileFile);
             }
-            logActivity($_SESSION['user_id'], 'DELETE', 'hero_slides', $id, 'Deleted slideshow slide');
         }
 
         return $result;
     } catch (Exception $e) {
         error_log('Delete hero slide error: ' . $e->getMessage());
+        if (isset($db) && $db->inTransaction()) $db->rollBack();
         return false;
     }
 }

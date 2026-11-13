@@ -169,6 +169,9 @@ foreach ($textPages as $sp) {
             ensureCollegeAdmissionHeadingSection();
         }
         $sectionsBySlug[$sp['slug']] = getPageSectionsDetailed($sp['slug']);
+        if ($sp['slug'] === 'enrollment-procedures') {
+            $sectionsBySlug[$sp['slug']] = array_values(array_filter($sectionsBySlug[$sp['slug']], static fn($section) => !preg_match('/^enrollment_tab_steps_[a-f0-9]{16}$/D', $section['section_key'])));
+        }
         if ($sp['slug'] === 'alumni') {
             $sectionsBySlug[$sp['slug']] = array_values(array_filter($sectionsBySlug[$sp['slug']], static function ($section) {
                 if (in_array($section['section_key'], ['voices_data', 'hero_image', 'events_image', 'survey_image'], true)) return false;
@@ -382,8 +385,8 @@ if ($editorMode) {
                     'list' => $m['file'] . '?embed=1', 'create' => ($m['canCreate'] && $m['key'] !== 'event') ? $m['file'] . '?embed=1&modal=create' : ($m['canCreate'] ? $m['file'] . '?embed=1' : null)];
         }, array_values($postModules)), 'open' => $openUrl];
     }
-    // Programs are edited on the canvas; their media controls live in the slide strip and page options.
-    $hasDrawer = in_array($veKind, ['admin', 'entity'], true) && !in_array($activeSlug, ['college-departments', 'programs', 'graduate-school'], true);
+    // Academic content is edited on the canvas; omit the duplicate department settings drawer.
+    $hasDrawer = in_array($veKind, ['admin', 'entity'], true) && !in_array($activeSlug, ['college-departments', 'basic-education', 'programs', 'graduate-school'], true);
     $hasPanel  = $hasDrawer || $veEmbed !== null;
     $drawerFile = $veKind === 'admin' ? 'administration-manager.php' : 'department-media-manager.php';
     if ($activeSlug === 'basic-education') $drawerFile = 'basic-edu-media-manager.php';
@@ -491,9 +494,6 @@ include __DIR__ . '/../components/header-admin.php';
             </div>
             <button type="button" class="ve-tool" id="veUndo" disabled title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" aria-keyshortcuts="Control+z Meta+z"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span>Undo</span></button>
             <button type="button" class="ve-tool" id="veRedo" disabled title="Redo (Ctrl+Y / Ctrl/Cmd+Shift+Z)" aria-label="Redo" aria-keyshortcuts="Control+y Control+Shift+z Meta+Shift+z"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span>Redo</span></button>
-            <?php if ($activeSlug === 'programs' && $canManagePages): ?>
-            <button type="button" class="ve-tool" id="veAddProgramBtn" title="Create a college or Graduate School program" aria-label="Add program"><i class="bi bi-plus-circle"></i><span>Add Program</span></button>
-            <?php endif; ?>
             <?php if ($VE['page']['publicUrl'] !== ''): ?>
             <a class="ve-tool" href="<?= ce_e($VE['page']['publicUrl']) ?>" target="_blank" rel="noopener" title="Open the live page in a new tab" aria-label="View live"><i class="bi bi-box-arrow-up-right"></i><span>View live</span></a>
             <?php endif; ?>

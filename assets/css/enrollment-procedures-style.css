@@ -119,6 +119,12 @@ html, body {
     flex-wrap: wrap;
 }
 .enrollment-level-tabs { padding-bottom: 24px; border-bottom: 1px solid var(--gnc-border); }
+.enrollment-custom-copy { margin-bottom: 28px; overflow-wrap: anywhere; font: 14px/1.6 'Inter', sans-serif; color: var(--gnc-text-gray); }
+.ve-previewing [data-ve-enrollment-add-tab] { display: none !important; }
+.ve-enrollment-add-step { margin: 16px 0 28px; padding: 9px 18px; border: 1px dashed #1f5e2c; border-radius: var(--gnc-choice-radius, 3px); background: #fff; color: #1f5e2c; font: 600 13px/1.4 'Inter', sans-serif; cursor: pointer; }
+.ve-enrollment-add-step:focus-visible { outline: 3px solid var(--gnc-gold); outline-offset: 3px; }
+.ve-enrollment-add-step:disabled { opacity: .5; cursor: default; }
+.ve-previewing .ve-enrollment-add-step { display: none !important; }
 .enrollment-level-title { color: var(--gnc-green-light); font: 700 28px/1.4 'Noto Serif', serif; margin: 0 0 24px; }
 
 .enrollment-tabs .nav-link {

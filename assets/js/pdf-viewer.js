@@ -21,7 +21,7 @@
     var MAX_CANVAS_PIXELS = 16 * 1024 * 1024;          // keeps phones from running out of memory
     var THUMB_W = 100;
 
-    var libPromise = null;
+    var libPromise = null, instances = new WeakMap();
     function loadPdfJs() {
         if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
         if (libPromise) return libPromise;
@@ -41,7 +41,7 @@
     }
 
     function initViewer(root) {
-        if (root.dataset.gncPdfReady) return;
+        if (instances.has(root)) return;
         root.dataset.gncPdfReady = '1';
 
         var src = root.getAttribute('data-pdf-src');
@@ -63,6 +63,19 @@
         var sizes = [];               // sizes[i] = [w, h] in PDF points, before user rotation
         var wrappers = [], infos = [];
         var layoutKey = 0, lastWidth = 0, thumbsBuilt = false;
+        var disposed = false, loadingTask = null, thumbObserver = null, resizeObserver = null;
+        instances.set(root, function () {
+            disposed = true; layoutKey++;
+            clearTimeout(resizeTimer);
+            if (resizeObserver) resizeObserver.disconnect();
+            if (thumbObserver) thumbObserver.disconnect();
+            window.removeEventListener('resize', onResize);
+            document.removeEventListener('click', onDocumentClick);
+            infos.forEach(function (info) { if (info.task) info.task.cancel(); });
+            if (loadingTask) loadingTask.destroy().catch(function () {});
+            pdfDoc = null;
+            instances.delete(root);
+        });
 
         /* ───────── helpers ───────── */
         function setStatus(msg, isError) {
@@ -185,12 +198,13 @@
                 });
                 return st.task.promise.then(function () { if (key === layoutKey) st.rendered = key; });
             }).catch(function (err) {
+                if (disposed) return;
                 if (err && err.name === 'RenderingCancelledException') return;
                 setStatus('Some pages could not be displayed. Try downloading the PDF instead.', true);
             }).then(function () { st.rendering = null; st.task = null; });
         }
         function updateVisible() {
-            if (!pdfDoc) return;
+            if (disposed || !pdfDoc) return;
             var h = stage.clientHeight, top = stage.scrollTop;
             var from = top - h, to = top + 2 * h;
             for (var i = 1; i <= total; i++) {
@@ -266,10 +280,12 @@
             var s0 = sizes[1] || [612, 792], ratio = Math.min(window.devicePixelRatio || 1, 2);
             var io = ('IntersectionObserver' in window) ? new IntersectionObserver(function (entries) {
                 entries.forEach(function (e) {
+                    if (disposed) return;
                     if (!e.isIntersecting) return;
                     var el = e.target; io.unobserve(el);
                     var i = +el.getAttribute('data-page');
                     pdfDoc.getPage(i).then(function (page) {
+                        if (disposed) return;
                         var nat = page.getViewport({ scale: 1 });
                         var vp = page.getViewport({ scale: THUMB_W / nat.width * ratio });
                         var cv = el.firstChild;
@@ -279,6 +295,7 @@
                     }).catch(function () {});
                 });
             }, { root: sidebar, rootMargin: '300px 0px' }) : null;
+            thumbObserver = io;
 
             for (var i = 1; i <= total; i++) {
                 var b = document.createElement('button');
@@ -314,7 +331,8 @@
             btnMore.setAttribute('aria-expanded', open ? 'true' : 'false');
         });
         menu.addEventListener('click', function (e) { if (e.target.closest('a')) closeMenu(); });
-        document.addEventListener('click', function (e) { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
+        function onDocumentClick(e) { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); }
+        document.addEventListener('click', onDocumentClick);
         root.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
 
         pageInput.addEventListener('change', function () { goTo(parseInt(pageInput.value, 10) || cur); updateControls(); });
@@ -347,7 +365,7 @@
                 if (pdfDoc && stage.clientWidth && Math.abs(stage.clientWidth - lastWidth) > 2) relayout();
             }, 120);
         }
-        if (window.ResizeObserver) new ResizeObserver(onResize).observe(stage);
+        if (window.ResizeObserver) { resizeObserver = new ResizeObserver(onResize); resizeObserver.observe(stage); }
         else window.addEventListener('resize', onResize);
 
         /* ───────── load ───────── */
@@ -355,10 +373,14 @@
         setStatus('Loading PDF…');
 
         loadPdfJs().then(function (pdfjsLib) {
-            return pdfjsLib.getDocument({ url: src }).promise;
+            if (disposed) return;
+            loadingTask = pdfjsLib.getDocument({ url: src });
+            return loadingTask.promise;
         }).then(function (doc) {
+            if (disposed) return;
             pdfDoc = doc; total = doc.numPages;
             return doc.getPage(1).then(function (p) {
+                if (disposed) return;
                 var v = p.getViewport({ scale: 1 });
                 sizes[1] = [v.width, v.height];
                 for (var i = 1; i <= total; i++) {
@@ -374,6 +396,7 @@
                 updateVisible();
             });
         }).catch(function (err) {
+            if (disposed) return;
             var msg = 'The PDF could not be displayed here.';
             if (err && err.name === 'PasswordException') msg = 'This PDF is password-protected and cannot be previewed.';
             else if (err && err.name === 'MissingPDFException') msg = 'This PDF is no longer available.';
@@ -386,6 +409,7 @@
         var nodes = document.querySelectorAll('.gnc-pdf-viewer[data-pdf-src]');
         for (var i = 0; i < nodes.length; i++) initViewer(nodes[i]);
     }
+    window.GNCPdfViewer = { init: initViewer, destroy: function (root) { var dispose = instances.get(root); if (dispose) dispose(); } };
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initAll);
     else initAll();

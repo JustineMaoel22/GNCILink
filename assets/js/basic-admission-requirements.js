@@ -4,8 +4,9 @@
     if (!root) return;
     function bindTabs(scope, buttonAttribute, panelAttribute) {
         function activate(tab, focus) {
-            const tabs = Array.from(scope.querySelectorAll('[' + buttonAttribute + ']'));
-            const panels = Array.from(scope.querySelectorAll('[' + panelAttribute + ']'));
+            const group = tab.closest('[data-basic-school-panel]') || scope;
+            const tabs = Array.from(group.querySelectorAll('[' + buttonAttribute + ']'));
+            const panels = Array.from(group.querySelectorAll('[' + panelAttribute + ']'));
             tabs.forEach(item => {
                 const active = item === tab;
                 item.classList.toggle('is-active', active);
@@ -27,7 +28,8 @@
                 if (event.target.closest('[data-ve-admission-label][contenteditable]:not([contenteditable="false"])')) return;
                 const tab = event.target.closest('[' + buttonAttribute + ']');
                 if (!tab || !scope.contains(tab)) return;
-                const tabs = Array.from(scope.querySelectorAll('[' + buttonAttribute + ']'));
+                const group = tab.closest('[data-basic-school-panel]') || scope;
+                const tabs = Array.from(group.querySelectorAll('[' + buttonAttribute + ']'));
                 const index = tabs.indexOf(tab);
                 let next;
                 if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
@@ -38,5 +40,5 @@
         });
     }
     bindTabs(root, 'data-basic-school', 'data-basic-school-panel');
-    root.querySelectorAll('[data-basic-school-panel]').forEach(panel => bindTabs(panel, 'data-basic-applicant', 'data-basic-applicant-panel'));
+    bindTabs(root, 'data-basic-applicant', 'data-basic-applicant-panel');
 })();

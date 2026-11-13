@@ -5,6 +5,8 @@ page. Open **Active** to see their names, profile pictures (or initials) and **V
 status. Multiple tabs for one account appear once; any editing tab makes that
 account Editing. Program/department/organization detail pages have separate
 lists. Directory filters, pagination and device sizes share the same list.
+Administration's four section tabs also share one list and save target, matching
+their shared collection draft.
 
 Updates use one small authenticated POST every five seconds, with no WebSocket
 service or additional dependency. Pending changes or recent input mark Editing;

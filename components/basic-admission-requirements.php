@@ -35,6 +35,18 @@ function basicAdmissionRequirements(): array
     ];
 }
 
+/** Custom departments share the existing page-section storage and publishing boundary. */
+function basicAdmissionSchoolsFromSections(array $sections): array
+{
+    $schools = basicAdmissionRequirements();
+    foreach ($sections as $section) {
+        if (($section['status'] ?? '') !== 'published' || !preg_match('/^school_label_(dept-[a-f0-9]{16})$/D', $section['section_key'], $match)) continue;
+        $label = trim(html_entity_decode(strip_tags($section['content']), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $schools[$match[1]] = ['label' => $label, 'title' => $label, 'groups' => []];
+    }
+    return $schools;
+}
+
 /** Seed content for the existing section-based editor; page layout stays in PHP/CSS. */
 function basicAdmissionPresentationDefaults(): array
 {

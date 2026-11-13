@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/../includes/content-publish-policy.php';
+require_once __DIR__.'/enrollment-tabs.php';
 /** Basic Education content uses the existing section-based Content Editor. */
 function basicEnrollmentDefaults(): array {
     return [
@@ -175,15 +176,17 @@ function publishEnrollmentIllustrations(array $changes, array $files, ?array &$t
 }
 
 /** Publish canvas step edits and illustration replacements as a single snapshot. */
-function publishEnrollmentCanvas(?array $steps, string $revision, array $changes, array $files): array {
+function publishEnrollmentCanvas(?array $steps, string $revision, array $changes, array $files, ?array $tabs = null, string $tabsRevision = ''): array {
     if (!hasPermission('manage_page_content')) throw new InvalidArgumentException('You cannot publish enrollment steps.');
     $db = getDB(); $uploads = [];
     $db->beginTransaction();
     try {
+        if ($tabs !== null) publishEnrollmentTabs($tabs, $tabsRevision);
         if ($steps !== null) publishBasicEnrollmentSteps($steps, $revision, [], $uploads);
         $images = publishEnrollmentIllustrations($changes, $files, $uploads);
         $published = basicEnrollmentSteps();
-        $result = ['steps'=>$published, 'revision'=>basicEnrollmentRevision($published), 'images'=>$images];
+        $publishedTabs = enrollmentExtraTabs();
+        $result = ['steps'=>$published, 'revision'=>basicEnrollmentRevision($published), 'images'=>$images, 'tabs'=>$publishedTabs, 'tabs_revision'=>enrollmentTabsRevision($publishedTabs)];
         $db->commit(); return $result;
     } catch (Throwable $e) {
         if ($db->inTransaction()) $db->rollBack();

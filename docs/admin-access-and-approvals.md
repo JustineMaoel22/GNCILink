@@ -22,7 +22,7 @@ Passwords are cleared from the dialog on cancel/close and are never stored in a
 confirmation token or session. `tests/user-roles-test.php` uses temporary tables
 to verify these protections without changing real accounts.
 
-Deleting news, announcements or events also requires the acting user's current
+Deleting news, announcements, events or Home Page slides also requires the acting user's current
 password in the existing deletion dialog. Confirmation is checked before either
 deleting content or queuing a Content Editor deletion proposal. Passwords are
 removed from the POST data before approval payloads are stored. Approval retains

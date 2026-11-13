@@ -895,6 +895,7 @@ body.ve-mode { overflow: hidden; }
 .ve-thumb.is-drag { opacity: .4; }
 .ve-thumb.is-over { border-color: var(--ve-gold); transform: translateY(-2px); }
 .ve-thumb-img { display: flex; align-items: center; justify-content: center; width: 100%; height: 66px; object-fit: cover; background: #0b3d22; color: #fff; font-size: 24px; }
+.ve-dock-track--uniform .ve-thumb-img { object-fit: contain; background: #fff; }
 .ve-thumb-n { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,.65); color: #fff; font-weight: 700; font-size: 11px; border-radius: 6px; padding: 1px 7px; }
 .ve-thumb-t { display: block; padding: 5px 8px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ve-thumb-badge { position: absolute; top: 6px; right: 6px; background: #b45309; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; border-radius: 6px; padding: 2px 6px; }

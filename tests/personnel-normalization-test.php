@@ -16,9 +16,11 @@ try {
     $_SESSION=['user_role'=>'Super Admin'];
     $db->exec("INSERT INTO users(first_name,last_name,email,password,role,status) VALUES('Personnel','Test','personnel@example.invalid','unused','Super Admin','active')");$_SESSION['user_id']=(int)$db->lastInsertId();
     $db->exec("INSERT INTO admin_sections(section_key,title,layout) VALUES('identity-people','People','people'),('identity-offices','Offices','offices')");
-    saveAdministrationPerson(0,'identity-people','Same Name','Teacher',null,false);
+    $createdPerson=saveAdministrationPerson(0,'identity-people','Same Name','Teacher',null,false);
+    identityCheck($createdPerson>0,'Person save returns the persisted ID for publication reconciliation.');
     saveAdministrationPerson(0,'identity-people','Same Name','Another teacher',null,false);
-    saveAdministrationOffice(0,'identity-offices','Test Office','Same Name','Head','','','','','',null,false);
+    $createdOffice=saveAdministrationOffice(0,'identity-offices','Test Office','Same Name','Head','','','','','',null,false);
+    identityCheck($createdOffice>0,'Office save returns the persisted ID for publication reconciliation.');
     $db->exec("INSERT INTO departments(dept_name,slug,dean_name) VALUES('Identity Department','identity-dept','Other Person')");
     saveHomepagePresident('Same Name','President','School','','','','',null,false);
     identityCheck(!personnelEnabled($db,true),'Legacy schema starts disabled.');

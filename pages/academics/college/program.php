@@ -517,6 +517,7 @@ if ($program !== null) {
             <?php renderPdfViewer($program['pdf_url'], ['title' => $text('curriculum_title'), 'download_name' => $program['pdf_name']]); ?>
             <?php endif; ?>
             <?php if ($cePreview): ?>
+            <?php renderPdfViewer(null, ['editor_template' => true, 'title' => $text('curriculum_title')]); ?>
             <div class="text-center mt-3">
                 <button type="button" class="ve-fac-btn" data-ve-program-section="curriculum"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> <?= !empty($program['pdf_url']) ? 'Manage curriculum PDF' : 'Upload curriculum PDF' ?></button>
             </div>

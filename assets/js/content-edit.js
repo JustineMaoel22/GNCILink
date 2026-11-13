@@ -449,9 +449,11 @@
         }
     };
     document.addEventListener('mousedown', function (e) {
+        // Photo framing and validation belong to the open Administration form.
+        if(kind==='admin' && e.target.closest('.image-frame-dialog,.pc-back'))return;
         if (!pop.hidden && !pop.contains(e.target) && !tb.contains(e.target)) closePop();
     });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePop(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !(kind==='admin' && (e.defaultPrevented || D.querySelector('.image-frame-dialog,.pc-back')))) closePop(); });
     /** A one-field popover form. */
     function askText(opts) {
         var input = h(opts.multiline ? 'textarea' : 'input', { class: 'form-control form-control-sm', type: 'text', value: opts.value || '', placeholder: opts.placeholder || '', rows: 3, maxlength: opts.max || 500 });
@@ -1263,6 +1265,7 @@
     D.addEventListener('keydown', function (e) { if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); shortcutSave(); } });
     btnSecondary.addEventListener('click', function () { if (S.adapter.runSecondary) S.adapter.runSecondary(); });
     btnPrimary.addEventListener('click', function () {
+        if(S.adapter.preparePublish)S.adapter.preparePublish();
         if(C.requiresApproval && drafts && drafts.supported()) { confirmPublish('',function(){});return; }
         if (S.adapter.runPrimary) S.adapter.runPrimary();
     });
@@ -1467,8 +1470,145 @@
         var photos = {};
         var enrollmentImages = {}, enrollmentChanges = {};
         var enrollmentCanvas = null, enrollmentBase = '', enrollmentRevision = '';
+        var enrollmentTabsBase = null, enrollmentTabsRevision = '', enrollmentStepArtChoices = {};
+        function enrollmentTabParts(key) {
+            var match=/^enrollment_tab_(level|college|basic|extra-[a-f0-9]{16})_([a-f0-9]{16})$/.exec(key);
+            return match ? {parent:match[1],id:'extra-'+match[2]} : null;
+        }
+        function enrollmentTabsPayload() {
+            return secs.filter(function(s){return enrollmentTabParts(s.key);}).map(function(s){return {key:s.key,title:s.title,content:s.el?html(s):s.html,steps:s.enrollmentSteps||[]};});
+        }
+        function enrollmentTabsDirty() {
+            return enrollmentTabsBase!==null && (JSON.stringify(enrollmentTabsPayload())!==enrollmentTabsBase || secs.some(function(s){return enrollmentTabParts(s.key)&&(s.dirty||s.has_draft);}));
+        }
+        function enrollmentTabControls() {
+            if(page!=='enrollment-procedures'||!C.canPublish)return;
+            $$('[data-enrollment-tab-parent]',S.doc).forEach(function(list){
+                if(list.querySelector('[data-ve-enrollment-add-tab]'))return;
+                list.appendChild(h('li',{class:'nav-item',role:'presentation'},[h('button',{type:'button',class:'nav-link ve-enrollment-add-tab','data-ve-enrollment-add-tab':list.getAttribute('data-enrollment-tab-parent'),text:'+ Add tab'})]));
+            });
+        }
+        function paintEnrollmentTabSteps(doc) {
+            secs.forEach(function(s){
+                if(!enrollmentTabParts(s.key)||!s.el)return;
+                var identity=enrollmentTabParts(s.key),pane=doc.getElementById(identity.id+'-pane');if(!pane)return;
+                var grid=doc.querySelector('[data-enrollment-tab-step-grid="'+s.key+'"]');
+                if(!grid){grid=h('div',{class:'enrollment-steps-grid','data-enrollment-tab-step-grid':s.key});s.el.after(grid);}
+                grid.textContent='';
+                (s.enrollmentSteps||[]).forEach(function(step,index){
+                    var card=h('div',{class:'enrollment-step-card is-visible','data-ve-enrollment-tab-step':step.step_id,'data-ve-enrollment-tab-key':s.key});
+                    card.appendChild(h('div',{class:'enrollment-step-label',text:'STEP '+(index+1)}));
+                    function field(key,cls,label,max){
+                        var el=h(key==='instruction'?'p':'div',{class:cls,'data-ve-field':'enrollment-tab-step-text','data-ve-key':key,'data-ve-label':label,'data-ve-max':max,'data-ve-ph':label,text:step[key]});
+                        if(key==='instruction'){el.setAttribute('data-ve-multiline','');el.style.whiteSpace='pre-line';}
+                        makeField(el,function(node,value){step[key]=value;},locked(s));return el;
+                    }
+                    card.appendChild(field('title','enrollment-step-title','Office / step title',150));
+                    card.appendChild(field('location','enrollment-step-sub','Location (optional)',150));
+                    if(step.illustration)card.appendChild(h('div',{class:'enrollment-step-icon'},[h('img',{src:step.illustration,alt:step.title,width:100,height:100})]));
+                    card.appendChild(field('instruction','enrollment-step-desc','Click to add instructions',2000));
+                    card.appendChild(h('div',{class:'enrollment-step-bar enrollment-step-bar--'+(index%2?'gold':'green')}));grid.appendChild(card);
+                });
+                var add=doc.querySelector('[data-ve-enrollment-tab-add-step="'+s.key+'"]');
+                if(!add&&C.canPublish){add=h('button',{type:'button',class:'ve-enrollment-add-step','data-ve-enrollment-tab-add-step':s.key,text:'+ Add step'});grid.after(add);}
+                if(add)add.disabled=locked(s)||(s.enrollmentSteps||[]).length>=40;
+                // Draft preview selectors can shift when step grids are added; restore the tab's canonical structure.
+                var heading=doc.querySelector('[data-enrollment-tab-heading="'+s.key+'"]');
+                if(identity.parent==='level'){
+                    var list=doc.querySelector('[data-enrollment-tab-parent="'+identity.id+'"]'),content=doc.querySelector('[data-enrollment-tab-content="'+identity.id+'"]');
+                    var overview=doc.getElementById(identity.id+'-overview-pane'),overviewTab=doc.getElementById(identity.id+'-overview-tab');
+                    if(!overviewTab){
+                        var active=!list.querySelector('.nav-link.active');
+                        overviewTab=h('button',{type:'button',class:'nav-link'+(active?' active':''),id:identity.id+'-overview-tab',role:'tab','data-bs-toggle':'pill','data-bs-target':'#'+identity.id+'-overview-pane','aria-controls':identity.id+'-overview-pane','aria-selected':String(active),text:'Enrollment procedures'});
+                        list.prepend(h('li',{class:'nav-item',role:'presentation'},[overviewTab]));
+                    }
+                    if(!overview){overview=h('div',{class:'tab-pane fade'+(overviewTab.classList.contains('active')?' show active':''),id:identity.id+'-overview-pane',role:'tabpanel','aria-labelledby':overviewTab.id,tabindex:'0'});content.prepend(overview);}
+                    if(heading){heading.className='enrollment-level-title';pane.appendChild(heading);}
+                    pane.appendChild(list);pane.appendChild(content);
+                    [s.el,grid,add].filter(Boolean).forEach(function(node){overview.appendChild(node);});
+                }else [heading,s.el,grid,add].filter(Boolean).forEach(function(node){pane.appendChild(node);});
+            });
+        }
+        function addEnrollmentTabStep(s) {
+            if(!s||locked(s)||S.busy)return;
+            if(!s.enrollmentSteps)s.enrollmentSteps=[];
+            if(s.enrollmentSteps.length>=40)return;
+            var id=Array.from(crypto.getRandomValues(new Uint8Array(16)),function(b){return b.toString(16).padStart(2,'0');}).join('');
+            s.enrollmentSteps.push({step_id:id,title:'',location:'',instruction:'',illustration:'/assets/images/svg/enrollment-procedures/fresh-1.svg'});
+            paintEnrollmentTabSteps(S.doc);select(null);chrome();
+            var card=S.doc.querySelector('[data-ve-enrollment-tab-key="'+s.key+'"][data-ve-enrollment-tab-step="'+id+'"]'),field=card.querySelector('[data-ve-key="title"]');
+            field.scrollIntoView({block:'center',behavior:'instant'});field.focus();select({kind:'enrollment-tab-step',el:field,sec:s,id:id,prevent:false});
+        }
+        function enrollmentTabStepTools(s,id) {
+            var steps=s.enrollmentSteps||[],index=steps.findIndex(function(step){return step.step_id===id;});
+            if(index<0)return [];
+            function move(offset){if(S.busy||locked(s))return;var step=steps.splice(index,1)[0];steps.splice(index+offset,0,step);paintEnrollmentTabSteps(S.doc);select(null);chrome();}
+            return [{type:'chip',text:'Step '+(index+1)},
+                {icon:'arrow-up',label:'Move step up',disabled:locked(s)||index===0,run:function(){move(-1);}},
+                {icon:'arrow-down',label:'Move step down',disabled:locked(s)||index===steps.length-1,run:function(){move(1);}},
+                {icon:'image',label:'Choose illustration',disabled:locked(s),run:function(){
+                    var selectArt=h('select',{class:'form-select form-select-sm','aria-label':'Step illustration'},[h('option',{value:'',text:'No illustration'})].concat(Object.keys(enrollmentStepArtChoices).map(function(url){return h('option',{value:url,text:enrollmentStepArtChoices[url]});})));
+                    if(steps[index].illustration&&!enrollmentStepArtChoices[steps[index].illustration])selectArt.appendChild(h('option',{value:steps[index].illustration,text:'Current illustration'}));
+                    selectArt.value=steps[index].illustration;
+                    popBelowToolbar(h('div',{class:'ve-pop-form'},[h('label',{class:'ve-pop-label',text:'Step illustration'}),selectArt,h('button',{type:'button',class:'btn btn-sm btn-gnc',text:'Apply',on:{click:function(){steps[index].illustration=selectArt.value;closePop();paintEnrollmentTabSteps(S.doc);select(null);chrome();}}})]));
+                }},
+                {icon:'trash',label:'Remove step',danger:true,disabled:locked(s),run:function(){confirmPop('Remove this step?','The change stays in your draft until you publish.','Remove step',function(){steps.splice(index,1);paintEnrollmentTabSteps(S.doc);select(null);chrome();});}}
+            ];
+        }
+        function restoreEnrollmentTab(s) {
+            var identity=enrollmentTabParts(s.key);if(!identity)return;
+            var list=S.doc.querySelector('[data-enrollment-tab-parent="'+identity.parent+'"]');
+            var content=S.doc.querySelector('[data-enrollment-tab-content="'+identity.parent+'"]');
+            if(!list||!content)return;
+            var button=h('button',{type:'button',class:'nav-link',role:'tab',id:identity.id+'-tab','data-bs-toggle':'pill','data-bs-target':'#'+identity.id+'-pane','aria-controls':identity.id+'-pane','aria-selected':'false','data-ve-enrollment-tab-name':s.key,text:s.title});
+            var item=h('li',{class:'nav-item',role:'presentation'},[button]);
+            var add=list.querySelector('[data-ve-enrollment-add-tab]');list.insertBefore(item,add?add.parentElement:null);
+            var pane=h('div',{class:'tab-pane fade',id:identity.id+'-pane',role:'tabpanel','aria-labelledby':button.id,tabindex:'0'},[
+                h('h2',{class:'enrollment-pane-title','data-enrollment-tab-heading':s.key,text:s.title})
+            ]);
+            s.el=h('div',{class:'enrollment-custom-copy cms-rich','data-ve-section':s.key,'data-ve-label':s.title+' enrollment procedures'});pane.appendChild(s.el);
+            if(identity.parent==='level'){
+                pane.appendChild(h('ul',{class:'nav nav-pills enrollment-tabs',role:'tablist','aria-label':'Applicant type','data-enrollment-tab-parent':identity.id}));
+                pane.appendChild(h('div',{class:'tab-content','data-enrollment-tab-content':identity.id}));
+            }
+            content.appendChild(pane);enrollmentTabControls();
+        }
+        function addEnrollmentTab(parent,anchor) {
+            if(!C.canPublish||S.busy)return;
+            askText({label:parent==='level'?'Education level tab name':'Applicant tab name',anchor:anchor,required:true,max:150,cta:'Add tab',done:function(title){
+                if(enrollmentTabsPayload().length>=40){toast('You can add up to 40 enrollment tabs.','error');return;}
+                var token=Array.from(crypto.getRandomValues(new Uint8Array(8)),function(b){return b.toString(16).padStart(2,'0');}).join('');
+                var s={key:'enrollment_tab_'+parent+'_'+token,title:title,html:'<p>Add enrollment instructions here.</p>',has_draft:false,review:'none',note:'',by:'',el:null,base:'',dirty:true,isNew:true};
+                secs.push(s);restoreEnrollmentTab(s);bind(s);s.dirty=true;paintEnrollmentTabSteps(S.doc);
+                var id=enrollmentTabParts(s.key).id;S.win.bootstrap.Tab.getOrCreateInstance(S.doc.getElementById(id+'-tab')).show();
+                select(null);chrome();toast('Tab added to your draft. Edit its instructions, then Publish when ready.','ok');
+            }});
+        }
+        function renameEnrollmentTab(s,anchor) {
+            if(!s||locked(s))return;
+            askText({label:'Tab name',value:s.title,anchor:anchor,required:true,max:150,cta:'Rename tab',done:function(title){
+                s.title=title;s.dirty=!!s.isNew||html(s)!==s.base||title!==s.tabBaseTitle;
+                S.doc.querySelector('[data-ve-enrollment-tab-name="'+s.key+'"]').textContent=title;
+                S.doc.querySelector('[data-enrollment-tab-heading="'+s.key+'"]').textContent=title;
+                chrome();
+            }});
+        }
+        function syncEnrollmentTab(s) {
+            if(!enrollmentTabParts(s.key))return;
+            var button=S.doc.querySelector('[data-ve-enrollment-tab-name="'+s.key+'"]'),heading=S.doc.querySelector('[data-enrollment-tab-heading="'+s.key+'"]');
+            if(button)button.textContent=s.title;if(heading)heading.textContent=s.title;
+        }
+        function removeNewEnrollmentTab(s) {
+            var identity=enrollmentTabParts(s.key),keys=[s.key];
+            if(identity.parent==='level')secs.forEach(function(row){var child=enrollmentTabParts(row.key);if(child&&child.parent===identity.id)keys.push(row.key);});
+            keys.forEach(function(key){var id=enrollmentTabParts(key).id,tab=S.doc.getElementById(id+'-tab'),pane=S.doc.getElementById(id+'-pane');if(tab)tab.parentElement.remove();if(pane)pane.remove();});
+            secs=secs.filter(function(row){return keys.indexOf(row.key)<0;});
+            var list=S.doc.querySelector('[data-enrollment-tab-parent="'+identity.parent+'"]'),first=list&&list.querySelector('[data-bs-toggle="pill"]');
+            if(first)S.win.bootstrap.Tab.getOrCreateInstance(first).show();
+            select(null);chrome();
+        }
         function enrollmentCanvasDirty() { return enrollmentCanvas !== null && JSON.stringify(enrollmentCanvas) !== enrollmentBase; }
-        function mediaChangeCount() { return Object.keys(photos).length + Object.keys(enrollmentChanges).length + (enrollmentCanvasDirty() ? 1 : 0) + (voices ? voices.dirty() : 0); }
+        function mediaChangeCount() { return Object.keys(photos).length + Object.keys(enrollmentChanges).length + (enrollmentCanvasDirty() ? 1 : 0) + (enrollmentTabsDirty() ? 1 : 0) + (voices ? voices.dirty() : 0); }
         function enrollmentCard(id) { return S.doc.querySelector('[data-ve-enrollment-step="'+cssEsc(id)+'"]'); }
         function paintEnrollmentCanvas(doc) {
             var grid = doc.querySelector('[data-ve-enrollment-grid]');
@@ -1525,10 +1665,15 @@
             ]);
         }
         function validateEnrollmentCanvas() {
+            if(enrollmentTabsDirty()){
+                var invalidTab=secs.find(function(s){return enrollmentTabParts(s.key)&&(s.enrollmentSteps||[]).some(function(step){return !step.title.trim()||!step.instruction.trim();});});
+                if(invalidTab){A.focus(invalidTab);toast('Add an office/title and instructions to each step before publishing.','error');return false;}
+            }
             if(!enrollmentCanvasDirty())return true;
             var missing=enrollmentCanvas.find(function(step){return !step.title.trim()||!step.instruction.trim();});
             if(!missing)return true;
             S.doc.getElementById('basic-education-tab').click();
+            var overview=S.doc.getElementById('basic-overview-tab');if(overview)overview.click();
             var field=enrollmentCard(missing.step_id).querySelector('[data-ve-key="'+(!missing.title.trim()?'title':'instruction')+'"]');
             field.scrollIntoView({block:'center',behavior:'instant'});field.focus();
             toast('Add an office/title and instructions to each step before publishing.','error');return false;
@@ -1560,7 +1705,7 @@
             ];
         }
         function publishEnrollmentCanvasChanges() {
-            if (!Object.keys(enrollmentChanges).length && !enrollmentCanvasDirty()) return Promise.resolve(true);
+            if (!Object.keys(enrollmentChanges).length && !enrollmentCanvasDirty() && !enrollmentTabsDirty()) return Promise.resolve(true);
             var payload={}, files={}, fields={};
             Object.keys(enrollmentChanges).forEach(function(key){
                 payload[key]={reset:enrollmentChanges[key].reset,expected:enrollmentImages[key].url};
@@ -1568,11 +1713,17 @@
             });
             fields.images=JSON.stringify(payload);
             if(enrollmentCanvasDirty()){fields.steps=JSON.stringify(enrollmentCanvas);fields.revision=enrollmentRevision;}
+            if(enrollmentTabsDirty()){fields.tabs=JSON.stringify(enrollmentTabsPayload());fields.tabs_revision=enrollmentTabsRevision;}
             return send('/admin/action/enrollment-canvas-handler.php',fields,files).then(function(res){
                 if(!res.ok){toast(res.error,'error');return false;}
                 Object.keys(enrollmentChanges).forEach(function(key){if(enrollmentChanges[key].preview)URL.revokeObjectURL(enrollmentChanges[key].preview);});
                 enrollmentChanges={};enrollmentImages=res.images;enrollmentCanvas=res.steps;enrollmentBase=JSON.stringify(res.steps);enrollmentRevision=res.revision;
+                if(fields.tabs){
+                    (res.tabs||[]).forEach(function(tab){var s=secs.find(function(row){return row.key===tab.key;});if(s){s.title=tab.title;s.tabBaseTitle=tab.title;s.enrollmentSteps=tab.steps||[];apply(s,{has_draft:false,review_status:'none',editor_html:tab.content},true);}});
+                    enrollmentTabsBase=JSON.stringify(enrollmentTabsPayload());enrollmentTabsRevision=res.tabs_revision;
+                }
                 paintEnrollmentCanvas(S.doc);
+                paintEnrollmentTabSteps(S.doc);
                 // College illustrations use their existing card nodes.
                 $$('[data-ve-img="enrollment-illustration"]',S.doc).forEach(function(el){var image=res.images[el.getAttribute('data-ve-key')];if(image)el.querySelector('img').src=image.url||image.default;});
                 select(null);toast('Published. Your changes are live now.','ok');return true;
@@ -1648,8 +1799,52 @@
             return { key: s.key, title: s.title, html: s.html || '', has_draft: !!s.has_draft, review: s.review_status || 'none',
                      note: s.review_note || '', by: s.submitted_by || '', el: null, base: '', dirty: false };
         });
-        var admissionBaseOrders = {}, admissionUndo = [];
+        var admissionBaseOrders = {}, admissionUndo = [], admissionRestoredOrders = null;
+        function admissionSchoolControls() {
+            var tabs = S.doc.querySelector('.basic-school-tabs');
+            if (!tabs || !C.canPublish || tabs.querySelector('[data-ve-admission-add-school]')) return;
+            tabs.appendChild(h('button',{type:'button',class:'ve-admission-add','data-ve-admission-add-school':'',text:'+ Add department category'}));
+        }
+        function restoreAdmissionSchool(s) {
+            var school = s.key.slice('school_label_'.length);
+            var tabs = S.doc.querySelector('.basic-school-tabs');
+            if (!tabs) return;
+            var text = S.doc.createElement('div'); text.innerHTML = s.html;
+            var label = h('span',{'data-ve-section':s.key,'data-ve-admission-label':'','data-ve-label':'Department category name',text:text.textContent});
+            var tab = h('button',{type:'button',class:'req-tab',role:'tab',id:'school-tab-'+school,'data-basic-school':school,'aria-controls':'school-panel-'+school,'aria-selected':'false',tabindex:'-1'},[label]);
+            var applicantTabs = h('div',{class:'requirements-tabs basic-applicant-tabs',role:'tablist','aria-label':text.textContent+' applicant type','data-admission-category-tabs':''});
+            var copy = h('div',{class:'requirements-copy','data-admission-category-panels':''});
+            var panels = h('div',{class:'requirements-panels'},[copy]);
+            var art = S.doc.querySelector('.requirements-art');
+            if (art) panels.appendChild(art.cloneNode(true));
+            var panel = h('section',{id:'school-panel-'+school,role:'tabpanel','aria-labelledby':tab.id,'data-basic-school-panel':school,'data-admission-scope':school,hidden:true},[
+                h('h2',{class:'basic-school-title',text:text.textContent}),applicantTabs,panels
+            ]);
+            var add = tabs.querySelector('[data-ve-admission-add-school]');
+            if (add) add.before(tab); else tabs.appendChild(tab);
+            var root = S.doc.querySelector('[data-basic-admission]'), credit = root.querySelector('.admission-art-credit');
+            if (credit) credit.before(panel); else root.appendChild(panel);
+            s.el = label; admissionControls(panel);
+        }
+        function addAdmissionSchool(anchor) {
+            if (!C.canPublish || S.busy) return;
+            askText({label:'Department category name',anchor:anchor,required:true,max:150,cta:'Add department category',done:function(title){
+                if (S.doc.querySelectorAll('[data-basic-school-panel]').length >= 40) { toast('This page can have up to 40 department categories.','error'); return; }
+                var token = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(function(v){return v.toString(16).padStart(2,'0');}).join('');
+                var school = 'dept-'+token;
+                var s = {key:'school_label_'+school,title:'Department category name',html:esc(title),has_draft:false,review:'none',note:'',by:'',el:null,base:'',dirty:true,isNew:true};
+                secs.push(s); restoreAdmissionSchool(s); bind(s); s.dirty=true;
+                var first = {key:school+'_custom_'+token,title:'New Students',html:'<h2>New Students</h2><p>Enrollment requirements</p><ol></ol>',has_draft:false,review:'none',note:'',by:'',el:null,base:'',dirty:true,isNew:true};
+                secs.push(first); restoreAdmissionCategory(first); bind(first); first.dirty=true;
+                admissionControls(S.doc.querySelector('[data-admission-scope="'+school+'"]'));
+                S.doc.getElementById('school-tab-'+school).click();
+                S.doc.getElementById('applicant-tab-'+first.key).click();
+                select(null); markAdmissionChanges(first); chrome();
+                toast('Department category added to your draft. Add requirements, then Publish when ready.','ok');
+            }});
+        }
         function restoreAdmissionCategory(s) {
+            if (/^school_label_dept-[a-f0-9]{16}$/.test(s.key)) { restoreAdmissionSchool(s); return; }
             var school=s.key.indexOf('custom_')===0?'college':s.key.split('_custom_')[0];
             var scope=S.doc.querySelector('[data-admission-scope="'+cssEsc(school)+'"]');if(!scope)return;
             var basic=school!=='college',tabId=(basic?'applicant-tab-':'tab-')+s.key,panelId=(basic?'applicant-panel-':'panel-')+s.key;
@@ -1678,10 +1873,11 @@
 
         function bind(s) {
             var el = s.el;
+            if(enrollmentTabParts(s.key)&&s.tabBaseTitle===undefined)s.tabBaseTitle=s.title;
             var admissionLabel = plainSection(el);
             el.__ve = { rich: !admissionLabel, sec: s, max: admissionLabel ? (parseInt(el.getAttribute('data-ve-max'), 10) || (s.key === 'hero_intro' ? 2000 : 150)) : 0,
                 multi: admissionLabel && (s.key === 'hero_intro' || el.hasAttribute('data-ve-multiline')), onChange: function () {
-                s.dirty = !!s.isNew || html(s) !== s.base;
+                s.dirty = !!s.isNew || html(s) !== s.base || !!(enrollmentTabParts(s.key)&&s.title!==s.tabBaseTitle);
                 admissionItemControls(s);
                 markAdmissionChanges(s);
             } };
@@ -1768,7 +1964,7 @@
         function submittable(s) { return !!s.el && !locked(s) && (s.dirty || (s.has_draft && s.review !== 'pending')); }
         function publishSections(list) {
             if (page === 'enrollment-procedures') {
-                run('Publishing enrollment content...',function(){return publishEnrollmentCanvasChanges().then(function(ok){if(!ok)return;return each(list,'publish').then(function(r){report(r,'published. It is live now');});});});
+                run('Publishing enrollment content...',function(){return publishEnrollmentCanvasChanges().then(function(ok){if(!ok)return;return each(list.filter(function(s){return !enrollmentTabParts(s.key);}),'publish').then(function(r){report(r,'published. It is live now');});});});
                 return;
             }
             if (S.doc.querySelector('[data-admission-scope]')) {
@@ -1827,6 +2023,10 @@
             });
         }
         function markAdmissionChanges(s) {
+            if (s.el && /^school_label_dept-[a-f0-9]{16}$/.test(s.key)) {
+                var schoolPanel=S.doc.getElementById('school-panel-'+s.key.slice('school_label_'.length));
+                if(schoolPanel){schoolPanel.querySelector('.basic-school-title').textContent=s.el.textContent;schoolPanel.querySelector('[data-admission-category-tabs]').setAttribute('aria-label',s.el.textContent+' applicant type');}
+            }
             if (!s.el || !s.el.classList.contains('admission-req-content')) return;
             s.el.classList.toggle('ve-admission-unsaved',!!s.dirty);
             var heading = s.el.querySelector('h2');
@@ -2048,6 +2248,15 @@
             }});
         }
         function removeNewAdmissionCategory(s) {
+            if(enrollmentTabParts(s.key)){removeNewEnrollmentTab(s);return;}
+            if (/^school_label_dept-[a-f0-9]{16}$/.test(s.key)) {
+                var school=s.key.slice('school_label_'.length),panel=S.doc.getElementById('school-panel-'+school);
+                if(panel)panel.remove();
+                var schoolTab=S.doc.getElementById('school-tab-'+school);if(schoolTab)schoolTab.remove();
+                secs=secs.filter(function(row){return row!==s && row.key.indexOf(school+'_')!==0;});
+                var firstSchool=S.doc.querySelector('[data-basic-school]');if(firstSchool)firstSchool.click();
+                select(null);markAdmissionLayout();chrome();return;
+            }
             var scope = s.el.closest('[data-admission-scope]');
             var panel = s.el.closest('.req-panel');
             var tab = S.doc.getElementById(panel.getAttribute('aria-labelledby'));
@@ -2060,12 +2269,26 @@
             outline: true,
             startFallback: function () { loadSrcdoc(fallbackHtml()); },
             draftState: function (value) {
-                if (!value) return {secs:secs.map(function(s){return Object.assign({},s,{html:s.el&&!s.removed?html(s):s.html});}),photos:photos,enrollmentImages:enrollmentImages,enrollmentChanges:enrollmentChanges,enrollmentCanvas:enrollmentCanvas,enrollmentBase:enrollmentBase,enrollmentRevision:enrollmentRevision,admissionBaseOrders:admissionBaseOrders,orders:admissionOrders(),alumniVoices:voices?voices.state():null};
+                if (!value) return {secs:secs.map(function(s){return Object.assign({},s,{html:s.el&&!s.removed?html(s):s.html});}),photos:photos,enrollmentImages:enrollmentImages,enrollmentChanges:enrollmentChanges,enrollmentCanvas:enrollmentCanvas,enrollmentBase:enrollmentBase,enrollmentRevision:enrollmentRevision,enrollmentTabsBase:enrollmentTabsBase,enrollmentTabsRevision:enrollmentTabsRevision,admissionBaseOrders:admissionBaseOrders,orders:admissionOrders(),alumniVoices:voices?voices.state():null};
                 if (voices && value.alumniVoices) voices.state(value.alumniVoices);
-                photos=value.photos;enrollmentImages=value.enrollmentImages;enrollmentChanges=value.enrollmentChanges;enrollmentCanvas=value.enrollmentCanvas;enrollmentBase=value.enrollmentBase;enrollmentRevision=value.enrollmentRevision;admissionBaseOrders=value.admissionBaseOrders;
+                photos=value.photos;enrollmentImages=value.enrollmentImages;enrollmentChanges=value.enrollmentChanges;enrollmentCanvas=value.enrollmentCanvas;enrollmentBase=value.enrollmentBase;enrollmentRevision=value.enrollmentRevision;admissionBaseOrders=value.admissionBaseOrders;admissionRestoredOrders=value.orders;
                 secs=value.secs.map(function(s){s.el=S.doc.querySelector('[data-ve-section="'+cssEsc(s.key)+'"]');return s;});
+                enrollmentTabsBase=value.enrollmentTabsBase===undefined?enrollmentTabsBase:value.enrollmentTabsBase;enrollmentTabsRevision=value.enrollmentTabsRevision||enrollmentTabsRevision;
+                $$('[data-ve-enrollment-tab-name]',S.doc).forEach(function(tab){
+                    var key=tab.getAttribute('data-ve-enrollment-tab-name');
+                    if(!secs.some(function(s){return s.key===key;})){var pane=S.doc.getElementById(enrollmentTabParts(key).id+'-pane');tab.parentElement.remove();if(pane)pane.remove();}
+                });
+                secs.forEach(function(s){var part=enrollmentTabParts(s.key);if(!s.el&&part&&part.parent==='level')restoreEnrollmentTab(s);});
+                $$('[data-basic-school-panel]',S.doc).forEach(function(panel){
+                    var school=panel.getAttribute('data-basic-school-panel');
+                    if(/^dept-[a-f0-9]{16}$/.test(school)&&!secs.some(function(s){return s.key==='school_label_'+school;})){
+                        panel.remove();var tab=S.doc.getElementById('school-tab-'+school);if(tab)tab.remove();
+                    }
+                });
+                secs.forEach(function(s){if(!s.el&&s.isNew&&/^school_label_dept-[a-f0-9]{16}$/.test(s.key))restoreAdmissionSchool(s);});
                 secs.forEach(function(s){
-                    if(!s.el&&s.isNew)restoreAdmissionCategory(s);
+                    if(!s.el&&enrollmentTabParts(s.key))restoreEnrollmentTab(s);
+                    else if(!s.el&&s.isNew)restoreAdmissionCategory(s);
                     if(s.removed&&s.el){var panel=s.el.closest('.req-panel'),tab=panel&&S.doc.getElementById(panel.getAttribute('aria-labelledby'));if(panel)panel.remove();if(tab)(tab.closest('.ve-admission-category')||tab).remove();}
                 });
                 paintEnrollmentCanvas(S.doc);
@@ -2077,6 +2300,19 @@
                 if (voices) voices.render();
                 secs.forEach(function(s){if(!s.el||s.removed)return;var base=s.base,dirty=s.dirty;bind(s);s.base=base;s.dirty=dirty;});
                 $$('[data-admission-scope]',S.doc).forEach(admissionControls);
+                admissionSchoolControls();
+                enrollmentTabControls();secs.forEach(syncEnrollmentTab);
+                paintEnrollmentTabSteps(S.doc);
+                if(admissionRestoredOrders){
+                    $$('[data-admission-scope]',S.doc).forEach(function(scope){
+                        var tabs=scope.querySelector('[data-admission-category-tabs]'),add=tabs.querySelector('[data-ve-admission-add-category]');
+                        (admissionRestoredOrders[scope.getAttribute('data-admission-scope')]||[]).forEach(function(key){
+                            var tab=$$('[role="tab"]',tabs).find(function(node){return admissionTabKey(node)===key;});
+                            if(tab)tabs.insertBefore(tab.closest('.ve-admission-category')||tab,add);
+                        });
+                    });
+                    admissionRestoredOrders=null;
+                }
                 secs.forEach(markAdmissionChanges);
                 Object.keys(photos).forEach(function(key){var el=S.doc.querySelector('[data-ve-img="history:'+cssEsc(key)+'"]');if(el)paintPhoto(el,photos[key]);});
                 Object.keys(enrollmentChanges).forEach(function(key){var el=S.doc.querySelector('[data-ve-img="enrollment-illustration"][data-ve-key="'+cssEsc(key)+'"] img');if(el)el.src=enrollmentChanges[key].preview||enrollmentImages[key].default;});
@@ -2089,6 +2325,11 @@
                     enrollmentCanvas=canvas.steps;enrollmentBase=JSON.stringify(canvas.steps);enrollmentRevision=canvas.revision;
                 }
                 paintEnrollmentCanvas(doc);
+                if(doc.getElementById('veEnrollmentTabs')){
+                    var tabData=JSON.parse(doc.getElementById('veEnrollmentTabs').textContent);enrollmentTabsRevision=tabData.revision;
+                    tabData.tabs.forEach(function(tab){var s=secs.find(function(row){return row.key===tab.key;});if(s&&s.enrollmentSteps===undefined)s.enrollmentSteps=tab.steps||[];});
+                }
+                if(doc.getElementById('veEnrollmentStepArt'))enrollmentStepArtChoices=JSON.parse(doc.getElementById('veEnrollmentStepArt').textContent);
 
                 Object.keys(enrollmentChanges).forEach(function (key) {
                     var el=doc.querySelector('[data-ve-img="enrollment-illustration"][data-ve-key="'+cssEsc(key)+'"] img');
@@ -2099,7 +2340,11 @@
                 if (!found && !S.fallback && !doc.querySelector('[data-admission-scope]')) { loadSrcdoc(fallbackHtml()); return true; }
                 addExtras(doc);
                 secs.forEach(bind);
+                enrollmentTabControls();
+                paintEnrollmentTabSteps(doc);
+                if(page==='enrollment-procedures'&&enrollmentTabsBase===null)enrollmentTabsBase=JSON.stringify(enrollmentTabsPayload());
                 $$('[data-admission-scope]', doc).forEach(admissionControls);
+                admissionSchoolControls();
                 admissionBaseOrders=admissionOrders();admissionUndo=[];secs.forEach(markAdmissionChanges);
                 if(doc.querySelector('[data-admission-scope]'))bindAdmissionReordering(doc);
                 if (doc.querySelector('[data-admission-scope]')) doc.addEventListener('selectionchange', function () {
@@ -2120,6 +2365,13 @@
             },
             focus: function (s) {
                 if (!s.el) return;
+                var tabIdentity=enrollmentTabParts(s.key);
+                if(tabIdentity){
+                    var parent=tabIdentity.parent,outer=parent==='college'?'college':parent==='basic'?'basic-education':parent;
+                    if(parent!=='level'){var parentTab=S.doc.getElementById(outer+'-tab');if(parentTab)S.win.bootstrap.Tab.getOrCreateInstance(parentTab).show();}
+                    S.win.bootstrap.Tab.getOrCreateInstance(S.doc.getElementById(tabIdentity.id+'-tab')).show();
+                    if(parent==='level'){var overviewTab=S.doc.getElementById(tabIdentity.id+'-overview-tab');if(overviewTab)S.win.bootstrap.Tab.getOrCreateInstance(overviewTab).show();}
+                }
                 s.el.scrollIntoView({ block: 'center', behavior: 'smooth' });
                 s.el.classList.add('ve-flash'); window.setTimeout(function () { s.el.classList.remove('ve-flash'); }, 1400);
                 select({ kind: 'rich', el: s.el, sec: s, noCaret: locked(s), prevent: false });
@@ -2132,6 +2384,11 @@
                 if(alumniAction){var actionSection=byEl(sectionElOf(alumniAction));if(actionSection)return {kind:'rich',el:actionSection.el,sec:actionSection,alumniAction:alumniAction,prevent:false,noCaret:locked(actionSection)};}
                 var enrollmentText=t.closest('[data-ve-field="enrollment-step-text"]');if(enrollmentText)return {kind:'field',el:enrollmentText,prevent:false};
                 if (t.closest('[data-ve-enrollment-add]')) { addEnrollmentCard(); return {kind:'none'}; }
+                var addTabStep=t.closest('[data-ve-enrollment-tab-add-step]');if(addTabStep){addEnrollmentTabStep(secs.find(function(s){return s.key===addTabStep.getAttribute('data-ve-enrollment-tab-add-step');}));return {kind:'none'};}
+                var tabStep=t.closest('[data-ve-enrollment-tab-step]');if(tabStep){var stepSection=secs.find(function(s){return s.key===tabStep.getAttribute('data-ve-enrollment-tab-key');});if(stepSection)return {kind:'enrollment-tab-step',el:fieldOf(t)||tabStep,sec:stepSection,id:tabStep.getAttribute('data-ve-enrollment-tab-step'),prevent:!fieldOf(t)};}
+                var addEnrollment=t.closest('[data-ve-enrollment-add-tab]');if(addEnrollment){addEnrollmentTab(addEnrollment.getAttribute('data-ve-enrollment-add-tab'),addEnrollment);return {kind:'none'};}
+                var enrollmentName=t.closest('[data-ve-enrollment-tab-name]');if(enrollmentName){var tabSection=secs.find(function(s){return s.key===enrollmentName.getAttribute('data-ve-enrollment-tab-name');});if(tabSection)return {kind:'enrollment-tab',el:enrollmentName,sec:tabSection,prevent:false};}
+                var addSchool=t.closest('[data-ve-admission-add-school]');if(addSchool){addAdmissionSchool(addSchool);return {kind:'none'};}
                 if(t.closest('[data-ve-admission-drag-item],[data-ve-admission-drag-category]'))return {kind:'none'};
                 var undo=t.closest('[data-ve-admission-undo]');if(undo){undoAdmissionDeletion(undo.closest('[data-admission-scope]'));return {kind:'none'};}
                 var rename=t.closest('[data-ve-admission-rename-category]');if(rename){renameAdmissionCategory(rename.getAttribute('data-ve-admission-rename-category'),rename);return {kind:'none'};}
@@ -2175,6 +2432,8 @@
                 return s ? { kind: 'rich', el: el, sec: s, prevent: false, noCaret: locked(s) } : null;
             },
             toolbar: function (sel) {
+                if(sel.kind==='enrollment-tab-step')return enrollmentTabStepTools(sel.sec,sel.id);
+                if(sel.kind==='enrollment-tab')return [chipFor(sel.sec),{icon:'pencil',label:'Rename tab',disabled:locked(sel.sec),run:function(){renameEnrollmentTab(sel.sec,sel.el);}}].concat(sel.sec.isNew?[{icon:'trash',label:'Remove new tab',danger:true,run:function(){confirmPop('Remove this new tab?','Its draft content and applicant tabs will be removed.','Remove tab',function(){removeNewEnrollmentTab(sel.sec);});}}]:[]);
                 if (voices) { var voiceTools=voices.toolbar(sel); if (voiceTools) return voiceTools; }
                 if (page === 'alumni' && sel.kind === 'post') return postToolbar(sel);
                 if (sel.kind === 'enrollment-step-field' || sel.kind === 'enrollment-step') return enrollmentStepTools(sel.id,true);
@@ -2220,7 +2479,7 @@
                     it.push({ icon: 'arrow-counterclockwise', title: s.has_draft ? 'Throw away my draft and go back to what is live' : 'Undo my unsaved changes', run: async function () {
                         if (!await window.AdminDialogs.confirm(s.has_draft ? 'Discard your draft and go back to what is on the website?' : 'Undo your unsaved changes in this section?')) return;
                         if (s.isNew) { removeNewAdmissionCategory(s); return; }
-                        if (!s.has_draft) { s.el.innerHTML = s.base || '<p></p>'; s.dirty = false; admissionItemControls(s); rememberAdmissionItems(s); markAdmissionChanges(s); renderToolbar(); chrome(); return; }
+                        if (!s.has_draft) { s.el.innerHTML = s.base || '<p></p>'; s.dirty = false; if(enrollmentTabParts(s.key)){s.title=s.tabBaseTitle;syncEnrollmentTab(s);} admissionItemControls(s); rememberAdmissionItems(s); markAdmissionChanges(s); renderToolbar(); chrome(); return; }
                         run('Discarding...', function () { return sendReview({ action: 'discard', page: page, section_key: s.key }).then(function (res) { if (res.ok) { apply(s, res, true); toast(res.message, 'ok'); } else toast(res.error, 'error'); }); });
                     } });
                 }
@@ -2310,6 +2569,24 @@
         var PKEYS = { 'pres-name': 'name', 'pres-title': 'title', 'pres-org': 'org', 'pres-eyebrow': 'eyebrow', 'pres-heading': 'heading', 'pres-greeting': 'greeting', 'pres-message': 'message' };
         var pres = {}, presOrig = {}, presFile = null, presRemove = false, presImg = null;
         var dock = $('#veDock'), emptyBox = $('#veEmpty');
+        function restoreNewSlide(s) {
+            var hero=S.doc.querySelector('.hero-slideshow');
+            if(!hero){hero=h('div',{class:'hero-slideshow'});var pillars=S.doc.querySelector('.gnc-pillars');if(pillars)pillars.before(hero);else S.doc.body.appendChild(hero);}
+            var el=h('div',{class:'hero-slide','data-ve-slide':s.id});
+            el.appendChild(h('div',{class:'slide-bg d-none d-md-block','data-ve-bg':'desktop'}));
+            el.appendChild(h('div',{class:'slide-bg d-md-none','data-ve-bg':'mobile'}));
+            el.appendChild(h('div',{class:'slide-overlay','data-ve-overlay':'1'}));
+            var lines=String(s.title||'').split('|');
+            function text(tag,cls,key,value,max,placeholder){return h(tag,{class:cls,'data-ve-field':key,'data-ve-max':max,'data-ve-ph':placeholder,text:value||''});}
+            var content=h('div',{class:'hero-content'},[
+                text('h1','hero-title-line','slide-title1',lines[0],50,'Headline'),text('h1','hero-title-line','slide-title2',lines[1],50,'Second line (optional)')
+            ]);
+            var desc=text('div','hero-desc cms-rich','slide-subtitle','',150,'Add a short description');desc.setAttribute('data-ve-rich','');desc.setAttribute('data-ve-multiline','');desc.innerHTML=cleanHtml(s.subtitle);content.appendChild(desc);
+            var buttons=h('div',{class:'hero-ctas'});
+            [1,2].forEach(function(n){buttons.appendChild(h('a',{href:s['btn'+n+'_link']||'#',class:n===1?'btn-enroll':'btn-explore','data-ve-btn':n},[text('span','','slide-btn'+n,s['btn'+n+'_text'],30,'Add a button')]));});
+            content.appendChild(buttons);el.appendChild(h('div',{class:'container h-100'},[content]));hero.appendChild(el);
+            s.el=el;bindSlide(s);paintBg(s);paintFlags(s);
+        }
         // headings, intro lines and the Academic Programs cards (stored by key, see saveHomeContent() in admin-functions.php)
         var HC = {}, hc = {}, hcFiles = {}, hcReset = {};
         function loadContent(c) { HC = c || {}; hc = {}; hcFiles = {}; hcReset = {}; Object.keys(HC).forEach(function (k) { hc[k] = HC[k].value; }); }
@@ -2349,6 +2626,9 @@
         loadSlides(HD.slides); loadPresident(HD.president);
 
         function slideDirty(s) { return !same(snap(s), s.orig) || !!s.file || !!s.mfile || s.removeMobile; }
+        function draftPublishTarget() {
+            var s=slides[cur];return s&&s.id>0&&s.status==='draft'&&s.orig.status==='draft'&&(slideDirty(s)||A.dirtyCount()===0)?s:null;
+        }
         function presDirty() {
             return Object.keys(PKEYS).some(function (k) { var f = PKEYS[k]; return String(pres[f]) !== String(presOrig[f]); }) || !!presFile || presRemove;
         }
@@ -2442,7 +2722,7 @@
                     on: { click: function () { goTo(i); select(S.doc && s.el ? { kind: 'slide', el: s.el, slide: s, anchor: 'bottom', prevent: true } : null); } } }, [
                     media, h('span', { class: 've-thumb-n', text: String(i + 1) }),
                     h('span', { class: 've-thumb-t', text: clip(String(s.title || '').replace(/\|/g, ' ') || 'Untitled slide', 22) }),
-                    s.status === 'draft' ? h('span', { class: 've-thumb-badge', text: 'Draft' }) : null,
+                    s.status === 'draft' || s.id <= 0 ? h('span', { class: 've-thumb-badge', text: 'Draft' }) : null,
                     slideDirty(s) ? h('span', { class: 've-thumb-dirty', title: 'Unsaved changes' }) : null]);
                 b.addEventListener('dragstart', function (e) { e.dataTransfer.setData('text/plain', String(i)); e.dataTransfer.effectAllowed = 'move'; b.classList.add('is-drag'); });
                 b.addEventListener('dragend', function () { b.classList.remove('is-drag'); $$('.ve-thumb', dock).forEach(function (x) { x.classList.remove('is-over'); }); });
@@ -2471,26 +2751,41 @@
             }).catch(function () { toast('Saved, but the preview could not be refreshed. Reload the page.', 'error'); });
         }
         async function addSlide() {
-            if (!await guardDirty('Adding a slide reloads the preview, so your unsaved changes would be lost.\n\nContinue?')) return;
+            if(S.busy)return;
             pickFile('image/*,video/*', function (f) {
-                run('Adding slide...', function () {
-                    return sendContent({ action: 'save', slide_id: 0, title: '', subtitle: '', btn1_text: '', btn1_link: '', btn2_text: '', btn2_link: '', status: 'draft', show_on_mobile: '1', show_gradient: '1' }, { media: f }).then(function (res) {
-                        if (!res.ok) { toast(res.error, 'error'); return; }
-                        toast('Slide added as a draft. Write on it, then press Publish when it is ready.', 'ok');
-                        return refresh(null, res.slide_id);
-                    });
-                });
+                var s=norm({slide_id:Math.min(0,...slides.map(function(slide){return slide.id;}))-1,status:'draft',media_type:/^video\//.test(f.type)||/\.(mp4|webm|mov)$/i.test(f.name)?'video':'image'});
+                s.status='published';s.file=f;s._url=previewUrl(f);slides.push(s);restoreNewSlide(s);goTo(slides.length-1);select(null);chrome();
+                toast('Slide added to your draft. Save draft to keep it private, or Publish when ready.','ok');
             },false,null,false,false,'natural');
         }
         async function deleteSlide(s) {
+            if(s.id<=0){
+                if(!await window.AdminDialogs.confirm('Remove this new slide from your draft?'))return;
+                if(s.el)s.el.remove();slides.splice(idx(s),1);cur=Math.max(0,Math.min(cur,slides.length-1));goTo(cur);select(null);renderDock();chrome();return;
+            }
             if (!await guardDirty('Deleting a slide reloads the preview, so your other unsaved changes would be lost.\n\nContinue?')) return;
-            if (!await window.AdminDialogs.confirm('Delete this slide for good?\n\nIt is removed from the website straight away. This cannot be undone.')) return;
-            run('Deleting...', function () {
-                return sendContent({ action: 'delete', slide_id: s.id }).then(function (res) {
-                    if (!res.ok) { toast(res.error, 'error'); return; }
-                    toast('Slide deleted.', 'ok'); return refresh(Math.max(0, idx(s) - 1));
-                });
+            var previous=D.activeElement,dialog=h('dialog',{class:'gnc-dialog gnc-dialog-danger','aria-labelledby':'homeSlideDeleteTitle'});
+            var input=h('input',{type:'password',id:'homeSlideDeletePassword',class:'form-control',autocomplete:'current-password',maxlength:4096,required:true});
+            var error=h('p',{class:'text-danger mt-2',role:'alert','data-slide-delete-error':''});
+            var cancel=h('button',{type:'button',class:'gnc-dialog-cancel',text:'Cancel',on:{click:function(){dialog.close();}}});
+            var accept=h('button',{type:'submit',class:'gnc-dialog-accept',text:C.requiresApproval?'Submit deletion':'Delete slide'});
+            var form=h('form',{class:'gnc-dialog-content'},[h('h2',{id:'homeSlideDeleteTitle',text:'Delete this slide?'}),h('p',{text:C.requiresApproval?'Enter your current password to submit this deletion for Super Admin approval.':'Enter your current password to permanently delete this slide and its media. This cannot be undone.'}),h('label',{class:'form-label',for:input.id,text:'Current password'}),input,error,h('div',{class:'gnc-dialog-actions'},[cancel,accept])]);
+            var busy=false;
+            form.addEventListener('submit',async function(event){
+                event.preventDefault();event.stopImmediatePropagation();if(busy)return;
+                busy=true;cancel.disabled=accept.disabled=true;error.textContent='';
+                var fields={action:'delete',slide_id:s.id,current_password:input.value};input.value='';
+                try{
+                    var res=await sendContent(fields);delete fields.current_password;
+                    if(res.submitted){dialog.close();toast('Deletion submitted for Super Admin approval. The slide is unchanged.','ok');return;}
+                    if(!res.ok)throw Error(res.error);
+                    dialog.close();toast('Slide deleted.','ok');await refresh(Math.max(0,idx(s)-1));
+                }catch(failure){error.textContent=failure.message||'Could not delete the slide. Try again.';input.focus();}
+                finally{delete fields.current_password;busy=false;cancel.disabled=accept.disabled=false;}
             });
+            dialog.addEventListener('cancel',function(event){if(busy)event.preventDefault();});
+            dialog.addEventListener('close',function(){input.value='';dialog.remove();if(previous&&previous.isConnected)previous.focus({preventScroll:true});},{once:true});
+            dialog.appendChild(form);D.body.appendChild(dialog);dialog.showModal();input.focus();
         }
 
         // ── heading icons (Bootstrap Icons class names, e.g. "bi-megaphone-fill") ──
@@ -2562,10 +2857,17 @@
         // ── saving ──
         function saveSlide(s) {
             return sendContent({
-                action: 'save', slide_id: s.id, title: s.title, subtitle: s.subtitle, btn1_text: s.btn1_text, btn1_link: s.btn1_link,
+                action: 'save', slide_id: Math.max(0,s.id), title: s.title, subtitle: s.subtitle, btn1_text: s.btn1_text, btn1_link: s.btn1_link,
                 btn2_text: s.btn2_text, btn2_link: s.btn2_link, status: s.status, show_on_mobile: s.show_on_mobile ? '1' : '0',
                 show_gradient: s.show_gradient ? '1' : '0', remove_mobile_media: s.removeMobile ? '1' : ''
-            }, { media: s.file, media_mobile: s.mfile });
+            }, { media: s.file, media_mobile: s.mfile }).then(function(res){
+                if(res.ok){
+                    s.id=+res.slide_id;if(s.el)s.el.setAttribute('data-ve-slide',s.id);
+                    if(res.slide){s.media_path=res.slide.media_path||'';s.media_path_mobile=res.slide.media_path_mobile||'';}
+                    s.file=null;s.mfile=null;s.removeMobile=false;s.orig=snap(s);
+                }
+                return res;
+            });
         }
         function savePresident() {
             var f = { action: 'save_homepage_president', remove_photo: presRemove ? '1' : '' };
@@ -2577,12 +2879,14 @@
             draftState: function (value) {
                 if(!value)return {slides:slides,cur:cur,orderDirty:orderDirty,pres:pres,presOrig:presOrig,presFile:presFile,presRemove:presRemove,HC:HC,hc:hc,hcFiles:hcFiles,hcReset:hcReset};
                 slides=value.slides;cur=value.cur;orderDirty=value.orderDirty;pres=value.pres;presOrig=value.presOrig;presFile=value.presFile;presRemove=value.presRemove;HC=value.HC;hc=value.hc;hcFiles=value.hcFiles;hcReset=value.hcReset;
-                slides.forEach(function(slide){slide.el=S.doc.querySelector('[data-ve-slide="'+slide.id+'"]');if(slide.el){bindSlide(slide);paintBg(slide);paintFlags(slide);}});bindPresident(S.doc);renderDock();
+                $$('[data-ve-slide]',S.doc).forEach(function(el){var id=+el.getAttribute('data-ve-slide');if(id<0&&!slides.some(function(s){return s.id===id;}))el.remove();});
+                slides.forEach(function(slide){slide.el=S.doc.querySelector('[data-ve-slide="'+slide.id+'"]');if(!slide.el&&slide.id<=0)restoreNewSlide(slide);if(slide.el){bindSlide(slide);paintBg(slide);paintFlags(slide);}});bindPresident(S.doc);renderDock();
             },
             draftRebind: function(){slides.forEach(bindSlide);bindPresident(S.doc);renderDock();},
             mount: function (doc) {
                 var els = $$('[data-ve-slide]', doc);
                 slides.forEach(function (s) { s.el = els.filter(function (e) { return +e.getAttribute('data-ve-slide') === s.id; })[0] || null; });
+                slides.forEach(function(s){if(!s.el&&s.id<=0)restoreNewSlide(s);});
                 if (slides.length && !els.length) toast('The homepage file does not carry the editor markers, so the slideshow cannot be edited in place. Please update index.php.', 'error');
                 slides.forEach(bindSlide); bindPresident(doc);
                 renderDock();
@@ -2676,12 +2980,12 @@
                     it.push({ type: 'sep' });
                     it.push({ icon: 'circle-half', label: 'Shade', title: 'Dark shade behind the text so it is easy to read', on: !!sl.show_gradient, run: function () { sl.show_gradient = sl.show_gradient ? 0 : 1; paintFlags(sl); renderToolbar(); chrome(); } });
                     it.push({ icon: sl.show_on_mobile ? 'check2-square' : 'square', label: 'On phones', title: 'Show this slide on phones', on: !!sl.show_on_mobile, run: function () { sl.show_on_mobile = sl.show_on_mobile ? 0 : 1; renderToolbar(); chrome(); } });
-                    it.push({ icon: sl.status === 'published' ? 'eye' : 'eye-slash', label: sl.status === 'published' ? 'Published' : 'Draft', title: sl.status === 'published' ? 'Visitors can see this slide. Click to hide it.' : 'Hidden from visitors. Click to publish it.', on: sl.status === 'published',
+                    it.push({ icon: sl.status === 'published' ? 'eye' : 'eye-slash', label: sl.status === 'published' ? (sl.id<=0||sl.orig.status==='draft'?'Ready to publish':'Published') : 'Draft', title: sl.status === 'published' ? 'This slide will be visible after Publish and any required approval. Click to keep it hidden.' : 'Hidden from visitors. Click to include it when publishing.', on: sl.status === 'published',
                         run: function () { sl.status = sl.status === 'published' ? 'draft' : 'published'; paintFlags(sl); renderToolbar(); chrome(); renderDock(); } });
                     it.push({ type: 'sep' });
                     it.push({ icon: 'arrow-left', title: 'Move this slide earlier', disabled: i === 0, run: function () { move(i, i - 1); } });
                     it.push({ icon: 'arrow-right', title: 'Move this slide later', disabled: i === slides.length - 1, run: function () { move(i, i + 1); } });
-                    it.push({ icon: 'trash', title: 'Delete this slide', danger: true, run: function () { deleteSlide(sl); } });
+                    it.push({ icon: 'trash', title: sl.id<=0?'Remove new slide from draft':'Delete this slide', danger: true, run: function () { deleteSlide(sl); } });
                 }
                 return it;
             },
@@ -2694,10 +2998,12 @@
                 return { text: d ? plural(d, 'draft slide') + ' hidden from visitors' : 'Everything here is live', tone: d ? 'warn' : 'ok' };
             },
             actions: function () {
-                return { secondary: null, primary: { label: 'Publish', icon: 'cloud-upload', disabled: A.dirtyCount() === 0,
+                return { secondary: null, primary: { label: 'Publish', icon: 'cloud-upload', disabled: A.dirtyCount() === 0 && !draftPublishTarget(),
                     title: 'Slides and the president message go live as soon as you publish. To keep a slide private, set it to Draft first.' } };
             },
+            preparePublish:function(){var target=draftPublishTarget();if(target){target.status='published';paintFlags(target);renderDock();chrome();}},
             runPrimary: function () {
+                A.preparePublish();
                 var list = slides.filter(slideDirty), doPres = presDirty(), doOrder = orderDirty, doHome = hcCount() > 0;
                 if (!list.length && !doPres && !doOrder && !doHome) return;
                 var published = list.filter(function (s) { return s.status === 'published'; }).length;
@@ -2717,8 +3023,8 @@
                         return p.then(function () {
                             errs.forEach(function (m) { toast(m, 'error'); });
                             if (done && !errs.length) toast(published || doHome || doPres || doOrder ? 'Published. Your changes are live now.' : 'Draft saved. Your changes are not live yet.', 'ok');
-                            if (done && !errs.length) return refresh(cur);       // reload from the server: proves what was saved
-                            if (done) return refresh(cur);
+                            if (done && !errs.length) return (drafts&&drafts.hasDraft()?drafts.clear():Promise.resolve()).then(function(){return refresh(cur);});
+                            renderDock();chrome();
                         });
                     });
                 });
@@ -2814,6 +3120,7 @@
         var secs = (C.admin && C.admin.sections) || [];
         var curKey = C.page.section || (secs[0] && secs[0].key) || '';
         var edits = { sec: {}, person: {}, office: {}, order: {} };
+        var additions = {}, nextId = -1;
         var suppressClickUntil=0, initialOrders=new WeakMap();
         D.addEventListener('administration:updated',function(event){
             if(event.detail&&event.detail.source==='settings'&&Array.isArray(event.detail.sections))secs=event.detail.sections;
@@ -2824,15 +3131,105 @@
         }
 
         function secBy(k) { for (var i = 0; i < secs.length; i++) if (secs[i].key === k) return secs[i]; return null; }
-        function personBy(id) { for (var i = 0; i < secs.length; i++) for (var j = 0; j < secs[i].people.length; j++) if (secs[i].people[j].id === id) return { p: secs[i].people[j], sec: secs[i] }; return null; }
-        function officeBy(id) { for (var i = 0; i < secs.length; i++) for (var j = 0; j < secs[i].offices.length; j++) if (secs[i].offices[j].id === id) return { o: secs[i].offices[j], sec: secs[i] }; return null; }
+        function personBy(id) { if(additions[id] && additions[id].kind==='person')return {p:additions[id].item,sec:secBy(additions[id].section)};for (var i = 0; i < secs.length; i++) for (var j = 0; j < secs[i].people.length; j++) if (secs[i].people[j].id === id) return { p: secs[i].people[j], sec: secs[i] }; return null; }
+        function officeBy(id) { if(additions[id] && additions[id].kind==='office')return {o:additions[id].item,sec:secBy(additions[id].section)};for (var i = 0; i < secs.length; i++) for (var j = 0; j < secs[i].offices.length; j++) if (secs[i].offices[j].id === id) return { o: secs[i].offices[j], sec: secs[i] }; return null; }
+        function draftSections() {
+            return secs.map(function(section){var copy=Object.assign({},section);copy.people=section.people.slice();copy.offices=section.offices.slice();Object.keys(additions).forEach(function(id){var entry=additions[id];if(entry.section===section.key)copy[entry.kind==='office'?'offices':'people'].push(entry.item);});
+                var order=edits.order[section.key];if(order){var list=copy.layout==='offices'?copy.offices:copy.people;list.sort(function(a,b){var ai=order.indexOf(+a.id),bi=order.indexOf(+b.id);return (ai<0?order.length:ai)-(bi<0?order.length:bi);});}return copy;});
+        }
+        function announceDraft() { D.dispatchEvent(new CustomEvent('administration:updated',{detail:{source:'canvas',sections:draftSections(),sectionKey:curKey}})); }
+        function preparePortrait(img) {
+            if(!img)return;
+            function reveal(){
+                img.classList.add('is-loaded');
+                var wrap=img.closest('.skeleton-wrap'),group=img.closest('.skeleton-group');
+                if(wrap)wrap.classList.add('is-loaded');
+                if(group)group.classList.add('is-loaded');
+            }
+            // New/template-restored cards arrive after the page's DOMContentLoaded
+            // skeleton initialization. Bind their load lifecycle explicitly.
+            if(!img.__vePortraitSkeleton){
+                img.__vePortraitSkeleton=true;
+                img.addEventListener('load',reveal);
+                img.addEventListener('error',reveal);
+            }
+            img.loading='eager';
+            if(img.complete&&img.naturalWidth>0)reveal();
+        }
+        function renderAddition(entry) {
+            var doc=S.doc, id=entry.item.id, kind=entry.kind;
+            if(doc.querySelector('[data-ve-'+kind+'="'+id+'"]'))return;
+            var grid=doc.querySelector('[data-ve-grid][data-ve-key="'+cssEsc(entry.section)+'"]');if(!grid)return;
+            var template=grid.querySelector('[data-administration-template="'+kind+'"]');if(!template)return;
+            var card=template.content.firstElementChild.cloneNode(true);
+            card.setAttribute('data-ve-'+kind,id);card.style.transitionDelay='0s';
+            $$('[data-ve-id]',card).forEach(function(el){el.setAttribute('data-ve-id',id);});
+            var img=card.querySelector('[data-ve-img="'+kind+'-photo"]');
+            if(img){preparePortrait(img);img.src=entry.item.image||'/assets/images/logos/gnc-logo-v1.svg';img.alt=entry.item.name;}
+            if(kind==='person'){
+                card.querySelector('[data-ve-field="person-name"]').textContent=entry.item.name;
+                card.querySelector('[data-ve-field="person-role"]').textContent=entry.item.role;
+            }else paintOfficeDetails({el:card},entry.details);
+            grid.insertBefore(card,grid.querySelector('[data-ve-add]'));
+            var handle=doc.createElement('button');handle.type='button';handle.className='ve-drag-handle';handle.title='Hold and drag to swap positions';handle.setAttribute('aria-label',handle.title);handle.textContent='Move';card.appendChild(handle);
+            $$('[data-ve-field]',card).forEach(function(el){var field=el.getAttribute('data-ve-field');makeField(el,function(e,v){setPerson(id,field==='person-name'?'name':'role',v);});});
+        }
+        async function stageAddition(kind, key, fields, file) {
+            if(!drafts || !drafts.available())throw Error('Draft storage is unavailable. Reload the editor before adding a person.');
+            var section=secBy(key);if(!section || section.layout!==(kind==='office'?'offices':'people'))throw Error('Please choose a valid Administration section.');
+            var name=String(kind==='office'?fields.head_name:fields.name).trim();
+            if(!name || name.length>255)throw Error('Enter a full name (up to 255 characters).');
+            if(kind==='office' && !String(fields.office_name||'').trim())throw Error('Enter the office name.');
+            var role=String((kind==='office'?fields.head_role:fields.role)||'').trim();if(role.length>500)throw Error('The position must be at most 500 characters.');
+            if(file && (!/^image\/(jpeg|png|webp)$/.test(file.type)||file.size>5*MB))throw Error('Choose a JPG, PNG or WebP photo up to 5 MB.');
+            var existingId=+(fields[kind+'_id']||0),previous=additions[existingId],previousEdit=previous&&(kind==='office'?edits.office:edits.person)[existingId];
+            var id=previous?existingId:nextId--,item={id:id,name:name,role:role,image:file?previewUrl(file):(previous&&fields.remove_photo!=='1'?previous.item.image:''),archived:false};
+            if(kind==='office')Object.assign(item,{office:fields.office_name.trim(),contact:{phone:fields.phone||'',email:fields.email||'',location:fields.location||'',hours:fields.hours||''},services:String(fields.services||'').split('\n').filter(function(line){return line.trim();})});
+            additions[id]={kind:kind,section:key,item:item,details:kind==='office'?fields:null};
+            (kind==='office'?edits.office:edits.person)[id]=Object.assign({file:file||(previousEdit&&fields.remove_photo!=='1'?previousEdit.file:null),frame:file&&window.GNCImageFraming?window.GNCImageFraming.fileSettings(file):previousEdit&&previousEdit.frame},kind==='office'?{details:fields}:{name:name,role:role});
+            var oldCard=S.doc.querySelector('[data-ve-'+kind+'="'+id+'"]');if(oldCard)oldCard.remove();
+            renderAddition(additions[id]);announceDraft();chrome();
+            // The existing owner-scoped, revision-checked database snapshot also saves photo bytes.
+            try { await drafts.save(); }
+            catch(error){var card=S.doc.querySelector('[data-ve-'+kind+'="'+id+'"]');if(card)card.remove();delete additions[id];delete (kind==='office'?edits.office:edits.person)[id];if(previous){additions[id]=previous;(kind==='office'?edits.office:edits.person)[id]=previousEdit;renderAddition(previous);}announceDraft();chrome();throw error;}
+            var savedCard=S.doc.querySelector('[data-ve-'+kind+'="'+id+'"]');
+            if(savedCard)savedCard.scrollIntoView({block:'center',behavior:'instant'});
+            toast((previous?'Saved ':'Added ')+name+'. Saved as an unpublished draft. Publish when ready.','ok');
+        }
+        D.addEventListener('administration:add-draft',function(event){
+            var request=event.detail;if(S.busy){request.reject(Error('Please wait for the current save.'));return;}
+            run('Saving draft...',async function(){try{await stageAddition(request.kind,request.section,request.fields,request.file);request.resolve({success:true,sections:draftSections(),message:'Added and saved as an unpublished draft.'});}catch(error){request.reject(error);}});
+        });
+        D.addEventListener('administration:order-draft',function(event){var request=event.detail;
+            if(S.busy){request.reject(Error('Please wait for the current save.'));return;}
+            run('Saving draft...',async function(){try{edits.order[request.section]=request.ids;paintDraft();await drafts.save();announceDraft();request.resolve({success:true});}catch(error){request.reject(error);}});
+        });
+        D.addEventListener('administration:remove-draft',function(event){var request=event.detail;
+            if(S.busy){request.reject(Error('Please wait for the current save.'));return;}
+            run('Saving draft...',async function(){try{removeAddition(request.id);await drafts.save();request.resolve({success:true,sections:draftSections(),message:'Removed from the unpublished draft.'});}catch(error){request.reject(error);}});
+        });
+        function removeAddition(id){var entry=additions[id];if(!entry)throw Error('This draft person no longer exists.');var card=S.doc.querySelector('[data-ve-'+entry.kind+'="'+id+'"]');if(card)card.remove();delete additions[id];delete edits[entry.kind][id];Object.keys(edits.order).forEach(function(key){edits.order[key]=edits.order[key].filter(function(value){return +value!==+id;});});announceDraft();}
+        function paintDraft(){
+            Object.keys(additions).forEach(function(id){renderAddition(additions[id]);});
+            $$('[data-ve-field]',S.doc).forEach(function(el){var field=el.getAttribute('data-ve-field'),id=el.getAttribute('data-ve-id'),key=el.getAttribute('data-ve-key'),edit=edits.person[id];
+                if(edit && field==='person-name' && edit.name!=null)el.textContent=edit.name;
+                if(edit && field==='person-role' && edit.role!=null)el.textContent=edit.role;
+                if(edits.sec[key]&&field==='admin-section-title'&&edits.sec[key].title!=null)el.textContent=edits.sec[key].title;
+                if(edits.sec[key]&&field==='admin-section-desc'&&edits.sec[key].desc!=null)el.innerHTML=cleanHtml(edits.sec[key].desc);
+            });
+            ['person','office'].forEach(function(kind){Object.keys(edits[kind]).forEach(function(id){var edit=edits[kind][id],card=S.doc.querySelector('[data-ve-'+kind+'="'+id+'"]');if(!card)return;
+                if(kind==='office'&&edit.details)paintOfficeDetails({el:card},edit.details);
+                var img=card.querySelector('[data-ve-img="'+kind+'-photo"]');if(img){preparePortrait(img);if(edit.file)img.src=previewUrl(edit.file);if(edit.remove)img.style.opacity='.2';}
+            });});
+            Object.keys(edits.order).forEach(function(key){var grid=S.doc.querySelector('[data-ve-grid][data-ve-key="'+cssEsc(key)+'"]');if(!grid)return;edits.order[key].forEach(function(id){var card=grid.querySelector('[data-ve-person="'+id+'"],[data-ve-office="'+id+'"]');if(card)grid.insertBefore(card,grid.querySelector('[data-ve-add]'));});});
+        }
         function setSec(key, f, v) {
             var s = secBy(key); if (!s) return; var e = edits.sec[key] || (edits.sec[key] = {}); e[f] = v;
             if ((e.title == null || e.title === s.title) && (e.desc == null || e.desc === s.desc)) delete edits.sec[key];
         }
         function setPerson(id, f, v) {
             var r = personBy(id); if (!r) return; var e = edits.person[id] || (edits.person[id] = {}); e[f] = v;
-            if ((e.name == null || e.name === r.p.name) && (e.role == null || e.role === r.p.role) && !e.file && !e.remove) delete edits.person[id];
+            if (!additions[id] && (e.name == null || e.name === r.p.name) && (e.role == null || e.role === r.p.role) && !e.file && !e.remove) delete edits.person[id];
         }
         function cleanEdit(map, id) { var e = map[id]; if (e && !e.file && !e.remove && Object.keys(e).filter(function (k) { return k !== 'file' && k !== 'remove' && e[k] != null; }).length === 0) delete map[id]; }
         function unitOf(el) { var g = el.closest('[data-ve-grid]'); var u = el; while (u && u.parentNode !== g) u = u.parentNode; return u; }
@@ -2854,6 +3251,7 @@
         }
 
         function bind(doc) {
+            curKey=new URL(S.url,location.origin).searchParams.get('section') || (secs[0]&&secs[0].key) || curKey;
             $$('[data-ve-field]', doc).forEach(function (el) {
                 var f = el.getAttribute('data-ve-field'), key = el.getAttribute('data-ve-key') || curKey, id = +el.getAttribute('data-ve-id');
                 if (f === 'admin-section-title') makeField(el, function (e, v) { setSec(key, 'title', v); });
@@ -2892,7 +3290,8 @@
             var go = h('button', { type: 'button', class: 'btn btn-sm btn-gnc', text: o ? 'Apply changes' : 'Add office', on: { click: function () {
                 if (!f.office.value.trim() || !f.head.value.trim()) { toast('Please fill in the office name and the head’s name.', 'error'); return; }
                 if(f.phone.__contact && !f.phone.__contact.validate()) return;
-                closePop(); done({ office_name: f.office.value, head_name: f.head.value, head_role: f.role.value, phone: f.phone.value, email: f.email.value, location: f.loc.value, hours: f.hours.value, services: f.svc.value }, photo);
+                if(go.disabled || S.busy)return;go.disabled=true;
+                Promise.resolve(done({ office_name: f.office.value, head_name: f.head.value, head_role: f.role.value, phone: f.phone.value, email: f.email.value, location: f.loc.value, hours: f.hours.value, services: f.svc.value }, photo)).then(closePop).catch(function(error){toast(error.message,'error');}).finally(function(){go.disabled=false;});
             } } });
             return h('div', { class: 've-pop-form ve-grid2' }, [
                 h('div', { class: 've-pop-label ve-span2', text: o ? 'Edit office details' : 'Add an office' }),
@@ -2905,12 +3304,22 @@
         function personForm(section, done) {
             var name = h('input', { class: 'form-control form-control-sm', maxlength: 255, placeholder: 'Full name' });
             var role = h('input', { class: 'form-control form-control-sm', maxlength: 500, placeholder: 'Position (optional)' });
-            var photo = null, pn = h('small', { class: 've-pop-hint', text: 'A photo is optional. You can add one later.' });
+            var photo = null, pn = h('small', { class: 've-pop-hint', role:'status', text: 'Enter a name, then click Add to page to save. A photo is optional.' });
+            var error=h('div',{class:'ve-pop-hint text-danger',role:'alert',hidden:true});
+            function fail(message){error.textContent=message;error.hidden=false;}
+            var go=h('button', { type: 'button', class: 'btn btn-sm btn-gnc', text: 'Add to page', on: { click: function () {
+                if(go.disabled)return;
+                if(S.busy){fail('The editor is still loading or saving. Please wait, then click Add to page.');return;}
+                if(!name.value.trim()){fail('Enter the person’s full name.');name.focus();return;}
+                error.hidden=true;
+                go.disabled=true;
+                go.textContent='Adding…';
+                Promise.resolve(done({name:name.value,role:role.value},photo)).then(closePop).catch(function(error){fail(error.message);toast(error.message,'error');}).finally(function(){go.disabled=false;go.textContent='Add to page';});
+            } } });
             return h('div', { class: 've-pop-form' }, [h('div', { class: 've-pop-label', text: 'Add a person' }), formField('Name', name), formField('Position', role),
                 h('div', { class: 've-pop-row' }, [
-                    h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Choose photo', on: { click: function () { pickPersonPhoto(function (f) { photo = f; pn.textContent = 'Photo: ' + f.name; }, null, function () { return {name:name.value,key:'person:0',section:section}; }); } } }),
-                    h('button', { type: 'button', class: 'btn btn-sm btn-gnc', text: 'Add to page', on: { click: function () {
-                        if (!name.value.trim()) { name.focus(); return; } closePop(); done({ name: name.value, role: role.value }, photo); } } })]), pn]);
+                    h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Choose photo', on: { click: function () { pickPersonPhoto(function (f) { photo = f; pn.textContent = 'Photo selected: ' + f.name + '. Click Add to page to save this person.'; }, null, function () { return {name:name.value,key:'person:0',section:section}; }); } } }),
+                    go]), pn,error]);
         }
         function take(res, msg) {
             if (!res.ok) { toast(res.error, 'error'); return false; }
@@ -2918,26 +3327,39 @@
         }
         function reload() { loadFrame(S.url, true); }
 
-        // ── structural actions (add / archive / delete): done on purpose, so they apply straight away ──
+        // Additions stay private; existing archive/delete actions retain their live-content boundary.
         async function addPerson(key, pos, anchorX, anchorY) {
-            if (!await guardDirty('Adding a person reloads the preview, so your unsaved changes would be lost.\n\nContinue?')) return;
+            if(S.busy)return;
             openPop(personForm(key, function (v, photo) {
-                run('Adding...', function () { return sendContent({ action: 'admin_save_person', person_id: 0, section_key: key, name: v.name, role: v.role }, { photo: photo }).then(function (r) { if (take(r, 'Added. They are on the page now.')) reload(); }); });
+                return saveAddition('person',key,v,photo);
             }), anchorX, anchorY);
         }
         async function addOffice(key, anchorX, anchorY) {
-            if (!await guardDirty('Adding an office reloads the preview, so your unsaved changes would be lost.\n\nContinue?')) return;
-            openPop(officeForm(secBy(key), null, function (v, photo) {
-                run('Adding...', function () { v.action = 'admin_save_office'; v.office_id = 0; v.section_key = key; return sendContent(v, { photo: photo }).then(function (r) { if (take(r, 'Added. The office is on the page now.')) reload(); }); });
-            }), anchorX, anchorY, null, true);
+            if(S.busy){toast('Please wait for the editor to finish loading or saving.','error');return;}
+            if(!D.getElementById('adm-office-form')){toast('The office form is unavailable. Reload the editor and try again.','error');return;}
+            // Use the same persistent form and draft save as More Settings. Photo
+            // processing dialogs must not dispose of the office's entered fields.
+            closePop();
+            D.dispatchEvent(new CustomEvent('administration:open-office',{detail:{section:key}}));
+        }
+        function saveAddition(kind,key,fields,file){
+            return new Promise(function(resolve,reject){D.dispatchEvent(new CustomEvent('administration:add-draft',{detail:{kind:kind,section:key,fields:fields,file:file,resolve:resolve,reject:reject}}));});
         }
         async function archiveItem(kind, id, name) {
+            if(additions[id]){toast('Publish this draft before archiving it, or discard the draft.','error');return;}
             if (!await guardDirty('This reloads the preview, so your unsaved changes would be lost.\n\nContinue?')) return;
             if (!await window.AdminDialogs.confirm('Hide “' + name + '” from the website?\n\nThey are kept safely. You can bring them back from “More settings” → Archived.')) return;
             run('Archiving...', function () { var f = { action: kind === 'office' ? 'admin_archive_office' : 'admin_archive_person', archived: '1' }; f[kind === 'office' ? 'office_id' : 'person_id'] = id;
                 return sendContent(f).then(function (r) { if (take(r, 'Hidden from the website.')) reload(); }); });
         }
         async function deleteItem(kind, id, name) {
+            if(additions[id]){
+                if(!await window.AdminDialogs.confirm('Remove “'+name+'” from this unpublished draft?'))return;
+                var card=S.doc.querySelector('[data-ve-'+kind+'="'+id+'"]');if(card)card.remove();
+                delete additions[id];delete (kind==='office'?edits.office:edits.person)[id];
+                Object.keys(edits.order).forEach(function(key){edits.order[key]=edits.order[key].filter(function(value){return value!==id;});});
+                announceDraft();chrome();savePageDraft();return;
+            }
             if (!await guardDirty('This reloads the preview, so your unsaved changes would be lost.\n\nContinue?')) return;
             if (!await window.AdminDialogs.confirm('Delete “' + name + '” for good?\n\nThis removes them from the website now and cannot be undone. (Use Archive to keep them.)')) return;
             run('Deleting...', function () { var f = { action: kind === 'office' ? 'admin_delete_office' : 'admin_delete_person' }; f[kind === 'office' ? 'office_id' : 'person_id'] = id;
@@ -2945,6 +3367,7 @@
         }
         function shift(sel, dir) {
             var u = unitOf(sel.el), g = u.parentNode, sibs = Array.prototype.filter.call(g.children, function (c) { return c.getAttribute('data-ve-add') === null; });
+            sibs=sibs.filter(function(c){return c.tagName!=='TEMPLATE';});
             var i = sibs.indexOf(u), j = i + dir; if (j < 0 || j >= sibs.length) return;
             if (dir < 0) g.insertBefore(u, sibs[j]); else g.insertBefore(u, sibs[j].nextSibling);
             rememberOrder(g, sel.kind === 'office' ? 'data-ve-office' : 'data-ve-person');
@@ -2957,12 +3380,13 @@
             var img = sel.el.querySelector(sel.kind === 'office' ? '[data-ve-img="office-photo"]' : '[data-ve-img="person-photo"]');
             pickPersonPhoto(function (f) {
                 var m = photoOf(sel).map; var e = m[sel.id] || (m[sel.id] = {}); e.file = f; e.remove = false;
-                if (img) { img.src = previewUrl(f); img.style.opacity = ''; }
+                e.frame=window.GNCImageFraming?window.GNCImageFraming.fileSettings(f):null;
+                if (img) { preparePortrait(img);img.src = previewUrl(f); img.style.opacity = ''; }
                 renderToolbar(); chrome();
             }, img, function () {
                 var found = sel.kind === 'office' ? officeBy(sel.id) : personBy(sel.id);
                 var base = found && (found.o || found.p), edit = photoOf(sel).get() || {};
-                return {name:sel.kind === 'office' ? ((edit.details || {}).head_name || (base && base.name) || '') : (edit.name || (base && base.name) || ''),key:sel.kind+':'+sel.id};
+                return {name:sel.kind === 'office' ? ((edit.details || {}).head_name || (base && base.name) || '') : (edit.name || (base && base.name) || ''),key:sel.kind+':'+Math.max(0,sel.id),section:found&&found.sec.key};
             });
         }
         function removePhoto(sel) {
@@ -2981,8 +3405,9 @@
                 e.details = v;
                 if (photo) {
                     e.file = photo; e.remove = false;
+                    e.frame=window.GNCImageFraming?window.GNCImageFraming.fileSettings(photo):null;
                     var img = sel.el.querySelector('[data-ve-img="office-photo"]');
-                    if (img) { img.src = previewUrl(photo); img.style.opacity = ''; }
+                    if (img) { preparePortrait(img);img.src = previewUrl(photo); img.style.opacity = ''; }
                 }
                 paintOfficeDetails(sel, v);
                 renderToolbar(); chrome();
@@ -3021,8 +3446,13 @@
 
         var A = {
             consumeClick: function(){return Date.now()<suppressClickUntil;},
-            draftState: function(value){if(!value)return {edits:edits,curKey:curKey};edits=value.edits;curKey=value.curKey;
+            draftState: function(value){if(!value)return {edits:edits,additions:additions,nextId:nextId};edits=value.edits;additions=value.additions||{};nextId=value.nextId||-1;
+                $$('[data-ve-person],[data-ve-office]',S.doc).forEach(function(card){var id=+(card.getAttribute('data-ve-person')||card.getAttribute('data-ve-office'));if(id<0&&!additions[id])card.remove();});
+                paintDraft();announceDraft();
                 Object.keys(edits.office).forEach(function(id){var el=S.doc.querySelector('[data-ve-office="'+cssEsc(id)+'"]');if(el&&edits.office[id].details)paintOfficeDetails({el:el,id:+id},edits.office[id].details);});
+            },
+            draftRebind: function(){
+                $$('[data-ve-field="person-name"],[data-ve-field="person-role"]',S.doc).forEach(function(el){var id=+el.getAttribute('data-ve-id'),field=el.getAttribute('data-ve-field');makeField(el,function(e,v){setPerson(id,field==='person-name'?'name':'role',v);});});
             },
             mount: function (doc) { bind(doc); return false; },
             onLink: async function (a) {
@@ -3090,22 +3520,44 @@
                     for (var k in edits.sec) { if (!S.allowIncomplete && edits.sec[k].title != null && !edits.sec[k].title.trim()) { toast('A heading cannot be empty.', 'error'); return; } }
                     run('Publishing...', function () {
                         var p = Promise.resolve(), errs = [], done = 0;
-                        function step(fields, files) { p = p.then(function () { return sendContent(fields, files).then(function (r) { if (r.ok) { done++; if (r.sections) syncSettings(r.sections); } else errs.push(r.error); }); }); }
+                        function step(fields, files, draftId) { p = p.then(function () {
+                            if(typeof fields==='function')fields=fields();if(!fields)return;
+                            return sendContent(fields, files).then(function (r) {
+                                if (!r.ok) { errs.push(r.error);return; }
+                                done++;if(r.sections)syncSettings(r.sections);
+                                var kind=fields.action==='admin_save_person'?'person':fields.action==='admin_save_office'?'office':null;
+                                if(kind){var old=draftId||+fields[kind+'_id'],id=+(r[kind+'_id']||old);
+                                    delete edits[kind][old];
+                                    if(additions[old]){
+                                        delete additions[old];
+                                        var card=S.doc.querySelector('[data-ve-'+kind+'="'+old+'"]');
+                                        if(card){card.setAttribute('data-ve-'+kind,id);$$('[data-ve-id]',card).forEach(function(el){el.setAttribute('data-ve-id',id);});
+                                            $$('[data-ve-field]',card).forEach(function(el){var field=el.getAttribute('data-ve-field');makeField(el,function(e,v){setPerson(id,field==='person-name'?'name':'role',v);});});
+                                        }
+                                        Object.keys(edits.order).forEach(function(key){edits.order[key]=edits.order[key].map(function(value){return +value===old?id:value;});});
+                                    }
+                                }else if(fields.action==='admin_save_section')delete edits.sec[fields.section_key];
+                                else if(fields.action==='admin_reorder')delete edits.order[fields.section_key];
+                                announceDraft();
+                            });
+                        }); }
                         Object.keys(edits.sec).forEach(function (k) { var s = secBy(k), e = edits.sec[k]; step({ action: 'admin_save_section', section_key: k, title: e.title != null ? e.title : s.title, description: e.desc != null ? e.desc : s.desc }); });
                         Object.keys(edits.person).forEach(function (id) {
                             var r = personBy(+id), e = edits.person[id]; if (!r) return;
-                            step({ action: 'admin_save_person', person_id: id, section_key: r.sec.key, name: e.name != null ? e.name : r.p.name, role: e.role != null ? e.role : r.p.role, remove_photo: e.remove ? '1' : '' }, { photo: e.file });
+                            if(e.file&&e.frame&&window.GNCImageFraming)window.GNCImageFraming.setFileSettings(e.file,e.frame);
+                            step({ action: 'admin_save_person', person_id: +id<0?0:id, section_key: r.sec.key, name: e.name != null ? e.name : r.p.name, role: e.role != null ? e.role : r.p.role, remove_photo: e.remove ? '1' : '' }, { photo: e.file }, +id);
                         });
                         Object.keys(edits.office).forEach(function (id) {
                             var r = officeBy(+id), e = edits.office[id]; if (!r) return; var o = r.o, c = o.contact || {};
-                            step(Object.assign({ action: 'admin_save_office', office_id: id, section_key: r.sec.key, office_name: o.office, head_name: o.name, head_role: o.role, phone: c.phone, email: c.email, location: c.location, hours: c.hours, services: (o.services || []).join('\n') }, e.details || {}, { remove_photo: e.remove ? '1' : '' }), { photo: e.file });
+                            if(e.file&&e.frame&&window.GNCImageFraming)window.GNCImageFraming.setFileSettings(e.file,e.frame);
+                            step(Object.assign({ action: 'admin_save_office', section_key: r.sec.key, office_name: o.office, head_name: o.name, head_role: o.role, phone: c.phone, email: c.email, location: c.location, hours: c.hours, services: (o.services || []).join('\n') }, e.details || {}, { office_id:+id<0?0:id,remove_photo: e.remove ? '1' : '' }), { photo: e.file }, +id);
                         });
-                        Object.keys(edits.order).forEach(function (k) { step({ action: 'admin_reorder', section_key: k, order: JSON.stringify(edits.order[k]) }); });
+                        Object.keys(edits.order).forEach(function (k) { step(function(){return edits.order[k].some(function(id){return +id<0;})?null:{ action: 'admin_reorder', section_key: k, order: JSON.stringify(edits.order[k]) };}); });
                         return p.then(function () {
                             errs.forEach(function (m) { toast(m, 'error'); });
                             if (done && !errs.length) { toast('Published. Your changes are live now.', 'ok'); }
                             if (!errs.length) edits = { sec: {}, person: {}, office: {}, order: {} };
-                            if (done) reload();
+                            if (done && !errs.length) reload();
                         });
                     });
                 });
@@ -3537,7 +3989,7 @@
                     on: { click: function () { if (tab !== k) { closePop(); tab = k; renderStrip(); } } } },
                     [icon(LISTS[k].icon), h('span', { text: LISTS[k].label + ' (' + slidesFor(LISTS[k]).length + ')' })]);
             })));
-            var track = h('div', { class: 've-dock-track', role: 'list' });
+            var track = h('div', { class: 've-dock-track' + (L.itemType === 'uniform' ? ' ve-dock-track--uniform' : ''), role: 'list' });
             slidesFor(L).forEach(function (s, i) {
                 var change=slideReplacements[replacementKey(L,s)], mediaUrl=change?change.url:s.image_url;
                 // Banner thumbnails follow the device-specific background (staged draft or published) shown in the preview.
@@ -4033,7 +4485,7 @@
             select(null); closePop(); chrome();
         }
         async function removeDepartment() {
-            if (!DD || DD.kind !== 'college') return;
+            if (!DD || (DD.kind !== 'college' && DD.kind !== 'basic')) return;
             closePop();
             if (dRemove.department) {
                 delete dRemove.department;
@@ -4047,7 +4499,7 @@
             toast('Deletion pending. Publish to delete the department, or cancel to keep it.', 'ok');
         }
         function deptOptions(x, y) {
-            if (!DD || (DD.kind !== 'college' && DD.kind !== 'graduate')) return;
+            if (!DD || (DD.kind !== 'college' && DD.kind !== 'basic' && DD.kind !== 'graduate')) return;
             var hidden = !!DD.archived;
             var toggle = h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', on: { click: async function () {
                 closePop(); if (!await okToReload()) return;
@@ -4060,7 +4512,7 @@
             } } }, [icon(hidden ? 'eye' : 'eye-slash'), hidden ? ' Show on the website' : ' Hide from the website']);
             var del = h('button', { type: 'button', class: 'btn btn-sm btn-outline-danger', on: { click: removeDepartment } }, [icon('trash'), dRemove.department ? ' Cancel department deletion' : ' Delete this department']);
             var headerControls = [];
-            headerControls.push(h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Edit department short code', on: { click: function () {
+            if (DD.kind !== 'basic') headerControls.push(h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary', text: 'Edit department short code', on: { click: function () {
                 formPop(btnPageOpts, 'Department short code', [{ name: 'code', label: 'Short code', value: dVal('short_code'), max: 20, required: true, placeholder: 'e.g. CON' }], 'Apply', function (values) {
                     if (!/^[A-Za-z0-9][A-Za-z0-9-]{1,19}$/.test(values.code.trim())) { toast('Enter a short code of 2–20 letters or numbers (a dash is allowed).', 'error'); return; }
                     dSet('short_code', values.code.trim().toUpperCase()); chrome();
@@ -4078,10 +4530,14 @@
                     });
                     headerControls.push(h('label',{class:'ve-pop-row'},[mobileBackground,'Hide background image on mobile']));
                 }
+            }
+            if ((DD.kind === 'college' || DD.kind === 'basic') && TD) {
                 var color = h('input', {type:'color',class:'ve-color','aria-label':'Department colour',value:/^#[0-9a-f]{6}$/i.test(dVal('theme_color'))?dVal('theme_color'):'#1F5E2C'});
                 color.addEventListener('input',function(){dSet('theme_color',color.value.toUpperCase());previewDepartmentColor(S.doc);chrome();});
-                headerControls.push(h('div',{class:'ve-pop-label',text:'Card and header colour'}));
+                headerControls.push(h('div',{class:'ve-pop-label',text:DD.kind === 'basic' ? 'Card colour' : 'Card and header colour'}));
                 headerControls.push(h('div',{class:'ve-pop-row'},[color,h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Use default colour',on:{click:function(){dSet('theme_color','');color.value='#1F5E2C';previewDepartmentColor(S.doc);chrome();}}})]));
+            }
+            if (DD.kind === 'college' && TD) {
                 if (TD.fields.header_extra_text) headerControls.push(h('button', {type:'button',class:'btn btn-sm btn-outline-success',text:'Add header text box',on:{click:addHeaderText}}));
                 [['prefix', 'header prefix'], ['subject', 'header title'], ['blurb', 'line under the title']].forEach(function (entry) {
                     if (!headerHidden('header_' + entry[0] + '_hidden')) return;
@@ -4436,17 +4892,51 @@
             it.push({ icon: 'arrow-right', title: 'Move later', disabled: r.i === n - 1, run: function () { moveItem(r, 1); } });
             it.push({ icon: 'trash', title: 'Delete this card', danger: true, run: function () { deleteItem(r); } });
         }
+        function previewCurriculum() {
+            if (!PD || !S.doc) return;
+            var section = S.doc.querySelector('#curriculum'), container = section && section.querySelector('.container');
+            if (!container) return;
+            var saved = container.querySelector(':scope > .gnc-pdf-viewer'), preview = container.querySelector('[data-ve-curriculum-preview]');
+            if (saved) saved.style.display = pPdf ? 'none' : '';
+            if (preview) {
+                var previous = preview.querySelector('.gnc-pdf-viewer');
+                if (previous && S.win.GNCPdfViewer) S.win.GNCPdfViewer.destroy(previous);
+                preview.remove();
+            }
+            section.setAttribute('data-warning-value', pPdf ? (pPdf.file ? pPdf.file.name : '') : (PD.pdf_url || ''));
+            if (!pPdf) return;
+            preview = S.doc.createElement('div');
+            preview.setAttribute('data-ve-curriculum-preview', '');
+            var note = S.doc.createElement('p');
+            note.className = 'text-muted';
+            note.textContent = 'Curriculum PDF will be removed when you publish.';
+            if (!pPdf.file) preview.appendChild(note);
+            if (pPdf.file) {
+                if (!pPdf.url) pPdf.url = previewUrl(pPdf.file);
+                var template = container.querySelector('[data-ve-curriculum-viewer]');
+                var viewer = template.content.querySelector('.gnc-pdf-viewer').cloneNode(true);
+                viewer.setAttribute('data-pdf-src', pPdf.url);
+                viewer.querySelectorAll('a').forEach(function(link) {
+                    link.href = pPdf.url;
+                    if (link.hasAttribute('download')) link.download = pPdf.file.name;
+                });
+                preview.appendChild(viewer);
+            }
+            var manage = container.querySelector('[data-ve-program-section="curriculum"]');
+            container.insertBefore(preview, manage ? manage.parentElement : null);
+            if (pPdf.file && S.win.GNCPdfViewer) S.win.GNCPdfViewer.init(viewer);
+        }
         function curriculumOptions(x,y) {
             if(!PD)return;
             var box=h('div',{class:'ve-pop-form'},[h('strong',{class:'ve-pop-label',text:'Curriculum PDF'}),h('small',{class:'ve-pop-hint',text:pPdf?(pPdf.file?pPdf.file.name+' · not published':'Removal pending'):PD.pdf_name||'No curriculum PDF uploaded'})]);
             box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Upload or replace PDF',on:{click:function(){
                 pickFile('application/pdf,.pdf',function(file){
                     if(!/\.pdf$/i.test(file.name)||file.size>20*MB){toast('Choose a PDF of up to 20 MB.','error');return;}
-                    pPdf={file:file};closePop();chrome();toast('PDF ready. Save draft or Publish when ready.','ok');
+                    pPdf={file:file};previewCurriculum();closePop();chrome();toast('PDF ready. Save draft or Publish when ready.','ok');
                 });
             }}}));
-            if(PD.pdf_url||(pPdf&&pPdf.file))box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-danger',text:'Remove PDF',on:{click:function(){pPdf=PD.pdf_url?{remove:true}:null;closePop();chrome();}}}));
-            if(pPdf)box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Undo PDF change',on:{click:function(){pPdf=null;closePop();chrome();}}}));
+            if(PD.pdf_url||(pPdf&&pPdf.file))box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-danger',text:'Remove PDF',on:{click:function(){pPdf=PD.pdf_url?{remove:true}:null;previewCurriculum();closePop();chrome();}}}));
+            if(pPdf)box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Undo PDF change',on:{click:function(){pPdf=null;previewCurriculum();closePop();chrome();}}}));
             box.appendChild(h('small',{class:'ve-pop-hint',text:'Changes are private until you publish.'}));
             openPop(box,x,y);
         }
@@ -4473,10 +4963,6 @@
             (C.programDepartments||[]).forEach(function(unit){department.appendChild(h('option',{value:unit.id,text:unit.name}));});department.value=String(metaVal('dept_id'));
             department.addEventListener('change',function(){pMetaSet('dept_id',Number(department.value),PD.dept_id);chrome();});
             box.appendChild(h('label',{class:'ve-pop-label',text:'Department'},[department]));
-            box.appendChild(h('div',{class:'ve-pop-row'},[
-                h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Replace program seal',on:{click:function(){programMedia('seal');}}})
-            ]));
-            if(PD.seal_upload||(pMedia.seal&&pMedia.seal.file))box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Use default seal',on:{click:function(){pMedia.seal={remove:true};closePop();chrome();}}}));
             var cur = metaVal('theme'), curHex = metaVal('theme_custom');
             var sws = h('div', { class: 've-swatches' });
             Object.keys(PD.presets).forEach(function (k) {
@@ -4493,7 +4979,6 @@
             });
             box.appendChild(h('label', { class: 've-pop-label', text: 'Page colour' }));
             box.appendChild(h('div', { class: 've-pop-row' }, [sws, color]));
-            box.appendChild(h('button',{type:'button',class:'btn btn-sm btn-outline-secondary',text:'Manage curriculum PDF',on:{click:function(){curriculumOptions(x,y);}}}));
             box.appendChild(h('small', { class: 've-pop-hint', text: 'Page colour previews immediately. Save draft to keep your changes; Publish updates the website.' }));
             box.appendChild(h('button', { type: 'button', class: 'btn btn-sm btn-outline-danger', on: { click: async function () {
                 closePop();
@@ -4573,7 +5058,7 @@
                 if(PD&&pRows.uniform){uniformWorkingRows();renderUniformPreview();renderStrip();}
                 bindEditing(S.doc);
             },
-            draftRebind:function(){bindEditing(S.doc);restoreSlideReplacements();previewProgramTheme();if(pMedia.seal&&pMedia.seal.file){var seal=S.doc.querySelector('.about-feature-seal-wrap img');if(seal)seal.src=previewUrl(pMedia.seal.file);}},
+            draftRebind:function(){bindEditing(S.doc);restoreSlideReplacements();previewProgramTheme();previewCurriculum();if(pMedia.seal&&pMedia.seal.file){var seal=S.doc.querySelector('.about-feature-seal-wrap img');if(seal)seal.src=previewUrl(pMedia.seal.file);}},
             mount: function (doc) {
                 if (departmentOrder) { departmentOrder.dispose(); departmentOrder=null; }
                 resetPending();
@@ -4787,7 +5272,7 @@
             },
             dirtyCount: function () { return pendingCount(); },
             consumeClick: function () { return departmentOrder && departmentOrder.consumeClick(); },
-            hasPageOptions: function () { return (mode === 'dept' && DD && DD.kind === 'college') || mode === 'prog'; },
+            hasPageOptions: function () { return (mode === 'dept' && DD && (DD.kind === 'college' || DD.kind === 'basic')) || mode === 'prog'; },
             pageOptions: function (x, y) { if (mode === 'dept') deptOptions(x, y); else if (mode === 'prog') progOptions(x, y); },
             status: function () {
                 if (DD && dRemove.department) return { text: 'Department deletion pending — Publish to delete', tone: 'warn' };
@@ -4798,7 +5283,7 @@
                 return { text: 'Click a department or program to open it, then click any text or picture to edit it.', tone: 'ok' };
             },
             actions: function () {
-                if (departmentOrder || mode === 'dept' || mode === 'prog' || mode === 'basic') return { secondary: mode === 'dept' && DD && DD.kind === 'college' ? { label: dRemove.department ? 'Cancel deletion' : 'Delete department', icon: 'trash', title: 'Stage or cancel department deletion; Publish applies it' } : null, primary: { label: 'Publish', icon: 'cloud-upload', disabled: pendingCount() === 0, title: 'Your changes go live on the website as soon as you publish.' } };
+                if (departmentOrder || mode === 'dept' || mode === 'prog' || mode === 'basic') return { secondary: null, primary: { label: 'Publish', icon: 'cloud-upload', disabled: pendingCount() === 0, title: 'Your changes go live on the website as soon as you publish.' } };
                 return { secondary: null, primary: C.hasDrawer ? { label: 'More settings', icon: 'sliders', title: 'Open the extra settings for this page' } : null };
             },
             runSecondary: removeDepartment,
@@ -4811,7 +5296,7 @@
                         return (mode === 'prog' ? saveProg() : saveDept()).then(function (r) {
                             r.errs.forEach(function (m) { toast(m, 'error'); });
                             if (r.did && !r.errs.length) {
-                                if (r.departmentDeleted) reloadEditor('Department deleted.', { page: 'college-departments', sub: '' });
+                                if (r.departmentDeleted) reloadEditor('Department deleted.', { page: DD.kind === 'basic' ? 'basic-education' : 'college-departments', sub: '' });
                                 else if (reasonsChanged) toast('Published. Your changes are live now.', 'ok');
                                 else reloadEditor('Published. Your changes are live now.', routeNow(), true);
                             }

@@ -37,6 +37,17 @@ epAssert($p1['page_key']!==editorPresencePage('programs','/programs/bsit')['page
 $org1=editorPresencePage('student-organizations','/pages/student%20life/student-org.php?p=1&category=2');
 $org2=editorPresencePage('student-organizations','/pages/student%20life/student-org.php?p=3');
 epAssert($org1===$org2,'Organization directory pagination shares presence.');
+$administration=editorPresencePage('administration','/pages/about/administration.php');
+foreach(['board-of-trustees','corporate-officers','board-of-administration','heads-of-student-services'] as $section){
+    $tab=editorPresencePage('administration','/pages/about/administration.php?section='.$section.'&navigation=1&ce_preview=1');
+    epAssert($tab===$administration,'Administration tabs share the collection draft identity.');
+    $tabPeer=['page_key'=>$tab['page_key'],'scope_key'=>$tab['scope']];
+    foreach(['save','save_recovery','submit_review'] as $action){
+        editorPresenceValidateTarget($tabPeer,'/admin/action/editor-draft-handler.php',['action'=>$action,'page'=>'administration','route'=>'/pages/about/administration.php']);
+        $checks++;
+    }
+    epConflict(fn()=>editorPresenceValidateTarget($tabPeer,'/admin/action/editor-draft-handler.php',['action'=>'save','page'=>'home','route'=>'/']),'Administration peers cannot save another page draft.');
+}
 epConflict(fn()=>editorPresencePeer($db,$a['token']),'A peer token from another session/account is rejected.');
 $db->prepare('UPDATE content_editor_presence SET seen_at=? WHERE user_id=1')->execute([time()-46]);
 epAssert(count(editorPresenceSnapshot($db,$peerB)['users'])===1,'Disconnected users expire after 45 seconds.');

@@ -60,6 +60,16 @@ body .na-tabs {
 }
 
 /* Preserve the attached category editing tools. */
+body .ve-admission-add:is([data-ve-admission-add-category], [data-ve-admission-add-school]) {
+    border-radius: var(--gnc-choice-radius);
+}
+body .enrollment-tabs .ve-enrollment-add-tab {
+    padding: 6px 20px;
+    border: 1px dashed #1f5e2c;
+    background: #fff;
+    color: #1f5e2c;
+    font: 600 13px/1.4 'Inter', sans-serif;
+}
 body .ve-admission-category {
     border-radius: var(--gnc-choice-radius);
 }

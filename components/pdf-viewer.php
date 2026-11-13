@@ -18,12 +18,13 @@ function renderPdfViewer(?string $pdfUrl, array $opts = []): void {
     static $assetsPrinted = false;
 
     // Same-site upload paths only
-    if (!$pdfUrl || strpos($pdfUrl, '/uploads/') !== 0 || strpos($pdfUrl, '..') !== false) {
+    $emptyTemplate = $pdfUrl === null && !empty($opts['editor_template']);
+    if (!$emptyTemplate && (!$pdfUrl || strpos($pdfUrl, '/uploads/') !== 0 || strpos($pdfUrl, '..') !== false)) {
         return;
     }
 
     $dl = trim((string)($opts['download_name'] ?? ''));
-    if ($dl === '') $dl = basename($pdfUrl);
+    if ($dl === '') $dl = $emptyTemplate ? 'curriculum.pdf' : basename($pdfUrl);
     if (!preg_match('/\.pdf$/i', $dl)) $dl .= '.pdf';
 
     $title = trim((string)($opts['title'] ?? ''));
@@ -50,6 +51,7 @@ function renderPdfViewer(?string $pdfUrl, array $opts = []): void {
             echo '<script src="/assets/js/pdf-viewer.js" defer></script>' . "\n";
         }
     ?>
+<?php if ($emptyTemplate): ?><template data-ve-curriculum-viewer><?php endif; ?>
 <section class="gnc-pdf-viewer" data-pdf-src="<?= $e($pdfUrl) ?>" aria-label="<?= $e($title) ?> (PDF)">
     <div class="gnc-pdf-toolbar" role="toolbar" aria-label="PDF controls">
 
@@ -110,5 +112,6 @@ function renderPdfViewer(?string $pdfUrl, array $opts = []): void {
         </p>
     </noscript>
 </section>
+<?php if ($emptyTemplate): ?></template><?php endif; ?>
     <?php
 }

@@ -1,8 +1,9 @@
 <?php
 /** Reauthenticate the acting account before deleting content or queuing its deletion. */
 function verifyContentDeletePassword(string $kind,string $password): void {
-    if(!in_array($kind,['news','announcement','event'],true))throw new InvalidArgumentException('Invalid content type.',400);
-    if(!hasPermission('delete_'.$kind)&&!hasPermission('delete_own_'.$kind))throw new RuntimeException('You do not have permission to delete this content.',403);
+    if(!in_array($kind,['news','announcement','event','slide'],true))throw new InvalidArgumentException('Invalid content type.',400);
+    $allowed=$kind==='slide'?hasPermission('manage_page_content'):(hasPermission('delete_'.$kind)||hasPermission('delete_own_'.$kind));
+    if(!$allowed)throw new RuntimeException('You do not have permission to delete this content.',403);
     if($password===''||strlen($password)>4096)throw new InvalidArgumentException('Enter your current password to confirm deletion.',403);
     $id=(int)$_SESSION['user_id'];
     if(!authRateAllowed('delete-content-password',(string)$id,5,900))throw new RuntimeException('Too many confirmation attempts. Wait 15 minutes before trying again.',429);
@@ -16,9 +17,10 @@ function verifyContentDeletePassword(string $kind,string $password): void {
     $db->prepare('DELETE FROM auth_rate_limits WHERE bucket_hash=?')->execute([hash('sha256','delete-content-password:'.$id)]);
 }
 function contentDeletePasswordBoundary(string $route): void {
-    $kind=['/admin/action/create-news.php'=>'news','/admin/action/create-announcement.php'=>'announcement','/admin/events.php'=>'event'][$route]??null;
+    $kind=['/admin/action/create-news.php'=>'news','/admin/action/create-announcement.php'=>'announcement','/admin/events.php'=>'event','/admin/action/page-content-handler.php'=>'slide'][$route]??null;
     $action=$kind==='event'?($_POST['ajax_action']??''):($_POST['action']??'');
     if(!$kind||($_SERVER['REQUEST_METHOD']??'GET')!=='POST'||!in_array($action,['delete','bulk_delete'],true))return;
+    if($kind==='slide'&&$action!=='delete')return;
     $password=is_string($_POST['current_password']??null)?$_POST['current_password']:'';
     unset($_POST['current_password']); // Never persist a password in an approval payload.
     // The one-use approval worker is authenticated by rbacRequestBoundary; its reviewer
@@ -34,7 +36,7 @@ function contentDeletePasswordBoundary(string $route): void {
         verifyContentDeletePassword($kind,$password);
     }catch(Throwable $e){
         $message=$e instanceof PDOException?'Deletion confirmation is unavailable. Nothing was deleted.':$e->getMessage();
-        if($kind==='event'){
+        if($kind==='event'||$kind==='slide'){
             http_response_code(in_array($e->getCode(),[400,401,403,429],true)?$e->getCode():503);
             header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');
             echo json_encode(['success'=>false,'error'=>$message,'message'=>$message]);exit;

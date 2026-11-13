@@ -5,9 +5,9 @@
  *   Board of Trustees · Corporate Officers · Board of Administration ·
  *   Heads of Student Services
  *
- * Included from content-edit.php for the 'administration' page. Saves go to
- * /admin/action/page-content-handler.php (admin_* actions); every save
- * returns the refreshed sections, which this script re-renders.
+ * Included from content-edit.php for the 'administration' page. New entries
+ * share the canvas private-draft flow; live-record actions retain the existing
+ * page-content-handler.php publishing and approval boundary.
  */
 $admInitial = administrationAdminPayload();
 $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE;
@@ -33,7 +33,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
 <!-- ───────── Person modal (Trustees / Officers / Administration) ───────── -->
 <div class="modal fade" id="admPersonModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <form data-content-publish class="modal-content" id="adm-person-form" autocomplete="off">
+    <form class="modal-content" id="adm-person-form" autocomplete="off">
       <div class="modal-header">
         <h5 class="modal-title" id="adm-person-title">Add person</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -69,7 +69,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button data-content-publish type="submit" class="btn-gnc-primary" id="adm-person-save"><i class="bi bi-check2-circle"></i> Save</button>
+        <button type="submit" class="btn-gnc-primary" id="adm-person-save"><i class="bi bi-check2-circle"></i> Save</button>
       </div>
     </form>
   </div>
@@ -78,7 +78,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
 <!-- ───────── Office modal (Heads of Student Services) ───────── -->
 <div class="modal fade" id="admOfficeModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-    <form data-content-publish class="modal-content" id="adm-office-form" autocomplete="off">
+    <form class="modal-content" id="adm-office-form" autocomplete="off">
       <div class="modal-header">
         <h5 class="modal-title" id="adm-office-title">Add office</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -140,7 +140,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button data-content-publish type="submit" class="btn-gnc-primary" id="adm-office-save"><i class="bi bi-check2-circle"></i> Save</button>
+        <button type="submit" class="btn-gnc-primary" id="adm-office-save"><i class="bi bi-check2-circle"></i> Save</button>
       </div>
     </form>
   </div>
@@ -263,6 +263,16 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
 
     // ── network ──
     function send(action, fields, file) {
+        var kind=action==='admin_save_person'?'person':action==='admin_save_office'?'office':null;
+        if(kind && +fields[kind+'_id']<=0){
+            return new Promise(function(resolve,reject){document.dispatchEvent(new CustomEvent('administration:add-draft',{detail:{kind:kind,section:fields.section_key,fields:fields,file:file,resolve:resolve,reject:reject}}));});
+        }
+        if(action==='admin_reorder' && JSON.parse(fields.order).some(function(id){return +id<0;})){
+            return new Promise(function(resolve,reject){document.dispatchEvent(new CustomEvent('administration:order-draft',{detail:{section:fields.section_key,ids:JSON.parse(fields.order),resolve:resolve,reject:reject}}));});
+        }
+        if((action==='admin_delete_person'||action==='admin_delete_office') && +(fields.person_id||fields.office_id)<0){
+            return new Promise(function(resolve,reject){document.dispatchEvent(new CustomEvent('administration:remove-draft',{detail:{id:+(fields.person_id||fields.office_id),resolve:resolve,reject:reject}}));});
+        }
         var fd = new FormData();
         fd.append('action', action);
         fd.append('csrf_token', CSRF);
@@ -323,7 +333,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
             actBtn('down', 'btn-outline-secondary', 'bi-arrow-down', 'Move down (show later)', i === count - 1) +
             '</span>' +
             actBtn('edit', 'btn-outline-primary', 'bi-pencil', 'Change the details or photo', false, 'Edit') +
-            (sec.can_archive ? actBtn('archive', 'btn-outline-secondary', 'bi-archive', 'Archive (hidden from the website, you can restore it later)', false, 'Archive') : '') +
+            (sec.can_archive && it.id > 0 ? actBtn('archive', 'btn-outline-secondary', 'bi-archive', 'Archive (hidden from the website, you can restore it later)', false, 'Archive') : '') +
             actBtn('delete', 'btn-outline-danger', 'bi-trash', 'Delete for good', false, 'Delete') +
             '</div></div>';
     }
@@ -352,8 +362,8 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
         var noun = isOffices ? 'office' : 'person';
 
         $('adm-section').innerHTML =
-            '<div class="adm-note"><i class="bi bi-lightning-charge-fill"></i><span><strong>Changes go live right away.</strong> ' +
-              'There is no separate Publish step here. As soon as you save, visitors see the change on the website.</span></div>' +
+            '<div class="adm-note"><i class="bi bi-lightning-charge-fill"></i><span><strong>Adding and publishing are separate.</strong> ' +
+              'New people and offices are saved as unpublished drafts. Use Publish or Submit for approval above when ready. Changes to existing live records here retain their confirmation and approval requirements.</span></div>' +
             '<div class="data-card mb-3">' +
               '<div class="data-card-header"><span class="data-card-title">Heading above the cards</span></div>' +
               '<form data-content-publish class="adm-meta-form" id="adm-meta-form">' +
@@ -366,7 +376,7 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
             '</div>' +
             '<div class="data-card">' +
               '<div class="data-card-header">' +
-                '<span class="data-card-title">' + (isOffices ? 'Offices' : 'People') + ' shown on the website <span class="adm-count">' + active.length + '</span></span>' +
+                '<span class="data-card-title">' + (isOffices ? 'Offices' : 'People') + ' in this editor <span class="adm-count">' + active.length + '</span></span>' +
                 '<button type="button" class="btn-gnc-gold btn-sm ms-auto" id="adm-add"><i class="bi bi-plus-lg"></i> ' + addLabel + '</button>' +
               '</div>' +
               (rows
@@ -550,8 +560,9 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
     function openPerson(p) {
         editingPerson = p;
         $('adm-person-photo').dataset.sectionKey = state.active;
-        $('adm-person-photo').dataset.profileKey = 'person:' + (p ? p.id : 0);
+        $('adm-person-photo').dataset.profileKey = 'person:' + (p ? Math.max(0,p.id) : 0);
         $('adm-person-title').textContent = p ? 'Edit this person' : 'Add a new person';
+        $('adm-person-save').textContent = p ? 'Save' : 'Add to page';
         $('adm-person-name').value = p ? p.name : '';
         $('adm-person-role').value = p ? p.role : '';
         $('adm-person-photo').value = '';
@@ -564,6 +575,8 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
     $('adm-person-form').addEventListener('submit', function (e) {
         e.preventDefault();
         var btn = $('adm-person-save');
+        if(btn.disabled)return;
+        if(!$('adm-person-name').value.trim()){showError('adm-person-error','Enter the person’s full name.');$('adm-person-name').focus();return;}
         btn.disabled = true;
         send('admin_save_person', {
             section_key: state.active,
@@ -579,12 +592,21 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
 
     // ── office modal ──
     var editingOffice = null;
-    function openOffice(o) {
+    var editingOfficeSection = null;
+    document.addEventListener('administration:open-office', function (event) {
+        var key = event.detail && event.detail.section;
+        var section = state.sections.filter(function (item) { return item.key === key && item.layout === 'offices'; })[0];
+        if (!section) { flash('Please choose a valid office section.', true); return; }
+        openOffice(null, key);
+    });
+    function openOffice(o, sectionKey) {
         editingOffice = o;
-        $('adm-office-photo').dataset.sectionKey = state.active;
-        $('adm-office-photo').dataset.profileKey = 'office:' + (o ? o.id : 0);
+        editingOfficeSection = sectionKey || state.active;
+        $('adm-office-photo').dataset.sectionKey = editingOfficeSection;
+        $('adm-office-photo').dataset.profileKey = 'office:' + (o ? Math.max(0,o.id) : 0);
         var c = (o && o.contact) || {};
         $('adm-office-title').textContent = o ? 'Edit this office' : 'Add a new office';
+        $('adm-office-save').textContent = o ? 'Save' : 'Add to page';
         $('adm-office-name').value     = o ? o.office : '';
         $('adm-office-head').value     = o ? o.name : '';
         $('adm-office-role').value     = o ? o.role : '';
@@ -604,9 +626,11 @@ $admFlags   = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON
     $('adm-office-form').addEventListener('submit', function (e) {
         e.preventDefault();
         var btn = $('adm-office-save');
+        if(btn.disabled)return;
+        if(!$('adm-office-name').value.trim()||!$('adm-office-head').value.trim()){showError('adm-office-error','Enter the office name and the head’s full name.');return;}
         btn.disabled = true;
         send('admin_save_office', {
-            section_key: state.active,
+            section_key: editingOfficeSection,
             office_id: editingOffice ? editingOffice.id : 0,
             office_name: $('adm-office-name').value,
             head_name: $('adm-office-head').value,

@@ -66,6 +66,9 @@
             var part = el.tagName.toLowerCase();
             if (identity) part += '[' + identity.name + '="' + CSS.escape(identity.value) + '"]';
             else part += ':nth-of-type(' + (Array.from(el.parentNode.children).filter(function (node) { return node.tagName === el.tagName; }).indexOf(el) + 1) + ')';
+            // Administration name/position spans share a person ID and parent.
+            // Keep both fields distinct when the preview is restored.
+            if (/^person-(name|role)$/.test(el.getAttribute('data-ve-field') || '')) part += '[data-ve-field="' + el.getAttribute('data-ve-field') + '"]';
             parts.unshift(part);
             if (doc.querySelectorAll(parts.join(' > ')).length === 1) break;
             el = el.parentElement;
@@ -87,6 +90,8 @@
         });
         doc.querySelectorAll('[data-ve-slide], [data-ve-department-card], [data-ve-program-card], [data-ve-grid], [data-ve-person], [data-ve-office], [data-ve-sport], [data-ve-team], [data-ve-facility], [data-ve-org-card], [data-ve-section], [data-admission-category-tabs] > *, [data-admission-category-panels] > *').forEach(function (el) {
             var parent = el.parentElement;
+            // The section intro and grid have a fixed layout; only their cards reorder.
+            if (parent.matches('.admin-section-inner')) return;
             var path = selector(parent);
             if (!result.orders.some(function (order) { return order.selector === path; })) result.orders.push({selector:path, children:Array.from(parent.children).map(selector)});
         });
@@ -98,6 +103,9 @@
         function find(path) { try { return doc.querySelector(path); } catch (_) { return null; } }
         (data.orders || []).forEach(function (order) {
             var parent=find(order.selector); if (!parent) return;
+            // Older shared Administration drafts can reference a different tab's grid,
+            // leaving only the intro matched and incorrectly appending it below the cards.
+            if (parent.matches('.admin-section-inner')) return;
             order.children.map(find).filter(function (node) { return node && node.parentNode === parent; }).forEach(function (node) { parent.appendChild(node); });
         });
         (data.fields || []).forEach(function (field) {
@@ -144,14 +152,16 @@
                 var target=new URL(url || '/',location.origin);['ce_preview','_','_ve','add_org'].forEach(function(key){target.searchParams.delete(key);});target.hash='';target.searchParams.sort();
                 if(options.page==='alumni')target.searchParams.delete('event_page');
                 var previousRoute=target.pathname+target.search;
+                // Administration tabs edit one collection; keep additions together when switching sections.
+                if(options.page==='administration') ['section','navigation'].forEach(function(key){target.searchParams.delete(key);});
                 // The directory is one ordered collection; page/filter changes share its draft.
                 if(options.page==='student-organizations'&&!(options.reviewing&&options.reviewing())&&/\/student-org(?:\.php)?$/.test(target.pathname))['p','category','archived'].forEach(function(key){target.searchParams.delete(key);});
                 route=target.pathname+target.search;revision=0;checkpoint='';loading=true;
                 var documentAtStart=options.document();
                 try{
                     var result=await request('load');
-                    // Carry an existing page-scoped organization draft into the shared directory draft.
-                    if(!result.draft&&options.page==='student-organizations'&&previousRoute!==route){
+                    // Carry an older section/page-scoped draft into the shared collection draft.
+                    if(!result.draft&&['student-organizations','administration'].indexOf(options.page)>=0&&previousRoute!==route){
                         var previous=await request('load',{route:previousRoute});
                         if(previous.draft){
                             var copied=await request('save',{revision:0,snapshot:JSON.stringify(previous.draft.snapshot)});

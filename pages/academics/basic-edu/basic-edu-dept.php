@@ -99,8 +99,13 @@ cePreviewActive();
         <div class="basic-edu-colleges">
             <div class="basic-edu-grid"<?= ceManageMark('data-ve-department-grid="basic-education"') ?>>
                 <?php foreach ($basicEduRows as $index =>$c): ?>
-                <?php $cardDepartment = $c; $logoUrl = $cardDepartment['logo_url'] ?? null; ?>
-                <article class="basic-edu-card basic-edu-card--<?= $c['mod'] ?>"<?= ceManageMark('data-ve-department-card="' . (int)$c['dept_id'] . '"') ?> data-reveal="scale" style="--d: <?= ($index % 3) * 100 ?>ms">
+                <?php
+                $cardDepartment = $c;
+                $logoUrl = $cardDepartment['logo_url'] ?? null;
+                $accent = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($cardDepartment['theme_color'] ?? ''))
+                    ? $cardDepartment['theme_color'] : '';
+                ?>
+                <article class="basic-edu-card basic-edu-card--<?= $c['mod'] ?>"<?= ceManageMark('data-ve-department-card="' . (int)$c['dept_id'] . '"') ?> data-reveal="scale" style="--d: <?= ($index % 3) * 100 ?>ms<?= $accent !== '' ? '; --accent: ' . htmlspecialchars($accent, ENT_QUOTES, 'UTF-8') : '' ?>">
                     <div class="basic-edu-card-body">
                         <div class="skeleton-wrap basic-edu-logo-wrap<?= empty($logoUrl) ? ' is-loaded' : '' ?>">
                             <?= basicEducationMedia($logoUrl, $cardDepartment['dept_name'] . ' logo', 'basic-edu-logo', ceManageMark('data-ve-basic-logo-id="' . (int)$cardDepartment['dept_id'] . '"')) ?>

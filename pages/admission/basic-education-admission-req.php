@@ -2,12 +2,13 @@
 require_once __DIR__ . '/../../admin/admin-functions.php';
 require_once __DIR__ . '/../../components/basic-admission-requirements.php';
 require_once __DIR__ . '/../../components/admission-page-manager.php';
-$basicSchools = basicAdmissionRequirements();
+$basicRows = getPageSections('basic-education-admission-requirements');
+$basicSchools = basicAdmissionSchoolsFromSections($basicRows);
 $basicDefaults = basicAdmissionSectionDefaults();
 $basicPreview = cePreviewActive();
 $basicSections = [];
 $basicOrder = [];
-foreach (getPageSections('basic-education-admission-requirements') as $section) {
+foreach ($basicRows as $section) {
     $scope = admissionCategoryScope('basic-education-admission-requirements',$section['section_key']);
     if ($scope !== null && $section['status'] !== 'published') {
         unset($basicSchools[$scope]['groups'][substr($section['section_key'],strlen($scope)+1)]);
@@ -15,7 +16,8 @@ foreach (getPageSections('basic-education-admission-requirements') as $section) 
     }
     $basicSections[$section['section_key']] = $basicPreview && $section['draft_content'] !== null ? $section['draft_content'] : $section['content'];
     $basicOrder[$section['section_key']] = (int)$section['display_order'];
-    if (preg_match('/^(casa|montessori|jhs-regular|shs-regular)_(custom_[a-f0-9]{16})$/D', $section['section_key'], $match)
+    if (preg_match('/^(casa|montessori|jhs-regular|shs-regular|dept-[a-f0-9]{16})_(custom_[a-f0-9]{16})$/D', $section['section_key'], $match)
+        && isset($basicSchools[$match[1]])
         && ($section['status'] === 'published' || $basicPreview)) {
         $basicSchools[$match[1]]['groups'][$match[2]] = ['title'=>$section['title']];
         $basicDefaults[$section['section_key']] = ['title'=>$section['title'], 'content'=>''];
@@ -31,10 +33,10 @@ foreach ($basicSchools as $scope => &$school) {
 unset($school);
 $basicH = static fn($value) => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 $basicText = static function (string $key) use ($basicSections, $basicDefaults): string {
-    return trim(html_entity_decode(strip_tags($basicSections[$key] ?? $basicDefaults[$key]['content']), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    return trim(html_entity_decode(strip_tags($basicSections[$key] ?? $basicDefaults[$key]['content'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
 };
 $basicTextMark = static function (string $key) use ($basicDefaults, $basicH): string {
-    return ceMark('data-ve-section="' . $basicH($key) . '" data-ve-field="admission-label" data-ve-admission-label data-ve-label="' . $basicH($basicDefaults[$key]['title']) . '"');
+    return ceMark('data-ve-section="' . $basicH($key) . '" data-ve-field="admission-label" data-ve-admission-label data-ve-label="' . $basicH($basicDefaults[$key]['title'] ?? 'Department category name') . '"');
 };
 foreach ($basicSchools as $key => &$school) $school['label'] = $basicText('school_label_' . $key);
 unset($school);
@@ -77,7 +79,7 @@ unset($school);
                 </div>
                 <?php foreach ($basicSchools as $schoolKey => $school): ?>
                 <section id="school-panel-<?= $schoolKey ?>" role="tabpanel" aria-labelledby="school-tab-<?= $schoolKey ?>" data-basic-school-panel="<?= $schoolKey ?>" data-admission-scope="<?= $schoolKey ?>"<?= $schoolKey !== 'casa' ? ' hidden' : '' ?>>
-                    <h2 class="basic-school-title"><?= $basicH($school['title']) ?></h2>
+                    <h2 class="basic-school-title"><?= $basicH(str_starts_with($schoolKey, 'dept-') ? $school['label'] : $school['title']) ?></h2>
                     <div class="requirements-tabs basic-applicant-tabs" role="tablist" aria-label="<?= $basicH($school['label']) ?> applicant type" data-admission-category-tabs>
                         <?php foreach ($school['groups'] as $key => $group): $first = $key === array_key_first($school['groups']); $sectionKey = $schoolKey . '_' . $key; ?>
                         <button type="button" class="req-tab<?= $first ? ' is-active' : '' ?>" role="tab" id="applicant-tab-<?= $sectionKey ?>" aria-controls="applicant-panel-<?= $sectionKey ?>" aria-selected="<?= $first ? 'true' : 'false' ?>" tabindex="<?= $first ? '0' : '-1' ?>" data-basic-applicant="<?= $sectionKey ?>"><?= $basicH($group['title']) ?></button>

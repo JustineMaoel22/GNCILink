@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../admin/admin-functions.php';
 require_once __DIR__ . '/../../components/enrollment-procedures-content.php';
 $enrollmentPreview = cePreviewActive();
+$enrollmentTabs = enrollmentExtraTabs();
 $basicEnrollmentSteps = basicEnrollmentSteps();
 $enrollmentImages = enrollmentIllustrations($basicEnrollmentSteps);
 $basicEnrollment = basicEnrollmentDefaults();
@@ -49,14 +50,15 @@ unset($field);
     <section class="enrollment-procedures">
         <div class="enrollment-procedures-inner">
 
-            <ul class="nav nav-pills enrollment-tabs enrollment-level-tabs" id="enrollmentLevelTab" role="tablist" aria-label="Education level">
+            <ul class="nav nav-pills enrollment-tabs enrollment-level-tabs" id="enrollmentLevelTab" role="tablist" aria-label="Education level" data-enrollment-tab-parent="level">
                 <li class="nav-item" role="presentation"><button class="nav-link active" id="college-tab" data-bs-toggle="pill" data-bs-target="#college-pane" type="button" role="tab" aria-controls="college-pane" aria-selected="true">College</button></li>
                 <li class="nav-item" role="presentation"><button class="nav-link" id="basic-education-tab" data-bs-toggle="pill" data-bs-target="#basic-education-pane" type="button" role="tab" aria-controls="basic-education-pane" aria-selected="false">Basic Education</button></li>
+                <?php enrollmentExtraTabButtons($enrollmentTabs, 'level'); ?>
             </ul>
-            <div class="tab-content" id="enrollmentLevelContent">
+            <div class="tab-content" id="enrollmentLevelContent" data-enrollment-tab-content="level">
                 <div class="tab-pane fade show active" id="college-pane" role="tabpanel" aria-labelledby="college-tab" tabindex="0">
                     <h2 class="enrollment-level-title">College</h2>
-            <ul class="nav nav-pills enrollment-tabs" id="enrollmentTab" role="tablist" aria-label="College applicant type">
+            <ul class="nav nav-pills enrollment-tabs" id="enrollmentTab" role="tablist" aria-label="College applicant type" data-enrollment-tab-parent="college">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="freshmen-tab" data-bs-toggle="pill"
                         data-bs-target="#freshmen-pane" type="button" role="tab"
@@ -78,9 +80,10 @@ unset($field);
                         Old Students
                     </button>
                 </li>
+                <?php enrollmentExtraTabButtons($enrollmentTabs, 'college'); ?>
             </ul>
 
-            <div class="tab-content" id="enrollmentTabContent">
+            <div class="tab-content" id="enrollmentTabContent" data-enrollment-tab-content="college">
                 <div class="tab-pane fade show active" id="freshmen-pane" role="tabpanel" aria-labelledby="freshmen-tab" tabindex="0">
 
                     <h2 class="enrollment-pane-title">Incoming Freshmen</h2>
@@ -197,9 +200,18 @@ unset($field);
                     </div>
                 </div>
 
+                <?php enrollmentExtraTabPanes($enrollmentTabs, 'college'); ?>
             </div>
                 </div>
                 <div class="tab-pane fade" id="basic-education-pane" role="tabpanel" aria-labelledby="basic-education-tab" tabindex="0">
+                    <?php $basicHasTabs = cePreviewCanManage() || enrollmentTabsFor($enrollmentTabs, 'basic'); ?>
+                    <?php if ($basicHasTabs): ?>
+                    <ul class="nav nav-pills enrollment-tabs" role="tablist" aria-label="Basic Education applicant type" data-enrollment-tab-parent="basic">
+                        <li class="nav-item" role="presentation"><button class="nav-link active" id="basic-overview-tab" data-bs-toggle="pill" data-bs-target="#basic-overview-pane" type="button" role="tab" aria-controls="basic-overview-pane" aria-selected="true">Enrollment procedures</button></li>
+                        <?php enrollmentExtraTabButtons($enrollmentTabs, 'basic'); ?>
+                    </ul>
+                    <div class="tab-content" data-enrollment-tab-content="basic"><div class="tab-pane fade show active" id="basic-overview-pane" role="tabpanel" aria-labelledby="basic-overview-tab" tabindex="0">
+                    <?php endif; ?>
                     <h2 class="enrollment-pane-title"<?= ceMark('data-ve-section="basic_education_title" data-ve-plain-section data-ve-label="Basic Education heading"') ?>><?= htmlspecialchars(html_entity_decode(strip_tags($basicEnrollment['basic_education_title']['content']), ENT_QUOTES | ENT_HTML5, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></h2>
                     <div class="enrollment-pane-desc"<?= ceMark('data-ve-section="basic_education_procedures" data-ve-label="Basic Education enrollment procedures"') ?>><?= renderSectionContent($basicEnrollment['basic_education_procedures']['content']) ?></div>
                     <?php if ($basicEnrollmentSteps || cePreviewCanManage()): ?>
@@ -219,8 +231,10 @@ unset($field);
                     <?php if (cePreviewCanManage()): ?>
                     <div class="mt-3"><button type="button" class="btn btn-outline-success" data-ve-enrollment-add><i class="bi bi-plus-lg" aria-hidden="true"></i> Add step</button></div>
                     <?php endif; ?>
+                    <?php if ($basicHasTabs): ?></div><?php enrollmentExtraTabPanes($enrollmentTabs, 'basic'); ?></div><?php endif; ?>
                 </div>
 
+                <?php enrollmentExtraTabPanes($enrollmentTabs, 'level'); ?>
             </div>
             <p class="enrollment-art-credit">Illustrations by <a href="https://storyset.com/" target="_blank" rel="noopener noreferrer">Storyset</a></p>
         </div>
@@ -230,6 +244,8 @@ unset($field);
     <?php if (cePreviewCanManage()): ?>
     <script type="application/json" id="veEnrollmentIllustrations"><?= json_encode($enrollmentImages, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
     <script type="application/json" id="veEnrollmentSteps"><?= json_encode(['steps'=>$basicEnrollmentSteps,'revision'=>basicEnrollmentRevision($basicEnrollmentSteps)], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
+    <script type="application/json" id="veEnrollmentTabs"><?= json_encode(['tabs'=>$enrollmentTabs,'revision'=>enrollmentTabsRevision($enrollmentTabs)], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
+    <script type="application/json" id="veEnrollmentStepArt"><?= json_encode(basicEnrollmentIllustrations(), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
     <?php endif; ?>
     <?php include_once __DIR__ . '/../../components/footer.php'; ?>
     <?php include_once $_SERVER['DOCUMENT_ROOT'] . '/chatbot/widget.php'; ?>
@@ -243,6 +259,12 @@ unset($field);
             if (window.location.hash === '#basic-education-pane') bootstrap.Tab.getOrCreateInstance(document.getElementById('basic-education-tab')).show();
         }
         showEnrollmentAnchor();
+        document.querySelectorAll('[data-enrollment-tab-parent]').forEach(function (list) {
+            if (!list.querySelector('.nav-link.active')) {
+                var first = list.querySelector('[data-bs-toggle="pill"]');
+                if (first) bootstrap.Tab.getOrCreateInstance(first).show();
+            }
+        });
         window.addEventListener('hashchange', showEnrollmentAnchor);
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
             !('IntersectionObserver' in window)) { return; }

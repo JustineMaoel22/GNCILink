@@ -138,6 +138,7 @@ try {
         // ── SAVE (create when no id, update when id is present) ──
         case 'save': {
             $id = (int)($_POST['slide_id'] ?? 0);
+            if ($id < 0 || !in_array($_POST['status'] ?? '', ['published', 'draft'], true)) throw new InvalidArgumentException('Choose a valid slide and draft or published status.');
 
             $data = [
                 'title'          => trim($_POST['title'] ?? ''),
@@ -177,7 +178,7 @@ try {
                     echo json_encode(['error' => 'Could not update the slide.']);
                     break;
                 }
-                echo json_encode(['success' => true, 'slide_id' => $id]);
+                echo json_encode(['success' => true, 'slide_id' => $id, 'slide' => getHeroSlideById($id)]);
             } else {
                 // Creating a new slide — desktop media is required, mobile image is optional
                 if ($media === null && !contentPublishAllowsIncomplete()) {
@@ -190,7 +191,7 @@ try {
                     echo json_encode(['error' => 'Could not create the slide.']);
                     break;
                 }
-                echo json_encode(['success' => true, 'slide_id' => $newId]);
+                echo json_encode(['success' => true, 'slide_id' => $newId, 'slide' => getHeroSlideById($newId)]);
             }
             break;
         }
@@ -592,7 +593,7 @@ try {
                     );
                     $message = 'Section saved.';
                 } elseif ($action === 'admin_save_person') {
-                    saveAdministrationPerson(
+                    $savedPersonId = saveAdministrationPerson(
                         (int)($_POST['person_id'] ?? 0),
                         trim($_POST['section_key'] ?? ''),
                         $_POST['name'] ?? '',
@@ -602,7 +603,7 @@ try {
                     );
                     $message = 'Saved.';
                 } elseif ($action === 'admin_save_office') {
-                    saveAdministrationOffice(
+                    $savedOfficeId = saveAdministrationOffice(
                         (int)($_POST['office_id'] ?? 0),
                         trim($_POST['section_key'] ?? ''),
                         $_POST['office_name'] ?? '',
@@ -647,6 +648,8 @@ try {
                     'success'  => true,
                     'message'  => $message,
                     'sections' => administrationAdminPayload(),
+                    'person_id' => $savedPersonId ?? null,
+                    'office_id' => $savedOfficeId ?? null,
                 ]);
             } catch (Exception $e) {
                 // The Administration functions only throw user-safe messages

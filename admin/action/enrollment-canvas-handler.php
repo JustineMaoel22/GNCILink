@@ -13,7 +13,9 @@ try {
     if (!is_array($changes)) throw new InvalidArgumentException('Invalid illustration changes.');
     $steps = isset($_POST['steps']) ? json_decode((string)$_POST['steps'],true,16,JSON_THROW_ON_ERROR) : null;
     if (isset($_POST['steps']) && !is_array($steps)) throw new InvalidArgumentException('Invalid enrollment steps.');
-    $result = publishEnrollmentCanvas($steps,(string)($_POST['revision'] ?? ''),$changes,$_FILES);
+    $tabs = isset($_POST['tabs']) ? json_decode((string)$_POST['tabs'],true,16,JSON_THROW_ON_ERROR) : null;
+    if (isset($_POST['tabs']) && !is_array($tabs)) throw new InvalidArgumentException('Invalid enrollment tabs.');
+    $result = publishEnrollmentCanvas($steps,(string)($_POST['revision'] ?? ''),$changes,$_FILES,$tabs,(string)($_POST['tabs_revision'] ?? ''));
     echo json_encode(['success'=>true] + $result);
 } catch (Throwable $e) {
     $expected=$e instanceof InvalidArgumentException || $e instanceof JsonException;

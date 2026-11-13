@@ -41,6 +41,16 @@ boundaries.
 
 ## Data and database changes
 
+Administration additions use the existing private Content Editor snapshot tables, including photo bytes and crop settings. Canvas and settings-modal additions share the same draft action; the four section tabs share a draft route. Preview-only card templates reuse the public card markup, including empty sections. Only explicit publication writes `admin_people`/`admin_offices`; returned IDs reconcile successful inserts before publication retries. Content Editors submit the existing snapshot approval workflow. No schema migration is required.
+
+Heads of Student Services uses the same persistent Add Office modal from both the canvas and More Settings. Photo processing and validation dialogs leave its entered fields intact; a modal-specific section key keeps creation in the selected Administration section without changing the settings drawer's active tab.
+
+Home Page slide uploads stay in the visual editor's private media snapshot until explicit publication or snapshot approval. `includes/publish-confirmation.php` distinguishes a true slide draft save from a live slide change; live updates are rechecked under the slide row lock. Permanent slide deletion shares the verified-password boundary in `includes/content-delete-password.php`, which strips credentials before approval staging. Slide creation/publication/deletion and their activity records commit in a transaction; media cleanup follows a successful commit. Existing Home Page content and approval routes remain the publishing boundary. No schema migration is required.
+
+Enrollment Procedures stores additional education-level and applicant tabs in the existing `page_sections` table through `components/enrollment-tabs.php`. Validated section keys identify each tab and its parent; published tabs render through shared helpers. The enrollment canvas handler saves these tabs with step and illustration changes in one transaction, checks a tab revision to reject stale edits, and preserves existing tabs. The visual editor keeps additions in its existing private draft snapshot until publication or approval. No schema migration is required.
+
+Each added enrollment tab can also hold up to 40 ordered step cards. Companion `enrollment_tab_steps_*` page sections store their JSON separately from the tab's rich text and stay hidden from text-section editing. These steps share the existing field and illustration-path validation, participate in the tab revision and canvas transaction, and support draft restoration, reordering and removal in the visual editor.
+
 Event category reads use `includes/event-categories.php`. After the CLI migration
 in `database/migrate-event-categories.php`, the Events category foreign key points
 to `event_categories`; that foreign key activates the new reader for admin,

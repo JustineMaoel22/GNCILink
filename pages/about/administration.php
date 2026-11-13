@@ -460,7 +460,11 @@ $skipPageEntrance = ($_GET['navigation'] ?? '') === 'tab';
 
                 <!-- Flip cards -->
                 <div class="hss-grid"<?= ceMark('data-ve-grid="offices" data-ve-key="' . ceAttr($section) . '"') ?>>
-                    <?php foreach ($current['offices'] as $i => $office): ?>
+                    <?php
+                    $editorOffices = $current['offices'];
+                    if (cePreviewActive()) $editorOffices[] = ['id' => -1, 'office' => '', 'name' => '', 'role' => '', 'image' => '', 'contact' => [], 'services' => [], '_template' => true];
+                    foreach ($editorOffices as $i => $office): ?>
+                        <?php if (!empty($office['_template'])): ?><template data-administration-template="office"><?php endif; ?>
                         <button type="button"
                                 class="hss-flip-card reveal-scale"
                                 style="transition-delay: <?= ($i % 2) * 0.15 ?>s;"
@@ -558,6 +562,7 @@ $skipPageEntrance = ($_GET['navigation'] ?? '') === 'tab';
 
                             </div>
                         </button>
+                        <?php if (!empty($office['_template'])): ?></template><?php endif; ?>
                     <?php endforeach; ?>
                 </div>
 
@@ -565,7 +570,11 @@ $skipPageEntrance = ($_GET['navigation'] ?? '') === 'tab';
 
                 <!-- Grid layout Trustees/Administration -->
                 <div class="admin-grid"<?= ceMark('data-ve-grid="people" data-ve-key="' . ceAttr($section) . '"') ?>>
-                    <?php foreach ($current['people'] as $i => $person): ?>
+                    <?php
+                    $editorPeople = $current['people'];
+                    if (cePreviewActive()) $editorPeople[] = ['id' => -1, 'name' => '', 'role' => '', 'image' => '', '_template' => true];
+                    foreach ($editorPeople as $i => $person): ?>
+                        <?php if (!empty($person['_template'])): ?><template data-administration-template="person"><?php endif; ?>
                         <div class="admin-card-wrap skeleton-group reveal-scale" style="transition-delay: <?= ($i % 3) * 0.15 ?>s;"<?= !empty($person['id']) ? ceMark('data-ve-person="' . (int)$person['id'] . '"') : '' ?>>
                             <div class="admin-square-top" aria-hidden="true"></div>
 
@@ -590,6 +599,7 @@ $skipPageEntrance = ($_GET['navigation'] ?? '') === 'tab';
 
                             <div class="admin-square-bottom" aria-hidden="true"></div>
                         </div>
+                        <?php if (!empty($person['_template'])): ?></template><?php endif; ?>
                     <?php endforeach; ?>
                 </div>
 

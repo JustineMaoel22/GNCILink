@@ -24,7 +24,7 @@ function editorPresencePeer(PDO $db,string $token): array {
     if (!$peer) throw new RuntimeException('Reconnect to the page before saving. Your pending changes are still in the editor.',409);
     return $peer;
 }
-/** Cosmetic filters/device choices share presence; entity routes and administration tabs do not. */
+/** Cosmetic filters/device choices and shared Administration drafts share presence; entity routes do not. */
 function editorPresencePage(string $page,string $route): array {
     if (!preg_match('/^[a-z0-9-]{1,100}$/D',$page)||strlen($route)>1000||!rbacSafePreviewRoute($route)) throw new InvalidArgumentException('Invalid editor page.');
     $allowed=array_column(getEditablePages(),'slug');
@@ -49,6 +49,9 @@ function editorPresencePage(string $page,string $route): array {
     if(preg_match('~^/pages/academics/college/programs/([a-z0-9-]+)\.php$~D',$path,$m)){
         $path='/pages/academics/college/program.php';$identity['slug']=$m[1];
     }
+    // All Administration tabs save one collection snapshot without a section route.
+    // Match that draft identity so a tab's peer can save or recover the shared draft.
+    if ($page==='administration') unset($identity['section']);
     ksort($identity);
     // Linked academic lists/details and shared personnel can update each other. Use one
     // conservative revision family while keeping the visible list specific to the page.

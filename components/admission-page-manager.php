@@ -16,6 +16,7 @@ function admissionCategoryScope(string $page, string $key): ?string
         return in_array($key,['freshmen','transferees'],true) || preg_match('/^custom_[a-f0-9]{16}$/D',$key) ? 'college' : null;
     }
     if ($page !== 'basic-education-admission-requirements') return null;
+    if (preg_match('/^(dept-[a-f0-9]{16})_custom_[a-f0-9]{16}$/D', $key, $match)) return $match[1];
     foreach (basicAdmissionRequirements() as $school => $data) {
         if (isset(basicAdmissionSectionDefaults()[$key]) && str_starts_with($key,$school.'_')) return $school;
         if (preg_match('/^'.preg_quote($school,'/').'_custom_[a-f0-9]{16}$/D',$key)) return $school;
@@ -26,7 +27,7 @@ function admissionCategoryScope(string $page, string $key): ?string
 function admissionPresentationField(string $page, string $key): bool
 {
     return ($page === 'college-admission-requirements' && in_array($key, ['hero_title', 'hero_intro'], true))
-        || ($page === 'basic-education-admission-requirements' && isset(basicAdmissionPresentationDefaults()[$key]));
+        || ($page === 'basic-education-admission-requirements' && (isset(basicAdmissionPresentationDefaults()[$key]) || preg_match('/^school_label_dept-[a-f0-9]{16}$/D', $key)));
 }
 
 /** Save the admission canvas in one transaction, including category order and removal. */
@@ -34,7 +35,7 @@ function publishAdmissionPage(string $page, array $changes, array $orders): arra
 {
     $scopes = $page === 'college-admission-requirements' ? ['college']
         : ($page === 'basic-education-admission-requirements' ? array_keys(basicAdmissionRequirements()) : []);
-    if (!$scopes || count($changes)>200 || array_diff(array_keys($orders),$scopes) || array_diff($scopes,array_keys($orders))) throw new InvalidArgumentException('Invalid admission page layout.');
+    if (!$scopes || count($changes)>200) throw new InvalidArgumentException('Invalid admission page layout.');
     $clean = [];
     foreach ($changes as $change) {
         if (!is_array($change) || !is_string($change['key'] ?? null) || isset($clean[$change['key']])) throw new InvalidArgumentException('Invalid category changes.');
@@ -57,6 +58,14 @@ function publishAdmissionPage(string $page, array $changes, array $orders): arra
         if (!$id) throw new InvalidArgumentException('Admission page not found.');
         $query=$db->prepare('SELECT * FROM page_sections WHERE page_id=? FOR UPDATE');$query->execute([$id]);
         $rows=[];foreach($query->fetchAll(PDO::FETCH_ASSOC) as $row)$rows[$row['section_key']]=$row;
+        if ($page === 'basic-education-admission-requirements') {
+            $schools = basicAdmissionSchoolsFromSections(array_values($rows));
+            foreach ($clean as $key => $change) {
+                if (preg_match('/^school_label_(dept-[a-f0-9]{16})$/D', $key, $match)) $schools[$match[1]] = [];
+            }
+            $scopes = array_keys($schools);
+        }
+        if (count($scopes)>40 || array_diff(array_keys($orders),$scopes) || array_diff($scopes,array_keys($orders))) throw new InvalidArgumentException('Invalid admission department layout.');
         $expected=[];
         foreach($rows as $key=>$row)if(admissionCategoryScope($page,$key)!==null && $row['status']==='published')$expected[$key]=true;
         foreach($clean as $key=>$change) {
@@ -74,7 +83,7 @@ function publishAdmissionPage(string $page, array $changes, array $orders): arra
         if(array_diff_key($expected,$seen) || array_diff_key($seen,$expected))throw new InvalidArgumentException('The categories changed. Reload the editor before publishing.');
         $updated=[];
         foreach($clean as $key=>$change) {
-            if(!isset($rows[$key]) && !preg_match('/(?:^|_)custom_[a-f0-9]{16}$/D',$key))throw new InvalidArgumentException('Category not found.');
+            if(!isset($rows[$key]) && !preg_match('/(?:^|_)custom_[a-f0-9]{16}$/D',$key) && !($page === 'basic-education-admission-requirements' && preg_match('/^school_label_dept-[a-f0-9]{16}$/D',$key)))throw new InvalidArgumentException('Category not found.');
             $status=$change['removed']?'draft':'published';
             if(isset($rows[$key])) {
                 $db->prepare("UPDATE page_sections SET title=?,content=?,draft_content=NULL,status=?,review_status='none',review_note=NULL,updated_by=? WHERE section_id=?")

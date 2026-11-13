@@ -7,6 +7,16 @@ function publishNeedsConfirmation(string $route, array $post): bool {
     if ($route === '/admin/submissions.php') return $action === 'approve';
     if ($route === '/admin/action/editor-draft-handler.php') return in_array($action,['complete_review','record_publication'],true);
     if ($route === '/admin/events.php' && $action === 'import_confirm') return ($post['import_status'] ?? '') === 'published';
+    if ($route === '/admin/action/page-content-handler.php' && $action === 'save' && ($post['status'] ?? '') === 'draft') {
+        $id = filter_var($post['slide_id'] ?? null, FILTER_VALIDATE_INT);
+        if ($id === 0) return false;
+        if ($id !== false && $id !== null && $id > 0) {
+            $query = getDB()->prepare('SELECT status FROM hero_slides WHERE slide_id=?');
+            $query->execute([$id]);
+            // Editing a live slide, including hiding it, still changes the public page.
+            if ($query->fetchColumn() === 'draft') return false;
+        }
+    }
     if ($route === '/admin/settings.php' || !rbacShouldQueue($route, $post)) return false;
     if (in_array($action, ['save_draft','submit','withdraw','discard','reject','request_revision','delete','bulk_delete','delete_section'], true)) return false;
     if (in_array($route, ['/admin/action/create-news.php','/admin/action/create-announcement.php','/admin/events.php'], true)) {

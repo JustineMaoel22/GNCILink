@@ -19,7 +19,7 @@ try {
     $key = (string)($_POST['section_key'] ?? '');
     $pattern = match ($page) {
         'college-admission-requirements' => '/^custom_[a-f0-9]{16}$/D',
-        'basic-education-admission-requirements' => '/^(casa|montessori|jhs-regular|shs-regular)_custom_[a-f0-9]{16}$/D',
+        'basic-education-admission-requirements' => '/^(casa|montessori|jhs-regular|shs-regular|dept-[a-f0-9]{16})_custom_[a-f0-9]{16}$/D',
         default => throw new InvalidArgumentException('Choose an admission requirements page.'),
     };
     if (!preg_match($pattern, $key)) throw new InvalidArgumentException('Invalid admission category.');
@@ -35,6 +35,12 @@ try {
         $query->execute([$page]);
         $id = $query->fetchColumn();
         if (!$id) throw new InvalidArgumentException('Admission page not found.');
+        if ($page === 'basic-education-admission-requirements' && str_starts_with($key, 'dept-')) {
+            $school = strstr($key, '_custom_', true);
+            $query = $db->prepare("SELECT section_id FROM page_sections WHERE page_id=? AND section_key=? AND status='published'");
+            $query->execute([$id, 'school_label_' . $school]);
+            if (!$query->fetchColumn()) throw new InvalidArgumentException('Department category not found. Publish the department first.');
+        }
         $query = $db->prepare('SELECT section_id FROM page_sections WHERE page_id = ? AND section_key = ?');
         $query->execute([$id, $key]);
         $existing = $query->fetchColumn();
