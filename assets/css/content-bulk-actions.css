@@ -7,6 +7,7 @@
 
 /* Keep draft thumbnails aligned with selectable announcements without treating
    private proposal IDs as live-content bulk-delete IDs. */
-@media(min-width:1051px) {
-    .announcement-management .ann-table:has([data-bulk-item]) tr[data-draft-id] .bulk-select-media::before { content: ""; width: 1em; flex: 0 0 1em; }
+.announcement-management .ann-table:has([data-bulk-item]) tr[data-draft-id] .bulk-select-media::before { content: ""; width: 1em; flex: 0 0 1em; }
+@media(max-width:1050px) {
+    .announcement-management .ann-table:has([data-bulk-item]) tr.ann-row[data-draft-id] { grid-template-columns: 84px minmax(0,1fr); }
 }
