@@ -17,8 +17,9 @@ foreach(['announcements'=>'announcement_id','news'=>'news_id','events'=>'event_i
 $db->exec("INSERT INTO announcements VALUES(1,1,'My notice','published',NOW(),NOW()),(2,1,'My draft','draft',NOW(),NOW()),(3,2,'Other notice','pending',NOW(),NOW()),(4,2,'Other pending','pending',NOW(),NOW()),(5,2,'Other published','published',NOW(),NOW())");
 $db->exec("INSERT INTO news VALUES(1,1,'Newest news','published',NOW(),DATE_ADD(NOW(),INTERVAL 1 DAY)),(2,2,'Other news','published',NOW(),NOW()),(3,2,'Other draft','draft',NOW(),NOW())");
 $db->exec("INSERT INTO events VALUES(1,1,'Future event','published',NOW(),NOW(),DATE_ADD(NOW(),INTERVAL 2 DAY)),(2,1,'Past event','published',NOW(),NOW(),DATE_SUB(NOW(),INTERVAL 2 DAY)),(3,1,'Draft event','draft',NOW(),NOW(),DATE_ADD(NOW(),INTERVAL 2 DAY)),(4,2,'Other event','published',NOW(),NOW(),DATE_ADD(NOW(),INTERVAL 2 DAY))");
-$db->exec('CREATE TEMPORARY TABLE rbac_submissions(submission_id INT PRIMARY KEY,user_id INT,title VARCHAR(500),status VARCHAR(20),revision INT,created_at DATETIME,updated_at DATETIME)');
-$db->exec("INSERT INTO rbac_submissions VALUES(1,1,'My pending','pending',1,NOW(),NOW()),(2,2,'Other pending','pending_approval',1,NOW(),NOW()),(3,2,'Another pending','pending',1,NOW(),NOW()),(4,1,'My revision','needs_revision',2,NOW(),NOW()),(5,2,'Other revision','needs_revision',3,NOW(),NOW()),(6,1,'Rejected proposal','rejected',1,NOW(),NOW()),(7,1,'Draft proposal','draft',1,NOW(),NOW())");
+$db->exec('CREATE TEMPORARY TABLE rbac_submissions(submission_id INT PRIMARY KEY,user_id INT,title VARCHAR(500),status VARCHAR(20),revision INT,created_at DATETIME,updated_at DATETIME,kind VARCHAR(30) DEFAULT \'request\',route VARCHAR(150) NULL)');
+$db->exec("INSERT INTO rbac_submissions(submission_id,user_id,title,status,revision,created_at,updated_at) VALUES(1,1,'My pending','pending',1,NOW(),NOW()),(2,2,'Other pending','pending_approval',1,NOW(),NOW()),(3,2,'Another pending','pending',1,NOW(),NOW()),(4,1,'My revision','needs_revision',2,NOW(),NOW()),(5,2,'Other revision','needs_revision',3,NOW(),NOW()),(6,1,'Rejected proposal','rejected',1,NOW(),NOW()),(7,1,'Draft proposal','draft',1,NOW(),NOW())");
+$db->exec("INSERT INTO rbac_submissions VALUES(8,1,'My private announcement','draft',1,NOW(),NOW(),'request','/admin/action/create-announcement.php'),(9,1,'My private news','draft',1,NOW(),NOW(),'request','/admin/action/create-news.php'),(10,2,'Other private draft','draft',1,NOW(),NOW(),'request','/admin/action/create-announcement.php'),(11,1,'My private page','draft',1,NOW(),NOW(),'snapshot','/admin/content-edit.php')");
 $db->exec('CREATE TEMPORARY TABLE page_sections(section_id INT PRIMARY KEY,review_status VARCHAR(20))');
 $db->exec("INSERT INTO page_sections VALUES(1,'pending'),(2,'pending'),(3,'none')");
 $db->exec('CREATE TEMPORARY TABLE pages(slug VARCHAR(100),title VARCHAR(255),page_type VARCHAR(30))');
@@ -27,8 +28,8 @@ $db->exec("INSERT INTO activity_logs(log_id,user_id,action,table_name,descriptio
 foreach(['Super Admin','Content Editor','The Mirror','Content Admin','Office Staff'] as $role){
     $_SESSION=['user_id'=>1,'user_role'=>$role];$d=roleDashboardData($db);$own=rbacRole()==='The Mirror';$super=rbacIsSuper();
     dashCheck(!$d['errors'],'All summaries loaded');
-    dashCheck($d['stats']['total_announcements']===($own?2:5),'Role-scoped announcement count');
-    dashCheck($d['stats']['total_news']===($own?1:3),'Role-scoped news count');
+    dashCheck($d['stats']['total_announcements']===($own?3:5),'Role-scoped announcement count');
+    dashCheck($d['stats']['total_news']===($own?2:3),'Role-scoped news count');
     dashCheck($d['stats']['published_content']===($own?2:7),'Published count across permitted modules');
     dashCheck($d['stats']['pending_approvals']===($super?5:1),'Approval count includes page text and proposals');
     dashCheck(($d['submission_counts']['needs_revision']??0)===($super?2:1),'Revision state count');
@@ -42,10 +43,20 @@ foreach(['Super Admin','Content Editor','The Mirror','Content Admin','Office Sta
     dashCheck($d['page_pending']===($super?2:null),'Legacy page review visibility');
     if(!$super)dashCheck(!array_intersect([2,3,5],array_column($d['submissions'],'submission_id')),'Other authors proposals never leak');
     if($own)dashCheck(!array_filter($d['recent'],fn($row)=>str_starts_with($row['title'],'Other')||$row['type']==='event'),'Mirror content stays owned');
+    if($own){
+        dashCheck($d['content_counts']['announcement']['draft']===2&&$d['content_counts']['news']['draft']===1,'Mirror counts private proposal drafts alongside its stored drafts');
+        dashCheck(count(array_filter($d['recent'],fn($row)=>!empty($row['_private_draft'])))===2,'Mirror recent content includes its two private article drafts');
+        $tasks=dashboardMirrorNextSteps($d);
+        dashCheck(array_column($tasks,1)===[2,1,1],'Mirror next steps shows draft counts and waiting proposals');
+        dashCheck(array_column($tasks,3)===['/admin/announcement.php?status=draft','/admin/news.php?status=draft','/admin/submissions.php?status=pending'],'Mirror tasks link to existing module filters and submitted proposals');
+    }else dashCheck(!array_filter($d['recent'],fn($row)=>!empty($row['_private_draft'])),'Other dashboard roles do not acquire Mirror private drafts');
 }
 dashCheck(str_contains(activityLogDescription(['action'=>'UPDATE','table_name'=>'users','description'=>'password=private-test-value']),'hidden'),'Dashboard descriptions suppress secrets');
 dashCheck(dashboardContentUrl(['type'=>'news','id'=>3])==='/admin/news.php?modal=edit&id=3','Record-specific edit link');
 dashCheck(dashboardContentUrl(['type'=>'event','id'=>3])==='/admin/events.php','Calendar management link');
+dashCheck(dashboardContentUrl(['type'=>'announcement','id'=>8,'_private_draft'=>true])==='/admin/announcement.php?revise=8','Private draft link opens its owner-only editor');
+dashCheck(dashboardMirrorNextSteps(['content_counts'=>[],'stats'=>['pending_approvals'=>2]])[0][1]===2,'Pending-only dashboard no longer displays an empty panel');
+dashCheck(dashboardMirrorNextSteps(['content_counts'=>[],'stats'=>['pending_approvals'=>0]])===[],'Truly empty next steps remains empty');
 dashCheck(dashTimeAgo('2026-11-04 12:00:00',strtotime('2026-11-04 12:01:00'))==='1 min ago','Relative timestamps');
 dashCheck(dashTimeAgo('2026-11-04 12:00:00',strtotime('2026-11-04 11:00:00'))!=='Just now','Future dates are not labelled just now');
 // Analytics use existing normalization and historical URL grouping.

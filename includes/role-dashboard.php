@@ -19,6 +19,23 @@ function roleDashboardData(?PDO $db=null): array {
             $q->execute(array_merge([$type],$params));$recent=array_merge($recent,$q->fetchAll(PDO::FETCH_ASSOC));
         }catch(PDOException $e){$errors['content']='Some content summaries could not be loaded.';error_log('Dashboard content unavailable: '.$type);}
     }
+    if($own){
+        try{
+            $routes=['/admin/action/create-announcement.php'=>['announcement','total_announcements'],'/admin/action/create-news.php'=>['news','total_news']];
+            $q=$db->prepare("SELECT route,COUNT(*) AS total FROM rbac_submissions WHERE user_id=? AND kind='request' AND status='draft' AND route IN (?,?) GROUP BY route");
+            $q->execute(array_merge([$id],array_keys($routes)));
+            foreach($q->fetchAll(PDO::FETCH_ASSOC) as $draft){
+                [$type,$counter]=$routes[$draft['route']];$count=(int)$draft['total'];
+                if(isset($contentCounts[$type])){$contentCounts[$type]['draft']+=$count;$contentCounts[$type]['total']+=$count;}
+                if($stats[$counter]!==null)$stats[$counter]+=$count;
+            }
+            $q=$db->prepare("SELECT CASE s.route WHEN '/admin/action/create-news.php' THEN 'news' ELSE 'announcement' END AS type,s.submission_id AS id,s.user_id AS author_id,s.title,s.status,s.created_at,s.updated_at,CONCAT_WS(' ',u.first_name,u.last_name) AS author,1 AS _private_draft FROM rbac_submissions s LEFT JOIN users u ON u.user_id=s.user_id WHERE s.user_id=? AND s.kind='request' AND s.status='draft' AND s.route IN (?,?) ORDER BY s.updated_at DESC,s.submission_id DESC LIMIT 6");
+            $q->execute(array_merge([$id],array_keys($routes)));$recent=array_merge($recent,$q->fetchAll(PDO::FETCH_ASSOC));
+        }catch(PDOException $e){
+            $errors['drafts']='Your draft summaries could not be loaded.';error_log('Dashboard private drafts unavailable.');
+            foreach(['announcement'=>'total_announcements','news'=>'total_news'] as $type=>$counter){$stats[$counter]=null;if(isset($contentCounts[$type]))$contentCounts[$type]['draft']=null;}
+        }
+    }
     if(hasPermission('manage_page_content')||hasPermission('edit_page_content')){
         try{require_once __DIR__.'/website-publications.php';$recent=array_merge($recent,dashboardPublishedPages($db));}
         catch(PDOException $e){$errors['content']='Some content summaries could not be loaded.';error_log('Dashboard page publications unavailable.');}
@@ -46,6 +63,18 @@ function roleDashboardData(?PDO $db=null): array {
     return ['stats'=>$stats,'recent'=>array_slice($recent,0,6),'submissions'=>$submissions,'submission_counts'=>$submissionCounts,'content_counts'=>$contentCounts,'page_pending'=>$pagePending,'logs'=>$logs,'errors'=>$errors];
 }
 
+/** Mirror's private drafts and waiting proposals are separate dashboard entries. */
+function dashboardMirrorNextSteps(array $data): array {
+    $tasks=[];
+    foreach(['announcement'=>['Announcement drafts','/admin/announcement.php?status=draft'],'news'=>['News drafts','/admin/news.php?status=draft']] as $type=>[$label,$route]){
+        $count=$data['content_counts'][$type]['draft']??0;
+        if($count>0)$tasks[]=[$label,$count,'Continue editing, or submit when ready.',$route,'file-earmark-text'];
+    }
+    $pending=$data['stats']['pending_approvals']??0;
+    if($pending>0)$tasks[]=['Awaiting Super Admin review',$pending,'Your submitted proposals are waiting for review.','/admin/submissions.php?status=pending','hourglass-split'];
+    return $tasks;
+}
+
 /** Keep analytics terminology aligned with recorded views and visitor identifiers. */
 function dashboardAnalytics(PDO $db,int $days): array {
     require_once __DIR__.'/../components/page-analytics.php';
@@ -64,6 +93,7 @@ function dashboardAnalytics(PDO $db,int $days): array {
 }
 
 function dashboardContentUrl(array $item): string {
+    if(!empty($item['_private_draft']))return '/admin/'.($item['type']==='news'?'news':'announcement').'.php?'.http_build_query(['revise'=>(int)$item['id']]);
     if($item['type']==='page')return '/admin/content-edit.php?'.http_build_query(['page'=>$item['page'],'sub'=>$item['sub']??'']);
     if($item['type']==='event')return '/admin/events.php';
     $page=$item['type']==='news'?'news':'announcement';
