@@ -30,7 +30,7 @@ let cleanupDrafts=async()=>{};
     const base='http://localhost:8080';
     await send('Page.enable');await send('Network.enable');
     await send('Network.setCookie',{...admin,url:base,httpOnly:true});
-    const visit=async route=>{await send('Page.navigate',{url:base+route});await until(()=>evaluate("document.readyState==='complete'"),'Page load timeout');};
+    const visit=async route=>{await evaluate("document.documentElement.dataset.testNavigation='old'");await send('Page.navigate',{url:base+route});await until(()=>evaluate("document.readyState==='complete'&&!document.documentElement.dataset.testNavigation"),'Page load timeout');};
     await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
     await visit('/admin/submissions.php');
     await until(()=>evaluate("Boolean(document.getElementById('approval-filters'))"),'Approvals unavailable');
@@ -52,96 +52,83 @@ let cleanupDrafts=async()=>{};
     }
     await evaluate("document.querySelector('#approval-dialog [data-review-close]').click()");
     assert.equal(await evaluate("document.getElementById('approval-dialog').open"),false);
-    const mirror=session(authorRole);
-    await send('Network.setCookie',{...mirror,url:base,httpOnly:true});
-    await visit('/admin/submissions.php?view=drafts');
-    await until(()=>evaluate("document.querySelector('h1')?.textContent==='Drafts'"),'Private Drafts view unavailable');
-    assert.equal(await evaluate("Boolean(document.querySelector('.gnc-sidebar a[href*=\"view=drafts\"]'))"),false,'Drafts should not appear in the sidebar');
-    assert.equal(await evaluate("Boolean(document.querySelector('.approval-overview'))"),false,'Drafts should not show approval counts');
-    assert.equal(await evaluate("document.querySelector('input[name=view]').value"),'drafts');
-    for(const route of ['/admin/news.php','/admin/announcement.php']){
-        const defaults=await evaluate(`fetch('${route}').then(r=>r.text()).then(html=>{const d=new DOMParser().parseFromString(html,'text/html');return {status:d.querySelector('#modal-status')?.value,version:!!d.querySelector('[name=_review_revision]')}})`);
-        assert.equal(defaults.status,'draft','New content must default to saving privately');
-        assert.equal(defaults.version,true,'Draft edit revision protection missing');
-    }
-    const fixtureIds=[];
+    const author=session(authorRole),fixtures=[];
+    await send('Network.setCookie',{...author,url:base,httpOnly:true});
     cleanupDrafts=async()=>{
-        await send('Network.setCookie',{...mirror,url:base,httpOnly:true});
-        for(const id of fixtureIds){
-            const removed=await evaluate(`(async()=>{for(const view of ['drafts','submissions']){const r=await fetch('/admin/submissions.php?view='+view+'&id=${id}');if(!r.ok)continue;const d=new DOMParser().parseFromString(await r.text(),'text/html');const button=d.querySelector('#submission-review form input[name=action][value=delete]');if(!button)continue;const form=button.closest('form');const reply=await fetch(form.getAttribute('action'),{method:'POST',body:new FormData(form)});return reply.ok;}return false;})()`);
-            assert.ok(removed,'Could not clean up private browser fixture '+id);
+        await send('Network.setCookie',{...author,url:base,httpOnly:true});
+        for(const item of fixtures){
+            const removed=await evaluate(`(async()=>{for(const url of ['${item.route}?status=draft&size=100','/admin/submissions.php?id=${item.id}']){const r=await fetch(url);if(!r.ok)continue;const d=new DOMParser().parseFromString(await r.text(),'text/html');const form=d.querySelector('[data-draft-id="${item.id}"] form[data-draft-action=delete]')||d.querySelector('#submission-review input[name=action][value=delete]')?.closest('form');if(!form)continue;const reply=await fetch(form.getAttribute('action'),{method:'POST',body:new FormData(form)});return reply.ok;}return false;})()`);
+            assert.ok(removed,'Could not clean up private browser fixture '+item.id);
         }
     };
-    for(const [route,formId] of [['/admin/news.php','news-form'],['/admin/announcement.php','announcement-form']]){
+    for(const [route,formId,filterId] of [['/admin/news.php','news-form','news-filter-status'],['/admin/announcement.php','announcement-form','ann-filter-status']]){
+        const queryId=formId==='news-form'?'news-query':'ann-query';
         await visit(route+'?modal=create');
-        await until(()=>evaluate(`Boolean(document.querySelector('#${formId}'))`),'Article form unavailable');
-        const title=authorRole+' draft browser fixture '+Date.now();
-        const saved=await evaluate(`(async()=>{const form=document.getElementById('${formId}');const data=new FormData(form);data.set('title',${JSON.stringify(title)});data.set('content','<p>First private version</p>');data.set('status','draft');const r=await fetch(form.getAttribute('action'),{method:'POST',body:data});return {url:r.url,ok:r.ok,html:await r.text()};})()`);
-        const id=new URL(saved.url).searchParams.get('id');
-        assert.ok(id&&saved.ok,'Draft was not saved at '+saved.url+': '+saved.html.slice(0,300));fixtureIds.push(id);
-        assert.equal(new URL(saved.url).searchParams.get('view'),'drafts','Draft save redirected into submissions');
-        await visit(route);
-        const filterId=formId==='news-form'?'news-filter-status':'ann-filter-status';
-        await until(()=>evaluate(`Boolean(document.getElementById('${filterId}'))`),'Status filter unavailable');
+        assert.equal(await evaluate("Boolean(document.querySelector('.gnc-sidebar a[href*=\"view=drafts\"]'))"),false,'Separate Drafts navigation returned');
+        assert.equal(await evaluate("document.getElementById('modal-status').value"),'draft','New content must default to saving privately');
+        const title=authorRole+' integrated draft fixture '+Date.now();
+        const saved=await evaluate(`(async()=>{const form=document.getElementById('${formId}'),data=new FormData(form);data.set('title',${JSON.stringify(title)});data.set('content','<p>First private version</p>');data.set('status','draft');const r=await fetch(form.getAttribute('action'),{method:'POST',body:data});return {url:r.url,ok:r.ok,html:await r.text()};})()`);
+        const id=await evaluate(`(()=>{const d=new DOMParser().parseFromString(${JSON.stringify(saved.html)},'text/html');return Array.from(d.querySelectorAll('[data-draft-id]')).find(row=>row.querySelector('[data-draft-edit]')?.textContent===${JSON.stringify(title)})?.dataset.draftId;})()`);
+        assert.ok(id&&saved.ok,'Draft save did not return its content list');fixtures.push({id,route});
+        assert.equal(new URL(saved.url).searchParams.get('status'),'draft');
+        assert.ok(!new URL(saved.url).pathname.includes('submissions'),'Saving draft opened separate Drafts page');
+        await visit(route+'?status=draft');
+        assert.ok(await evaluate(`Boolean(document.querySelector('[data-draft-id="${id}"]'))`),'Draft missing from module list');
+        assert.equal(await evaluate("Boolean(document.querySelector('.approval-page'))"),false,'Separate Drafts layout still rendered');
+        await evaluate(`(()=>{const select=document.getElementById('${filterId}');select.value='';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+        await until(()=>evaluate(`(new URL(location.href).searchParams.get('status')||'')===''&&!document.getElementById('${queryId}').hasAttribute('aria-busy')`),'All statuses did not refresh');
+        assert.ok(await evaluate(`Boolean(document.querySelector('[data-draft-id="${id}"]'))`),'All statuses omitted private draft');
         await evaluate(`(()=>{const select=document.getElementById('${filterId}');select.value='draft';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
-        await until(()=>evaluate("document.querySelector('h1')?.textContent==='Drafts'"),'Draft filter did not open private drafts');
-        assert.equal(await evaluate("new URL(location.href).searchParams.get('type')"),formId==='news-form'?'news':'announcements');
-        assert.ok(await evaluate(`Array.from(document.querySelectorAll('.approval-row-title')).some(el=>el.textContent===${JSON.stringify(title)})`),'Saved draft not visible through status filter');
-        await visit('/admin/submissions.php?view=drafts&id='+id);
-        await until(()=>evaluate("Boolean(document.querySelector('#submission-review a[href*=revise]'))"),'Draft edit action missing');
-        const edit=await evaluate("document.querySelector('#submission-review a[href*=revise]').getAttribute('href')");
-        await visit(edit);
-        await until(()=>evaluate(`document.querySelector('#${formId} [name=_review_id]')?.value==='${id}'`),'Draft identity was not restored in editor');
-        assert.equal(await evaluate("document.getElementById('modal-status').value"),'draft','Editing draft selected submission');
-        for(let revision=1;revision<=2;revision++){
-            const updated=await evaluate(`(async()=>{const form=document.getElementById('${formId}');const data=new FormData(form);data.set('content','<p>Private version ${revision+1}</p>');data.set('status','draft');const r=await fetch(form.getAttribute('action'),{method:'POST',body:data});return {url:r.url,ok:r.ok,html:await r.text()};})()`);
-            assert.equal(new URL(updated.url).searchParams.get('id'),id,'Repeated save created another draft');
-            assert.equal(new URL(updated.url).searchParams.get('view'),'drafts');
-            await visit(edit);
-            await until(()=>evaluate(`document.querySelector('#${formId} [name=_review_revision]')?.value==='${revision+1}'`),'Latest draft revision not restored');
+        await until(()=>evaluate(`new URL(location.href).searchParams.get('status')==='draft'&&!document.getElementById('${queryId}').hasAttribute('aria-busy')`),'Draft filter did not refresh in place');
+        assert.equal(await evaluate(`document.querySelector('h1').textContent==='Drafts'`),false,'Draft filter navigated to separate page');
+        if(formId==='announcement-form'){
+            for(const width of [1440,390]){
+                await send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});await delay(200);
+                assert.ok(await evaluate("document.documentElement.scrollWidth<=innerWidth"),'Integrated draft list overflows viewport');
+                fs.writeFileSync(`cache/integrated-drafts-${width}.png`,Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+            }
+            await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
         }
-        assert.ok(await evaluate(`fetch('/admin/submissions.php').then(r=>{if(!r.ok)throw Error('Submission list failed: '+r.status);return r.text();}).then(html=>!Array.from(new DOMParser().parseFromString(html,'text/html').querySelectorAll('.approval-row-title')).some(el=>el.textContent===${JSON.stringify(title)}))`),'Draft leaked to My Submissions');
+        const edit=await evaluate(`document.querySelector('[data-draft-id="${id}"] [data-draft-edit]').getAttribute('href')`);
+        for(let revision=1;revision<=2;revision++){
+            await visit(edit);
+            assert.equal(await evaluate(`document.querySelector('#${formId} [name=_review_id]').value`),id,'Draft identity missing from editor');
+            assert.equal(await evaluate("document.getElementById('modal-status').value"),'draft');
+            const updated=await evaluate(`(async()=>{const form=document.getElementById('${formId}'),data=new FormData(form);data.set('content','<p>Private version ${revision+1}</p>');const r=await fetch(form.getAttribute('action'),{method:'POST',body:data});return {url:r.url,ok:r.ok,html:await r.text()};})()`);
+            assert.ok(updated.ok&&!new URL(updated.url).pathname.includes('submissions'),'Draft update opened separate page');
+            assert.equal(await evaluate(`new DOMParser().parseFromString(${JSON.stringify(updated.html)},'text/html').querySelector('[data-draft-id="${id}"]').dataset.draftRevision`),String(revision+1));
+        }
+        assert.ok(await evaluate(`fetch('/admin/submissions.php').then(r=>r.text()).then(html=>!Array.from(new DOMParser().parseFromString(html,'text/html').querySelectorAll('.approval-row-title')).some(el=>el.textContent===${JSON.stringify(title)}))`),'Draft leaked to My Submissions');
         await send('Network.setCookie',{...admin,url:base,httpOnly:true});
-        const forbidden=await evaluate(`fetch('/admin/submissions.php?id=${id}').then(async r=>({status:r.status,url:r.url,body:(await r.text()).slice(0,600)}))`);
-        assert.equal(forbidden.status,404,'Super Admin draft response: '+JSON.stringify(forbidden));
-        assert.equal(await evaluate(`fetch('/admin/submissions.php?view=drafts&id=${id}').then(r=>r.status)`),404,'Super Admin accessed private Drafts');
-        await send('Network.setCookie',{...mirror,url:base,httpOnly:true});
+        assert.equal(await evaluate(`fetch('/admin/submissions.php?media=${id}&view=drafts&field=image').then(r=>r.status)`),404,'Other account accessed private draft media');
+        await send('Network.setCookie',{...author,url:base,httpOnly:true});
         await visit('/admin/submissions.php?view=drafts&id='+id);
-        await until(()=>evaluate("Boolean(document.querySelector('#submission-review input[name=action][value=submit]'))"),'Explicit draft submit action unavailable');
-        const submitted=await evaluate(`(async()=>{const form=document.querySelector('#submission-review input[name=action][value=submit]').closest('form');const r=await fetch(form.getAttribute('action'),{method:'POST',body:new FormData(form)});return {url:r.url,ok:r.ok,status:r.status,body:(await r.text()).slice(0,500)};})()`);
-        assert.ok(submitted.ok,JSON.stringify(submitted));assert.equal(new URL(submitted.url).searchParams.get('view'),'submissions');
+        assert.ok(await evaluate(`Boolean(document.getElementById('${queryId}'))&&!document.querySelector('.approval-page')`),'Old Drafts bookmark did not return to module list');
+        const submitted=await evaluate(`(async()=>{const form=document.querySelector('[data-draft-id="${id}"] form[data-draft-action=submit]');const r=await fetch(form.getAttribute('action'),{method:'POST',body:new FormData(form)});return {url:r.url,ok:r.ok};})()`);
+        assert.ok(submitted.ok);assert.equal(new URL(submitted.url).searchParams.get('view'),'submissions');
         await send('Network.setCookie',{...admin,url:base,httpOnly:true});
-        const reviewable=await evaluate(`fetch('/admin/submissions.php?id=${id}').then(r=>r.text()).then(html=>{const d=new DOMParser().parseFromString(html,'text/html');return !!d.querySelector('#submission-review input[name=action][value=approve]')&&d.querySelector('#submission-review').textContent.includes('Private version 3')})`);
-        assert.equal(reviewable,true,'Explicitly submitted latest draft did not reach Approvals');
-        await send('Network.setCookie',{...mirror,url:base,httpOnly:true});
+        assert.equal(await evaluate(`fetch('/admin/submissions.php?id=${id}').then(r=>r.text()).then(html=>{const d=new DOMParser().parseFromString(html,'text/html');return !!d.querySelector('#submission-review input[name=action][value=approve]')&&d.querySelector('#submission-review').textContent.includes('Private version 3')})`),true,'Submitted draft did not reach Approvals');
+        await send('Network.setCookie',{...author,url:base,httpOnly:true});
         if(authorRole==='Content Editor'){
             const editSelector=formId==='news-form'?'.btn-edit-news':'.btn-edit-announcement';
             await visit(route+'?status=published');
-            await until(()=>evaluate(`Boolean(document.querySelector('${editSelector}[data-status=published]'))`),'Published content fixture unavailable');
             const original=await evaluate(`(()=>{const b=document.querySelector('${editSelector}[data-status=published]');return {id:b.dataset.id,title:b.dataset.title,status:b.dataset.status,content:document.getElementById(b.dataset.contentId).innerHTML};})()`);
-            const readPublished=()=>evaluate(`fetch('${route}?status=published').then(r=>{if(!r.ok)throw Error('Published list unavailable');return r.text();}).then(html=>{const d=new DOMParser().parseFromString(html,'text/html'),b=d.querySelector('${editSelector}[data-id="${original.id}"]');return b?{id:b.dataset.id,title:b.dataset.title,status:b.dataset.status,content:d.getElementById(b.dataset.contentId).innerHTML}:null;})`);
+            const readPublished=()=>evaluate(`fetch('${route}?status=published').then(r=>r.text()).then(html=>{const d=new DOMParser().parseFromString(html,'text/html'),b=d.querySelector('${editSelector}[data-id="${original.id}"]');return b?{id:b.dataset.id,title:b.dataset.title,status:b.dataset.status,content:d.getElementById(b.dataset.contentId).innerHTML}:null;})`);
             await evaluate(`document.querySelector('${editSelector}[data-id="${original.id}"]').click()`);
-            await until(()=>evaluate(`document.querySelector('#${formId} [name=${formId==='news-form'?'news_id':'announcement_id'}]')?.value==='${original.id}'`),'Published edit form unavailable');
             assert.equal(await evaluate("document.getElementById('modal-status').value"),'draft','Published edit must default to private draft');
-            const edited=await evaluate(`(async()=>{const form=document.getElementById('${formId}'),data=new FormData(form);data.set('content','<p>Private proposed published edit</p>');const r=await fetch(form.getAttribute('action'),{method:'POST',body:data});return {url:r.url,ok:r.ok};})()`);
-            const editId=new URL(edited.url).searchParams.get('id');
-            assert.ok(edited.ok&&editId,'Published edit draft save failed');fixtureIds.push(editId);
-            assert.equal(new URL(edited.url).searchParams.get('view'),'drafts');
-            assert.deepEqual(await readPublished(),original,'Saving draft changed published content');
-            await visit('/admin/submissions.php?view=drafts&id='+editId);
-            await until(()=>evaluate("Boolean(document.querySelector('#submission-review input[name=action][value=submit]'))"),'Published-edit draft unavailable');
-            const result=await evaluate(`(async()=>{const form=document.querySelector('#submission-review input[name=action][value=submit]').closest('form');const r=await fetch(form.getAttribute('action'),{method:'POST',body:new FormData(form)});return {url:r.url,ok:r.ok};})()`);
-            assert.ok(result.ok);assert.equal(new URL(result.url).searchParams.get('view'),'submissions');
-            assert.deepEqual(await readPublished(),original,'Submitting edit changed published content before approval');
+            const edited=await evaluate(`(async()=>{const form=document.getElementById('${formId}'),data=new FormData(form);data.set('content','<p>Private proposed published edit</p>');const r=await fetch(form.getAttribute('action'),{method:'POST',body:data});return {url:r.url,ok:r.ok,html:await r.text()};})()`);
+            const editId=await evaluate(`(()=>{const d=new DOMParser().parseFromString(${JSON.stringify(edited.html)},'text/html');return Array.from(d.querySelectorAll('[data-draft-id]')).find(row=>row.querySelector('[data-draft-edit]')?.textContent===${JSON.stringify(original.title)})?.dataset.draftId;})()`);
+            assert.ok(edited.ok&&editId,'Published edit draft save failed');fixtures.push({id:editId,route});
+            assert.deepEqual(await readPublished(),original,'Draft changed published original');
+            await visit(route+'?status=draft');
+            const result=await evaluate(`(async()=>{const form=document.querySelector('[data-draft-id="${editId}"] form[data-draft-action=submit]');const r=await fetch(form.getAttribute('action'),{method:'POST',body:new FormData(form)});return {url:r.url,ok:r.ok};})()`);
+            assert.ok(result.ok);assert.deepEqual(await readPublished(),original,'Submitting draft changed published original');
             await send('Network.setCookie',{...admin,url:base,httpOnly:true});
-            assert.equal(await evaluate(`fetch('/admin/submissions.php?id=${editId}').then(r=>r.text()).then(html=>{const d=new DOMParser().parseFromString(html,'text/html');return !!d.querySelector('#submission-review input[name=action][value=approve]')&&d.querySelector('#submission-review').textContent.includes('Private proposed published edit')})`),true,'Edited version did not require Super Admin approval');
-            await send('Network.setCookie',{...mirror,url:base,httpOnly:true});
+            assert.equal(await evaluate(`fetch('/admin/submissions.php?id=${editId}').then(r=>r.text()).then(html=>{const d=new DOMParser().parseFromString(html,'text/html');return !!d.querySelector('#submission-review input[name=action][value=approve]')&&d.querySelector('#submission-review').textContent.includes('Private proposed published edit')})`),true,'Edited version did not require approval');
+            await send('Network.setCookie',{...author,url:base,httpOnly:true});
         }
     }
-    await visit('/admin/submissions.php');
-    await until(()=>evaluate("document.querySelector('h1')?.textContent==='My Submissions'"),'My Submissions unavailable');
-    assert.equal(await evaluate("Boolean(document.querySelector('#approval-status option[value=draft]'))"),false,'Submission filters expose drafts');
-    console.log(authorRole+': Combined Approvals loads; separate banner removed; old review links redirect; sample section opens in same review dialog; approval requires password; cancellation/close and desktop/mobile layouts verified. Private News and Announcement drafts were saved, edited twice, explicitly submitted and cleaned up; no public content changed.');
+    console.log(authorRole+': integrated News and Announcement drafts, All statuses, in-place draft filtering, old-bookmark redirects, repeated saves, explicit submission and published-content isolation passed. No public content changed.');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{
     try{await cleanupDrafts();}catch(error){console.error(error);process.exitCode=1;}
     for(const s of sessions)docker(['destroy',s.value]);

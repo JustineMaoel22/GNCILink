@@ -13,6 +13,7 @@ function announcementFilters(array $input): array {
 }
 function announcementList(PDO $db,array &$filters): array {
     $where=[];$params=[];
+    if(function_exists('rbacRole')&&in_array(rbacRole(),['Content Editor','The Mirror'],true)){$where[]="(a.status<>'draft' OR a.user_id=?)";$params[]=(int)$_SESSION['user_id'];}
     if($filters['search']!==''){$term='%'.strtr($filters['search'],['!'=>'!!','%'=>'!%','_'=>'!_']).'%';$where[]="(a.title LIKE ? ESCAPE '!' OR a.content LIKE ? ESCAPE '!')";array_push($params,$term,$term);}
     foreach(['status'=>'a.status','pinned'=>'a.is_pinned'] as $key=>$field)if($filters[$key]!==''){$where[]="$field=?";$params[]=$filters[$key];}
     if($filters['category']!==''){$where[]=announcementCategoryCondition($db,'a');$params[]=$filters['category'];}

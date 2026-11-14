@@ -196,7 +196,7 @@ function rbacQueueCurrentRequest(string $route): void {
         }
         $id=rbacSaveSubmission('request',$route,$title,$proposal,$target,$resubmit,$status,$expectedRevision);
         $message=$status==='draft'?'Draft saved. It is not live.':'Submitted for Super Admin approval. Published content is unchanged.';
-        if(str_starts_with($route,'/admin/action/create-')||$route==='/admin/settings.php'){$_SESSION['flash_success']=$message;header('Location: /admin/submissions.php?'.($status==='draft'?'view=drafts&':'').'id='.$id);exit;}
+        if(str_starts_with($route,'/admin/action/create-')||$route==='/admin/settings.php'){$_SESSION['flash_success']=$message;header('Location: '.($status==='draft'&&rbacArticleRoute($route)?('/admin/'.(str_contains($route,'create-news')?'news':'announcement').'.php?status=draft'):('/admin/submissions.php?'.($status==='draft'?'view=drafts&':'').'id='.$id)));exit;}
         header('Content-Type: application/json');http_response_code(202);echo json_encode(['success'=>true,'submitted'=>$status!=='draft','submission_id'=>$id,'message'=>$message]);exit;
     }catch(Throwable $e){rbacFail($e instanceof PDOException?'Submission could not be stored. No live content was changed.':$e->getMessage(),422);}
 }

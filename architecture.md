@@ -46,17 +46,17 @@ boundaries.
 - Warn about incomplete required or recommended content before publishing; allow the admin to continue editing or explicitly publish where policy permits.
 - Apply identical authorization and input validation to visual-editor and conventional admin endpoints.
 
-Mirror and Content Editor News and Announcement drafts remain private checkpoints in the existing
-`rbac_submissions` / `rbac_submission_chunks` tables. The owner-only Drafts view
-(`/admin/submissions.php?view=drafts`) supports editing and explicit submission.
-Content Editors and Mirror accounts access it through the Drafts status filter
-in Announcements or News; it has no separate sidebar entry.
-Submission lists, dashboard proposal summaries and direct review/media access
-exclude private drafts. Article submission changes `draft` to `pending_approval`;
-queue presentation also accepts legacy `pending` requests. Revision checks reject
-stale draft saves. Content Editor edits of published articles default to a private
-draft; only approved proposals update the published record. Existing VARCHAR
-status storage needs no migration.
+Mirror and Content Editor News and Announcement drafts remain private checkpoints
+in `rbac_submissions` / `rbac_submission_chunks`. `includes/article-draft-list.php`
+merges the owner's saved drafts into each module's existing list, filters and
+pagination. All statuses includes published records and private drafts; Drafts
+restricts the same list to drafts. Draft rows use separate IDs and actions so
+live-content bulk actions cannot target them. The former separate Drafts page
+redirects to the appropriate list, and draft saves return there. Submission
+lists and notifications exclude drafts. Explicit submission changes `draft` to
+`pending_approval`; existing `pending` requests remain compatible. Published
+records stay unchanged until approval, and stale draft saves are rejected.
+No schema migration is required.
 
 ## Data and database changes
 

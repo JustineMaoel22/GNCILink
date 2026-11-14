@@ -19,13 +19,7 @@ require_once __DIR__ . '/news-view.php';
 initSession();
 requireLogin();
 
-// Private proposals use the existing Drafts view rather than the live-content list.
-if (!rbacIsSuper() && ($_GET['status']??'')==='draft' && !isset($_GET['modal']) && !isset($_GET['revise'])) {
-    $draftQuery=['view'=>'drafts','type'=>'news'];
-    if(is_string($_GET['search']??null)&&$_GET['search']!=='')$draftQuery['q']=$_GET['search'];
-    header('Location: /admin/submissions.php?'.http_build_query($draftQuery));
-    exit;
-}
+
 
 /* Dates are stored in UTC. Show them in local (Philippine) time. */
 if (!function_exists('newsLocalTime')) {
@@ -43,6 +37,7 @@ if (!function_exists('newsLocalTime')) {
 $flashErrors  = $_SESSION['flash_errors'] ?? [];
 $flashOld     = $_SESSION['flash_old'] ?? [];
 require_once __DIR__.'/../includes/content-submissions.php';
+require_once __DIR__.'/../includes/article-draft-list.php';
 if (isset($_GET['revise'])) $flashOld=rbacRevisionFormData('/admin/action/create-news.php');
 $flashSuccess = $_SESSION['flash_success'] ?? '';
 unset($_SESSION['flash_errors'], $_SESSION['flash_old'], $_SESSION['flash_success']);
@@ -52,7 +47,7 @@ unset($_SESSION['flash_errors'], $_SESSION['flash_old'], $_SESSION['flash_succes
 // ============================================================
 $listFilters=newsFilters($_GET);$listError='';$listTotal=0;$listPages=1;$listGalleries=[];$newsList=[];
 $statusFilter=$listFilters['status'];$categoryFilter=$listFilters['category'];$search=$listFilters['search'];
-try{$result=newsListResults(getDB(),$listFilters,rbacRole(),(int)$_SESSION['user_id']);$newsList=$result['rows'];$listTotal=$result['total'];$listPages=$result['pages'];$listGalleries=$result['galleries'];}
+try{$result=articleListWithDrafts(getDB(),$listFilters,'news',static function($db,&$filters){return newsListResults($db,$filters,rbacRole(),(int)$_SESSION['user_id']);});$newsList=$result['rows'];$listTotal=$result['total'];$listPages=$result['pages'];$listGalleries=$result['galleries'];}
 catch(Throwable $e){$listError='News articles could not be loaded. Please try again.';error_log('News management list unavailable.');}
 $newsCategories = getNewsCategories();
 $newsAudienceEnabled = newsAudienceReady(getDB());
@@ -192,6 +187,7 @@ include __DIR__ . '/../components/header-admin.php';
                     </div>
                 </td></tr>
                 <?php else: foreach ($newsList as $n):
+                    if(!empty($n['_private_draft'])){$draft=$n;$draftKind='news';include __DIR__.'/partials/article-draft-row.php';continue;}
                     $isOwner    = $n['user_id'] == ($_SESSION['user_id'] ?? null);
                     $postedBy   = trim(($n['first_name'] ?? '') . ' ' . ($n['last_name'] ?? ''));
                     $byline     = trim($n['author'] ?? '');

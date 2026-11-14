@@ -18,6 +18,7 @@ function newsReturnUrl(array $input,array $extra=[]): string {
 function newsListResults(PDO $db,array &$f,string $role,int $userId): array {
     $where=[];$params=[];
     if($role==='The Mirror'){$where[]='n.user_id=?';$params[]=$userId;}
+    elseif($role==='Content Editor'){$where[]="(n.status<>'draft' OR n.user_id=?)";$params[]=$userId;}
     if($f['search']!==''){
         $term='%'.strtr($f['search'],['!'=>'!!','%'=>'!%','_'=>'!_']).'%';
         $where[]="(n.title LIKE ? ESCAPE '!' OR n.content LIKE ? ESCAPE '!')";array_push($params,$term,$term);

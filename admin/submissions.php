@@ -8,6 +8,11 @@ require_once __DIR__.'/approval-view.php';
 $error='';$success=$_SESSION['flash_success']??'';unset($_SESSION['flash_success']);
 $ready=rbacSubmissionsReady();$super=rbacIsSuper();$userId=(int)$_SESSION['user_id'];
 $draftView=($_GET['view']??$_POST['return_view']??'')==='drafts';
+$draftModule=in_array($_POST['return_module']??'', ['news','announcement'],true)?$_POST['return_module']:((($_GET['type']??'')==='news')?'news':'announcement');
+if($draftView&&in_array($_SERVER['REQUEST_METHOD']??'GET',['GET','HEAD'],true)&&!isset($_GET['media'])){
+    if(is_string($_GET['id']??null)){$legacy=rbacGetSubmission((int)$_GET['id']);if($legacy&&rbacArticleRoute($legacy['route'])&&(int)$legacy['user_id']===$userId)$draftModule=str_contains($legacy['route'],'create-news')?'news':'announcement';}
+    header('Location: /admin/'.$draftModule.'.php?status=draft');exit;
+}
 if(isset($_GET['media'])){
     $row=$ready&&is_string($_GET['media'])?rbacGetSubmission((int)$_GET['media']):null;
     if(!$row||!rbacSubmissionVisible($row,$super,$userId,$draftView))rbacFail('Submission not found.',404);
@@ -48,8 +53,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         $_SESSION['flash_success']=$success;
         $return=[];foreach(['q','status','type','author','from','to','sort','page','size','view'] as $key)$return[$key]=$_POST['return_'.$key]??'';
         $return=approvalFilters($return);if($action==='submit'){$return['view']='submissions';$return['status']='pending';}if($action!=='delete'){$return['id']=$id;if($sectionAction)$return['source']='section';}
-        header('Location: /admin/submissions.php?'.http_build_query($return));exit;
+        header('Location: '.($draftView&&$action!=='submit'?('/admin/'.$draftModule.'.php?status=draft'):('/admin/submissions.php?'.http_build_query($return))));exit;
     }catch(Throwable $e){$error=$e instanceof PDOException?'The review could not be saved. Please try again.':$e->getMessage();}
+    if($draftView&&$error!==''){$_SESSION['flash_errors']=[$error];header('Location: /admin/'.$draftModule.'.php?status=draft');exit;}
 }
 
 $filters=approvalFilters($_GET);

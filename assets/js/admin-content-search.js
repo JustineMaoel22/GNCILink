@@ -7,6 +7,17 @@ window.GNCContentSearch = {
         const source = document.getElementById(dataId);
         if (!table || !pagination || !source) return;
         const facebook = kind === 'facebook';
+        page.addEventListener('submit', async event => {
+            const draftForm = event.target.closest('form[data-draft-action="delete"]');
+            if (!draftForm || !window.AdminDialogs) return;
+            event.preventDefault();
+            if (draftForm.dataset.submitting) return;
+            draftForm.dataset.submitting = 'true';
+            try {
+                if (await AdminDialogs.confirm('Delete this private draft? Published content will stay unchanged.', {title: 'Delete draft', confirmText: 'Delete draft', danger: true})) HTMLFormElement.prototype.submit.call(draftForm);
+                else delete draftForm.dataset.submitting;
+            } catch (_) { delete draftForm.dataset.submitting; }
+        });
         const headingSelector = facebook ? '.fb-results' : '.ann-list-heading';
         const chipsSelector = facebook ? '.fb-active-filters' : '.news-active-filters';
         const status = document.createElement('div');
@@ -39,13 +50,6 @@ window.GNCContentSearch = {
             try {
                 const response = await fetch(url, {credentials: 'same-origin', headers: {'Accept': 'text/html'}, signal: activeController.signal, cache: 'no-store'});
                 if (!response.ok) throw Error('Results could not be loaded. Please try again.');
-                if (response.redirected) {
-                    const target = new URL(response.url);
-                    if (target.origin === location.origin && /^\/admin\/submissions(?:\.php)?$/.test(target.pathname) && target.searchParams.get('view') === 'drafts') {
-                        if (request === sequence) location.assign(target.href);
-                        return;
-                    }
-                }
                 const html = await response.text();
                 if (request !== sequence) return;
                 const doc = new DOMParser().parseFromString(html, 'text/html');

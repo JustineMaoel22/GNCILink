@@ -17,13 +17,7 @@ require_once __DIR__ . '/../includes/facebook-publishing.php';
 initSession();
 requireLogin();
 
-// Private proposals use the existing Drafts view rather than the live-content list.
-if (!rbacIsSuper() && ($_GET['status']??'')==='draft' && !isset($_GET['modal']) && !isset($_GET['revise'])) {
-    $draftQuery=['view'=>'drafts','type'=>'announcements'];
-    if(is_string($_GET['search']??null)&&$_GET['search']!=='')$draftQuery['q']=$_GET['search'];
-    header('Location: /admin/submissions.php?'.http_build_query($draftQuery));
-    exit;
-}
+
 
 $facebookPostsPage = ($facebookPostsPage ?? false) === true;
 // Keep bookmarks to the former Facebook filter working.
@@ -39,6 +33,7 @@ if (!$facebookPostsPage && ($_GET['source'] ?? '') === 'facebook') {
 $flashErrors = $_SESSION['flash_errors'] ?? [];
 $flashOld    = $_SESSION['flash_old'] ?? [];
 require_once __DIR__.'/../includes/content-submissions.php';
+require_once __DIR__.'/../includes/article-draft-list.php';
 if (isset($_GET['revise'])) $flashOld=rbacRevisionFormData('/admin/action/create-announcement.php');
 $flashSuccess = $_SESSION['flash_success'] ?? '';
 unset($_SESSION['flash_errors'], $_SESSION['flash_old'], $_SESSION['flash_success']);
@@ -55,7 +50,7 @@ $sourceFilter = $facebookPostsPage ? 'facebook' : 'website';
 
 // Source filter: "facebook" hides website announcements entirely.
 $announcements=[];
-if(!$facebookPostsPage){try{$list=announcementList(getDB(),$listFilters);$announcements=$list['rows'];$listTotal=$list['total'];$listPages=$list['pages'];$listGalleries=$list['galleries'];}catch(Throwable $e){$listError='Announcements could not be loaded. Please try again.';error_log('Announcements list unavailable.');}}
+if(!$facebookPostsPage){try{$list=articleListWithDrafts(getDB(),$listFilters,'announcement','announcementList');$announcements=$list['rows'];$listTotal=$list['total'];$listPages=$list['pages'];$listGalleries=$list['galleries'];}catch(Throwable $e){$listError='Announcements could not be loaded. Please try again.';error_log('Announcements list unavailable.');}}
 $announcementAudiences = getAnnouncementAudiencesBatch(getDB(), $announcements);
 $pinnedCount   = countPinnedItems();
 
@@ -267,6 +262,7 @@ include __DIR__ . '/../components/header-admin.php';
                     </div>
                 </td></tr>
                 <?php else: foreach ($announcements as $a):
+                    if(!empty($a['_private_draft'])){$draft=$a;$draftKind='announcement';include __DIR__.'/partials/article-draft-row.php';continue;}
                     $isOwner = $a['user_id'] == ($_SESSION['user_id'] ?? null);
                     $authorName = trim(($a['first_name'] ?? '') . ' ' . ($a['last_name'] ?? ''));
                     $progCode = $a['program'] ?? 'ALL';
