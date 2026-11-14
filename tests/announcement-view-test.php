@@ -38,4 +38,8 @@ $pinned=announcementPinnedItems($db);
 annCheck(count($pinned)===3,'All pinned sources load with mixed ID collations');
 annCheck(array_column($pinned,'item_id')===['136','7','123_456'],'Unpin uses the correct source IDs');
 annCheck(!array_diff(['source','item_id','title','status'],array_keys($pinned[0])),'Pinned renderer fields match query');
+$returnUrl=announcementReturnUrl(['return_query'=>'search=Example&status=&category=1&sort=oldest&size=25&page=2&redirect=https://example.com']);
+parse_str(parse_url($returnUrl,PHP_URL_QUERY),$returned);
+annCheck($returned['status']===''&&$returned['search']==='Example'&&$returned['sort']==='oldest'&&$returned['size']==='25'&&$returned['page']==='2','Delete return preserves All statuses, search, sort and pagination');
+annCheck(parse_url($returnUrl,PHP_URL_PATH)==='/admin/announcement.php'&&!isset($returned['redirect']),'Return URL is restricted to validated announcement filters');
 echo "$checks announcement list checks passed. No persistent data changed.\n";

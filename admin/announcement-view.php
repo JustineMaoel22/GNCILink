@@ -11,6 +11,11 @@ function announcementFilters(array $input): array {
     if(in_array((int)$text('size'),[10,25,50,100],true))$f['size']=(int)$text('size');
     $f['page']=max(1,min(2147483647,(int)$text('page')));return $f;
 }
+function announcementReturnUrl(array $input): string {
+    $query=is_string($input['return_query']??null)?$input['return_query']:'';
+    $parsed=[];if(strlen($query)<=3000)parse_str($query,$parsed);
+    return '/admin/announcement.php?'.http_build_query(announcementFilters($parsed));
+}
 function announcementList(PDO $db,array &$filters): array {
     $where=[];$params=[];
     if(function_exists('rbacRole')&&in_array(rbacRole(),['Content Editor','The Mirror'],true)){$where[]="(a.status<>'draft' OR a.user_id=?)";$params[]=(int)$_SESSION['user_id'];}

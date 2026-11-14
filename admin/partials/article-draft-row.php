@@ -15,6 +15,7 @@ $categoryLabel=$draftKind==='news'?($newsCategories[$draft['category']]??$draft[
 <a class="btn btn-sm btn-outline-secondary" href="<?= $de($editUrl) ?>" title="Edit draft" aria-label="Edit draft"><i class="bi bi-pencil" aria-hidden="true"></i><span>Edit draft</span></a>
 <?php foreach(['submit'=>'Submit for approval','delete'=>'Delete draft'] as $draftAction=>$draftLabel): ?>
 <form method="post" action="/admin/submissions.php" data-draft-action="<?= $draftAction ?>" class="ann-inline-form">
+<input type="hidden" name="return_query" value="<?= $de(http_build_query($listFilters??[])) ?>">
 <input type="hidden" name="csrf_token" value="<?= $de($csrfToken) ?>"><input type="hidden" name="submission_id" value="<?= $draftId ?>"><input type="hidden" name="revision" value="<?= (int)$draft['revision'] ?>"><input type="hidden" name="action" value="<?= $draftAction ?>"><input type="hidden" name="return_view" value="drafts"><input type="hidden" name="return_module" value="<?= $draftKind ?>">
 <button type="submit" class="btn btn-sm <?= $draftAction==='delete'?'btn-outline-danger':'btn-outline-secondary' ?>" title="<?= $draftLabel ?>" aria-label="<?= $draftLabel ?>"><i class="bi <?= $draftAction==='delete'?'bi-trash3':'bi-send' ?>" aria-hidden="true"></i><span><?= $draftLabel ?></span></button>
 </form>

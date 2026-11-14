@@ -57,6 +57,7 @@ let cleanupDrafts=async()=>{};
     cleanupDrafts=async()=>{
         await send('Network.setCookie',{...author,url:base,httpOnly:true});
         for(const item of fixtures){
+            if(item.deleted)continue;
             const removed=await evaluate(`(async()=>{for(const url of ['${item.route}?status=draft&size=100','/admin/submissions.php?id=${item.id}']){const r=await fetch(url);if(!r.ok)continue;const d=new DOMParser().parseFromString(await r.text(),'text/html');const form=d.querySelector('[data-draft-id="${item.id}"] form[data-draft-action=delete]')||d.querySelector('#submission-review input[name=action][value=delete]')?.closest('form');if(!form)continue;const reply=await fetch(form.getAttribute('action'),{method:'POST',body:new FormData(form)});return reply.ok;}return false;})()`);
             assert.ok(removed,'Could not clean up private browser fixture '+item.id);
         }
@@ -78,6 +79,27 @@ let cleanupDrafts=async()=>{};
         await evaluate(`(()=>{const select=document.getElementById('${filterId}');select.value='';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
         await until(()=>evaluate(`(new URL(location.href).searchParams.get('status')||'')===''&&!document.getElementById('${queryId}').hasAttribute('aria-busy')`),'All statuses did not refresh');
         assert.ok(await evaluate(`Boolean(document.querySelector('[data-draft-id="${id}"]'))`),'All statuses omitted private draft');
+        if(formId==='announcement-form'){
+            const deleteTitle=title+' delete only this fixture';
+            const extra=await evaluate(`(async()=>{const form=document.getElementById('${formId}'),data=new FormData(form);data.set('action','create');data.set('_review_id','0');data.set('title',${JSON.stringify(deleteTitle)});data.set('content','<p>Disposable private draft</p>');data.set('status','draft');const r=await fetch(form.getAttribute('action'),{method:'POST',body:data});return {ok:r.ok,html:await r.text()};})()`);
+            const deleteId=await evaluate(`(()=>{const d=new DOMParser().parseFromString(${JSON.stringify(extra.html)},'text/html');return Array.from(d.querySelectorAll('[data-draft-id]')).find(row=>row.querySelector('[data-draft-edit]')?.textContent===${JSON.stringify(deleteTitle)})?.dataset.draftId;})()`);
+            assert.ok(extra.ok&&deleteId,'Could not prepare deletion fixture');const deletionFixture={id:deleteId,route};fixtures.push(deletionFixture);
+            await visit(route+'?sort=oldest&size=100');
+            const rowKeys=()=>evaluate(`Array.from(document.querySelectorAll('#announcements-table tbody tr.ann-row')).map(row=>row.dataset.draftId?'draft:'+row.dataset.draftId:'announcement:'+row.querySelector('[data-preview-id]')?.dataset.previewId)`);
+            const before=await rowKeys();
+            await evaluate(`document.querySelector('[data-draft-id="${deleteId}"] form[data-draft-action=delete] button').click()`);
+            await until(()=>evaluate("Boolean(document.querySelector('dialog[open] .gnc-dialog-accept'))"),'Draft deletion confirmation unavailable');
+            await evaluate("document.documentElement.dataset.deletingDraft='yes';document.querySelector('dialog[open] .gnc-dialog-accept').click()");
+            await until(()=>evaluate("document.readyState==='complete'&&!document.documentElement.dataset.deletingDraft&&!!document.getElementById('ann-query')"),'Draft deletion did not return to announcement list');
+            const after=await rowKeys();
+            assert.ok(!after.includes('draft:'+deleteId),'Selected test draft was not deleted');deletionFixture.deleted=true;
+            assert.equal(await evaluate("new URL(location.href).searchParams.get('status')||''"),'','Deletion forced a different status filter');
+            assert.equal(await evaluate("document.getElementById('ann-filter-status').value"),'','Deletion changed All statuses');
+            assert.equal(await evaluate("new URL(location.href).searchParams.get('sort')"),'oldest','Deletion lost the selected sort order');
+            assert.equal(await evaluate("new URL(location.href).searchParams.get('size')"),'100','Deletion lost the page size');
+            assert.ok(before.filter(key=>key!=='draft:'+deleteId).every(key=>after.includes(key)),'Unrelated announcement rows disappeared after deletion');
+        }
+
         await evaluate(`(()=>{const select=document.getElementById('${filterId}');select.value='draft';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
         await until(()=>evaluate(`new URL(location.href).searchParams.get('status')==='draft'&&!document.getElementById('${queryId}').hasAttribute('aria-busy')`),'Draft filter did not refresh in place');
         assert.equal(await evaluate(`document.querySelector('h1').textContent==='Drafts'`),false,'Draft filter navigated to separate page');
@@ -128,7 +150,7 @@ let cleanupDrafts=async()=>{};
             await send('Network.setCookie',{...author,url:base,httpOnly:true});
         }
     }
-    console.log(authorRole+': integrated News and Announcement drafts, All statuses, in-place draft filtering, old-bookmark redirects, repeated saves, explicit submission and published-content isolation passed. No public content changed.');
+    console.log(authorRole+': integrated News and Announcement drafts, All statuses, in-place draft filtering, old-bookmark redirects, repeated saves, explicit submission, deletion return state and published-content isolation passed. No public content changed.');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{
     try{await cleanupDrafts();}catch(error){console.error(error);process.exitCode=1;}
     for(const s of sessions)docker(['destroy',s.value]);
