@@ -77,8 +77,9 @@ try {
     }
     if ($action === 'save' || $action === 'save_recovery') {
         if($action==='save_recovery'&&empty($_SERVER['HTTP_X_GNCI_EDITOR_PEER']))edReply(['error'=>'Open the Content Editor to save a recovery draft.'],403);
-        $payload = $_POST['snapshot'] ?? null;
-        if (!is_string($payload)) edReply(['error' => 'The draft was not received. Check the hosting request-size limit.'], 400);
+        try {$payload=editorDraftRequestPayload($_POST,$_FILES);}
+        catch(LengthException $e){edReply(['error'=>$e->getMessage()],413);}
+        catch(InvalidArgumentException $e){edReply(['error'=>$e->getMessage()],400);}
         if(!empty($_SERVER['HTTP_X_GNCI_EDITOR_PEER'])) {
             require_once __DIR__.'/../../includes/editor-presence.php';
             $decoded=json_decode($payload,true,64,JSON_THROW_ON_ERROR);

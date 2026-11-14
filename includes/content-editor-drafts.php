@@ -3,6 +3,25 @@
 // Drafts are private checkpoints. Only the existing publish handlers write live content.
 const GNC_EDITOR_DRAFT_LIMIT = 96 * 1024 * 1024;
 
+/** Read the legacy text snapshot or a private multipart snapshot upload. */
+function editorDraftRequestPayload(array $post,array $files): string {
+    if(!array_key_exists('snapshot_file',$files)){
+        if(!is_string($post['snapshot']??null))throw new InvalidArgumentException('The draft was not received. Check the hosting request-size limit.');
+        return $post['snapshot'];
+    }
+    if(array_key_exists('snapshot',$post))throw new InvalidArgumentException('Send one draft snapshot at a time.');
+    $file=$files['snapshot_file'];
+    if(!is_array($file)||!is_int($file['error']??null))throw new InvalidArgumentException('The draft upload was not received correctly.');
+    if(in_array($file['error'],[UPLOAD_ERR_INI_SIZE,UPLOAD_ERR_FORM_SIZE],true))throw new LengthException('The draft exceeds the hosting upload limit (upload_max_filesize: '.ini_get('upload_max_filesize').'). Ask your hosting provider to allow larger draft uploads.');
+    if($file['error']!==UPLOAD_ERR_OK||!is_string($file['tmp_name']??null)||!is_uploaded_file($file['tmp_name']))throw new InvalidArgumentException('The draft upload was not received correctly. Please try again.');
+    $size=filesize($file['tmp_name']);
+    if($size===false||$size===0)throw new InvalidArgumentException('The draft upload is empty or unreadable.');
+    if($size>GNC_EDITOR_DRAFT_LIMIT)throw new LengthException('This draft is too large. Save fewer media changes at a time.');
+    $payload=file_get_contents($file['tmp_name']);
+    if(!is_string($payload)||strlen($payload)!==$size)throw new InvalidArgumentException('The draft upload could not be read. Please try again.');
+    return $payload;
+}
+
 function editorDraftLoad(PDO $db, int $userId, string $key): ?array {
     $db->beginTransaction();
     try {

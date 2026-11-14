@@ -65,7 +65,7 @@ their existing scope.
 
 ## Data and database changes
 
-Administration additions use the existing private Content Editor snapshot tables, including photo bytes and crop settings. Canvas and settings-modal additions share the same draft action; the four section tabs share a draft route. Preview-only card templates reuse the public card markup, including empty sections. Only explicit publication writes `admin_people`/`admin_offices`; returned IDs reconcile successful inserts before publication retries. Content Editors submit the existing snapshot approval workflow. No schema migration is required.
+Administration additions use the existing private Content Editor snapshot tables, including photo bytes and crop settings. Large Administration snapshots are sent as multipart JSON file uploads to avoid hosting text-field limits. The endpoint checks the uploaded file origin and size, then applies the same snapshot validation, ownership, revision and publication boundaries; legacy text snapshots remain supported. Canvas and settings-modal additions share the same draft action; the four section tabs share a draft route. Preview-only card templates reuse the public card markup, including empty sections. Only explicit publication writes `admin_people`/`admin_offices`; returned IDs reconcile successful inserts before publication retries. Content Editors submit the existing snapshot approval workflow. No schema migration is required.
 
 Heads of Student Services uses the same persistent Add Office modal from both the canvas and More Settings. Photo processing and validation dialogs leave its entered fields intact; a modal-specific section key keeps creation in the selected Administration section without changing the settings drawer's active tab.
 

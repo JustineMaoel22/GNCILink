@@ -6818,7 +6818,17 @@
         backgrounds:function(){return responsiveBackgroundChanges;},setBackgrounds:function(value){responsiveBackgroundChanges=value||{};applyResponsiveBackgrounds();},
         setPositions:function(value){imagePositions=value;Object.keys(value).forEach(function(path){previewImagePosition(path,value[path].value);});},
         clean:cleanHtml,notify:toast,refresh:chrome,
-        send:function(fields){if(C.reviewSubmission)fields.review_submission=C.reviewSubmission;return send('/admin/action/editor-draft-handler.php',fields);}
+        send:function(fields){
+            if(C.reviewSubmission)fields.review_submission=C.reviewSubmission;
+            var files;
+            // Hosting firewalls can impose a small limit on text fields even when
+            // normal image uploads are allowed. Keep large photo snapshots in a file part.
+            if(C.page.slug==='administration'&&typeof fields.snapshot==='string'&&fields.snapshot.length>256*1024){
+                files={snapshot_file:new File([fields.snapshot],'administration-draft.json',{type:'application/json'})};
+                delete fields.snapshot;
+            }
+            return send('/admin/action/editor-draft-handler.php',fields,files);
+        }
     });
     function savePageDraft(){if(drafts && drafts.supported() && !S.busy)return run('Saving draft...',function(){return drafts.save();});}
     var draftSaveButton=$('#veSaveDraft'),draftDiscardButton=$('#veDiscardDraft');

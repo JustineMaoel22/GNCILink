@@ -5,7 +5,7 @@ require_once __DIR__.'/../config/config.php';
 require_once __DIR__.'/../admin/admin-functions.php';
 if(!in_array(DB_HOST,['db','127.0.0.1','localhost'],true))throw new RuntimeException('Local testing only.');
 $db=getDB();$source=(string)$db->query('SELECT DATABASE()')->fetchColumn();
-$schema='gnci_office_http_'.bin2hex(random_bytes(6));$created=false;$server=null;$sessionId=null;$checks=0;
+$schema='gnci_office_http_'.bin2hex(random_bytes(6));$created=false;$server=null;$sessionId=null;$checks=0;$draftUploadPath=null;$invalidUploadPath=null;
 $log=tempnam(sys_get_temp_dir(),'gnci-office-http-');$root=dirname(__DIR__);
 function officeHttpCheck(bool $ok,string $message):void{global $checks;if(!$ok)throw new RuntimeException($message);$checks++;}
 try{
@@ -21,7 +21,7 @@ try{
     $_SERVER['HTTP_HOST']='localhost';initSession();$_SESSION=['user_id'=>$userId,'user_role'=>'Super Admin','credential_version'=>1,'_initiated'=>true,'last_activity'=>time()];
     $csrf=generateCSRFToken();$sessionId=session_id();$cookie=session_name().'='.$sessionId;session_write_close();
     $port=random_int(18000,28000);$base='http://127.0.0.1:'.$port;
-    $server=proc_open(['php','-S','127.0.0.1:'.$port,'-t',$root,__DIR__.'/administration-office-http-router.php'],[0=>['pipe','r'],1=>['file',$log,'a'],2=>['file',$log,'a']],$pipes,$root,array_merge(getenv(),['GNCI_OFFICE_TEST_SCHEMA'=>$schema]));
+    $server=proc_open(['php','-S','127.0.0.1:'.$port,'-t',$root,__DIR__.'/administration-office-http-router.php'],[0=>['pipe','r'],1=>['file',$log,'a'],2=>['file',$log,'a']],$pipes,$root,array_merge(getenv(),['GNCI_OFFICE_TEST_SCHEMA'=>$schema,'GNCI_OFFICE_TEST_FIELD_LIMIT'=>'1048576']));
     if(!is_resource($server))throw new RuntimeException('Local test server did not start.');fclose($pipes[0]);
     for($end=microtime(true)+5;microtime(true)<$end;){$ready=@fsockopen('127.0.0.1',$port,$errno,$error,.1);if($ready){fclose($ready);break;}usleep(50000);}
     $request=static function(string $route,?array $fields=null,array $headers=[],bool $authenticated=true)use($base,$cookie):array{
@@ -36,6 +36,29 @@ try{
     officeHttpCheck((int)$db->query('SELECT COUNT(*) FROM admin_offices')->fetchColumn()===0,'Draft save created live offices.');
     [$status,,$reply]=$request('/admin/action/editor-draft-handler.php',array_merge($draft,['action'=>'load']));
     officeHttpCheck($status===200&&$reply['draft']['snapshot']['files'][0]['data']===$snapshot['files'][0]['data'],'Database draft round trip lost the photo.');
+    // A genuine PNG with a large ancillary text chunk represents a 1.72 MiB photo.
+    $png=base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=');
+    $padding='Comment'.chr(0).str_repeat('q',1803550-strlen($png)-12-8);
+    $photo=substr($png,0,-12).pack('N',strlen($padding)).'tEXt'.$padding.pack('N',crc32('tEXt'.$padding)).substr($png,-12);
+    officeHttpCheck(strlen($photo)===1803550&&getimagesizefromstring($photo)!==false,'Large photo fixture is a valid 1.72 MiB PNG.');
+    $large=$snapshot;$large['files'][0]['data']=base64_encode($photo);$encoded=json_encode($large);
+    [$status]=$request('/admin/action/editor-draft-handler.php',array_merge($draft,['revision'=>1,'action'=>'save','snapshot'=>$encoded]));
+    officeHttpCheck($status===413,'Legacy large text-field transport did not reproduce the hosting rejection.');
+    $draftUploadPath=tempnam(sys_get_temp_dir(),'gnci-draft-upload-');file_put_contents($draftUploadPath,$encoded);
+    $uploaded=array_merge($draft,['revision'=>1,'action'=>'save','snapshot_file'=>new CURLFile($draftUploadPath,'application/json','administration-draft.json')]);
+    [$status,,$reply]=$request('/admin/action/editor-draft-handler.php',$uploaded);
+    officeHttpCheck($status===200&&!empty($reply['success'])&&(int)$reply['revision']===2,'Multipart snapshot failed under the same hosting text-field cap.');
+    [$status,,$reply]=$request('/admin/action/editor-draft-handler.php',array_merge($draft,['action'=>'load']));
+    officeHttpCheck($status===200&&$reply['draft']['snapshot']['files'][0]['data']===$large['files'][0]['data'],'Large photo bytes did not survive real upload, private storage and restore.');
+    officeHttpCheck((int)$db->query('SELECT COUNT(*) FROM admin_offices')->fetchColumn()===0,'Large photo draft changed published Administration content.');
+    $invalidUploadPath=tempnam(sys_get_temp_dir(),'gnci-invalid-draft-');file_put_contents($invalidUploadPath,'not JSON');
+    $bad=$uploaded;$bad['revision']=2;$bad['snapshot_file']=new CURLFile($invalidUploadPath,'application/json','invalid.json');
+    [$status]=$request('/admin/action/editor-draft-handler.php',$bad);officeHttpCheck($status===400,'Invalid uploaded snapshot was accepted.');
+    $bad=$uploaded;$bad['snapshot']='{}';[$status]=$request('/admin/action/editor-draft-handler.php',$bad);officeHttpCheck($status===400,'Ambiguous text/file snapshots were accepted.');
+    $bad=$uploaded;$bad['csrf_token']='invalid';[$status]=$request('/admin/action/editor-draft-handler.php',$bad);officeHttpCheck($status===403,'Multipart snapshot bypassed CSRF protection.');
+    [$status]=$request('/admin/action/editor-draft-handler.php',$uploaded,[],false);officeHttpCheck(in_array($status,[401,403],true),'Unauthenticated multipart snapshot was accepted.');
+    [$status,,$reply]=$request('/admin/action/editor-draft-handler.php',array_merge($draft,['action'=>'load']));
+    officeHttpCheck($status===200&&(int)$reply['draft']['revision']===2&&$reply['draft']['snapshot']['files'][0]['data']===$large['files'][0]['data'],'Refused uploads overwrote the previously saved draft.');
     $fields=['action'=>'admin_save_office','csrf_token'=>$csrf,'office_id'=>0,'section_key'=>'heads-of-student-services','office_name'=>'QA HTTP Office','head_name'=>'QA HTTP Head','head_role'=>'Director','phone'=>'045-900-4473 loc. 123','email'=>'office@example.invalid','location'=>'Building A','hours'=>'Monday to Friday','services'=>"Student support\nRecords"];
     [$status]=$request('/admin/action/page-content-handler.php',$fields);
     officeHttpCheck($status===428&&(int)$db->query('SELECT COUNT(*) FROM admin_offices')->fetchColumn()===0,'Publication bypassed password confirmation.');
@@ -67,6 +90,7 @@ try{
         if($schema!==$source&&preg_match('/\Agnci_office_http_[a-f0-9]{12}\z/D',$schema))$db->exec("DROP DATABASE `$schema`");
     }
     if($sessionId){session_id($sessionId);session_start();$_SESSION=[];session_destroy();}
+    foreach([$draftUploadPath,$invalidUploadPath] as $temporary)if(is_string($temporary)&&is_file($temporary))unlink($temporary);
     if(is_file($log))unlink($log);
 }
 if(isset($summary))echo $summary;

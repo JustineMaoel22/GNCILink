@@ -106,7 +106,7 @@ function approvalDate(?string $date): string {
     return $stamp?$stamp->format('M j, Y · g:i A'):$date;
 }
 function approvalFields(array $post): array {
-    $skip=['action','ajax_action','csrf_token','status','allow_incomplete','facebook_confirmed','facebook_request_key','image_framing','image_framing_json','publish_destination','import_token','category_ids_present'];
+    $skip=['action','ajax_action','csrf_token','status','allow_incomplete','facebook_confirmed','facebook_request_key','image_framing','image_framing_json','publish_destination','import_token','category_ids_present','dept_ids','audience_present'];
     $out=[];
     foreach($post as $key=>$value){
         if($key==='category_ids'&&is_array($value)){

@@ -6,7 +6,7 @@ const profile=fs.mkdtempSync(path.join(os.tmpdir(),'gnci-administration-http-'))
 const browser=spawn(process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn,message){for(let end=Date.now()+20000;Date.now()<end;){if(await fn())return;await delay(100);}throw Error(message);}
-let socket,session,evaluate,trace=[],cleanup,fileChooser;
+let socket,session,evaluate,trace=[],cleanup,fileChooser,photoFixture;
 const marker='QA Administration HTTP '+Date.now();
 const office=process.env.ADMIN_HTTP_OFFICE==='1',mockDraft=process.env.ADMIN_HTTP_MOCK_DRAFT==='1',kind=office?'office':'person';
 (async()=>{
@@ -18,8 +18,8 @@ const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++serial;
 evaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
 await send('Page.enable');await send('Network.enable');await send('Runtime.enable');
 await send('Page.addScriptToEvaluateOnNewDocument',{source:`window.__httpTrace=[];const original=window.fetch;window.fetch=async function(input,opts){const action=opts?.body?.get?.('action'),url=String(input);let result;
-if(${mockDraft}&&url.includes('editor-draft-handler')){let snapshot=sessionStorage.getItem(${JSON.stringify(marker)});if(action==='save'){snapshot=opts.body.get('snapshot');sessionStorage.setItem(${JSON.stringify(marker)},snapshot);}result=new Response(JSON.stringify({success:true,revision:1,draft:action==='load'&&snapshot?{revision:1,snapshot:JSON.parse(snapshot)}:null}),{headers:{'Content-Type':'application/json'}});}else result=await original.apply(this,arguments);
-if(url.includes('editor-draft-handler')){const reply=await result.clone().json().catch(()=>({}));__httpTrace.push({action,status:result.status,error:reply.error,success:reply.success,revision:reply.revision,hasDraft:!!reply.draft,route:opts?.body?.get?.('route')});}return result;};`});
+if(${mockDraft}&&url.includes('editor-draft-handler')){let snapshot=sessionStorage.getItem(${JSON.stringify(marker)});if(action==='save'){snapshot=opts.body.get('snapshot');if(typeof snapshot!=='string')snapshot=await opts.body.get('snapshot_file').text();sessionStorage.setItem(${JSON.stringify(marker)},snapshot);}result=new Response(JSON.stringify({success:true,revision:1,draft:action==='load'&&snapshot?{revision:1,snapshot:JSON.parse(snapshot)}:null}),{headers:{'Content-Type':'application/json'}});}else result=await original.apply(this,arguments);
+if(url.includes('editor-draft-handler')){const reply=await result.clone().json().catch(()=>({}));__httpTrace.push({action,status:result.status,error:reply.error,success:reply.success,revision:reply.revision,hasDraft:!!reply.draft,snapshotUploadBytes:opts?.body?.get?.('snapshot_file')?.size||0,snapshotTextBytes:typeof opts?.body?.get?.('snapshot')==='string'?opts.body.get('snapshot').length:0,route:opts?.body?.get?.('route')});}return result;};`});
 session=JSON.parse(docker(['Super Admin']));await send('Network.setCookie',{...session,url:'http://localhost:8080',httpOnly:true});
 await send('Emulation.setDeviceMetricsOverride',{width:1917,height:1080,deviceScaleFactor:1,mobile:false});
 await send('Page.setInterceptFileChooserDialog',{enabled:true});
@@ -40,10 +40,19 @@ if(process.env.ADMIN_HTTP_PHOTO){
     await evaluate(`window.__photoFetch=window.fetch;window.fetch=async function(input,opts){if(String(input).includes('photo-check-handler'))return new Response(JSON.stringify({success:true,checked:true,ok:true,reason:'clear'}),{headers:{'Content-Type':'application/json'}});return __photoFetch.apply(this,arguments);};`);
     await click(office?'#adm-office-photo':'#vePop .ve-pop-row button');await until(()=>fileChooser,'File chooser did not open');
     let uploadPath=path.resolve(__dirname,'../assets/images/test-image.png');
+    if(process.env.ADMIN_HTTP_PHOTO_BYTES){
+        const length=Number(process.env.ADMIN_HTTP_PHOTO_BYTES),png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
+        assert.ok(Number.isInteger(length)&&length>png.length+20&&length<=5*1024*1024);
+        const data=Buffer.concat([Buffer.from('Comment\0'),Buffer.alloc(length-png.length-20,113)]),type=Buffer.from('tEXt');
+        let crc=0xffffffff;for(const byte of Buffer.concat([type,data])){crc^=byte;for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}crc=(crc^0xffffffff)>>>0;
+        const size=Buffer.alloc(4),checksum=Buffer.alloc(4);size.writeUInt32BE(data.length);checksum.writeUInt32BE(crc);
+        uploadPath=photoFixture=path.join(profile,'test-large-photo.png');fs.writeFileSync(uploadPath,Buffer.concat([png.subarray(0,-12),size,type,data,checksum,png.subarray(-12)]));
+        assert.equal(fs.statSync(uploadPath).size,length);
+    }
     if(process.env.ADMIN_HTTP_UPLOAD_ERROR){uploadPath=path.join(profile,'invalid.jpg');fs.writeFileSync(uploadPath,Buffer.alloc(5*1024*1024+1));}
     await send('DOM.setFileInputFiles',{files:[uploadPath],backendNodeId:fileChooser.backendNodeId});
     if(process.env.ADMIN_HTTP_UPLOAD_ERROR){await until(()=>evaluate(`Boolean(document.querySelector('.gnc-dialog-accept'))`),'Upload error dialog unavailable');await click('.gnc-dialog-accept');assert.equal(await evaluate(office?`document.getElementById('adm-office-name').value`:`document.querySelector('#vePop input')?.value`),marker,'Photo error dismissed the office form and lost its entered details');if(office){assert.equal(await evaluate(`document.getElementById('adm-office-head').value`),marker);assert.ok(await evaluate(`document.getElementById('admOfficeModal').classList.contains('show')`));}console.log('PASS: photo error preserved the office form.');return;}
-    await until(()=>evaluate(`Boolean(document.querySelector('.image-frame-save'))`),'Framing unavailable');await click('.image-frame-save');await until(()=>evaluate(office?`document.getElementById('adm-office-preview').src.startsWith('data:image')`:`document.querySelector('#vePop small')?.textContent.includes('test-image.png')`),'Photo form lost');
+    await until(()=>evaluate(`Boolean(document.querySelector('.image-frame-save'))`),'Framing unavailable');await click('.image-frame-save');await until(()=>evaluate(office?`document.getElementById('adm-office-preview').src.startsWith('data:image')`:`document.querySelector('#vePop small')?.textContent.includes(${JSON.stringify(path.basename(uploadPath))})`),'Photo form lost');
 }
 if(process.env.ADMIN_HTTP_PHOTO_FIRST)await fill();
 if(office)await click('#adm-office-save');else{await evaluate(`Array.from(document.querySelectorAll('#vePop button')).find(b=>/^(Add to page|Add office)$/.test(b.textContent)).setAttribute('data-test-add','')`);await click('#vePop [data-test-add]');}
@@ -51,10 +60,11 @@ await delay(2000);
 console.log(JSON.stringify(await evaluate(`({requests:__httpTrace,status:document.getElementById('veStatus').textContent,cards:doc().querySelectorAll('[data-ve-${kind}^="-"]').length})`)));
 assert.equal(await evaluate(`doc().querySelectorAll('[data-ve-${kind}^="-"]').length`),1,'Added card missing from preview');
 assert.ok(await evaluate(`__httpTrace.some(r=>r.action==='save'&&r.success)`),'No successful database draft save');
+if(process.env.ADMIN_HTTP_PHOTO_BYTES)assert.ok(await evaluate("__httpTrace.some(r=>r.action==='save'&&r.snapshotUploadBytes>1048576&&r.snapshotTextBytes===0)"),'Large photo draft was not sent as a file part');
 if(mockDraft&&office){const snapshot=JSON.parse(await evaluate(`sessionStorage.getItem(${JSON.stringify(marker)})`)),entry=Object.values(snapshot.state.additions)[0];assert.equal(entry.kind,'office');assert.equal(entry.section,'heads-of-student-services');assert.equal(entry.item.office,marker);assert.equal(entry.item.name,marker);if(process.env.ADMIN_HTTP_PHOTO)assert.ok(snapshot.files.length>0,'Draft lost uploaded photo bytes');if(process.env.ADMIN_HTTP_COMPLETE){assert.equal(entry.item.contact.email,'office@example.invalid');assert.deepEqual(entry.item.services,['Student support','Records']);}}
 assert.ok(await evaluate(`document.body.innerText.includes(${JSON.stringify('Added '+marker+'. Saved as an unpublished draft.')})`),'Named success feedback missing');
 assert.ok(await evaluate(`(()=>{const r=doc().querySelector('[data-ve-${kind}^="-"]').getBoundingClientRect();return r.bottom>0&&r.top<doc().defaultView.innerHeight;})()`),'New card was not scrolled into view');
 await visit();assert.equal(await evaluate(`doc().querySelector('[data-ve-${kind}^="-"] ${office?'.hss-badge-title':'[data-ve-field="person-name"]'}')?.textContent`),marker,'Refresh lost saved name');
 await until(()=>evaluate(`(()=>{const img=doc().querySelector('[data-ve-${kind}^="-"] [data-ve-img="${kind}-photo"]');return img?.complete&&img.naturalWidth>0&&Number(doc().defaultView.getComputedStyle(img).opacity)>.99;})()`),'Restored photo stayed invisible');
 console.log(mockDraft?'PASS: physical clicks, native upload, shared office form and snapshot restoration. Draft transport mocked; no live content changed.':'PASS: physical clicks, canonical editor URL, real draft endpoint/database and refresh restoration. No live content changed.');
-})().catch(async e=>{console.error(e);console.error(JSON.stringify(trace));if(evaluate)console.error(await evaluate(`({trace:window.__httpTrace,pop:document.getElementById('vePop')?.innerText,status:document.getElementById('veStatus')?.textContent})`).catch(()=>null));process.exitCode=1;}).finally(async()=>{try{if(cleanup)await cleanup();}catch(e){console.error(e);process.exitCode=1;}socket?.close();browser.kill();if(session)docker(['destroy',session.value]);});
+})().catch(async e=>{console.error(e);console.error(JSON.stringify(trace));if(evaluate)console.error(await evaluate(`({trace:window.__httpTrace,pop:document.getElementById('vePop')?.innerText,status:document.getElementById('veStatus')?.textContent})`).catch(()=>null));process.exitCode=1;}).finally(async()=>{try{if(cleanup)await cleanup();}catch(e){console.error(e);process.exitCode=1;}if(photoFixture&&fs.existsSync(photoFixture))fs.unlinkSync(photoFixture);socket?.close();browser.kill();if(session)docker(['destroy',session.value]);});
