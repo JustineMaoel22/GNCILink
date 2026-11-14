@@ -6,7 +6,7 @@ $editUrl=$module.'?'.http_build_query(['revise'=>$draftId]);
 $categoryLabel=$draftKind==='news'?($newsCategories[$draft['category']]??$draft['category']):implode(', ',array_column(array_filter($categories,static fn($c)=>in_array((string)$c['category_id'],array_map('strval',$draft['_draft_categories']),true)),'category_name'));
 ?>
 <tr class="ann-row" data-draft-id="<?= $draftId ?>" data-draft-revision="<?= (int)$draft['revision'] ?>">
-<td class="ann-img-cell"><?php if($draft['image_path']): ?><img class="ann-thumb" src="<?= $de($draft['image_path']) ?>" alt="" loading="lazy"><?php else: ?><div class="ann-thumb ann-thumb-empty"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></div><?php endif; ?></td>
+<td class="ann-img-cell"><div class="bulk-select-media"><?php if($draft['image_path']): ?><img class="ann-thumb" src="<?= $de($draft['image_path']) ?>" alt="" loading="lazy"><?php else: ?><div class="ann-thumb ann-thumb-empty"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></div><?php endif; ?></div></td>
 <td class="ann-title-cell"><a class="ann-title text-reset text-decoration-none" data-draft-edit href="<?= $de($editUrl) ?>"><?= $de($draft['title']) ?></a><div class="ann-sub">Private draft &middot; Revision <?= (int)$draft['revision'] ?></div></td>
 <td data-label="Category"><span class="program-badge"><?= $de($categoryLabel?:'Not set') ?></span></td>
 <?php if($draftKind==='announcement'): ?><td data-label="For"><?= $de(contentAudienceDescription($draft['_draft_audience'])) ?></td><?php endif; ?>
