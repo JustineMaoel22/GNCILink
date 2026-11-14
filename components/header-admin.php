@@ -151,9 +151,6 @@ $gncEmbedded = (($_GET['embed'] ?? '') === '1')
     </ul>
     <?php endif; ?>
 
-    <?php if (hasPermission('view_own_submissions')): ?>
-    <ul class="sidebar-nav"><li><a href="/admin/submissions.php?view=drafts" class="sidebar-link <?= $currentPage==='submissions'&&($_GET['view']??'')==='drafts'?'active':'' ?>"><i class="bi bi-file-earmark-text"></i> Drafts</a></li></ul>
-    <?php endif; ?>
 
     <!-- Administration -->
     <?php if (hasPermission('manage_users') || hasPermission('view_logs')): ?>

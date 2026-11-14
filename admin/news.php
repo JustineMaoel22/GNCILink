@@ -19,6 +19,14 @@ require_once __DIR__ . '/news-view.php';
 initSession();
 requireLogin();
 
+// Private proposals use the existing Drafts view rather than the live-content list.
+if (!rbacIsSuper() && ($_GET['status']??'')==='draft' && !isset($_GET['modal']) && !isset($_GET['revise'])) {
+    $draftQuery=['view'=>'drafts','type'=>'news'];
+    if(is_string($_GET['search']??null)&&$_GET['search']!=='')$draftQuery['q']=$_GET['search'];
+    header('Location: /admin/submissions.php?'.http_build_query($draftQuery));
+    exit;
+}
+
 /* Dates are stored in UTC. Show them in local (Philippine) time. */
 if (!function_exists('newsLocalTime')) {
     function newsLocalTime($raw, $format) {

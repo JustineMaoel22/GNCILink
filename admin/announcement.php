@@ -17,6 +17,14 @@ require_once __DIR__ . '/../includes/facebook-publishing.php';
 initSession();
 requireLogin();
 
+// Private proposals use the existing Drafts view rather than the live-content list.
+if (!rbacIsSuper() && ($_GET['status']??'')==='draft' && !isset($_GET['modal']) && !isset($_GET['revise'])) {
+    $draftQuery=['view'=>'drafts','type'=>'announcements'];
+    if(is_string($_GET['search']??null)&&$_GET['search']!=='')$draftQuery['q']=$_GET['search'];
+    header('Location: /admin/submissions.php?'.http_build_query($draftQuery));
+    exit;
+}
+
 $facebookPostsPage = ($facebookPostsPage ?? false) === true;
 // Keep bookmarks to the former Facebook filter working.
 if (!$facebookPostsPage && ($_GET['source'] ?? '') === 'facebook') {
