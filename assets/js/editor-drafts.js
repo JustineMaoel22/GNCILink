@@ -134,13 +134,61 @@
         (data.links || []).forEach(function(entry){var el=find(entry.selector);if(!el||!el.matches('[data-ve-payment-link],[data-ve-linkkey],[data-ve-btn]'))return;['href','value'].forEach(function(key){var value=entry[key];if(typeof value==='string'&&/^(https?:\/\/|mailto:|tel:|\/(?!\/)|#)/i.test(value)&&!/[\x00-\x20]/.test(value))el.setAttribute(key==='href'?'href':'data-ve-link',value);});});
     }
     function create(options) {
-        var revision=0, checkpoint='', route='', available=true, loading=false, fileIds=new WeakMap(), serial=0;
+        var revision=0, checkpoint='', route='', available=true, loading=false, fileIds=new WeakMap(), serial=0, submitting=null, held=false, offer=null;
+        var reopen=document.createElement('button');reopen.type='button';reopen.className='btn btn-outline-secondary ve-btn';reopen.textContent='Review saved draft';reopen.hidden=true;
+        var saveButton=document.getElementById('veSaveDraft');if(saveButton)saveButton.parentNode.insertBefore(reopen,saveButton);
         function identity(blob){if(!fileIds.has(blob))fileIds.set(blob,++serial);return {$file:fileIds.get(blob)};}
         function state(){return options.adapter().draftState ? options.adapter().draftState() : {};}
         function fingerprint(){return JSON.stringify(plain({state:state(), positions:options.positions(),textPlacements:options.textPlacements?options.textPlacements():{},backgrounds:options.backgrounds?options.backgrounds():{}},identity));}
         function saved(){return !!checkpoint && checkpoint===fingerprint();}
         function fields(action){return {action:action,page:options.page,route:route,revision:revision};}
         async function request(action, extra){var result=await options.send(Object.assign(fields(action),extra));if(!result.ok)throw Error(result.error);return result;}
+        function restore(draft){
+            var snapshot=decode(draft.snapshot);
+            options.adapter().draftState(snapshot.state);options.setPositions(snapshot.state.imagePositions||{});
+            restorePreview(options.document(),snapshot.preview,options.clean);
+            if(options.adapter().draftRebind)options.adapter().draftRebind();
+            if(options.setTextPlacements)options.setTextPlacements(snapshot.state.textPlacements||{});
+            if(options.setBackgrounds)options.setBackgrounds(snapshot.state.responsiveBackgrounds||{});
+            held=false;reopen.hidden=true;checkpoint=fingerprint();options.refresh();
+            options.notify(draft.outdated?'Older draft resumed for review. Its original version is retained; publishing is blocked until the changes are reconciled with current content.':'Draft resumed. These changes are not live.');
+        }
+        function offerDraft(draft){
+            reopen.hidden=false;reopen.onclick=function(){offerDraft(draft);};
+            if(offer)offer.remove();
+            var box=document.createElement('dialog'),title=document.createElement('h3'),note=document.createElement('p'),diff=document.createElement('pre');
+            box.style.cssText='max-width:760px;width:90%;max-height:85vh;overflow:auto;padding:24px;border:1px solid #ccc;border-radius:12px';
+            title.textContent=draft.outdated?'Saved draft uses an older page version':'Resume your saved draft?';
+            note.textContent='The preview shows the latest published page. Your private draft is preserved. Review differences before resuming an older draft; it cannot overwrite newer published content.';
+            diff.hidden=true;diff.style.cssText='white-space:pre-wrap;max-height:45vh;overflow:auto';box.append(title,note,diff);
+            function action(label,fn){var button=document.createElement('button');button.type='button';button.className='btn btn-sm btn-outline-secondary m-1';button.textContent=label;button.onclick=async function(){try{await fn();}catch(error){options.notify(error.message,'error');}};box.appendChild(button);}
+            action('Review differences',function(){
+                var lines=[];
+                (draft.snapshot.preview.fields||[]).forEach(function(field){var el;try{el=options.document().querySelector(field.selector);}catch(_){}if(!el||el.textContent!==field.text||field.rich&&options.clean(el.innerHTML)!==field.html)lines.push(field.selector+'\nCurrent: '+(el?el.textContent:'[missing from current page]')+'\nDraft: '+field.text);});
+                lines.push('Current settings:\n'+JSON.stringify(plain(state(),function(file){return {name:file.name,type:file.type,size:file.size};}),null,2));
+                lines.push('Saved settings and media references (binary files omitted):\n'+JSON.stringify(draft.snapshot.state,null,2));
+                lines.push('Current media and layout:\n'+JSON.stringify(preview(options.document(),options.clean),null,2));
+                lines.push('Saved media and layout:\n'+JSON.stringify(draft.snapshot.preview,null,2));
+                diff.textContent=lines.join('\n\n');diff.hidden=false;
+            });
+            action('Keep draft and view current',function(){box.close();});
+            action('Resume saved draft',async function(){
+                if(options.pending()>0&&!await window.AdminDialogs.confirm('Replace your current local preview changes with the saved draft?'))return;
+                var presence=options.presence&&options.presence();
+                if(presence){await presence.acquire(false);await presence.resumeDraft({page:options.page,route:route,revision:revision});}
+                restore(draft);box.close();
+            });
+            if(draft.outdated)action('Use reviewed draft with current version',async function(){
+                if(diff.hidden){options.notify('Review differences first, including saved settings and media.','error');return;}
+                if(!await window.AdminDialogs.confirm('Confirm you have compared the saved changes with the current published page. Resuming will use all saved draft changes; it does not merge them automatically. The draft remains private until publication or approval.'))return;
+                var presence=options.presence&&options.presence();if(!presence)throw Error('Conflict protection is unavailable.');
+                await presence.acquire(false);
+                revision=await presence.reconcileDraft({page:options.page,route:route,revision:revision,confirmed:'1',current_revision:draft.current_version.revision,current_external:draft.current_version.external});
+                draft.outdated=false;restore(draft);box.close();
+            });
+            action('Discard saved draft',async function(){if(!await window.AdminDialogs.confirm('Permanently discard your saved draft?'))return;await request('delete');revision=0;checkpoint='';held=false;reopen.hidden=true;box.close();options.refresh();});
+            document.body.appendChild(box);offer=box;box.showModal();
+        }
         return {
             supported:function(){return !!options.adapter().draftState;},
             available:function(){return available && !loading;},
@@ -156,36 +204,27 @@
                 if(options.page==='administration') ['section','navigation'].forEach(function(key){target.searchParams.delete(key);});
                 // The directory is one ordered collection; page/filter changes share its draft.
                 if(options.page==='student-organizations'&&!(options.reviewing&&options.reviewing())&&/\/student-org(?:\.php)?$/.test(target.pathname))['p','category','archived'].forEach(function(key){target.searchParams.delete(key);});
-                route=target.pathname+target.search;revision=0;checkpoint='';loading=true;
+                route=target.pathname+target.search;revision=0;checkpoint='';held=false;reopen.hidden=true;loading=true;if(offer){offer.remove();offer=null;}
                 var documentAtStart=options.document();
                 try{
                     var result=await request('load');
-                    // Carry an older section/page-scoped draft into the shared collection draft.
+                    // Offer legacy checkpoints in place; viewing never copies or deletes a draft.
                     if(!result.draft&&['student-organizations','administration'].indexOf(options.page)>=0&&previousRoute!==route){
                         var previous=await request('load',{route:previousRoute});
-                        if(previous.draft){
-                            var copied=await request('save',{revision:0,snapshot:JSON.stringify(previous.draft.snapshot)});
-                            result.draft={revision:copied.revision,snapshot:previous.draft.snapshot};
-                            await request('delete',{route:previousRoute,revision:previous.draft.revision});
-                        }
+                        if(previous.draft){result=previous;route=previousRoute;}
                     }
                     if(options.document()!==documentAtStart)return;
                     if(result.draft){
                         revision=result.draft.revision;
-                        var snapshot=decode(result.draft.snapshot);
-                        options.adapter().draftState(snapshot.state);
-                        options.setPositions(snapshot.state.imagePositions || {});
-                        restorePreview(options.document(),snapshot.preview,options.clean);
-                        if(options.adapter().draftRebind)options.adapter().draftRebind();
-                        if(options.setTextPlacements)options.setTextPlacements(snapshot.state.textPlacements||{});
-                        if(options.setBackgrounds)options.setBackgrounds(snapshot.state.responsiveBackgrounds||{});
-                        checkpoint=fingerprint();options.notify('Draft restored. These changes are not live.');
+                        if(options.reviewing&&options.reviewing())restore(result.draft);
+                        else {held=true;offerDraft(result.draft);}
                     }
                     available=true;
                 }catch(error){available=false;options.notify(error.message,'error');}
                 finally{loading=false;options.refresh();}
             },
             save:async function(recovery){
+                if(held)throw Error('Your saved draft is preserved. Resume it or explicitly discard it before saving a replacement.');
                 var snapshot={version:1,state:Object.assign({},state(),{imagePositions:options.positions(),textPlacements:options.textPlacements?options.textPlacements():{},responsiveBackgrounds:options.backgrounds?options.backgrounds():{}}),preview:preview(options.document(),options.clean)};
                 var before=fingerprint();
                 var payload=await encode(snapshot);
@@ -193,8 +232,13 @@
                 var result=await request(recovery?'save_recovery':'save',{snapshot:payload});revision=result.revision;checkpoint=before;
                 options.notify(recovery?'Recovery draft saved. It keeps your previous content version and cannot overwrite newer live content.':'Draft saved. Visitors still see the published page.');options.refresh();
             },
-            clear:async function(){if(revision)await request('delete');revision=0;checkpoint='';options.refresh();},
-            submit:async function(){await this.save();return request('submit_review');},
+            clear:async function(){if(revision)await request('delete');revision=0;checkpoint='';held=false;reopen.hidden=true;options.refresh();},
+            submit:function(){
+                if(submitting)return submitting;
+                var self=this;
+                submitting=(async function(){if(!revision||!saved())await self.save();return request('submit_review');})().finally(function(){submitting=null;});
+                return submitting;
+            },
             fingerprint:fingerprint
         };
     }

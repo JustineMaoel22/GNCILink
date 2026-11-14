@@ -60,18 +60,19 @@ try {
         edReply(['success'=>true,'draft'=>['revision'=>0,'snapshot'=>$payload['snapshot']]]);
     }
     if($action==='submit_review'){
-        $draft=editorDraftLoad($db,$userId,$key);
-        if(!$draft||(int)$draft['revision']!==$revision)edReply(['error'=>'Save the draft before submitting it.'],409);
-        $resubmit=0;
-        if($reviewId){$old=rbacGetSubmission($reviewId);if($old&&(int)$old['user_id']===$userId&&in_array($old['status'],['draft','rejected','needs_revision','failed'],true))$resubmit=$reviewId;}
-        $id=rbacSaveSubmission('snapshot','/admin/content-edit.php','Page changes: '.$page,['page'=>$page,'route'=>$route,'snapshot'=>$draft['snapshot']],0,$resubmit);
-        edReply(['success'=>true,'submission_id'=>$id,'message'=>'Submitted for Super Admin approval. Visitors still see the published page.']);
+        $submitted=editorDraftSubmitForReview($db,$userId,$page,$route,$revision,$reviewId);
+        edReply(['success'=>true,'message'=>$submitted['already_submitted']?'This saved version has already been submitted. Check My Submissions for its review status.':'Submitted for Super Admin approval. Visitors still see the published page.']+$submitted);
     }
     if ($action === 'load') {
         $loaded=editorDraftLoad($db,$userId,$key);
         if($loaded && !empty($_SERVER['HTTP_X_GNCI_EDITOR_PEER'])) {
             require_once __DIR__.'/../../includes/editor-presence.php';
-            editorPresenceRestoreDraft($db,$_SERVER['HTTP_X_GNCI_EDITOR_PEER'],$loaded['snapshot']);
+            $saved=$loaded['snapshot']['content_version']??['scope'=>'','revision'=>0,'external'=>0];
+            $peer=editorPresencePeer($db,$_SERVER['HTTP_X_GNCI_EDITOR_PEER']);
+            $latest=editorPresenceSnapshot($db,$peer);
+            $current=['scope'=>$peer['scope_key'],'revision'=>$latest['revision'],'external'=>$latest['external']];
+            $loaded['outdated']=$saved!==$current;
+            $loaded['current_version']=$current;
         }
         edReply(['success'=>true,'draft'=>$loaded]);
     }
@@ -103,5 +104,5 @@ try {
     error_log('Editor draft storage error: ' . $e->getCode());
     edReply(['error' => 'Draft storage is unavailable. Ask your developer to run database/migrate-content-editor-drafts.php.'], 503);
 } catch (Throwable $e) {
-    edReply(['error' => $e->getCode() === 409 ? $e->getMessage() : 'Could not save the draft. Please try again.'], $e->getCode() === 409 ? 409 : 500);
+    edReply(['error' => in_array($e->getCode(),[403,409],true) ? $e->getMessage() : 'Could not save the draft. Please try again.'], in_array($e->getCode(),[403,409],true) ? $e->getCode() : 500);
 }

@@ -34,9 +34,11 @@ events while preserving legacy NULL inference. Calendar imports clear that flag
 when replacing a schedule and include it in their conflict signature. See
 `docs/event-edit-protection.md` for deployment and verification.
 
-The Content Editor uses page-scoped heartbeat presence and server-side version
-checks through `includes/editor-presence.php`. MySQL named locks serialize guarded
-writes; short leases protect multi-request publishing. Private drafts and approval
+The Content Editor uses view-only heartbeat presence, explicit tab-bound editing
+reservations, and server-side version checks through `includes/editor-presence.php`.
+MySQL named locks serialize acquisition, renewal, takeover and guarded writes;
+short leases also protect multi-request publishing. Draft reopening offers explicit
+resume/difference review; confirmed reconciliation checks the current versions. Private drafts and approval
 snapshots retain their content baseline. Presence metadata uses additive tables;
 see `docs/content-editor-presence.md` for deployment and shared-content conflict
 boundaries.

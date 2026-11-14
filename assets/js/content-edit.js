@@ -383,15 +383,18 @@
         popBelowToolbar(box, null, true);
         confirm.focus();
     }
+    var approvalPromptPending=false;
     function confirmPublish(message, onConfirm, options) {
         options = options || {};
         if(C.requiresApproval && drafts && drafts.supported() && !(options.root && options.root.ownerDocument !== D)) {
+            if(S.busy||approvalPromptPending){if(options.cancel)options.cancel();return;}
+            approvalPromptPending=true;
             window.AdminDialogs.confirm('Submit these changes for Super Admin approval? The published page will stay unchanged.', {title:'Submit for approval',confirmText:'Submit'}).then(async function(ok){
                 if(!ok){if(options.cancel)options.cancel();return;}
                 try{await run('Submitting...',async function(){var result=await drafts.submit();toast(result.message || 'Submitted for approval.','ok');});}
                 catch(error){toast(error.message,'error');}
                 if(options.cancel)options.cancel();
-            });
+            }).finally(function(){approvalPromptPending=false;});
             return;
         }
         if (D.querySelector('.ve-publish-dialog') || (typeof S !== 'undefined' && (S.busy || S.completenessPending))) { if (options.cancel) options.cancel(); return; }
@@ -1217,6 +1220,10 @@
         if(S.adapter.renderDock)S.adapter.renderDock();
         if(editHistory)editHistory.refresh();
         if(presence)presence.refresh();
+        if(presence&&!presence.editable()) {
+            btnPrimary.disabled=true;btnSecondary.disabled=true;
+            if(saveDraft)saveDraft.disabled=true;
+        }
     }
     /** Run an async save with the buttons locked and a status message. */
     function run(label, fn) {
@@ -1252,13 +1259,13 @@
             if ((/^Publishing/.test(label) || /^Sending/.test(label)) && drafts && drafts.hasDraft() && !S.adapter.dirtyCount()) await drafts.clear();
             else if (/^Publishing/.test(label) && drafts && drafts.hasDraft() && S.adapter.dirtyCount()) await drafts.save();
             S.publishing = false;
-            if(presence)await presence.release();
+            if(presence && /^(Publishing|Submitting|Sending)/.test(label) && !publicationFailed && (!/^Publishing/.test(label)||(!S.publicationFailed&&!S.adapter.dirtyCount())))await presence.release();
             if (/^Publishing/.test(label) && window.AdminPublish) window.AdminPublish.end();
             S.allowIncomplete = false;
             S.busy = false; chrome();
             if (S.publishReload) { var pendingReload=S.publishReload;S.publishReload=null;if(!S.adapter.dirtyCount())loadFrame(pendingReload.url,pendingReload.keepScroll); }
             if(S.publishNavigation){var navigation=S.publishNavigation;S.publishNavigation=null;reloadEditor(navigation.msg,navigation.route,navigation.preserveSettings);}
-        }).catch(function (e) { if(presence)presence.release(); if (/^Publishing/.test(label) && window.AdminPublish) window.AdminPublish.end(); S.publishNavigation=null; S.publishing = false; S.allowIncomplete = false; S.publishReload=null; S.busy = false; toast(e.message, 'error'); chrome(); });
+        }).catch(function (e) { if (/^Publishing/.test(label) && window.AdminPublish) window.AdminPublish.end(); S.publishNavigation=null; S.publishing = false; S.allowIncomplete = false; S.publishReload=null; S.busy = false; toast(e.message, 'error'); chrome(); });
     }
     function shortcutSave() {
         var draftButton = $('#veSaveDraft');
@@ -1333,7 +1340,9 @@
             else if (el.__vePrev !== undefined) { el.setAttribute('contenteditable', el.__vePrev); delete el.__vePrev; }
         });
     }
-    function setPreview(on) {
+    function setPreview(on, silent) {
+        if(!on&&presence&&!presence.editable()) { presence.acquire(false).catch(function(error){toast(error.message,'error');});return; }
+        if(on&&presence&&presence.editable())presence.release().catch(function(error){toast(error.message,'error');});
         S.preview = !!on;
         select(null); closePop(); applyPreview();
         D.body.classList.toggle('ve-previewing', S.preview);
@@ -1345,7 +1354,7 @@
             btnPreview.appendChild(h('span', { text: S.preview ? 'Back to editing' : 'Preview' }));
             btnPreview.title = S.preview ? 'Go back to editing the page' : 'See the page as visitors see it (no editing outlines)';
         }
-        if (S.preview) toast('Preview: this is how visitors see the page. Press “Back to editing” to continue.', 'ok');
+        if (S.preview && !silent) toast('Preview: this is how visitors see the page. Press “Start editing” to continue.', 'ok');
     }
     if (btnPreview) btnPreview.addEventListener('click', function () { setPreview(!S.preview); });
 
@@ -6781,6 +6790,7 @@
     withImagePositions(S.adapter);
     if(window.GNCEditorPresence)presence=window.GNCEditorPresence.create({
         page:C.page.slug,csrf:C.csrf,dirty:function(){return !!S.adapter.dirtyCount();},
+        notify:toast,access:function(editable){if(S.preview===!editable)return;setPreview(!editable,true);if(S.adapter)chrome();},
         recover:function(){if(drafts&&drafts.supported()&&!S.busy)return run('Saving recovery draft...',function(){return drafts.save(true);});},
         preview:function(){return S.preview;},busy:function(){return S.busy;},publishing:function(){return S.publishing;}
     });
@@ -6811,6 +6821,7 @@
         $('#veRedo').addEventListener('click',editHistory.redo);
     }
     if (window.GNCEditorDrafts) drafts=window.GNCEditorDrafts.create({
+        presence:function(){return presence;},
         reviewing:function(){return !!C.reviewSubmission;},
         page:C.page.slug,adapter:function(){return S.adapter;},document:function(){return S.doc;},
         pending:function(){return S.adapter.dirtyCount();},positions:function(){return imagePositions;},

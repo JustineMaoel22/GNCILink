@@ -3,6 +3,31 @@
 const EDITOR_PRESENCE_TTL = 45;
 const EDITOR_WRITE_LEASE = 120;
 
+/** The existing lease is also the explicit editing reservation. Call under the named lock. */
+function editorPresenceReservation(PDO $db,array $peer): ?array {
+    $q=$db->prepare("SELECT v.lease_owner,p.user_id,u.first_name,u.last_name FROM content_editor_versions v JOIN content_editor_presence p ON p.peer_key=v.lease_owner JOIN users u ON u.user_id=p.user_id AND u.status='active' AND u.credential_version=p.credential_version WHERE v.scope_key=? AND v.lease_until>?");
+    $q->execute([$peer['scope_key'],time()]);$owner=$q->fetch(PDO::FETCH_ASSOC);
+    if(!$owner)return null;
+    return ['name'=>trim($owner['first_name'].' '.$owner['last_name'])?:'Administrator','owned'=>hash_equals($owner['lease_owner'],$peer['peer_key'])];
+}
+function editorPresenceRequireReservation(PDO $db,array $peer): void {
+    $owner=editorPresenceReservation($db,$peer);
+    if(!$owner||!$owner['owned'])throw new RuntimeException('Editing access expired, was released, or was taken over. Your draft is preserved. Start editing again before making changes.',409);
+}
+function editorPresenceAcquire(PDO $db,array $peer,bool $takeover=false): void {
+    editorPresenceLock($db);
+    try {
+        if($takeover&&!rbacIsSuper())throw new RuntimeException('Only Super Admin can take over editing.',403);
+        $owner=editorPresenceReservation($db,$peer);
+        if($owner&&!$owner['owned']) {
+            if(!$takeover)throw new RuntimeException('Currently being edited by '.$owner['name'].'.',409);
+            if(!logActivity((int)$_SESSION['user_id'],'EDITOR_TAKEOVER','content_editor_versions',null,'Took over '.$peer['scope_key'].' from '.$owner['name'].'. Private drafts retained.'))throw new RuntimeException('Could not record the takeover.',503);
+        }
+        // Acquiring never changes the preview/draft baseline.
+        $db->prepare('UPDATE content_editor_versions SET lease_owner=?,lease_until=? WHERE scope_key=?')->execute([$peer['peer_key'],time()+EDITOR_PRESENCE_TTL,$peer['scope_key']]);
+    } finally { editorPresenceUnlock($db); }
+}
+
 function editorPresenceReady(PDO $db): bool {
     try { $db->query('SELECT scope_key FROM content_editor_versions LIMIT 0');$db->query('SELECT peer_key FROM content_editor_presence LIMIT 0');return true; }
     catch (PDOException $e) { if ($e->getCode()==='42S02') return false;throw $e; }
@@ -80,7 +105,7 @@ function editorPresenceSnapshot(PDO $db,array $peer): array {
         $name=trim($row['first_name'].' '.$row['last_name']);
         $users[]=['id'=>(int)$row['user_id'],'name'=>$name?:'Administrator','activity'=>$row['editing']?'editing':'viewing','self'=>(int)$row['user_id']===(int)$_SESSION['user_id'],'avatar'=>$pictures[(int)$row['user_id']]??null];
     }
-    return ['users'=>$users,'stale'=>$stale,'revision'=>(int)$version['revision'],'external'=>(int)$external['revision']];
+    return ['users'=>$users,'stale'=>$stale,'revision'=>(int)$version['revision'],'external'=>(int)$external['revision'],'reservation'=>editorPresenceReservation($db,$peer),'can_takeover'=>rbacIsSuper()];
 }
 function editorPresenceCheck(PDO $db,array $peer): void {
     $version=editorPresenceVersion($db,$peer['scope_key']);$external=editorPresenceVersion($db,'external');
@@ -94,6 +119,7 @@ function editorPresenceCheckSavedVersion(PDO $db,array $saved): void {
 }
 function editorPresenceRelease(PDO $db,array $peer): void {
     $db->prepare('UPDATE content_editor_versions SET lease_owner=NULL,lease_until=0 WHERE lease_owner=?')->execute([$peer['peer_key']]);
+    $db->prepare("UPDATE content_editor_presence SET activity='viewing' WHERE peer_key=?")->execute([$peer['peer_key']]);
 }
 function editorPresenceValidateTarget(array $peer,string $route,array $post): void {
     $features=['alumni-voices'=>'alumni','athletics-sports'=>'athletics-sports','community-activities'=>'community-activities','enrollment-canvas'=>'enrollment-procedures','enrollment-illustrations'=>'enrollment-procedures','faqs'=>'faqs','payment-guide'=>'online-payment-guide','scholarship'=>'scholarships','student-achievements'=>'student-achievements','student-organizations'=>'student-organizations','tuition-fees'=>'tuition-fees'];
@@ -127,8 +153,19 @@ function editorPresenceWriteBoundary(string $route): void {
     $release=true;
     try {
         $peer=$token!==''?editorPresencePeer($db,$token):null;
-        if ($peer) { editorPresenceValidateTarget($peer,$route,$_POST);if(!($draft&&$action==='save_recovery'))editorPresenceCheck($db,$peer); }
+        if($draft&&!$peer)throw new RuntimeException('Start editing in the Content Editor before saving.',409);
+        if ($peer) {
+            editorPresenceValidateTarget($peer,$route,$_POST);
+            // Recovery checkpoints are private and retain their old baseline. They cannot
+            // publish, submit, or overwrite a newer same-account draft revision.
+            if(!($draft&&$action==='save_recovery')) { editorPresenceRequireReservation($db,$peer);editorPresenceCheck($db,$peer); }
+        }
         if(!$peer&&isset($_SESSION['_rbac_worker']['editor_version']))editorPresenceCheckSavedVersion($db,$_SESSION['_rbac_worker']['editor_version']);
+        if(!$peer) {
+            // Omitting a tab token must not bypass the reservation through proposal staging.
+            $q=$db->prepare('SELECT COUNT(*) FROM content_editor_versions WHERE lease_owner IS NOT NULL AND lease_until>?');$q->execute([time()]);
+            if((int)$q->fetchColumn()>0)throw new RuntimeException('Content is reserved by an editor. Finish editing or wait for the reservation to expire before using this tool.',409);
+        }
         $live=!$draft && (rbacIsSuper()||!empty($_SESSION['_rbac_worker']));
         if ($live) {
             $q=$db->prepare('SELECT scope_key FROM content_editor_versions WHERE lease_owner IS NOT NULL AND lease_until>?'.($peer?' AND lease_owner<>?':''));
@@ -138,6 +175,7 @@ function editorPresenceWriteBoundary(string $route): void {
             $leases=$q->fetchAll(PDO::FETCH_COLUMN);
             if (!$peer&&$leases) throw new RuntimeException('Another editor is publishing. Try again in a moment.',409);
             $global=in_array($route,['/admin/action/image-framing-handler.php','/admin/settings.php'],true);
+            if($global&&$leases)throw new RuntimeException('Shared content is reserved by another editor. Finish or wait before saving shared settings.',409);
             $scope=$peer&&!$global?$peer['scope_key']:($route==='/admin/enrollment-steps.php'?'enrollment-procedures':($route==='/admin/action/alumni-voices-handler.php'?'alumni':'external'));
             editorPresenceVersion($db,$scope);
             // Reserve the revision before executing. Invalid/failed writes may conservatively

@@ -3,6 +3,9 @@
 if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
 require_once __DIR__.'/../config/config.php';
 if(!in_array(DB_HOST,['db','localhost','127.0.0.1'],true))throw new RuntimeException('Local tests only.');
+if(($argv[1]??'')==='expire'){
+    getDB()->prepare('UPDATE content_editor_versions SET lease_until=? WHERE lease_owner IN (SELECT peer_key FROM content_editor_presence WHERE session_key=?)')->execute([time()-1,hash('sha256',$argv[2])]);exit;
+}
 if(($argv[1]??'')==='destroy'){
     session_id($argv[2]);session_start();
     getDB()->prepare('UPDATE content_editor_versions SET lease_owner=NULL,lease_until=0 WHERE lease_owner IN (SELECT peer_key FROM content_editor_presence WHERE session_key=?)')->execute([hash('sha256',session_id())]);

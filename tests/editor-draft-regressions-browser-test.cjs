@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const {spawn, spawnSync} = require('node:child_process');
 const docker = args => {
-    const r=spawnSync('docker',['compose','exec','-T','--user','www-data','web','php','cache/activity-log-session.php',...args],{encoding:'utf8',windowsHide:true});
+    const r=spawnSync('docker',['compose','exec','-T','--user','www-data','web','php','tests/editor-presence-session.php',...args],{encoding:'utf8',windowsHide:true});
     if(r.status!==0) throw Error(r.stderr||r.stdout);
     return r.stdout;
 };
@@ -32,6 +32,7 @@ let socket;
 
     await visit('/admin/content-edit.php?page=administration');
     await until(()=>evaluate('Boolean(window.VE?.state.doc)&&!VE.state.busy&&document.getElementById("veLoader").hidden'),'Administration ready');
+    await evaluate('VE.presence().acquire(false)');
     const result=await evaluate(`(async()=>{
         const adapter=VE.state.adapter;
         // Reproduce the empty-map shape returned by PHP, without altering any draft.
@@ -47,6 +48,7 @@ let socket;
     console.log('Restored Administration heading and negative draft IDs survive encoding');
     await visit('/admin/content-edit.php?page=history');
     await until(()=>evaluate('Boolean(window.VE?.state.doc)&&!VE.state.busy&&document.getElementById("veLoader").hidden'),'History ready');
+    await evaluate('VE.presence().acquire(false)');
     await evaluate(`window.__originalFetch=window.fetch;window.__saves=[];
         window.fetch=async function(url,opts){if(String(url).includes('editor-draft-handler')&&opts?.body?.get('action')==='save'){__saves.push(JSON.parse(opts.body.get('snapshot')));return new Response(JSON.stringify({success:true,revision:__saves.length}),{headers:{'Content-Type':'application/json'}});}return __originalFetch.apply(this,arguments);};
         window.__field=Array.from(VE.state.doc.querySelectorAll('[contenteditable]')).find(e=>e.isContentEditable&&e.__ve&&!e.closest('header,footer'));

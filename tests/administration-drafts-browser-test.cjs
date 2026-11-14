@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {spawn,spawnSync}=require('node:child_process');
 const sessions=[];
-function docker(args){const r=spawnSync('docker',['compose','exec','-T','--user','www-data','web','php','cache/activity-log-session.php',...args],{encoding:'utf8',windowsHide:true});if(r.status!==0)throw Error(r.stderr||r.stdout);return r.stdout;}
+function docker(args){const r=spawnSync('docker',['compose','exec','-T','--user','www-data','web','php','tests/editor-presence-session.php',...args],{encoding:'utf8',windowsHide:true});if(r.status!==0)throw Error(r.stderr||r.stdout);return r.stdout;}
 const profile=fs.mkdtempSync(path.join(os.tmpdir(),'gnci-administration-'));
 const browser=spawn(process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
@@ -15,7 +15,8 @@ const original=window.fetch;window.fetch=async function(url,opts){
 const target=String(url),body=opts?.body,action=body?.get?.('action');const reply=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
 if(target.includes('publish-confirmation-handler')){if(action==='end')return reply({success:true});__pw++;return body.get('password')==='qa-correct'?reply({success:true,token:'a'.repeat(64)}):reply({success:false,error:'Incorrect password.'},422);}
 if(target.includes('photo-check-handler')){__checks++;return reply({success:true,checked:true,ok:true,reason:'clear'});}
-if(target.includes('editor-draft-handler')){if(action==='save'){__saves++;if(window.__failDraft)return reply({success:false,error:'Draft storage test failure.'},503);__snap=body.get('snapshot');}if(action==='delete')__snap=null;if(action==='submit_review')__submitted++;if(action==='complete_review')__approved++;return reply({success:true,revision:__snap?1:0,draft:action==='load'&&__snap?{revision:1,snapshot:JSON.parse(__snap)}:null,submission_id:123});}
+if(target.includes('editor-presence-handler')&&action==='resume_draft'){var ping=new URLSearchParams(body);ping.set('action','ping');return original(url,Object.assign({},opts,{body:ping}));}
+if(target.includes('editor-draft-handler')){if(action==='save'){__saves++;if(window.__failDraft)return reply({success:false,error:'Draft storage test failure.'},503);__snap=body.get('snapshot');}if(action==='delete')__snap=null;if(action==='submit_review'){__submitted++;await new Promise(resolve=>setTimeout(resolve,150));}if(action==='complete_review')__approved++;return reply({success:true,revision:__snap?1:0,draft:action==='load'&&__snap?{revision:1,snapshot:JSON.parse(__snap)}:null,submission_id:123});}
 if(target.includes('page-content-handler')&&opts?.method==='POST'){
 __writes.push({action,id:Number(body.get('person_id')||body.get('office_id')),name:body.get('name')||body.get('head_name'),section:body.get('section_key'),photo:body.get('photo')?.size||0,confirmed:new Headers(opts.headers).has('X-GNCI-Publish-Token')});
 if(window.__failName===body.get('name')){window.__failName=null;return reply({success:false,error:'Simulated personnel save failure.'},422);}
@@ -37,7 +38,9 @@ if(injected)await send('Page.removeScriptToEvaluateOnNewDocument',{identifier:in
 injected=await send('Page.addScriptToEvaluateOnNewDocument',{source:intercept(snapshot,review)});
 await send('Page.navigate',{url:'http://localhost:8080/admin/content-edit.php?page=administration&section='+section});
 await until(()=>evaluate(`Boolean(document.getElementById('veFrame')?.contentDocument?.querySelector('[data-ve-add]'))&&document.getElementById('veLoader').hidden`),'Administration editor unavailable');
-await evaluate(`window.AdminDialogs.confirm=async()=>true;window.ContentCompleteness=undefined;window.doc=()=>document.getElementById('veFrame').contentDocument;`);
+await evaluate(`window.__confirmCalls=0;window.AdminDialogs.confirm=async()=>{__confirmCalls++;return true;};window.ContentCompleteness=undefined;window.doc=()=>document.getElementById('veFrame').contentDocument;`);
+await evaluate('VE.presence().acquire(false)');
+if(snapshot&&!review){await evaluate(`Array.from(document.querySelectorAll('dialog button')).find(b=>b.textContent==='Resume saved draft').click()`);await until(()=>evaluate('!document.querySelector("dialog[open]")'),'Draft resume');}
 await delay(500);
 }
 async function open(kind){await evaluate(`doc().querySelector('[data-ve-add="${kind}"]').click()`);await until(()=>evaluate(kind==='office'?`document.getElementById('admOfficeModal').classList.contains('show')&&!bootstrap.Modal.getInstance(document.getElementById('admOfficeModal'))._isTransitioning`:`!document.getElementById('vePop').hidden`),'Add form unavailable');}
@@ -73,7 +76,7 @@ assert.equal(await evaluate(`doc().querySelectorAll('[data-ve-${office?'office':
 await visit(key,snapshot);assert.equal(await evaluate(`doc().querySelectorAll('[data-ve-${office?'office':'person'}^="-"]').length`),1,'Refresh lost draft card');
 assert.equal(await evaluate(`doc().querySelector('[data-ve-${office?'office':'person'}^="-"] ${office?'.hss-badge-title':'[data-ve-field="person-name"]'}').textContent`),'QA '+key,'Refresh overwrote the personnel name');
 await until(()=>evaluate(`(()=>{const img=doc().querySelector('[data-ve-${office?'office':'person'}^="-"] [data-ve-img="${office?'office':'person'}-photo"]'),wrap=img?.closest('.skeleton-wrap');return img?.complete&&img.naturalWidth>0&&Number(doc().defaultView.getComputedStyle(img).opacity)>.99&&(!wrap||wrap.classList.contains('is-loaded'));})()`),'Restored portrait stayed invisible');
-if(role==='Content Editor'){await evaluate(`document.getElementById('vePrimary').click()`);await until(()=>evaluate('__submitted===1'),'Approval snapshot not submitted');assert.equal(await evaluate('__pw'),0);assert.deepEqual(await evaluate('__writes'),[]);if(index===0)reviewSnapshot=await evaluate('__snap');}
+if(role==='Content Editor'){const saves=await evaluate('__saves');await evaluate(`document.getElementById('vePrimary').click();document.getElementById('vePrimary').click()`);await until(()=>evaluate('__submitted===1&&!VE.state.busy'),'Approval snapshot not submitted');assert.equal(await evaluate('__confirmCalls'),1,'Double click opened duplicate approval confirmations');assert.equal(await evaluate('__submitted'),1,'Double click sent duplicate approval requests');assert.equal(await evaluate('__saves'),saves,'Unchanged saved draft was written again before submission');assert.equal(await evaluate('__pw'),0);assert.deepEqual(await evaluate('__writes'),[]);if(index===0)reviewSnapshot=await evaluate('__snap');}
 else {await publish();await password();await until(()=>evaluate('__writes.length===1'),'Personnel publication failed');assert.ok((await evaluate('__writes'))[0].confirmed);assert.ok((await evaluate('__writes'))[0].photo>0);}
 console.log(role+': '+key+' validation, photo, draft restore and publish/approval passed.');
 }
@@ -102,9 +105,14 @@ assert.ok(await evaluate(`(()=>{const intro=doc().querySelector('.admin-section-
 await visit(keys[0],JSON.stringify(legacyLayout));
 await evaluate(`doc().querySelector('a[href*="section=corporate-officers"]').click()`);
 await until(()=>evaluate(`doc().querySelector('[data-ve-grid]')?.getAttribute('data-ve-key')==='corporate-officers'&&document.getElementById('veLoader').hidden`),'Tab switch failed');
+await evaluate(`Array.from(document.querySelectorAll('dialog button')).find(b=>b.textContent==='Resume saved draft').click()`);
+await until(()=>evaluate('!document.querySelector("dialog[open]")&&!VE.state.preview'),'Switched tab draft resume');
 await open('person');await fill('QA second section');await add();
 assert.equal(Object.keys(JSON.parse(await evaluate('__snap')).state.additions).length,2,'Switching sections lost a draft');
 await evaluate(`doc().querySelector('a[href*="section=board-of-trustees"]').click()`);
+await until(()=>evaluate(`doc().querySelector('[data-ve-grid]')?.getAttribute('data-ve-key')==='board-of-trustees'&&document.getElementById('veLoader').hidden`),'Return tab load');
+await evaluate(`Array.from(document.querySelectorAll('dialog button')).find(b=>b.textContent==='Resume saved draft').click()`);
+await until(()=>evaluate('!document.querySelector("dialog[open]")&&!VE.state.preview'),'Returned tab draft resume');
 await until(()=>evaluate(`doc().querySelector('[data-ve-person^="-"]')?.textContent.includes('QA settings')&&document.getElementById('veLoader').hidden`),'Returning to first section lost its draft');
 // A successful insert is removed from pending edits before retrying failed publication.
 await visit(keys[0]);await open('person');await fill('QA first');await add();await open('person');await fill('QA fails once');await add();

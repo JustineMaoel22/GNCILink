@@ -24,11 +24,17 @@ try{
     $server=proc_open(['php','-S','127.0.0.1:'.$port,'-t',$root,__DIR__.'/administration-office-http-router.php'],[0=>['pipe','r'],1=>['file',$log,'a'],2=>['file',$log,'a']],$pipes,$root,array_merge(getenv(),['GNCI_OFFICE_TEST_SCHEMA'=>$schema,'GNCI_OFFICE_TEST_FIELD_LIMIT'=>'1048576']));
     if(!is_resource($server))throw new RuntimeException('Local test server did not start.');fclose($pipes[0]);
     for($end=microtime(true)+5;microtime(true)<$end;){$ready=@fsockopen('127.0.0.1',$port,$errno,$error,.1);if($ready){fclose($ready);break;}usleep(50000);}
-    $request=static function(string $route,?array $fields=null,array $headers=[],bool $authenticated=true)use($base,$cookie):array{
+    $editorPeer='';
+    $request=static function(string $route,?array $fields=null,array $headers=[],bool $authenticated=true)use($base,$cookie,&$editorPeer):array{
+        if($editorPeer!=='')$headers[]='X-GNCI-Editor-Peer: '.$editorPeer;
         $curl=curl_init($base.$route);curl_setopt_array($curl,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>20,CURLOPT_FOLLOWLOCATION=>true,CURLOPT_HTTPHEADER=>array_merge(['Host: localhost'],$headers)]);
         if($authenticated)curl_setopt($curl,CURLOPT_COOKIE,$cookie);if($fields!==null)curl_setopt($curl,CURLOPT_POSTFIELDS,$fields);
         $body=curl_exec($curl);$status=curl_getinfo($curl,CURLINFO_RESPONSE_CODE);if($body===false)throw new RuntimeException('Local HTTP request failed.');curl_close($curl);return [$status,$body,json_decode($body,true)];
     };
+    [$status,,$joined]=$request('/admin/action/editor-presence-handler.php',['csrf_token'=>$csrf,'action'=>'join','page'=>'administration','route'=>'/pages/about/administration.php']);
+    officeHttpCheck($status===200,'Test editor could not join.');$editorPeer=$joined['token'];
+    [$status]=$request('/admin/action/editor-presence-handler.php',['csrf_token'=>$csrf,'action'=>'acquire','token'=>$editorPeer]);
+    officeHttpCheck($status===200,'Test editor could not reserve Administration.');
     $snapshot=['version'=>1,'state'=>['edits'=>['office'=>['-1'=>['file'=>['$draftFile'=>0]]]],'additions'=>['-1'=>['kind'=>'office','section'=>'heads-of-student-services','item'=>['id'=>-1,'name'=>'QA Office Head','office'=>'QA Office']]]],'preview'=>[],'files'=>[['name'=>'portrait.png','type'=>'image/png','data'=>base64_encode(file_get_contents($root.'/assets/images/test-image.png'))]]];
     $draft=['csrf_token'=>$csrf,'page'=>'administration','route'=>'/pages/about/administration.php','revision'=>0];
     [$status,,$reply]=$request('/admin/action/editor-draft-handler.php',array_merge($draft,['action'=>'save','snapshot'=>json_encode($snapshot)]));
@@ -59,6 +65,12 @@ try{
     [$status]=$request('/admin/action/editor-draft-handler.php',$uploaded,[],false);officeHttpCheck(in_array($status,[401,403],true),'Unauthenticated multipart snapshot was accepted.');
     [$status,,$reply]=$request('/admin/action/editor-draft-handler.php',array_merge($draft,['action'=>'load']));
     officeHttpCheck($status===200&&(int)$reply['draft']['revision']===2&&$reply['draft']['snapshot']['files'][0]['data']===$large['files'][0]['data'],'Refused uploads overwrote the previously saved draft.');
+    $reviewFields=array_merge($draft,['action'=>'submit_review','revision'=>2]);
+    [$status,,$firstReview]=$request('/admin/action/editor-draft-handler.php',$reviewFields);
+    officeHttpCheck($status===200&&!empty($firstReview['submission_id'])&&empty($firstReview['already_submitted']),'First snapshot submission failed.');
+    [$status,,$repeatReview]=$request('/admin/action/editor-draft-handler.php',$reviewFields);
+    officeHttpCheck($status===200&&!empty($repeatReview['already_submitted'])&&$repeatReview['submission_id']===$firstReview['submission_id'],'Repeated HTTP submission created another approval.');
+    officeHttpCheck((int)$db->query("SELECT COUNT(*) FROM rbac_submissions WHERE kind='snapshot'")->fetchColumn()===1,'Duplicate snapshot approval stored after repeated HTTP requests.');
     $fields=['action'=>'admin_save_office','csrf_token'=>$csrf,'office_id'=>0,'section_key'=>'heads-of-student-services','office_name'=>'QA HTTP Office','head_name'=>'QA HTTP Head','head_role'=>'Director','phone'=>'045-900-4473 loc. 123','email'=>'office@example.invalid','location'=>'Building A','hours'=>'Monday to Friday','services'=>"Student support\nRecords"];
     [$status]=$request('/admin/action/page-content-handler.php',$fields);
     officeHttpCheck($status===428&&(int)$db->query('SELECT COUNT(*) FROM admin_offices')->fetchColumn()===0,'Publication bypassed password confirmation.');

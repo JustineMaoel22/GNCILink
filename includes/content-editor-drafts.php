@@ -22,6 +22,45 @@ function editorDraftRequestPayload(array $post,array $files): string {
     return $payload;
 }
 
+/** One approval per saved snapshot, including concurrent clicks and network retries. */
+function editorDraftSubmitForReview(PDO $db,int $userId,string $page,string $route,int $revision,int $reviewId=0): array {
+    if($userId!==(int)($_SESSION['user_id']??0)||(!hasPermission('manage_page_content')&&!hasPermission('edit_page_content')))throw new RuntimeException('You cannot submit this draft.',403);
+    $key=$page.':'.$route;$lock='gnci-draft-submit:'.substr(hash('sha256',$userId.':'.$key),0,40);
+    $q=$db->prepare('SELECT GET_LOCK(?,5)');$q->execute([$lock]);
+    if((int)$q->fetchColumn()!==1)throw new RuntimeException('Another submission is finishing. Please try again.',409);
+    try {
+        $draft=editorDraftLoad($db,$userId,$key);
+        if(!$draft||(int)$draft['revision']!==$revision)throw new RuntimeException('Save the latest draft before submitting it.',409);
+        require_once __DIR__.'/editor-presence.php';
+        if(editorPresenceReady($db)) {
+            $identity=editorPresencePage($page,$route);
+            editorPresenceCheckSavedVersion($db,$draft['snapshot']['content_version']??['scope'=>$identity['scope'],'revision'=>0,'external'=>0]);
+        }
+        $resubmit=0;
+        if($reviewId){
+            $old=rbacGetSubmission($reviewId);
+            if(!$old||(int)$old['user_id']!==$userId||$old['kind']!=='snapshot'||$old['route']!=='/admin/content-edit.php')throw new RuntimeException('You cannot revise this submission.',403);
+            $previous=rbacReadPayload($reviewId);
+            if(($previous['page']??'')!==$page||($previous['route']??'')!==$route)throw new RuntimeException('Open the page stored with this submission.',409);
+            if(in_array($old['status'],['draft','rejected','needs_revision','failed'],true))$resubmit=$reviewId;
+        }
+        $fingerprint=hash('sha256',json_encode($draft['snapshot'],JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE));
+        $q=$db->prepare("SELECT submission_id FROM rbac_submissions WHERE user_id=? AND kind='snapshot' AND route='/admin/content-edit.php' AND status<>'draft' AND title=? ORDER BY (status='pending') DESC,submission_id DESC");
+        $q->execute([$userId,'Page changes: '.$page]);
+        foreach($q->fetchAll(PDO::FETCH_COLUMN) as $candidate){
+            if((int)$candidate===$resubmit)continue;
+            $payload=rbacReadPayload((int)$candidate);
+            if(($payload['page']??'')!==$page||($payload['route']??'')!==$route)continue;
+            // Comparing saved content also recognizes submissions made before this fix.
+            if(isset($payload['snapshot'])&&hash_equals($fingerprint,hash('sha256',json_encode($payload['snapshot'],JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE))))return ['submission_id'=>(int)$candidate,'already_submitted'=>true];
+        }
+        $id=rbacSaveSubmission('snapshot','/admin/content-edit.php','Page changes: '.$page,['page'=>$page,'route'=>$route,'snapshot'=>$draft['snapshot']],0,$resubmit);
+        return ['submission_id'=>$id,'already_submitted'=>false];
+    }finally{
+        $db->prepare('SELECT RELEASE_LOCK(?)')->execute([$lock]);
+    }
+}
+
 function editorDraftLoad(PDO $db, int $userId, string $key): ?array {
     $db->beginTransaction();
     try {
