@@ -368,7 +368,7 @@
 }
 
 /* Safari can paint composited portrait/badge layers through a rotated face.
-   Switch visibility at the edge of the flip as well as hiding backfaces.
+   administration.js switches visibility at the actual rotated edge, not on a timer.
    Both faces stay in the grid so the card keeps its height. */
 .hss-face-front { visibility: visible; }
 .hss-face-back { visibility: hidden; }
@@ -618,7 +618,7 @@
     background: #d3a63a;
 }
 
-.hss-face { transition: border-color .15s ease, visibility 0s linear .15s; }
+.hss-face { transition: border-color .15s ease; }
 @media (hover: hover) {
     .admin-photo-card, .hss-flip-card { transition: transform .2s ease; }
     .admin-card-wrap:hover .admin-photo-card,

@@ -1,7 +1,31 @@
 document.querySelectorAll('[data-hss-flip]').forEach(function (card) {
+    const inner = card.querySelector('.hss-flip-card-inner');
+    const front = card.querySelector('.hss-face-front');
+    const back = card.querySelector('.hss-face-back');
+    if (!inner || !front || !back) return;
+    let frame = 0;
+
+    function showFacingSide() {
+        // Follow the rendered rotation, including eased and interrupted flips.
+        // A fixed half-duration delay does not coincide with the edge of an eased flip.
+        const transform = getComputedStyle(inner).transform;
+        const frontFacing = transform === 'none' || new DOMMatrixReadOnly(transform).m11 >= 0;
+        front.style.visibility = frontFacing ? 'visible' : 'hidden';
+        back.style.visibility = frontFacing ? 'hidden' : 'visible';
+    }
+    function followFlip() {
+        showFacingSide();
+        frame = inner.getAnimations().some(function (animation) {
+            return animation.transitionProperty === 'transform' && animation.playState === 'running';
+        }) ? requestAnimationFrame(followFlip) : 0;
+    }
+
+    showFacingSide();
     card.addEventListener('click', function () {
         const isFlipped = card.classList.toggle('is-flipped');
         card.setAttribute('aria-expanded', isFlipped ? 'true' : 'false');
+        showFacingSide();
+        if (!frame) frame = requestAnimationFrame(followFlip);
     });
 });
 

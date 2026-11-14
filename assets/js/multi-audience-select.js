@@ -394,6 +394,7 @@
             const unrestrictedLabel = this.config.allLabel;
             this.config.restrictToItems = true;
             const previousOnChange = departmentSelect.config.onChange;
+            const previousProgramOnChange = this.config.onChange;
             let previousDepartments = departmentSelect.getSelected();
             const refresh = (selectNewDepartments = false) => {
                 const ids = departmentSelect.getSelected();
@@ -416,6 +417,22 @@
             departmentSelect.config.onChange = (values) => {
                 refresh(true);
                 if (typeof previousOnChange === 'function') previousOnChange(values);
+            };
+            this.config.onChange = (values) => {
+                const ids = departmentSelect.getSelected();
+                const selectedPrograms = new Set(values);
+                const availableDepartments = new Set(departmentSelect.config.items.map(item => String(item.value)));
+                const owners = allItems.filter(item => selectedPrograms.has(String(item.value)))
+                    .map(item => String(item.departmentId)).filter(id => availableDepartments.has(id));
+                const nextIds = [...new Set([...ids, ...owners])];
+                if (nextIds.length !== ids.length) {
+                    departmentSelect.setSelected(nextIds, false);
+                    // Update the department baseline before notifying it, so adding an
+                    // owner keeps just the chosen program rather than selecting its siblings.
+                    refresh(false);
+                    departmentSelect.fireChange();
+                }
+                if (typeof previousProgramOnChange === 'function') previousProgramOnChange(this.getSelected());
             };
             refresh();
         }

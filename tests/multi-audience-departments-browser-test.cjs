@@ -39,7 +39,15 @@ async function until(fn, message) {
         window.options=()=>Array.from(document.querySelectorAll('#programs .gnc-ms-checkbox'),cb=>cb.value);`);
     assert.deepEqual(await evaluate('options()'),['A','B','C']);
     assert.equal(await evaluate("getComputedStyle(programs.allCheckbox.closest('label')).display"),'flex');
-    await evaluate("programs.setSelected(['A','B']);depts.setSelected(['1'])");
+    await evaluate("programs.setSelected(['A'])");
+    assert.deepEqual(await evaluate('depts.getSelected()'),['1'],'Choosing one program selects its owning department');
+    assert.deepEqual(await evaluate('programs.getSelected()'),['A'],'Automatic department selection does not add sibling programs');
+    assert.deepEqual(await evaluate("new FormData(document.querySelector('form')).getAll('dept_ids[]')"),['1'],'Owning department is submitted');
+    await evaluate("depts.deselectAll();programs.setSelected(['A','B'])");
+    assert.deepEqual(await evaluate('depts.getSelected()'),['1','2'],'Program-only edit values select every owning department');
+    assert.deepEqual(await evaluate('programs.getSelected()'),['A','B']);
+    await evaluate('depts.deselectAll()');
+    await evaluate("depts.setSelected(['1'])");
     assert.deepEqual(await evaluate('options()'),['A','C']);
     assert.equal(await evaluate("getComputedStyle(programs.allCheckbox.closest('label')).display"),'none');
     assert.equal(await evaluate("getComputedStyle(programs.listEl.querySelector('.gnc-ms-divider')).display"),'none');
