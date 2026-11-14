@@ -28,7 +28,7 @@ $db->exec("INSERT INTO activity_logs(log_id,user_id,action,table_name,descriptio
 foreach(['Super Admin','Content Editor','The Mirror','Content Admin','Office Staff'] as $role){
     $_SESSION=['user_id'=>1,'user_role'=>$role];$d=roleDashboardData($db);$own=rbacRole()==='The Mirror';$super=rbacIsSuper();
     dashCheck(!$d['errors'],'All summaries loaded');
-    dashCheck($d['stats']['total_announcements']===($own?3:5),'Role-scoped announcement count');
+    dashCheck($d['stats']['total_announcements']===($super?5:($own?3:6)),'Role-scoped announcement count');
     dashCheck($d['stats']['total_news']===($own?2:3),'Role-scoped news count');
     dashCheck($d['stats']['published_content']===($own?2:7),'Published count across permitted modules');
     dashCheck($d['stats']['pending_approvals']===($super?5:1),'Approval count includes page text and proposals');
@@ -43,20 +43,21 @@ foreach(['Super Admin','Content Editor','The Mirror','Content Admin','Office Sta
     dashCheck($d['page_pending']===($super?2:null),'Legacy page review visibility');
     if(!$super)dashCheck(!array_intersect([2,3,5],array_column($d['submissions'],'submission_id')),'Other authors proposals never leak');
     if($own)dashCheck(!array_filter($d['recent'],fn($row)=>str_starts_with($row['title'],'Other')||$row['type']==='event'),'Mirror content stays owned');
-    if($own){
-        dashCheck($d['content_counts']['announcement']['draft']===2&&$d['content_counts']['news']['draft']===1,'Mirror counts private proposal drafts alongside its stored drafts');
-        dashCheck(count(array_filter($d['recent'],fn($row)=>!empty($row['_private_draft'])))===2,'Mirror recent content includes its two private article drafts');
-        $tasks=dashboardMirrorNextSteps($d);
-        dashCheck(array_column($tasks,1)===[2,1,1],'Mirror next steps shows draft counts and waiting proposals');
-        dashCheck(array_column($tasks,3)===['/admin/announcement.php?status=draft','/admin/news.php?status=draft','/admin/submissions.php?status=pending'],'Mirror tasks link to existing module filters and submitted proposals');
-    }else dashCheck(!array_filter($d['recent'],fn($row)=>!empty($row['_private_draft'])),'Other dashboard roles do not acquire Mirror private drafts');
+    if(!$super){
+        dashCheck($d['content_counts']['announcement']['draft']===2&&$d['content_counts']['news']['draft']===1,'Author counts include only its own private drafts and stored drafts');
+        dashCheck(count(array_filter($d['recent'],fn($row)=>!empty($row['_private_draft'])))===2,'Author recent content includes its two private article drafts');
+        dashCheck(!array_filter($d['recent'],fn($row)=>!empty($row['_private_draft'])&&(int)$row['author_id']!==1),'Another author private draft is never exposed');
+        $tasks=dashboardAuthorNextSteps($d);
+        dashCheck(array_column($tasks,1)===[2,1,1],'Author next steps shows draft counts and waiting proposals');
+        dashCheck(array_column($tasks,3)===['/admin/announcement.php?status=draft','/admin/news.php?status=draft','/admin/submissions.php?status=pending'],'Author tasks link to existing module filters and submitted proposals');
+    }else dashCheck(!array_filter($d['recent'],fn($row)=>!empty($row['_private_draft'])),'Super Admin dashboard does not expose private drafts');
 }
 dashCheck(str_contains(activityLogDescription(['action'=>'UPDATE','table_name'=>'users','description'=>'password=private-test-value']),'hidden'),'Dashboard descriptions suppress secrets');
 dashCheck(dashboardContentUrl(['type'=>'news','id'=>3])==='/admin/news.php?modal=edit&id=3','Record-specific edit link');
 dashCheck(dashboardContentUrl(['type'=>'event','id'=>3])==='/admin/events.php','Calendar management link');
 dashCheck(dashboardContentUrl(['type'=>'announcement','id'=>8,'_private_draft'=>true])==='/admin/announcement.php?revise=8','Private draft link opens its owner-only editor');
-dashCheck(dashboardMirrorNextSteps(['content_counts'=>[],'stats'=>['pending_approvals'=>2]])[0][1]===2,'Pending-only dashboard no longer displays an empty panel');
-dashCheck(dashboardMirrorNextSteps(['content_counts'=>[],'stats'=>['pending_approvals'=>0]])===[],'Truly empty next steps remains empty');
+dashCheck(dashboardAuthorNextSteps(['content_counts'=>[],'stats'=>['pending_approvals'=>2]])[0][1]===2,'Pending-only dashboard no longer displays an empty panel');
+dashCheck(dashboardAuthorNextSteps(['content_counts'=>[],'stats'=>['pending_approvals'=>0]])===[],'Truly empty next steps remains empty');
 dashCheck(dashTimeAgo('2026-11-04 12:00:00',strtotime('2026-11-04 12:01:00'))==='1 min ago','Relative timestamps');
 dashCheck(dashTimeAgo('2026-11-04 12:00:00',strtotime('2026-11-04 11:00:00'))!=='Just now','Future dates are not labelled just now');
 // Analytics use existing normalization and historical URL grouping.

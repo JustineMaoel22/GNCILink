@@ -8,7 +8,7 @@ function roleDashboardData(?PDO $db=null): array {
     if(hasPermission('manage_events'))$types['events']=['event','event_id','total_events'];
     foreach($types as $table=>[$type,$key,$counter]){
         try{
-            $where=$own?' WHERE c.user_id=?':'';$params=$own?[$id]:[];
+            $where=$own?' WHERE c.user_id=?':(!$super&&$table!=='events'?" WHERE (c.status<>'draft' OR c.user_id=?)":'');$params=$where!==''?[$id]:[];
             // Event dates are school-local wall times, independent of the DB timezone.
             $upcoming=$table==='events'?",COALESCE(SUM(c.status='published' AND c.start_date>=?),0) AS upcoming":'';
             $countParams=$table==='events'?array_merge([dashNow()->format('Y-m-d H:i:s')],$params):$params;
@@ -19,7 +19,7 @@ function roleDashboardData(?PDO $db=null): array {
             $q->execute(array_merge([$type],$params));$recent=array_merge($recent,$q->fetchAll(PDO::FETCH_ASSOC));
         }catch(PDOException $e){$errors['content']='Some content summaries could not be loaded.';error_log('Dashboard content unavailable: '.$type);}
     }
-    if($own){
+    if(!$super&&hasPermission('view_own_submissions')){
         try{
             $routes=['/admin/action/create-announcement.php'=>['announcement','total_announcements'],'/admin/action/create-news.php'=>['news','total_news']];
             $q=$db->prepare("SELECT route,COUNT(*) AS total FROM rbac_submissions WHERE user_id=? AND kind='request' AND status='draft' AND route IN (?,?) GROUP BY route");
@@ -63,8 +63,8 @@ function roleDashboardData(?PDO $db=null): array {
     return ['stats'=>$stats,'recent'=>array_slice($recent,0,6),'submissions'=>$submissions,'submission_counts'=>$submissionCounts,'content_counts'=>$contentCounts,'page_pending'=>$pagePending,'logs'=>$logs,'errors'=>$errors];
 }
 
-/** Mirror's private drafts and waiting proposals are separate dashboard entries. */
-function dashboardMirrorNextSteps(array $data): array {
+/** Authors' private drafts and waiting proposals are separate dashboard entries. */
+function dashboardAuthorNextSteps(array $data): array {
     $tasks=[];
     foreach(['announcement'=>['Announcement drafts','/admin/announcement.php?status=draft'],'news'=>['News drafts','/admin/news.php?status=draft']] as $type=>[$label,$route]){
         $count=$data['content_counts'][$type]['draft']??0;

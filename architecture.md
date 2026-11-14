@@ -57,11 +57,11 @@ lists and notifications exclude drafts. Explicit submission changes `draft` to
 `pending_approval`; existing `pending` requests remain compatible. Published
 records stay unchanged until approval, and stale draft saves are rejected.
 No schema migration is required.
-Mirror's dashboard also reads its own article drafts from the private proposal
-store for totals, recent content and links back to the existing draft filters.
+Mirror and Content Editor dashboards read the signed-in author's article drafts
+from the private proposal store for totals, recent content and links back to the
+existing draft filters. Other authors' unpublished drafts stay hidden.
 Awaiting-review submissions have a separate next-steps link; these summaries do
-not change draft status or create approval requests. Other roles' dashboards keep
-their existing scope.
+not change draft status, published-content permissions or create approval requests.
 
 ## Data and database changes
 

@@ -23,7 +23,7 @@ if($super){
     }
 }else{
     foreach(['needs_revision'=>['Revision requested','Read the feedback and update your proposal.'],'rejected'=>['Rejected proposals','Read the reason before revising or resubmitting.'],'failed'=>['Approval failed','Review the error and check your proposal.'],'uncertain'=>['Needs verification','Check with your Super Admin before another submission.'],'draft'=>['Saved proposal drafts','Continue your draft and submit it when ready.']] as $status=>[$label,$hint])if(($counts[$status]??0)>0)$tasks[]=[$label,$counts[$status],$hint,'/admin/submissions.php?status='.$status,'file-earmark-text'];
-    if($own)$tasks=array_merge($tasks,dashboardMirrorNextSteps($data));
+    $tasks=array_merge($tasks,dashboardAuthorNextSteps($data));
 }
 $actions=[];
 if(hasPermission('create_announcement'))$actions[]=['Create announcement','/admin/announcement.php?modal=create','megaphone'];
